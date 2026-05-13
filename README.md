@@ -37,14 +37,21 @@ cargo run
 
 ## Storage
 
-Data is stored in `~/.tct/boards/` as JSON files. Override with the `TCT_DATA_DIR` environment variable.
+Data is stored as JSON files. Storage location is resolved in this order:
+
+1. `TCT_DATA_DIR` environment variable (if set)
+2. A `.tct/` directory in the current working directory or any of its parents (project-local boards)
+3. `~/.tct/` (global default)
+
+This means you can keep project-specific boards alongside your code by creating a `.tct/` directory in your project root.
 
 ```
-~/.tct/boards/
-  <board-id>/
-    board.json          # Board metadata + list order
-    list-<id>.json      # List name + card ID order
-    card-<id>.json      # Card data (title, description, labels, etc.)
+.tct/  (or ~/.tct/)
+  boards/
+    <board-id>/
+      board.json          # Board metadata + list order
+      list-<id>.json      # List name + card ID order
+      card-<id>.json      # Card data (title, description, labels, etc.)
 ```
 
 All writes are atomic (write to `.tmp`, then rename).
@@ -134,7 +141,7 @@ tct --help                              Show all commands and options
 tct --board <name>                      Open TUI directly on a matching board
 ```
 
-Board, list, card, and label names use **case-insensitive partial matching**. Multiple matches produce an error listing all candidates.
+Board, list, card, and label arguments use **case-insensitive partial name matching** or **ID prefix matching** (IDs are shown in listings as `[xxxxxxxx]`). Multiple matches produce an error listing all candidates.
 
 ### Boards
 

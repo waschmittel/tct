@@ -4,6 +4,19 @@ pub fn base_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("TCT_DATA_DIR") {
         return PathBuf::from(dir);
     }
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut dir = cwd.as_path();
+        loop {
+            let candidate = dir.join(".tct");
+            if candidate.is_dir() {
+                return candidate;
+            }
+            match dir.parent() {
+                Some(parent) => dir = parent,
+                None => break,
+            }
+        }
+    }
     dirs::home_dir()
         .expect("Cannot determine home directory")
         .join(".tct")

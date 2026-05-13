@@ -57,8 +57,14 @@ COMMANDS:
   labels assign <board> <card> <label>  Assign a label to a card
   labels remove <board> <card> <label>  Remove a label from a card
 
-Board, list, card, and label names support case-insensitive partial matching.
+Board, list, card, and label arguments support case-insensitive partial name matching
+or exact/prefix ID matching (IDs are shown in listings as [xxxxxxxx]).
 Multiple matches or zero matches result in an error.
+
+STORAGE:
+    By default data is stored in ~/.tct/. If a .tct/ directory exists in the current
+    working directory or any of its parents, that directory is used instead.
+    Override with the TCT_DATA_DIR environment variable.
 ";
 
 pub fn print_help() {
@@ -111,8 +117,8 @@ fn cmd_boards(args: &[String]) -> anyhow::Result<()> {
             for board in &boards {
                 let (lists, total_cards) = board_summary_counts(&board.id);
                 println!(
-                    "  {:<32} {} lists, {} active cards",
-                    board.name, lists, total_cards
+                    "  [{}]  {:<30} {} lists, {} active cards",
+                    board.id, board.name, lists, total_cards
                 );
             }
         }
@@ -124,7 +130,7 @@ fn cmd_boards(args: &[String]) -> anyhow::Result<()> {
             }
             println!("Archived boards ({}):", boards.len());
             for board in &boards {
-                println!("  {}", board.name);
+                println!("  [{}]  {}", board.id, board.name);
             }
         }
         Some("create") => {
@@ -182,13 +188,13 @@ fn cmd_lists(args: &[String]) -> anyhow::Result<()> {
                     let board = find_board(board_partial)?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
                     let all_cards = load_all_cards(&board.id, &lists);
-                    println!("Board: {}", board.name);
+                    println!("Board: {} [{}]", board.name, board.id);
                     if lists.is_empty() {
                         println!("  (no lists)");
                     } else {
                         for (i, list) in lists.iter().enumerate() {
                             let count = count_active(&list.card_ids, &all_cards);
-                            println!("  {}. {}  ({} active cards)", i + 1, list.name, count);
+                            println!("  {}. [{}]  {}  ({} active cards)", i + 1, list.id, list.name, count);
                         }
                     }
                 }
@@ -248,7 +254,7 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                     let board = find_board(board_partial)?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
                     let all_cards = load_all_cards(&board.id, &lists);
-                    println!("Board: {}", board.name);
+                    println!("Board: {} [{}]", board.name, board.id);
                     for list in &lists {
                         let active: Vec<_> = list
                             .card_ids
@@ -256,7 +262,7 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                             .filter_map(|id| all_cards.get(id))
                             .filter(|c| !c.archived)
                             .collect();
-                        println!("  List: {}  ({} active cards)", list.name, active.len());
+                        println!("  List: {} [{}]  ({} active cards)", list.name, list.id, active.len());
                         for (i, card) in active.iter().enumerate() {
                             print_card_line(i + 1, card, &board.labels);
                         }
@@ -265,10 +271,10 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                 Some("archived") => {
                     let board = find_board(board_partial)?;
                     let archived = card_store::list_archived_cards(&board.id);
-                    println!("Board: {}  (archived cards: {})", board.name, archived.len());
+                    println!("Board: {} [{}]  (archived cards: {})", board.name, board.id, archived.len());
                     for (i, card) in archived.iter().enumerate() {
                         let date = card.updated_at.format("%Y-%m-%d");
-                        println!("  {}. {}  (archived: {})", i + 1, card.title, date);
+                        println!("  {}. [{}]  {}  (archived: {})", i + 1, card.id, card.title, date);
                     }
                 }
                 Some("show") => {
@@ -382,7 +388,7 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                         .filter_map(|id| all_cards.get(id))
                         .filter(|c| !c.archived)
                         .collect();
-                    println!("Board: {}  List: {}  ({} active cards)", board.name, list.name, active.len());
+                    println!("Board: {} [{}]  List: {} [{}]  ({} active cards)", board.name, board.id, list.name, list.id, active.len());
                     for (i, card) in active.iter().enumerate() {
                         print_card_line(i + 1, card, &board.labels);
                     }
@@ -472,12 +478,12 @@ fn cmd_labels(args: &[String]) -> anyhow::Result<()> {
     match sub {
         None => {
             let board = find_board(board_partial)?;
-            println!("Board: {}  Labels ({}):", board.name, board.labels.len());
+            println!("Board: {} [{}]  Labels ({}):", board.name, board.id, board.labels.len());
             if board.labels.is_empty() {
                 println!("  (no labels)");
             } else {
                 for label in &board.labels {
-                    println!("  {} [{}]", label.name, label_color_name(&label.color));
+                    println!("  [{}]  {}  ({})", label.id, label.name, label_color_name(&label.color));
                 }
             }
         }
@@ -554,15 +560,22 @@ fn cmd_labels(args: &[String]) -> anyhow::Result<()> {
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
 
+fn id_matches(id: &str, partial: &str) -> bool {
+    id.starts_with(partial)
+}
+
 fn find_board(partial: &str) -> anyhow::Result<BoardMeta> {
     let boards = board_store::list_boards()?;
     let q = partial.to_lowercase();
-    let matches: Vec<_> = boards.into_iter().filter(|b| b.name.to_lowercase().contains(&q)).collect();
+    let matches: Vec<_> = boards
+        .into_iter()
+        .filter(|b| id_matches(&b.id, partial) || b.name.to_lowercase().contains(&q))
+        .collect();
     match matches.len() {
         0 => bail!("No active board matches '{partial}'."),
         1 => Ok(matches.into_iter().next().unwrap()),
         _ => {
-            let names: Vec<_> = matches.iter().map(|b| b.name.as_str()).collect();
+            let names: Vec<_> = matches.iter().map(|b| format!("{} [{}]", b.name, b.id)).collect();
             bail!("Multiple boards match '{partial}': {}.", names.join(", "))
         }
     }
@@ -571,12 +584,15 @@ fn find_board(partial: &str) -> anyhow::Result<BoardMeta> {
 fn find_archived_board(partial: &str) -> anyhow::Result<BoardMeta> {
     let boards = board_store::list_archived_boards()?;
     let q = partial.to_lowercase();
-    let matches: Vec<_> = boards.into_iter().filter(|b| b.name.to_lowercase().contains(&q)).collect();
+    let matches: Vec<_> = boards
+        .into_iter()
+        .filter(|b| id_matches(&b.id, partial) || b.name.to_lowercase().contains(&q))
+        .collect();
     match matches.len() {
         0 => bail!("No archived board matches '{partial}'."),
         1 => Ok(matches.into_iter().next().unwrap()),
         _ => {
-            let names: Vec<_> = matches.iter().map(|b| b.name.as_str()).collect();
+            let names: Vec<_> = matches.iter().map(|b| format!("{} [{}]", b.name, b.id)).collect();
             bail!("Multiple archived boards match '{partial}': {}.", names.join(", "))
         }
     }
@@ -584,12 +600,15 @@ fn find_archived_board(partial: &str) -> anyhow::Result<BoardMeta> {
 
 fn find_list<'a>(lists: &'a [CardList], partial: &str) -> anyhow::Result<&'a CardList> {
     let q = partial.to_lowercase();
-    let matches: Vec<_> = lists.iter().filter(|l| l.name.to_lowercase().contains(&q)).collect();
+    let matches: Vec<_> = lists
+        .iter()
+        .filter(|l| id_matches(&l.id, partial) || l.name.to_lowercase().contains(&q))
+        .collect();
     match matches.len() {
         0 => bail!("No list matches '{partial}'."),
         1 => Ok(matches.into_iter().next().unwrap()),
         _ => {
-            let names: Vec<_> = matches.iter().map(|l| l.name.as_str()).collect();
+            let names: Vec<_> = matches.iter().map(|l| format!("{} [{}]", l.name, l.id)).collect();
             bail!("Multiple lists match '{partial}': {}.", names.join(", "))
         }
     }
@@ -606,7 +625,9 @@ fn find_card_in_lists(
     for list in lists {
         for card_id in &list.card_ids {
             if let Some(card) = all_cards.get(card_id) {
-                if (include_archived || !card.archived) && card.title.to_lowercase().contains(&q) {
+                if (include_archived || !card.archived)
+                    && (id_matches(&card.id, partial) || card.title.to_lowercase().contains(&q))
+                {
                     matches.push((list.clone(), card.clone()));
                 }
             }
@@ -616,7 +637,7 @@ fn find_card_in_lists(
         0 => bail!("No card matches '{partial}'."),
         1 => Ok(matches.into_iter().next().unwrap()),
         _ => {
-            let names: Vec<_> = matches.iter().map(|(_, c)| c.title.as_str()).collect();
+            let names: Vec<_> = matches.iter().map(|(_, c)| format!("{} [{}]", c.title, c.id)).collect();
             bail!("Multiple cards match '{partial}': {}.", names.join(", "))
         }
     }
@@ -625,12 +646,15 @@ fn find_card_in_lists(
 fn find_archived_card(board_id: &str, partial: &str) -> anyhow::Result<Card> {
     let cards = card_store::list_archived_cards(board_id);
     let q = partial.to_lowercase();
-    let matches: Vec<_> = cards.into_iter().filter(|c| c.title.to_lowercase().contains(&q)).collect();
+    let matches: Vec<_> = cards
+        .into_iter()
+        .filter(|c| id_matches(&c.id, partial) || c.title.to_lowercase().contains(&q))
+        .collect();
     match matches.len() {
         0 => bail!("No archived card matches '{partial}'."),
         1 => Ok(matches.into_iter().next().unwrap()),
         _ => {
-            let names: Vec<_> = matches.iter().map(|c| c.title.as_str()).collect();
+            let names: Vec<_> = matches.iter().map(|c| format!("{} [{}]", c.title, c.id)).collect();
             bail!("Multiple archived cards match '{partial}': {}.", names.join(", "))
         }
     }
@@ -638,12 +662,15 @@ fn find_archived_card(board_id: &str, partial: &str) -> anyhow::Result<Card> {
 
 fn find_label<'a>(labels: &'a [Label], partial: &str) -> anyhow::Result<&'a Label> {
     let q = partial.to_lowercase();
-    let matches: Vec<_> = labels.iter().filter(|l| l.name.to_lowercase().contains(&q)).collect();
+    let matches: Vec<_> = labels
+        .iter()
+        .filter(|l| id_matches(&l.id, partial) || l.name.to_lowercase().contains(&q))
+        .collect();
     match matches.len() {
         0 => bail!("No label matches '{partial}'."),
         1 => Ok(matches.into_iter().next().unwrap()),
         _ => {
-            let names: Vec<_> = matches.iter().map(|l| l.name.as_str()).collect();
+            let names: Vec<_> = matches.iter().map(|l| format!("{} [{}]", l.name, l.id)).collect();
             bail!("Multiple labels match '{partial}': {}.", names.join(", "))
         }
     }
@@ -717,13 +744,13 @@ fn print_card_line(idx: usize, card: &Card, labels: &[Label]) {
         None => String::new(),
         Some((done, total)) => format!("  checklist: {done}/{total}"),
     };
-    println!("    {idx}. {}{label_str}{due_str}{checklist_str}", card.title);
+    println!("    {idx}. [{}]  {}{label_str}{due_str}{checklist_str}", card.id, card.title);
 }
 
 fn print_card_detail(card: &Card, board: &BoardMeta, list: &CardList) {
-    println!("Card:        {}", card.title);
-    println!("Board:       {}", board.name);
-    println!("List:        {}", list.name);
+    println!("Card:        {} [{}]", card.title, card.id);
+    println!("Board:       {} [{}]", board.name, board.id);
+    println!("List:        {} [{}]", list.name, list.id);
 
     let label_names: Vec<_> = card
         .resolved_labels(&board.labels)
