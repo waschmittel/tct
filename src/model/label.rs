@@ -35,6 +35,12 @@ pub enum LabelColor {
     Custom { r: u8, g: u8, b: u8 },
 }
 
+impl Default for LabelColor {
+    fn default() -> Self {
+        Self::Cyan
+    }
+}
+
 impl LabelColor {
     pub fn to_ratatui_color(self) -> Color {
         match self {

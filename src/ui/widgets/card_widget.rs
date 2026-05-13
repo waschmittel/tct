@@ -15,6 +15,7 @@ pub fn render(
     dimmed: bool,
     grabbed: bool,
     board_labels: &[Label],
+    accent: Color,
 ) {
     if area.height < 2 {
         return;
@@ -33,7 +34,7 @@ pub fn render(
     let border_style = if grabbed {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else if selected {
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        Style::default().fg(accent).add_modifier(Modifier::BOLD)
     } else if dimmed {
         Style::default().fg(Color::DarkGray)
     } else {

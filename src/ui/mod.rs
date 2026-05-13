@@ -86,6 +86,14 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
     frame.render_widget(block, popup);
 
     let help_text = vec![
+        Line::from(Span::styled("Board Selector", Style::default().fg(Color::Cyan))),
+        Line::raw("  j/k            Navigate boards"),
+        Line::raw("  Enter          Open board"),
+        Line::raw("  n              New board"),
+        Line::raw("  c              Cycle board accent color"),
+        Line::raw("  d              Delete board"),
+        Line::raw("  q              Quit"),
+        Line::raw(""),
         Line::from(Span::styled("Board View", Style::default().fg(Color::Cyan))),
         Line::raw("  h/l or Left/Right  Switch lists"),
         Line::raw("  j/k or Down/Up     Navigate cards"),

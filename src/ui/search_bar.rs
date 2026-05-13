@@ -1,5 +1,5 @@
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
 use ratatui::Frame;
@@ -12,7 +12,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Clear, bar_area);
 
     let line = Line::from(vec![
-        Span::styled(" /", Style::default().fg(Color::Cyan)),
+        Span::styled(" /", Style::default().fg(app.accent_color())),
         Span::raw(&app.search_query),
     ]);
     frame.render_widget(Paragraph::new(line), bar_area);

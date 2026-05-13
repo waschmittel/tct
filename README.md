@@ -19,6 +19,7 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 - Undo/redo in description editor
 - macOS Cmd key support (in supported terminals)
 - Auto-continuing lists in editor
+- Per-board configurable accent color (pastel palette, cycle with 'c')
 - Periodic filesystem reload (every 15s) for background sync support
 
 ## Installation
@@ -56,6 +57,7 @@ All writes are atomic (write to `.tmp`, then rename).
 | j/k | Navigate boards |
 | Enter | Open board |
 | n | New board |
+| c | Cycle board accent color |
 | d | Delete board |
 | q | Quit |
 

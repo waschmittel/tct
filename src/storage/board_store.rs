@@ -48,6 +48,7 @@ pub fn save_board(meta: &BoardMeta) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 pub fn create_board(name: String) -> Result<BoardMeta> {
     let meta = BoardMeta::new(name);
     save_board(&meta)?;

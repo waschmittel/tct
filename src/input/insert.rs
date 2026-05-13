@@ -269,7 +269,12 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
 
     match target {
         InsertTarget::NewBoardName => {
-            board_store::create_board(text.clone())?;
+            let existing_colors: Vec<_> =
+                app.boards.iter().map(|b| b.accent_color).collect();
+            let mut meta = crate::model::board::BoardMeta::new(text.clone());
+            meta.accent_color =
+                crate::model::label::LabelColor::generate_pastel(&existing_colors);
+            board_store::save_board(&meta)?;
             app.reload_boards()?;
             app.set_status(format!("Created board '{text}'"));
             app.mode = AppMode::BoardSelector;

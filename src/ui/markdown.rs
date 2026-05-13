@@ -1,7 +1,7 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
-pub fn highlight_lines(text: &str) -> Vec<Line<'static>> {
+pub fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     let mut in_code_block = false;
 
@@ -23,13 +23,13 @@ pub fn highlight_lines(text: &str) -> Vec<Line<'static>> {
             continue;
         }
 
-        lines.push(Line::from(highlight_line(line)));
+        lines.push(Line::from(highlight_line(line, accent)));
     }
 
     lines
 }
 
-pub fn highlight_line(line: &str) -> Vec<Span<'static>> {
+pub fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
     let mut spans = Vec::new();
     let owned = line.to_string();
 
@@ -42,7 +42,7 @@ pub fn highlight_line(line: &str) -> Vec<Span<'static>> {
         spans.push(Span::styled("# ".to_string(), Style::default().fg(Color::DarkGray)));
         spans.push(Span::styled(
             stripped.to_string(),
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
         ));
         return spans;
     }
@@ -51,7 +51,7 @@ pub fn highlight_line(line: &str) -> Vec<Span<'static>> {
             spans.push(Span::styled(prefix.to_string(), Style::default().fg(Color::DarkGray)));
             spans.push(Span::styled(
                 stripped.to_string(),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
             ));
             return spans;
         }
@@ -72,7 +72,7 @@ pub fn highlight_line(line: &str) -> Vec<Span<'static>> {
 
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
         spans.push(Span::raw(indent_str));
-        spans.push(Span::styled(trimmed[..2].to_string(), Style::default().fg(Color::Cyan)));
+        spans.push(Span::styled(trimmed[..2].to_string(), Style::default().fg(accent)));
         highlight_inline(&trimmed[2..], &mut spans);
         return spans;
     }
@@ -83,7 +83,7 @@ pub fn highlight_line(line: &str) -> Vec<Span<'static>> {
             spans.push(Span::raw(indent_str));
             spans.push(Span::styled(
                 trimmed[..dot_pos + 2].to_string(),
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(accent),
             ));
             highlight_inline(&trimmed[dot_pos + 2..], &mut spans);
             return spans;
@@ -201,19 +201,19 @@ mod tests {
 
     #[test]
     fn test_highlight_lines_code_block() {
-        let lines = highlight_lines("```\nfn main() {}\n```");
+        let lines = highlight_lines("```\nfn main() {}\n```", Color::Cyan);
         assert_eq!(lines.len(), 3);
     }
 
     #[test]
     fn test_highlight_lines_heading() {
-        let lines = highlight_lines("# Hello");
+        let lines = highlight_lines("# Hello", Color::Cyan);
         assert!(!lines.is_empty());
     }
 
     #[test]
     fn test_highlight_line_bold() {
-        let spans = highlight_line("this is **bold** text");
+        let spans = highlight_line("this is **bold** text", Color::Cyan);
         assert!(!spans.is_empty());
     }
 

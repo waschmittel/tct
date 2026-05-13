@@ -23,14 +23,16 @@ pub fn render(
         None => return,
     };
 
+    let accent = app.accent_color();
+
     let border_style = if is_selected {
-        Style::default().fg(Color::Cyan)
+        Style::default().fg(accent)
     } else {
         Style::default().fg(Color::DarkGray)
     };
 
     let title_style = if is_selected {
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        Style::default().fg(accent).add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
@@ -161,7 +163,7 @@ pub fn render(
                 .map(|g| g == card_id)
                 .unwrap_or(false);
 
-            card_widget::render(frame, card_area, card, is_card_selected, dimmed, grabbed, &board.meta.labels);
+            card_widget::render(frame, card_area, card, is_card_selected, dimmed, grabbed, &board.meta.labels, accent);
         }
     }
 

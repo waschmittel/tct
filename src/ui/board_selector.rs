@@ -34,10 +34,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             .iter()
             .enumerate()
             .map(|(i, b)| {
+                let board_color = b.accent_color.to_ratatui_color();
                 let style = if i == app.selected_board_idx {
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                    Style::default().fg(board_color).add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default()
+                    Style::default().fg(board_color)
                 };
                 let prefix = if i == app.selected_board_idx { ">" } else { " " };
                 ListItem::new(Line::from(Span::styled(

@@ -21,12 +21,14 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     ])
     .split(area);
 
+    let accent = app.accent_color();
+
     // Title bar
     let mut title_spans = vec![
         Span::styled(
             format!(" {} ", board.meta.name),
             Style::default()
-                .fg(Color::Cyan)
+                .fg(accent)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
@@ -64,7 +66,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if board.lists.is_empty() {
         let empty = Paragraph::new(Line::from(vec![
             Span::styled("  No lists. Press ", Style::default().fg(Color::DarkGray)),
-            Span::styled("N", Style::default().fg(Color::Cyan)),
+            Span::styled("N", Style::default().fg(accent)),
             Span::styled(" to create one.", Style::default().fg(Color::DarkGray)),
         ]));
         frame.render_widget(empty, chunks[1]);
@@ -84,10 +86,10 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // Inline title editing overlay (for new card / new list / rename)
     match &app.mode {
         AppMode::Insert(InsertTarget::NewCardTitle) => {
-            render_input_overlay(frame, area, "New Card", &app.input_buffer, app.input_cursor);
+            render_input_overlay(frame, area, "New Card", &app.input_buffer, app.input_cursor, accent);
         }
         AppMode::Insert(InsertTarget::NewListName) => {
-            render_input_overlay(frame, area, "New List", &app.input_buffer, app.input_cursor);
+            render_input_overlay(frame, area, "New List", &app.input_buffer, app.input_cursor, accent);
         }
         AppMode::Insert(InsertTarget::EditCardTitleInline) => {
             render_input_overlay(
@@ -96,6 +98,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 "Edit Card Title",
                 &app.input_buffer,
                 app.input_cursor,
+                accent,
             );
         }
         AppMode::Insert(InsertTarget::RenameList) => {
@@ -105,10 +108,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 "Rename List",
                 &app.input_buffer,
                 app.input_cursor,
+                accent,
             );
         }
         AppMode::Insert(InsertTarget::NewLabelName) => {
-            render_input_overlay(frame, area, "New Label", &app.input_buffer, app.input_cursor);
+            render_input_overlay(frame, area, "New Label", &app.input_buffer, app.input_cursor, accent);
         }
         AppMode::Insert(InsertTarget::EditLabelName) => {
             render_input_overlay(
@@ -117,6 +121,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 "Rename Label",
                 &app.input_buffer,
                 app.input_cursor,
+                accent,
             );
         }
         _ => {}
@@ -132,6 +137,7 @@ fn render_input_overlay(
     title: &str,
     input: &str,
     cursor: usize,
+    accent: Color,
 ) {
     let width = 50u16.min(area.width.saturating_sub(4));
     let height = 5u16;
@@ -144,7 +150,7 @@ fn render_input_overlay(
     let block = ratatui::widgets::Block::default()
         .title(format!(" {title} "))
         .borders(ratatui::widgets::Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(accent));
     let inner = block.inner(dialog_area);
     frame.render_widget(block, dialog_area);
 

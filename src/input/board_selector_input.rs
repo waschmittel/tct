@@ -1,6 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::app::{App, AppMode, DialogKind, InsertTarget};
+use crate::storage::board_store;
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
@@ -23,6 +24,13 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
         KeyCode::Char('n') => {
             app.start_insert(InsertTarget::NewBoardName);
+        }
+        KeyCode::Char('c') => {
+            if let Some(board) = app.boards.get_mut(app.selected_board_idx) {
+                board.accent_color = board.accent_color.next();
+                board_store::save_board(board)?;
+                app.set_status("Board color changed".into());
+            }
         }
         KeyCode::Char('d') => {
             if !app.boards.is_empty() {

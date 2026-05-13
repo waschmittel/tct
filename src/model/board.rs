@@ -2,7 +2,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use super::ids::{self, ShortId};
-use super::label::Label;
+use super::label::{Label, LabelColor};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoardMeta {
@@ -12,6 +12,8 @@ pub struct BoardMeta {
     pub list_order: Vec<ShortId>,
     #[serde(default)]
     pub labels: Vec<Label>,
+    #[serde(default)]
+    pub accent_color: LabelColor,
     pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
 }
@@ -25,6 +27,7 @@ impl BoardMeta {
             description: String::new(),
             list_order: Vec::new(),
             labels: Vec::new(),
+            accent_color: LabelColor::default(),
             created_at: now,
             updated_at: now,
         }

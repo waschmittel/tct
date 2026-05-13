@@ -18,6 +18,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         None => return,
     };
 
+    let accent = app.accent_color();
+
     let width = (area.width * 80 / 100).max(40).min(area.width.saturating_sub(2));
     let height = (area.height * 80 / 100).max(20).min(area.height.saturating_sub(2));
     let x = (area.width.saturating_sub(width)) / 2;
@@ -34,28 +36,28 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         vec![
             Span::styled(" Ctrl+S", Style::default().fg(Color::Yellow)),
             Span::raw(":save  "),
-            Span::styled("Esc", Style::default().fg(Color::Cyan)),
+            Span::styled("Esc", Style::default().fg(accent)),
             Span::raw(":cancel  "),
-            Span::styled("Ctrl+B/I/K", Style::default().fg(Color::Cyan)),
+            Span::styled("Ctrl+B/I/K", Style::default().fg(accent)),
             Span::raw(":format  "),
-            Span::styled("Ctrl+L", Style::default().fg(Color::Cyan)),
+            Span::styled("Ctrl+L", Style::default().fg(accent)),
             Span::raw(":list "),
         ]
     } else {
         vec![
-            Span::styled(" Esc", Style::default().fg(Color::Cyan)),
+            Span::styled(" Esc", Style::default().fg(accent)),
             Span::raw(":close  "),
-            Span::styled("t", Style::default().fg(Color::Cyan)),
+            Span::styled("t", Style::default().fg(accent)),
             Span::raw(":title  "),
-            Span::styled("e", Style::default().fg(Color::Cyan)),
+            Span::styled("e", Style::default().fg(accent)),
             Span::raw(":desc  "),
-            Span::styled("u", Style::default().fg(Color::Cyan)),
+            Span::styled("u", Style::default().fg(accent)),
             Span::raw(":due  "),
-            Span::styled("l", Style::default().fg(Color::Cyan)),
+            Span::styled("l", Style::default().fg(accent)),
             Span::raw(":labels  "),
-            Span::styled("a", Style::default().fg(Color::Cyan)),
+            Span::styled("a", Style::default().fg(accent)),
             Span::raw(":add  "),
-            Span::styled("Space", Style::default().fg(Color::Cyan)),
+            Span::styled("Space", Style::default().fg(accent)),
             Span::raw(":toggle "),
         ]
     };
@@ -64,7 +66,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .title(title_display)
         .title_bottom(Line::from(bottom_hints))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(accent));
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
@@ -75,7 +77,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // If editing description, render the editor instead
     if is_editing_desc {
         if let Some(textarea) = &app.description_editor {
-            render_description_editor(frame, inner, textarea, app.editor_scroll);
+            render_description_editor(frame, inner, textarea, app.editor_scroll, accent);
         }
         return;
     }
@@ -86,7 +88,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // --- Description Section ---
     lines.push(Line::from(Span::styled(
         "Description",
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        Style::default().fg(accent).add_modifier(Modifier::BOLD),
     )));
     if card.description.is_empty() {
         lines.push(Line::from(Span::styled(
@@ -94,7 +96,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(Color::DarkGray),
         )));
     } else {
-        let desc_lines = markdown::highlight_lines(&card.description);
+        let desc_lines = markdown::highlight_lines(&card.description, accent);
         for dl in desc_lines {
             lines.push(dl);
         }
@@ -110,12 +112,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if total > 0 {
         lines.push(Line::from(Span::styled(
             format!("Checklist [{done}/{total}]"),
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
         )));
     } else {
         lines.push(Line::from(Span::styled(
             "Checklist",
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
         )));
     }
 
@@ -130,7 +132,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             let check = if item.completed { "✓" } else { " " };
             let style = if is_active {
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(accent)
                     .add_modifier(Modifier::BOLD)
             } else if item.completed {
                 Style::default().fg(Color::Green)
@@ -153,7 +155,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // --- Labels Section ---
     lines.push(Line::from(Span::styled(
         "Labels",
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        Style::default().fg(accent).add_modifier(Modifier::BOLD),
     )));
 
     let resolved = card.resolved_labels(&board.meta.labels);
@@ -181,7 +183,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // --- Due Date Section ---
     lines.push(Line::from(Span::styled(
         "Due Date",
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        Style::default().fg(accent).add_modifier(Modifier::BOLD),
     )));
 
     if let Some(due) = card.due_date {
@@ -243,6 +245,7 @@ fn render_description_editor(
     area: Rect,
     textarea: &ratatui_textarea::TextArea<'static>,
     editor_scroll: usize,
+    accent: Color,
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
@@ -265,7 +268,7 @@ fn render_description_editor(
 
     for (vi, li) in (start..end).enumerate() {
         let line_text = &lines[li];
-        let highlighted = markdown::highlight_line(line_text);
+        let highlighted = markdown::highlight_line(line_text, accent);
 
         let y = inner.y + vi as u16;
         let line_area = Rect::new(inner.x, y, inner.width, 1);

@@ -107,6 +107,10 @@ fn render_confirm(frame: &mut Frame, area: Rect, title: &str, message: &str) {
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
+fn accent(app: &App) -> Color {
+    app.accent_color()
+}
+
 fn render_archived_cards(frame: &mut Frame, area: Rect, app: &App) {
     let height = (app.archived_cards.len() as u16 + 4).min(area.height.saturating_sub(4)).max(6);
     let width = 50u16.min(area.width.saturating_sub(4));
@@ -137,7 +141,7 @@ fn render_archived_cards(frame: &mut Frame, area: Rect, app: &App) {
         let prefix = if is_selected { "» " } else { "  " };
         let date = card.updated_at.format("%Y-%m-%d");
         let style = if is_selected {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default().fg(accent(app)).add_modifier(Modifier::BOLD)
         } else {
             Style::default()
         };
@@ -174,7 +178,7 @@ fn render_label_picker(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(" Labels (Space/Enter:toggle, Esc:back) ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
+        .border_style(Style::default().fg(accent(app)));
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
@@ -238,15 +242,15 @@ fn render_label_manager(frame: &mut Frame, area: Rect, app: &App) {
     let block = Block::default()
         .title(" Label Manager ")
         .title_bottom(Line::from(vec![
-            Span::styled(" n", Style::default().fg(Color::Cyan)),
+            Span::styled(" n", Style::default().fg(accent(app))),
             Span::raw(":new  "),
-            Span::styled("e", Style::default().fg(Color::Cyan)),
+            Span::styled("e", Style::default().fg(accent(app))),
             Span::raw(":rename  "),
-            Span::styled("c", Style::default().fg(Color::Cyan)),
+            Span::styled("c", Style::default().fg(accent(app))),
             Span::raw(":color  "),
-            Span::styled("x", Style::default().fg(Color::Cyan)),
+            Span::styled("x", Style::default().fg(accent(app))),
             Span::raw(":delete  "),
-            Span::styled("Esc", Style::default().fg(Color::Cyan)),
+            Span::styled("Esc", Style::default().fg(accent(app))),
             Span::raw(":close "),
         ]))
         .borders(Borders::ALL)

@@ -319,6 +319,15 @@ impl App {
     }
 }
 
+impl App {
+    pub fn accent_color(&self) -> Color {
+        self.board
+            .as_ref()
+            .map(|b| b.meta.accent_color.to_ratatui_color())
+            .unwrap_or(Color::Cyan)
+    }
+}
+
 fn migrate_labels(meta: &mut BoardMeta, cards: &mut HashMap<ShortId, Card>) {
     if !meta.labels.is_empty() {
         return;

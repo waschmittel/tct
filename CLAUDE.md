@@ -16,10 +16,17 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 - **Description editing**: Uses `ratatui-textarea` TextArea for editing, custom renderer in `card_detail.rs::render_description_editor()` for syntax highlighting via `markdown::highlight_line()`.
 - **Markdown rendering**: Hand-rolled line-level highlighter for editor (`markdown::highlight_line()`).
 - **Label colors**: `LabelColor` enum with named pastel variants + `Custom { r, g, b }`. New labels get auto-generated pastel colors via `LabelColor::generate_pastel()` which picks maximally distant hue from existing labels.
+- **Board accent color**: Each board has an `accent_color: LabelColor` field in `BoardMeta`. All UI highlight/accent colors use `app.accent_color()` instead of hardcoded `Color::Cyan`. New boards auto-get a differentiated pastel color. Users cycle with 'c' in board selector. Help overlay keeps structural Cyan.
 - **Search**: When active, non-matching cards are hidden (not just dimmed). Navigation skips hidden cards. First match auto-selected on search confirm.
 - **Periodic reload**: `App::on_tick()` reloads board from filesystem every 15s (configurable via `reload_interval`). Skipped during editing/dialog/grab modes. Preserves selection state.
 
 ## How to Add Things
+
+### New keybinding in board selector
+1. Add match arm in `input/board_selector_input.rs`
+2. Update status bar hints in `ui/status_bar.rs`
+3. Update help text in `ui/mod.rs::render_help()`
+4. Update README.md keybindings table
 
 ### New keybinding in board view
 1. Add match arm in `input/normal.rs`
