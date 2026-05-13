@@ -38,7 +38,7 @@ fn run_app(
 
 #[cfg(test)]
 mod tests {
-    use crate::model::card::{Card, Checklist, ChecklistItem};
+    use crate::model::card::{Card, ChecklistItem};
     use crate::model::label::{Label, LabelColor};
     use crate::model::list::CardList;
     use crate::storage::{board_store, card_store, list_store};
@@ -92,27 +92,22 @@ mod tests {
     fn card_roundtrip() {
         with_temp_dir(|| {
             let board = board_store::create_board("Board".into()).unwrap();
+            let label = Label::new("BUG".into(), LabelColor::Red);
+            let label_id = label.id.clone();
             let mut card = Card::new("Fix bug".into());
             card.description = "Important fix".into();
-            card.labels.push(Label {
-                name: "BUG".into(),
-                color: LabelColor::Red,
-            });
-            card.checklists.push(Checklist {
-                title: "Steps".into(),
-                items: vec![
-                    ChecklistItem { text: "Reproduce".into(), completed: true },
-                    ChecklistItem { text: "Fix".into(), completed: false },
-                ],
-            });
+            card.label_ids.push(label_id.clone());
+            card.checklist.push(ChecklistItem { text: "Reproduce".into(), completed: true });
+            card.checklist.push(ChecklistItem { text: "Fix".into(), completed: false });
 
             card_store::save_card(&board.id, &card).unwrap();
             let loaded = card_store::load_card(&board.id, &card.id).unwrap();
             assert_eq!(loaded.title, "Fix bug");
             assert_eq!(loaded.description, "Important fix");
-            assert_eq!(loaded.labels.len(), 1);
-            assert_eq!(loaded.checklists[0].items.len(), 2);
-            assert!(loaded.checklists[0].items[0].completed);
+            assert_eq!(loaded.label_ids.len(), 1);
+            assert_eq!(loaded.label_ids[0], label_id);
+            assert_eq!(loaded.checklist.len(), 2);
+            assert!(loaded.checklist[0].completed);
         });
     }
 

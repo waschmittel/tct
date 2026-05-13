@@ -5,8 +5,17 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::Frame;
 
 use crate::model::card::Card;
+use crate::model::label::Label;
 
-pub fn render(frame: &mut Frame, area: Rect, card: &Card, selected: bool, dimmed: bool, grabbed: bool) {
+pub fn render(
+    frame: &mut Frame,
+    area: Rect,
+    card: &Card,
+    selected: bool,
+    dimmed: bool,
+    grabbed: bool,
+    board_labels: &[Label],
+) {
     if area.height < 2 {
         return;
     }
@@ -47,9 +56,9 @@ pub fn render(frame: &mut Frame, area: Rect, card: &Card, selected: bool, dimmed
     let title = truncate(&card.title, max_w);
     lines.push(Line::from(Span::styled(title, base_style.add_modifier(Modifier::BOLD))));
 
-    if !card.labels.is_empty() && inner.height > 1 {
-        let label_spans: Vec<Span> = card
-            .labels
+    let resolved = card.resolved_labels(board_labels);
+    if !resolved.is_empty() && inner.height > 1 {
+        let label_spans: Vec<Span> = resolved
             .iter()
             .map(|l| {
                 if dimmed {
@@ -81,10 +90,16 @@ pub fn render(frame: &mut Frame, area: Rect, card: &Card, selected: bool, dimmed
             } else {
                 Color::Green
             };
-            info.push(Span::styled(
-                format!("Due:{}", due.format("%m/%d")),
-                Style::default().fg(color),
-            ));
+            let label = if days < 0 {
+                format!("Due:{} (-{}d)", due.format("%m/%d"), -days)
+            } else if days == 0 {
+                format!("Due:{} (today)", due.format("%m/%d"))
+            } else if days <= 3 {
+                format!("Due:{} ({}d)", due.format("%m/%d"), days)
+            } else {
+                format!("Due:{}", due.format("%m/%d"))
+            };
+            info.push(Span::styled(label, Style::default().fg(color)));
         }
         if let Some((done, total)) = card.checklist_progress() {
             let style = if dimmed {

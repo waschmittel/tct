@@ -1,10 +1,23 @@
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
+use super::ids::{self, ShortId};
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Label {
+    pub id: ShortId,
     pub name: String,
     pub color: LabelColor,
+}
+
+impl Label {
+    pub fn new(name: String, color: LabelColor) -> Self {
+        Self {
+            id: ids::new_id(),
+            name,
+            color,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -34,29 +47,16 @@ impl LabelColor {
         }
     }
 
-    pub fn all() -> &'static [LabelColor] {
-        &[
-            Self::Red,
-            Self::Orange,
-            Self::Yellow,
-            Self::Green,
-            Self::Blue,
-            Self::Purple,
-            Self::Pink,
-            Self::Cyan,
-        ]
-    }
-
-    pub fn name(self) -> &'static str {
+    pub fn next(self) -> Self {
         match self {
-            Self::Red => "Red",
-            Self::Orange => "Orange",
-            Self::Yellow => "Yellow",
-            Self::Green => "Green",
-            Self::Blue => "Blue",
-            Self::Purple => "Purple",
-            Self::Pink => "Pink",
-            Self::Cyan => "Cyan",
+            Self::Red => Self::Orange,
+            Self::Orange => Self::Yellow,
+            Self::Yellow => Self::Green,
+            Self::Green => Self::Blue,
+            Self::Blue => Self::Purple,
+            Self::Purple => Self::Pink,
+            Self::Pink => Self::Cyan,
+            Self::Cyan => Self::Red,
         }
     }
 }

@@ -20,7 +20,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let hints = match &app.mode {
         AppMode::BoardSelector => "j/k:navigate  Enter:open  n:new  d:delete  q:quit",
         AppMode::Normal => "h/l:lists  j/k:cards  Enter:open  n:new  N:list  a:archive  v:unarchive  /:search  ?:help  q:quit",
-        AppMode::CardDetail => "Tab:section  e:edit  Space:toggle  a:add item  A:add checklist  l:labels  u:due  Esc:close",
+        AppMode::CardDetail => "j/k:items  Space:toggle  a:add  x:del  Enter:edit  e:desc  t:title  l:labels  L:manage  u:due  Esc:close",
         AppMode::Insert(_) => "Enter:confirm  Esc:cancel  Ctrl+u:clear",
         AppMode::Command => "Enter:search  Esc:cancel",
         AppMode::Dialog(_) => "y:confirm  n:cancel",

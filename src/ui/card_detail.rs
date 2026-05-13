@@ -4,7 +4,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use ratatui::Frame;
 
-use crate::app::{App, AppMode, CardDetailTab, InsertTarget};
+use crate::app::{App, AppMode, InsertTarget};
 
 use super::markdown;
 
@@ -39,18 +39,24 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled("Ctrl+B/I/K", Style::default().fg(Color::Cyan)),
             Span::raw(":format  "),
             Span::styled("Ctrl+L", Style::default().fg(Color::Cyan)),
-            Span::raw(":list  "),
-            Span::styled("Ctrl+T", Style::default().fg(Color::Cyan)),
-            Span::raw(":table "),
+            Span::raw(":list "),
         ]
     } else {
         vec![
             Span::styled(" Esc", Style::default().fg(Color::Cyan)),
             Span::raw(":close  "),
-            Span::styled("Tab", Style::default().fg(Color::Cyan)),
-            Span::raw(":section  "),
             Span::styled("t", Style::default().fg(Color::Cyan)),
-            Span::raw(":title "),
+            Span::raw(":title  "),
+            Span::styled("e", Style::default().fg(Color::Cyan)),
+            Span::raw(":desc  "),
+            Span::styled("u", Style::default().fg(Color::Cyan)),
+            Span::raw(":due  "),
+            Span::styled("l", Style::default().fg(Color::Cyan)),
+            Span::raw(":labels  "),
+            Span::styled("a", Style::default().fg(Color::Cyan)),
+            Span::raw(":add  "),
+            Span::styled("Space", Style::default().fg(Color::Cyan)),
+            Span::raw(":toggle "),
         ]
     };
 
@@ -66,81 +72,169 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    // Tab bar
-    let tab_area = Rect::new(inner.x, inner.y, inner.width, 1);
-    let content_area = Rect::new(
-        inner.x,
-        inner.y + 2,
-        inner.width,
-        inner.height.saturating_sub(2),
-    );
-
-    let tabs = [
-        CardDetailTab::Description,
-        CardDetailTab::Checklists,
-        CardDetailTab::Labels,
-        CardDetailTab::DueDate,
-    ];
-    let tab_spans: Vec<Span> = tabs
-        .iter()
-        .map(|t| {
-            if *t == board.detail_tab {
-                Span::styled(
-                    format!(" {} ", t.label()),
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                )
-            } else {
-                Span::styled(format!(" {} ", t.label()), Style::default().fg(Color::Gray))
-            }
-        })
-        .collect();
-    frame.render_widget(Paragraph::new(Line::from(tab_spans)), tab_area);
-
-    // Separator
-    let sep_area = Rect::new(inner.x, inner.y + 1, inner.width, 1);
-    frame.render_widget(
-        Paragraph::new(Line::from("─".repeat(inner.width as usize)))
-            .style(Style::default().fg(Color::DarkGray)),
-        sep_area,
-    );
-
-    match board.detail_tab {
-        CardDetailTab::Description => render_description(frame, content_area, card, app),
-        CardDetailTab::Checklists => render_checklists(frame, content_area, card, board, app),
-        CardDetailTab::Labels => render_labels(frame, content_area, card),
-        CardDetailTab::DueDate => render_due_date(frame, content_area, card, app),
-    }
-
-    // Popup dialog for title editing
-    if matches!(app.mode, AppMode::Insert(InsertTarget::EditCardTitle)) {
-        render_input_dialog(frame, popup, "Edit Card Title", &app.input_buffer, app.input_cursor);
-    }
-}
-
-fn render_description(
-    frame: &mut Frame,
-    area: Rect,
-    card: &crate::model::card::Card,
-    app: &App,
-) {
-    if let Some(textarea) = &app.description_editor {
-        render_description_editor(frame, area, textarea, app.editor_scroll);
+    // If editing description, render the editor instead
+    if is_editing_desc {
+        if let Some(textarea) = &app.description_editor {
+            render_description_editor(frame, inner, textarea, app.editor_scroll);
+        }
         return;
     }
 
+    // Unified view: render all sections vertically
+    let mut lines: Vec<Line<'static>> = Vec::new();
+
+    // --- Description Section ---
+    lines.push(Line::from(Span::styled(
+        "Description",
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )));
     if card.description.is_empty() {
-        let text = Paragraph::new(Span::styled(
-            "(no description — press 'e' to add)",
+        lines.push(Line::from(Span::styled(
+            "  (no description — press 'e' to add)",
             Style::default().fg(Color::DarkGray),
-        ));
-        frame.render_widget(text, area);
+        )));
     } else {
-        let lines = markdown::render_markdown(&card.description);
-        let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-        frame.render_widget(paragraph, area);
+        let desc_lines = markdown::highlight_lines(&card.description);
+        for dl in desc_lines {
+            lines.push(dl);
+        }
+    }
+
+    lines.push(Line::from(Span::styled(
+        "─".repeat(inner.width as usize),
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    // --- Checklist Section ---
+    let (done, total) = card.checklist_progress().unwrap_or((0, 0));
+    if total > 0 {
+        lines.push(Line::from(Span::styled(
+            format!("Checklist [{done}/{total}]"),
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "Checklist",
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        )));
+    }
+
+    if card.checklist.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  (no items — press 'a' to add)",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (ii, item) in card.checklist.iter().enumerate() {
+            let is_active = ii == board.detail_item_idx;
+            let check = if item.completed { "✓" } else { " " };
+            let style = if is_active {
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            } else if item.completed {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default()
+            };
+            let prefix = if is_active { "» " } else { "  " };
+            lines.push(Line::from(Span::styled(
+                format!("{prefix}[{check}] {}", item.text),
+                style,
+            )));
+        }
+    }
+
+    lines.push(Line::from(Span::styled(
+        "─".repeat(inner.width as usize),
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    // --- Labels Section ---
+    lines.push(Line::from(Span::styled(
+        "Labels",
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )));
+
+    let resolved = card.resolved_labels(&board.meta.labels);
+    if resolved.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  (no labels — press 'l' to add)",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for label in &resolved {
+            lines.push(Line::from(Span::styled(
+                format!("  ● {}", label.name),
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(label.color.to_ratatui_color()),
+            )));
+        }
+    }
+
+    lines.push(Line::from(Span::styled(
+        "─".repeat(inner.width as usize),
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    // --- Due Date Section ---
+    lines.push(Line::from(Span::styled(
+        "Due Date",
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+    )));
+
+    if let Some(due) = card.due_date {
+        let today = chrono::Local::now().date_naive();
+        let days = (due - today).num_days();
+        let (status, color) = if days < 0 {
+            (format!("{} days overdue", -days), Color::Red)
+        } else if days == 0 {
+            ("Due today!".to_string(), Color::Yellow)
+        } else if days <= 3 {
+            (format!("Due in {} days", days), Color::Yellow)
+        } else {
+            (format!("Due in {} days", days), Color::Green)
+        };
+        lines.push(Line::from(Span::styled(
+            format!("  {}", due.format("%Y-%m-%d")),
+            Style::default().fg(Color::White),
+        )));
+        lines.push(Line::from(Span::styled(
+            format!("  {status}"),
+            Style::default().fg(color),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "  (no due date — press 'u' to set)",
+            Style::default().fg(Color::DarkGray),
+        )));
+    }
+
+    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
+    frame.render_widget(paragraph, inner);
+
+    // Input dialogs rendered on top
+    match &app.mode {
+        AppMode::Insert(InsertTarget::EditCardTitle) => {
+            render_input_dialog(frame, popup, "Edit Card Title", &app.input_buffer, app.input_cursor);
+        }
+        AppMode::Insert(InsertTarget::NewChecklistItem) => {
+            render_input_dialog(frame, popup, "New Item", &app.input_buffer, app.input_cursor);
+        }
+        AppMode::Insert(InsertTarget::EditChecklistItem) => {
+            render_input_dialog(frame, popup, "Edit Item", &app.input_buffer, app.input_cursor);
+        }
+        AppMode::Insert(InsertTarget::EditDueDate) => {
+            render_input_dialog(
+                frame,
+                popup,
+                "Due Date (YYYY-MM-DD)",
+                &app.input_buffer,
+                app.input_cursor,
+            );
+        }
+        _ => {}
     }
 }
 
@@ -150,8 +244,6 @@ fn render_description_editor(
     textarea: &ratatui_textarea::TextArea<'static>,
     editor_scroll: usize,
 ) {
-    use ratatui::widgets::Borders;
-
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow))
@@ -168,7 +260,6 @@ fn render_description_editor(
     let ratatui_textarea::DataCursor(cursor_row, cursor_col) = textarea.cursor();
 
     let scroll = editor_scroll;
-
     let end = (scroll + visible_height).min(lines.len());
     let start = scroll.min(end);
 
@@ -194,163 +285,6 @@ fn render_description_editor(
         let cx = inner.x + (cursor_col as u16).min(inner.width.saturating_sub(1));
         let cy = inner.y + (cursor_row - start) as u16;
         frame.set_cursor_position((cx, cy));
-    }
-}
-
-fn render_checklists(
-    frame: &mut Frame,
-    area: Rect,
-    card: &crate::model::card::Card,
-    board: &crate::app::LoadedBoard,
-    app: &App,
-) {
-    if card.checklists.is_empty() {
-        let text = Paragraph::new(Span::styled(
-            "(no checklists — press 'A' to add)",
-            Style::default().fg(Color::DarkGray),
-        ));
-        frame.render_widget(text, area);
-
-        if let AppMode::Insert(InsertTarget::NewChecklistTitle) = &app.mode {
-            render_input_dialog(frame, area, "New Checklist", &app.input_buffer, app.input_cursor);
-        }
-        return;
-    }
-
-    let mut lines = vec![];
-    for (ci, cl) in card.checklists.iter().enumerate() {
-        let is_active_cl = ci == board.detail_checklist_idx;
-        let done = cl.items.iter().filter(|i| i.completed).count();
-        let total = cl.items.len();
-
-        let cl_style = if is_active_cl {
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::White)
-        };
-        lines.push(Line::from(Span::styled(
-            format!("▸ {} [{}/{}]", cl.title, done, total),
-            cl_style,
-        )));
-
-        for (ii, item) in cl.items.iter().enumerate() {
-            let is_active = is_active_cl && ii == board.detail_item_idx;
-            let check = if item.completed { "✓" } else { " " };
-            let style = if is_active {
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
-            } else if item.completed {
-                Style::default().fg(Color::Green)
-            } else {
-                Style::default()
-            };
-            let prefix = if is_active { "» " } else { "  " };
-            lines.push(Line::from(Span::styled(
-                format!("{prefix}[{check}] {}", item.text),
-                style,
-            )));
-        }
-        lines.push(Line::raw(""));
-    }
-
-    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, area);
-
-    match &app.mode {
-        AppMode::Insert(InsertTarget::NewChecklistTitle) => {
-            render_input_dialog(frame, area, "New Checklist", &app.input_buffer, app.input_cursor);
-        }
-        AppMode::Insert(InsertTarget::NewChecklistItem) => {
-            render_input_dialog(frame, area, "New Item", &app.input_buffer, app.input_cursor);
-        }
-        AppMode::Insert(InsertTarget::EditChecklistItem) => {
-            render_input_dialog(frame, area, "Edit Item", &app.input_buffer, app.input_cursor);
-        }
-        _ => {}
-    }
-}
-
-fn render_labels(frame: &mut Frame, area: Rect, card: &crate::model::card::Card) {
-    if card.labels.is_empty() {
-        let text = Paragraph::new(Span::styled(
-            "(no labels — press 'l' to add)",
-            Style::default().fg(Color::DarkGray),
-        ));
-        frame.render_widget(text, area);
-        return;
-    }
-
-    let mut lines = vec![];
-    for label in &card.labels {
-        lines.push(Line::from(Span::styled(
-            format!("  ● {}", label.name),
-            Style::default()
-                .fg(Color::Black)
-                .bg(label.color.to_ratatui_color()),
-        )));
-    }
-
-    let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, area);
-}
-
-fn render_due_date(
-    frame: &mut Frame,
-    area: Rect,
-    card: &crate::model::card::Card,
-    app: &App,
-) {
-    let text = if let Some(due) = card.due_date {
-        let today = chrono::Local::now().date_naive();
-        let days = (due - today).num_days();
-        let (status, color) = if days < 0 {
-            (format!("{} days overdue", -days), Color::Red)
-        } else if days == 0 {
-            ("Due today!".to_string(), Color::Yellow)
-        } else if days <= 3 {
-            (format!("Due in {} days", days), Color::Yellow)
-        } else {
-            (format!("Due in {} days", days), Color::Green)
-        };
-        vec![
-            Line::from(Span::styled(
-                format!("  Date: {}", due.format("%Y-%m-%d")),
-                Style::default().fg(Color::White),
-            )),
-            Line::from(Span::styled(format!("  {status}"), Style::default().fg(color))),
-            Line::raw(""),
-            Line::from(Span::styled(
-                "  Press 'u' to change, or 'e' to edit",
-                Style::default().fg(Color::DarkGray),
-            )),
-        ]
-    } else {
-        vec![
-            Line::from(Span::styled(
-                "  No due date set",
-                Style::default().fg(Color::DarkGray),
-            )),
-            Line::from(Span::styled(
-                "  Press 'u' to set (YYYY-MM-DD)",
-                Style::default().fg(Color::DarkGray),
-            )),
-        ]
-    };
-
-    let paragraph = Paragraph::new(text);
-    frame.render_widget(paragraph, area);
-
-    if let AppMode::Insert(InsertTarget::EditDueDate) = &app.mode {
-        render_input_dialog(
-            frame,
-            area,
-            "Due Date (YYYY-MM-DD)",
-            &app.input_buffer,
-            app.input_cursor,
-        );
     }
 }
 

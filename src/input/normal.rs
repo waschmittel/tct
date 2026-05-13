@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
-use crate::app::{App, AppMode, DialogKind, InsertTarget};
+use crate::app::{App, AppMode, DialogKind, GrabOrigin, InsertTarget};
 use crate::storage::{board_store, card_store, list_store};
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
@@ -15,7 +15,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             app.mode = AppMode::BoardSelector;
         }
 
-        // Navigation — when grabbed, these move the card instead of just the cursor
+        // Navigation — when grabbed, these move the card
         KeyCode::Char('h') | KeyCode::Left => {
             if grabbed {
                 move_card_left(app)?;
@@ -56,23 +56,34 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
 
-        // Grab/release toggle
+        // Grab / confirm / abort
         KeyCode::Char('m') => {
             if let Some(board) = &mut app.board {
                 if board.is_grabbed() {
+                    // Also confirm (like Enter)
                     board.grabbed_card = None;
-                    app.set_status("Card released".into());
+                    board.grab_origin = None;
+                    app.set_status("Card placed".into());
                 } else if let Some(card_id) = board.current_card_id().cloned() {
+                    let origin = GrabOrigin {
+                        list_idx: board.selected_list,
+                        card_idx: board.selected_card[board.selected_list],
+                    };
                     board.grabbed_card = Some(card_id);
-                    app.set_status("Card grabbed — move with h/j/k/l, m or Esc to release".into());
+                    board.grab_origin = Some(origin);
+                    app.set_status("Card grabbed — h/j/k/l to move, Enter to confirm, Esc to cancel".into());
                 }
             }
         }
-        KeyCode::Esc if grabbed => {
+        KeyCode::Enter if grabbed => {
             if let Some(board) = &mut app.board {
                 board.grabbed_card = None;
-                app.set_status("Card released".into());
+                board.grab_origin = None;
+                app.set_status("Card placed".into());
             }
+        }
+        KeyCode::Esc if grabbed => {
+            abort_card_move(app)?;
         }
 
         KeyCode::Char('g') if !grabbed => {
@@ -113,7 +124,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             if let Some(board) = &app.board {
                 if let Some(card) = board.current_card() {
                     let title = card.title.clone();
-                    app.start_insert_with(InsertTarget::EditCardTitle, &title);
+                    app.start_insert_with(InsertTarget::EditCardTitleInline, &title);
                 }
             }
         }
@@ -198,8 +209,64 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             app.label_filter = None;
             app.set_status("Filters cleared".into());
         }
+        KeyCode::Char('L') if !grabbed => {
+            app.label_picker_idx = 0;
+            app.mode = AppMode::Dialog(DialogKind::LabelManager);
+        }
         _ => {}
     }
+    Ok(())
+}
+
+fn abort_card_move(app: &mut App) -> anyhow::Result<()> {
+    let board = match &mut app.board {
+        Some(b) => b,
+        None => return Ok(()),
+    };
+
+    let origin = match board.grab_origin.take() {
+        Some(o) => o,
+        None => {
+            board.grabbed_card = None;
+            return Ok(());
+        }
+    };
+
+    let card_id = match board.grabbed_card.take() {
+        Some(id) => id,
+        None => return Ok(()),
+    };
+
+    // Find where the card currently is
+    let mut current_list = None;
+    let mut current_idx = None;
+    for (li, list) in board.lists.iter().enumerate() {
+        if let Some(ci) = list.card_ids.iter().position(|id| *id == card_id) {
+            current_list = Some(li);
+            current_idx = Some(ci);
+            break;
+        }
+    }
+
+    if let (Some(cur_li), Some(cur_ci)) = (current_list, current_idx) {
+        // Remove from current position
+        board.lists[cur_li].card_ids.remove(cur_ci);
+        list_store::save_list(&board.meta.id, &board.lists[cur_li])?;
+
+        // Insert at original position
+        let dest_li = origin.list_idx.min(board.lists.len().saturating_sub(1));
+        let dest_ci = origin.card_idx.min(board.lists[dest_li].card_ids.len());
+        board.lists[dest_li].card_ids.insert(dest_ci, card_id);
+        if cur_li != dest_li {
+            list_store::save_list(&board.meta.id, &board.lists[dest_li])?;
+        }
+
+        board.selected_list = dest_li;
+        board.clamp_selection();
+        board.selected_card[dest_li] = dest_ci.min(board.visible_card_count(dest_li).saturating_sub(1));
+    }
+
+    app.set_status("Move cancelled".into());
     Ok(())
 }
 

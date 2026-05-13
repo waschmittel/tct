@@ -38,7 +38,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if board.is_grabbed() {
         title_spans.push(Span::raw("  "));
         title_spans.push(Span::styled(
-            " GRABBED — h/j/k/l to move, m or Esc to release ",
+            " MOVING — h/j/k/l to move, Enter to confirm, Esc to cancel ",
             Style::default().fg(Color::Black).bg(Color::Yellow),
         ));
     }
@@ -89,7 +89,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         AppMode::Insert(InsertTarget::NewListName) => {
             render_input_overlay(frame, area, "New List", &app.input_buffer, app.input_cursor);
         }
-        AppMode::Insert(InsertTarget::EditCardTitle) => {
+        AppMode::Insert(InsertTarget::EditCardTitleInline) => {
             render_input_overlay(
                 frame,
                 area,

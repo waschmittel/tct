@@ -1,7 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
-use crate::app::{App, AppMode, DialogKind};
-use crate::model::label::{Label, LabelColor};
+use crate::app::{App, AppMode, DialogKind, InsertTarget};
 use crate::storage::{board_store, card_store, list_store};
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
@@ -18,6 +17,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         DialogKind::ConfirmCancelEdit => handle_confirm_cancel_edit(app, key),
         DialogKind::ArchivedCards => handle_archived_cards(app, key),
         DialogKind::LabelPicker => handle_label_picker(app, key),
+        DialogKind::LabelManager => handle_label_manager(app, key),
     }
 }
 
@@ -134,7 +134,7 @@ fn handle_confirm_cancel_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()
             app.mode = AppMode::CardDetail;
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            app.mode = AppMode::Insert(crate::app::InsertTarget::EditCardDescription);
+            app.mode = AppMode::Insert(InsertTarget::EditCardDescription);
         }
         _ => {}
     }
@@ -186,10 +186,22 @@ fn handle_archived_cards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 }
 
 fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    let all = LabelColor::all();
+    let label_count = app
+        .board
+        .as_ref()
+        .map(|b| b.meta.labels.len())
+        .unwrap_or(0);
+
+    if label_count == 0 {
+        if matches!(key.code, KeyCode::Esc) {
+            app.mode = AppMode::CardDetail;
+        }
+        return Ok(());
+    }
+
     match key.code {
         KeyCode::Char('j') | KeyCode::Down => {
-            if app.label_picker_idx < all.len() - 1 {
+            if app.label_picker_idx < label_count - 1 {
                 app.label_picker_idx += 1;
             }
         }
@@ -199,37 +211,96 @@ fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
         KeyCode::Enter | KeyCode::Char(' ') => {
-            let color = all[app.label_picker_idx];
             if let Some(board) = &mut app.board {
-                if let Some(card_id) = board.current_card_id().cloned() {
-                    if let Some(card) = board.cards.get_mut(&card_id) {
-                        if let Some(pos) = card.labels.iter().position(|l| l.color == color) {
-                            card.labels.remove(pos);
-                        } else {
-                            card.labels.push(Label {
-                                name: color.name().to_string(),
-                                color,
-                            });
+                let label_id = board
+                    .meta
+                    .labels
+                    .get(app.label_picker_idx)
+                    .map(|l| l.id.clone());
+                if let Some(lid) = label_id {
+                    if let Some(card_id) = board.current_card_id().cloned() {
+                        if let Some(card) = board.cards.get_mut(&card_id) {
+                            if let Some(pos) = card.label_ids.iter().position(|id| *id == lid) {
+                                card.label_ids.remove(pos);
+                            } else {
+                                card.label_ids.push(lid);
+                            }
+                            card.touch();
+                            card_store::save_card(&board.meta.id, card)?;
                         }
-                        card.touch();
-                        card_store::save_card(&board.meta.id, card)?;
                     }
                 }
             }
         }
         KeyCode::Esc => {
-            app.mode = if app.board.is_some() {
-                if matches!(
-                    app.board.as_ref().map(|b| b.detail_tab),
-                    Some(crate::app::CardDetailTab::Labels)
-                ) {
-                    AppMode::CardDetail
-                } else {
-                    AppMode::Normal
+            app.mode = AppMode::CardDetail;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+    let label_count = app
+        .board
+        .as_ref()
+        .map(|b| b.meta.labels.len())
+        .unwrap_or(0);
+
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => {
+            if label_count > 0 && app.label_picker_idx < label_count - 1 {
+                app.label_picker_idx += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            if app.label_picker_idx > 0 {
+                app.label_picker_idx -= 1;
+            }
+        }
+        KeyCode::Char('n') => {
+            app.start_insert(InsertTarget::NewLabelName);
+        }
+        KeyCode::Char('e') => {
+            if label_count > 0 {
+                if let Some(board) = &app.board {
+                    if let Some(label) = board.meta.labels.get(app.label_picker_idx) {
+                        let name = label.name.clone();
+                        app.start_insert_with(InsertTarget::EditLabelName, &name);
+                    }
                 }
-            } else {
-                AppMode::Normal
-            };
+            }
+        }
+        KeyCode::Char('c') => {
+            if label_count > 0 {
+                if let Some(board) = &mut app.board {
+                    if let Some(label) = board.meta.labels.get_mut(app.label_picker_idx) {
+                        label.color = label.color.next();
+                        board_store::save_board(&board.meta)?;
+                    }
+                }
+            }
+        }
+        KeyCode::Char('x') => {
+            if label_count > 0 {
+                if let Some(board) = &mut app.board {
+                    let removed_id = board.meta.labels[app.label_picker_idx].id.clone();
+                    board.meta.labels.remove(app.label_picker_idx);
+                    // Remove from all cards
+                    for card in board.cards.values_mut() {
+                        card.label_ids.retain(|id| *id != removed_id);
+                    }
+                    board_store::save_board(&board.meta)?;
+                    if app.label_picker_idx >= board.meta.labels.len()
+                        && !board.meta.labels.is_empty()
+                    {
+                        app.label_picker_idx = board.meta.labels.len() - 1;
+                    }
+                }
+            }
+        }
+        KeyCode::Esc => {
+            app.mode = AppMode::Normal;
         }
         _ => {}
     }

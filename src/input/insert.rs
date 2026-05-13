@@ -3,6 +3,7 @@ use ratatui_textarea::CursorMove;
 
 use crate::app::{App, AppMode, DialogKind, InsertTarget};
 use crate::model::card::Card;
+use crate::model::label::Label;
 use crate::model::list::CardList;
 use crate::storage::{board_store, card_store, list_store};
 use crate::ui::markdown;
@@ -74,11 +75,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 
 fn handle_description_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match (key.code, key.modifiers) {
-        // Save
         (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
             confirm_description_save(app)?;
         }
-        // Cancel — with confirmation if changed
         (KeyCode::Esc, _) => {
             let changed = description_changed(app);
             if changed {
@@ -89,7 +88,6 @@ fn handle_description_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 app.mode = AppMode::CardDetail;
             }
         }
-        // Undo/Redo
         (KeyCode::Char('z'), m) if has_ctrl_or_cmd(m) => {
             if let Some(textarea) = &mut app.description_editor {
                 textarea.undo();
@@ -100,7 +98,6 @@ fn handle_description_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 textarea.redo();
             }
         }
-        // Formatting shortcuts
         (KeyCode::Char('b'), m) if has_ctrl_or_cmd(m) => {
             wrap_selection_or_insert(app, "**", "**");
         }
@@ -113,22 +110,9 @@ fn handle_description_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         (KeyCode::Char('l'), m) if has_ctrl_or_cmd(m) => {
             insert_at_line_start(app, "- ");
         }
-        (KeyCode::Char('t'), m) if has_ctrl_or_cmd(m) => {
-            insert_table_template(app);
-        }
-        // Tab in tables
-        (KeyCode::Tab, m) => {
-            if !handle_tab_in_table(app, m.contains(KeyModifiers::SHIFT)) {
-                if let Some(textarea) = &mut app.description_editor {
-                    textarea.input(key);
-                }
-            }
-        }
-        // Enter — auto-continue lists
         (KeyCode::Enter, _) => {
             handle_enter_in_list(app);
         }
-        // Everything else → delegate to textarea
         _ => {
             if let Some(textarea) = &mut app.description_editor {
                 textarea.input(key);
@@ -187,7 +171,6 @@ fn handle_enter_in_list(app: &mut App) {
     let current_line = textarea.lines().get(row).cloned().unwrap_or_default();
     let trimmed = current_line.trim_start();
 
-    // Check for empty list item — end the list
     if trimmed == "-" || trimmed == "*" || trimmed == "- " || trimmed == "* " {
         textarea.move_cursor(CursorMove::Head);
         textarea.delete_line_by_end();
@@ -203,7 +186,6 @@ fn handle_enter_in_list(app: &mut App) {
         }
     }
 
-    // Auto-continue unordered list
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
         let indent = current_line.len() - trimmed.len();
         let prefix_char = &trimmed[..2];
@@ -214,7 +196,6 @@ fn handle_enter_in_list(app: &mut App) {
         return;
     }
 
-    // Auto-continue ordered list
     if let Some(dot_pos) = trimmed.find(". ") {
         let num_part = &trimmed[..dot_pos];
         if let Ok(num) = num_part.parse::<u64>() {
@@ -227,73 +208,7 @@ fn handle_enter_in_list(app: &mut App) {
         }
     }
 
-    // Normal enter
     textarea.insert_newline();
-}
-
-fn handle_tab_in_table(app: &mut App, shift: bool) -> bool {
-    let Some(textarea) = &mut app.description_editor else {
-        return false;
-    };
-    let ratatui_textarea::DataCursor(row, col) = textarea.cursor();
-    let line = match textarea.lines().get(row) {
-        Some(l) => l.clone(),
-        None => return false,
-    };
-
-    if !line.contains('|') {
-        return false;
-    }
-
-    if shift {
-        // Find previous | before cursor
-        if let Some(prev_pipe) = line[..col].rfind('|') {
-            if prev_pipe > 0 {
-                if let Some(before) = line[..prev_pipe].rfind('|') {
-                    let target = before + 2;
-                    textarea.move_cursor(CursorMove::Head);
-                    for _ in 0..target.min(line.len()) {
-                        textarea.move_cursor(CursorMove::Forward);
-                    }
-                    return true;
-                }
-            }
-            // At first cell, go to previous row
-            if row > 0 {
-                textarea.move_cursor(CursorMove::Up);
-                textarea.move_cursor(CursorMove::End);
-            }
-            return true;
-        }
-    } else {
-        // Find next | after cursor
-        if let Some(next_pipe) = line[col..].find('|') {
-            let abs_pos = col + next_pipe;
-            if abs_pos + 1 < line.len() {
-                let target = abs_pos + 2;
-                textarea.move_cursor(CursorMove::Head);
-                for _ in 0..target.min(line.len()) {
-                    textarea.move_cursor(CursorMove::Forward);
-                }
-                return true;
-            }
-        }
-        // At last cell, go to next row
-        let next_row = row + 1;
-        if next_row < textarea.lines().len() {
-            textarea.move_cursor(CursorMove::Down);
-            textarea.move_cursor(CursorMove::Head);
-            let next_line = textarea.lines().get(next_row).cloned().unwrap_or_default();
-            if let Some(first_pipe) = next_line.find('|') {
-                let target = first_pipe + 2;
-                for _ in 0..target.min(next_line.len()) {
-                    textarea.move_cursor(CursorMove::Forward);
-                }
-            }
-            return true;
-        }
-    }
-    true
 }
 
 fn wrap_selection_or_insert(app: &mut App, prefix: &str, suffix: &str) {
@@ -320,13 +235,6 @@ fn insert_at_line_start(app: &mut App, prefix: &str) {
     textarea.insert_str(prefix);
 }
 
-fn insert_table_template(app: &mut App) {
-    let Some(textarea) = &mut app.description_editor else {
-        return;
-    };
-    textarea.insert_str("| Column 1 | Column 2 |\n| --- | --- |\n| cell | cell |");
-}
-
 fn cancel_insert(app: &mut App) {
     let target = match &app.mode {
         AppMode::Insert(t) => t.clone(),
@@ -334,15 +242,17 @@ fn cancel_insert(app: &mut App) {
     };
     app.mode = match target {
         InsertTarget::NewBoardName => AppMode::BoardSelector,
-        InsertTarget::NewCardTitle | InsertTarget::NewListName | InsertTarget::RenameList => {
-            AppMode::Normal
-        }
-        InsertTarget::EditCardTitle => AppMode::Normal,
-        InsertTarget::EditCardDescription
-        | InsertTarget::NewChecklistTitle
+        InsertTarget::NewCardTitle
+        | InsertTarget::NewListName
+        | InsertTarget::RenameList
+        | InsertTarget::EditCardTitleInline => AppMode::Normal,
+        InsertTarget::EditCardTitle
+        | InsertTarget::EditCardDescription
         | InsertTarget::NewChecklistItem
         | InsertTarget::EditChecklistItem
-        | InsertTarget::EditDueDate => AppMode::CardDetail,
+        | InsertTarget::EditDueDate
+        | InsertTarget::NewLabelName
+        | InsertTarget::EditLabelName => AppMode::CardDetail,
     };
 }
 
@@ -404,7 +314,12 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
             }
             app.mode = AppMode::Normal;
         }
-        InsertTarget::EditCardTitle => {
+        InsertTarget::EditCardTitle | InsertTarget::EditCardTitleInline => {
+            let return_mode = if target == InsertTarget::EditCardTitleInline {
+                AppMode::Normal
+            } else {
+                AppMode::CardDetail
+            };
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
@@ -414,39 +329,22 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                     }
                 }
             }
-            app.mode = AppMode::Normal;
+            app.mode = return_mode;
         }
         InsertTarget::EditCardDescription => {
-            app.mode = AppMode::CardDetail;
-        }
-        InsertTarget::NewChecklistTitle => {
-            if let Some(board) = &mut app.board {
-                if let Some(card_id) = board.current_card_id().cloned() {
-                    if let Some(card) = board.cards.get_mut(&card_id) {
-                        card.checklists.push(crate::model::card::Checklist {
-                            title: text,
-                            items: Vec::new(),
-                        });
-                        card.touch();
-                        card_store::save_card(&board.meta.id, card)?;
-                        board.detail_checklist_idx = card.checklists.len() - 1;
-                    }
-                }
-            }
             app.mode = AppMode::CardDetail;
         }
         InsertTarget::NewChecklistItem => {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
-                        if let Some(cl) = card.checklists.get_mut(board.detail_checklist_idx) {
-                            cl.items.push(crate::model::card::ChecklistItem {
-                                text,
-                                completed: false,
-                            });
-                            card.touch();
-                            card_store::save_card(&board.meta.id, card)?;
-                        }
+                        card.checklist.push(crate::model::card::ChecklistItem {
+                            text,
+                            completed: false,
+                        });
+                        board.detail_item_idx = card.checklist.len() - 1;
+                        card.touch();
+                        card_store::save_card(&board.meta.id, card)?;
                     }
                 }
             }
@@ -456,12 +354,10 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
-                        if let Some(cl) = card.checklists.get_mut(board.detail_checklist_idx) {
-                            if let Some(item) = cl.items.get_mut(board.detail_item_idx) {
-                                item.text = text;
-                                card.touch();
-                                card_store::save_card(&board.meta.id, card)?;
-                            }
+                        if let Some(item) = card.checklist.get_mut(board.detail_item_idx) {
+                            item.text = text;
+                            card.touch();
+                            card_store::save_card(&board.meta.id, card)?;
                         }
                     }
                 }
@@ -494,6 +390,25 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                 app.set_status(msg);
             }
             app.mode = AppMode::CardDetail;
+        }
+        InsertTarget::NewLabelName => {
+            if let Some(board) = &mut app.board {
+                let label = Label::new(text.clone(), crate::model::label::LabelColor::Blue);
+                board.meta.labels.push(label);
+                board_store::save_board(&board.meta)?;
+                app.label_picker_idx = board.meta.labels.len().saturating_sub(1);
+                app.set_status(format!("Created label '{text}'"));
+            }
+            app.mode = AppMode::Dialog(DialogKind::LabelManager);
+        }
+        InsertTarget::EditLabelName => {
+            if let Some(board) = &mut app.board {
+                if let Some(label) = board.meta.labels.get_mut(app.label_picker_idx) {
+                    label.name = text;
+                    board_store::save_board(&board.meta)?;
+                }
+            }
+            app.mode = AppMode::Dialog(DialogKind::LabelManager);
         }
     }
     Ok(())

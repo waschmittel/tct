@@ -34,10 +34,11 @@ pub fn render(frame: &mut Frame, app: &App) {
                     | AppMode::Insert(
                         InsertTarget::EditCardTitle
                             | InsertTarget::EditCardDescription
-                            | InsertTarget::NewChecklistTitle
                             | InsertTarget::NewChecklistItem
                             | InsertTarget::EditChecklistItem
                             | InsertTarget::EditDueDate
+                            | InsertTarget::NewLabelName
+                            | InsertTarget::EditLabelName
                     )
             ) {
                 card_detail::render(frame, area, app);
@@ -51,6 +52,7 @@ pub fn render(frame: &mut Frame, app: &App) {
                     | AppMode::Dialog(crate::app::DialogKind::ConfirmCancelEdit)
                     | AppMode::Dialog(crate::app::DialogKind::ArchivedCards)
                     | AppMode::Dialog(crate::app::DialogKind::LabelPicker)
+                    | AppMode::Dialog(crate::app::DialogKind::LabelManager)
             ) {
                 dialog::render(frame, area, app);
             }
@@ -99,24 +101,25 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
         Line::raw("  D                  Delete list"),
         Line::raw("  a                  Archive card (confirm)"),
         Line::raw("  v                  View/restore archived"),
-        Line::raw("  m                  Move card to another list"),
+        Line::raw("  m                  Grab card to move (Enter:confirm, Esc:abort)"),
         Line::raw("  J/K                Reorder card up/down"),
         Line::raw("  </> (Shift+,/.)    Reorder list left/right"),
         Line::raw("  /                  Search"),
-        Line::raw("  f                  Filter by label"),
+        Line::raw("  L                  Manage labels"),
         Line::raw("  F                  Clear filters"),
         Line::raw("  b                  Back to board selector"),
         Line::raw("  q                  Quit"),
         Line::raw(""),
         Line::from(Span::styled("Card Detail", Style::default().fg(Color::Cyan))),
-        Line::raw("  Tab        Cycle sections"),
         Line::raw("  t          Edit title"),
-        Line::raw("  e          Edit field"),
+        Line::raw("  e          Edit description"),
+        Line::raw("  j/k        Navigate checklist items"),
         Line::raw("  Space      Toggle checklist item"),
         Line::raw("  a          Add checklist item"),
-        Line::raw("  A          Add checklist"),
+        Line::raw("  Enter      Edit checklist item"),
         Line::raw("  x          Delete checklist item"),
-        Line::raw("  l          Toggle label (Labels tab)"),
+        Line::raw("  l          Assign/remove labels"),
+        Line::raw("  L          Manage labels"),
         Line::raw("  u          Set due date"),
         Line::raw("  Esc        Close"),
         Line::raw(""),
@@ -127,8 +130,6 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
         Line::raw("  Ctrl+I     Italic (*text*)"),
         Line::raw("  Ctrl+K     Code (`text`)"),
         Line::raw("  Ctrl+L     List item (- )"),
-        Line::raw("  Ctrl+T     Table template"),
-        Line::raw("  Tab        Next table cell"),
         Line::raw("  Enter      Auto-continue lists"),
         Line::raw("  Esc        Cancel (confirm if changed)"),
     ];

@@ -7,16 +7,18 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 - Multiple boards with named lists and cards
 - Grab-and-move card reordering (within and across lists)
 - Inline markdown description editor with syntax highlighting
-- Markdown rendering with pulldown-cmark (tables, code blocks, lists, bold/italic, strikethrough, task lists)
-- Checklists with toggle support
-- Labels (color-coded)
-- Due dates with countdown display
+- Markdown syntax highlighting (code blocks, headings, bold/italic, inline code, lists, tables)
+- Unified card detail view — description, checklist, labels, due date in one scrollable view
+- Checklist CRUD — add, edit, toggle, delete items
+- Board-level global labels with CRUD management
+- Due dates with overdueness display
 - Card archiving and un-archiving
 - Search and label filtering
+- Grab-and-move with confirm/abort (Esc restores card to original position)
 - Confirmation dialogs for destructive actions
 - Undo/redo in description editor
 - macOS Cmd key support (in supported terminals)
-- Auto-continuing lists and table cell navigation in editor
+- Auto-continuing lists in editor
 - Table auto-formatting on save
 
 ## Installation
@@ -73,12 +75,14 @@ All writes are atomic (write to `.tmp`, then rename).
 | D | Delete list (confirm) |
 | a | Archive card (confirm) |
 | v | View/restore archived cards |
-| m | Grab/release card for moving |
-| J/K (grabbed) | Reorder card up/down |
-| h/l (grabbed) | Move card between lists |
+| m | Grab card for moving |
+| h/j/k/l (grabbed) | Move card |
+| Enter (grabbed) | Confirm move |
+| Esc (grabbed) | Abort — restore to original position |
+| J/K | Reorder card up/down in list |
 | </>  | Reorder list left/right |
 | / | Search |
-| f | Filter by label |
+| L | Manage labels |
 | F | Clear filters |
 | b | Back to board selector |
 | ? | Help |
@@ -88,14 +92,15 @@ All writes are atomic (write to `.tmp`, then rename).
 
 | Key | Action |
 | --- | --- |
-| Tab | Cycle sections (Description, Checklists, Labels, Due Date) |
 | t | Edit title |
-| e | Edit field (description/checklist item/due date) |
+| e | Edit description |
+| j/k | Navigate checklist items |
 | Space | Toggle checklist item |
 | a | Add checklist item |
-| A | Add checklist |
-| x | Delete checklist item |
-| l | Toggle label (Labels tab) |
+| Enter | Edit selected checklist item |
+| x | Delete selected checklist item |
+| l | Assign/remove labels (label picker) |
+| L | Manage labels (create, rename, color, delete) |
 | u | Set due date |
 | Esc | Close |
 
@@ -110,9 +115,6 @@ All writes are atomic (write to `.tmp`, then rename).
 | Ctrl+I | Italic (\*text\*) |
 | Ctrl+K | Inline code (\`text\`) |
 | Ctrl+L | Insert list item (- ) |
-| Ctrl+T | Insert table template |
-| Tab | Jump to next table cell |
-| Shift+Tab | Jump to previous table cell |
 | Enter | Auto-continue list items |
 | Esc | Cancel (confirms if changes exist) |
 
@@ -126,7 +128,7 @@ src/
   app.rs           # App state, modes, board loading
   model/
     board.rs       # BoardMeta
-    card.rs        # Card, Checklist, ChecklistItem
+    card.rs        # Card, ChecklistItem
     ids.rs         # ShortId generation
     label.rs       # Label, LabelColor
     list.rs        # CardList

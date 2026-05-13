@@ -5,7 +5,6 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::app::{App, DialogKind};
-use crate::model::label::LabelColor;
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let kind = match &app.mode {
@@ -72,6 +71,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         }
         DialogKind::LabelPicker => {
             render_label_picker(frame, area, app);
+        }
+        DialogKind::LabelManager => {
+            render_label_manager(frame, area, app);
         }
     }
 }
@@ -149,16 +151,20 @@ fn render_archived_cards(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn render_label_picker(frame: &mut Frame, area: Rect, app: &App) {
-    let all = LabelColor::all();
-    let current_labels = app
-        .board
-        .as_ref()
-        .and_then(|b| b.current_card())
-        .map(|c| &c.labels[..])
-        .unwrap_or(&[]);
+    let board = match &app.board {
+        Some(b) => b,
+        None => return,
+    };
 
-    let height = (all.len() as u16 + 4).min(area.height.saturating_sub(4));
-    let width = 30u16.min(area.width.saturating_sub(4));
+    let board_labels = &board.meta.labels;
+    let card_label_ids: Vec<_> = board
+        .current_card()
+        .map(|c| c.label_ids.as_slice())
+        .unwrap_or(&[])
+        .to_vec();
+
+    let height = (board_labels.len() as u16 + 6).min(area.height.saturating_sub(4)).max(6);
+    let width = 36u16.min(area.width.saturating_sub(4));
     let x = (area.width.saturating_sub(width)) / 2;
     let y = (area.height.saturating_sub(height)) / 2;
     let popup = Rect::new(x, y, width, height);
@@ -166,29 +172,110 @@ fn render_label_picker(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Clear, popup);
 
     let block = Block::default()
-        .title(" Labels (Enter to toggle) ")
+        .title(" Labels (Space/Enter:toggle, Esc:back) ")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Cyan));
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
+    if board_labels.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "No labels. Press L to manage.",
+                Style::default().fg(Color::DarkGray),
+            )),
+            inner,
+        );
+        return;
+    }
+
     let mut lines = vec![];
-    for (i, color) in all.iter().enumerate() {
-        let is_active = current_labels.iter().any(|l| l.color == *color);
+    for (i, label) in board_labels.iter().enumerate() {
+        let assigned = card_label_ids.contains(&label.id);
         let is_selected = i == app.label_picker_idx;
-        let check = if is_active { "●" } else { "○" };
+        let check = if assigned { "●" } else { "○" };
         let prefix = if is_selected { "» " } else { "  " };
 
         let style = if is_selected {
             Style::default()
-                .fg(color.to_ratatui_color())
+                .fg(label.color.to_ratatui_color())
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(color.to_ratatui_color())
+            Style::default().fg(label.color.to_ratatui_color())
         };
 
         lines.push(Line::from(Span::styled(
-            format!("{prefix}{check} {}", color.name()),
+            format!("{prefix}{check} {}", label.name),
+            style,
+        )));
+    }
+
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn render_label_manager(frame: &mut Frame, area: Rect, app: &App) {
+    let board = match &app.board {
+        Some(b) => b,
+        None => return,
+    };
+
+    let labels = &board.meta.labels;
+    let height = (labels.len() as u16 + 6).min(area.height.saturating_sub(4)).max(8);
+    let width = 40u16.min(area.width.saturating_sub(4));
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = (area.height.saturating_sub(height)) / 2;
+    let popup = Rect::new(x, y, width, height);
+
+    frame.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .title(" Label Manager ")
+        .title_bottom(Line::from(vec![
+            Span::styled(" n", Style::default().fg(Color::Cyan)),
+            Span::raw(":new  "),
+            Span::styled("e", Style::default().fg(Color::Cyan)),
+            Span::raw(":rename  "),
+            Span::styled("c", Style::default().fg(Color::Cyan)),
+            Span::raw(":color  "),
+            Span::styled("x", Style::default().fg(Color::Cyan)),
+            Span::raw(":delete  "),
+            Span::styled("Esc", Style::default().fg(Color::Cyan)),
+            Span::raw(":close "),
+        ]))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    if labels.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Span::styled(
+                "No labels. Press 'n' to create one.",
+                Style::default().fg(Color::DarkGray),
+            )),
+            inner,
+        );
+        return;
+    }
+
+    let mut lines = vec![];
+    for (i, label) in labels.iter().enumerate() {
+        let is_selected = i == app.label_picker_idx;
+        let prefix = if is_selected { "» " } else { "  " };
+
+        let style = if is_selected {
+            Style::default()
+                .fg(Color::Black)
+                .bg(label.color.to_ratatui_color())
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+                .fg(Color::Black)
+                .bg(label.color.to_ratatui_color())
+        };
+
+        lines.push(Line::from(Span::styled(
+            format!("{prefix}● {}", label.name),
             style,
         )));
     }

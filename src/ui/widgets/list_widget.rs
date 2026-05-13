@@ -112,14 +112,14 @@ pub fn render(
             };
 
             let is_card_selected = is_selected && ci == selected_card_idx;
-            let dimmed = app.search_active && !card.matches_search(&app.search_query);
+            let dimmed = app.search_active && !card.matches_search(&app.search_query, &board.meta.labels);
             let grabbed = board
                 .grabbed_card
                 .as_ref()
                 .map(|g| g == card_id)
                 .unwrap_or(false);
 
-            card_widget::render(frame, card_area, card, is_card_selected, dimmed, grabbed);
+            card_widget::render(frame, card_area, card, is_card_selected, dimmed, grabbed, &board.meta.labels);
         }
     }
 

@@ -9,18 +9,14 @@ pub struct Card {
     pub id: ShortId,
     pub title: String,
     pub description: String,
-    pub labels: Vec<Label>,
+    #[serde(default)]
+    pub label_ids: Vec<ShortId>,
     pub due_date: Option<NaiveDate>,
-    pub checklists: Vec<Checklist>,
+    #[serde(default)]
+    pub checklist: Vec<ChecklistItem>,
     pub archived: bool,
     pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Checklist {
-    pub title: String,
-    pub items: Vec<ChecklistItem>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,9 +32,9 @@ impl Card {
             id: ids::new_id(),
             title,
             description: String::new(),
-            labels: Vec::new(),
+            label_ids: Vec::new(),
             due_date: None,
-            checklists: Vec::new(),
+            checklist: Vec::new(),
             archived: false,
             created_at: now,
             updated_at: now,
@@ -46,28 +42,34 @@ impl Card {
     }
 
     pub fn checklist_progress(&self) -> Option<(usize, usize)> {
-        let total: usize = self.checklists.iter().map(|c| c.items.len()).sum();
+        let total = self.checklist.len();
         if total == 0 {
             return None;
         }
-        let done: usize = self
-            .checklists
-            .iter()
-            .flat_map(|c| &c.items)
-            .filter(|i| i.completed)
-            .count();
+        let done = self.checklist.iter().filter(|i| i.completed).count();
         Some((done, total))
     }
 
-    pub fn matches_search(&self, query: &str) -> bool {
+    pub fn matches_search(&self, query: &str, board_labels: &[Label]) -> bool {
         let q = query.to_lowercase();
         self.title.to_lowercase().contains(&q)
             || self.description.to_lowercase().contains(&q)
-            || self.labels.iter().any(|l| l.name.to_lowercase().contains(&q))
+            || self.label_ids.iter().any(|lid| {
+                board_labels
+                    .iter()
+                    .any(|l| l.id == *lid && l.name.to_lowercase().contains(&q))
+            })
     }
 
     pub fn touch(&mut self) {
         self.updated_at = Utc::now();
+    }
+
+    pub fn resolved_labels<'a>(&self, board_labels: &'a [Label]) -> Vec<&'a Label> {
+        self.label_ids
+            .iter()
+            .filter_map(|lid| board_labels.iter().find(|l| l.id == *lid))
+            .collect()
     }
 }
 
@@ -81,7 +83,7 @@ mod tests {
         let card = Card::new("Test".into());
         assert_eq!(card.title, "Test");
         assert!(card.description.is_empty());
-        assert!(card.labels.is_empty());
+        assert!(card.label_ids.is_empty());
         assert!(card.due_date.is_none());
         assert!(!card.archived);
     }
@@ -95,29 +97,27 @@ mod tests {
     #[test]
     fn checklist_progress_counts() {
         let mut card = Card::new("Test".into());
-        card.checklists.push(Checklist {
-            title: "TODO".into(),
-            items: vec![
-                ChecklistItem { text: "A".into(), completed: true },
-                ChecklistItem { text: "B".into(), completed: false },
-                ChecklistItem { text: "C".into(), completed: true },
-            ],
-        });
+        card.checklist = vec![
+            ChecklistItem { text: "A".into(), completed: true },
+            ChecklistItem { text: "B".into(), completed: false },
+            ChecklistItem { text: "C".into(), completed: true },
+        ];
         assert_eq!(card.checklist_progress(), Some((2, 3)));
     }
 
     #[test]
     fn search_matches_title() {
         let card = Card::new("Fix login bug".into());
-        assert!(card.matches_search("login"));
-        assert!(card.matches_search("LOGIN"));
-        assert!(!card.matches_search("signup"));
+        assert!(card.matches_search("login", &[]));
+        assert!(card.matches_search("LOGIN", &[]));
+        assert!(!card.matches_search("signup", &[]));
     }
 
     #[test]
     fn search_matches_label() {
+        let label = Label::new("BUG".into(), LabelColor::Red);
         let mut card = Card::new("Task".into());
-        card.labels.push(Label { name: "BUG".into(), color: LabelColor::Red });
-        assert!(card.matches_search("bug"));
+        card.label_ids.push(label.id.clone());
+        assert!(card.matches_search("bug", &[label]));
     }
 }
