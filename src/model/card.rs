@@ -66,9 +66,9 @@ impl Card {
     }
 
     pub fn resolved_labels<'a>(&self, board_labels: &'a [Label]) -> Vec<&'a Label> {
-        self.label_ids
+        board_labels
             .iter()
-            .filter_map(|lid| board_labels.iter().find(|l| l.id == *lid))
+            .filter(|l| self.label_ids.contains(&l.id))
             .collect()
     }
 }
@@ -119,5 +119,46 @@ mod tests {
         let mut card = Card::new("Task".into());
         card.label_ids.push(label.id.clone());
         assert!(card.matches_search("bug", &[label]));
+    }
+
+    #[test]
+    fn resolved_labels_follow_board_order() {
+        let l1 = Label::new("alpha".into(), LabelColor::Red);
+        let l2 = Label::new("beta".into(), LabelColor::Green);
+        let l3 = Label::new("gamma".into(), LabelColor::Blue);
+        let board_labels = vec![l1.clone(), l2.clone(), l3.clone()];
+
+        let mut card = Card::new("Task".into());
+        // Assign in reverse order
+        card.label_ids = vec![l3.id.clone(), l1.id.clone(), l2.id.clone()];
+
+        let resolved = card.resolved_labels(&board_labels);
+        // Should follow board order: alpha, beta, gamma
+        assert_eq!(resolved[0].name, "alpha");
+        assert_eq!(resolved[1].name, "beta");
+        assert_eq!(resolved[2].name, "gamma");
+    }
+
+    #[test]
+    fn resolved_labels_reflect_reorder() {
+        let l1 = Label::new("first".into(), LabelColor::Red);
+        let l2 = Label::new("second".into(), LabelColor::Green);
+        let mut board_labels = vec![l1.clone(), l2.clone()];
+
+        let mut card = Card::new("Task".into());
+        card.label_ids = vec![l1.id.clone(), l2.id.clone()];
+
+        // Before reorder: first, second
+        let resolved = card.resolved_labels(&board_labels);
+        assert_eq!(resolved[0].name, "first");
+        assert_eq!(resolved[1].name, "second");
+
+        // Reorder board labels
+        board_labels.swap(0, 1);
+
+        // After reorder: second, first
+        let resolved = card.resolved_labels(&board_labels);
+        assert_eq!(resolved[0].name, "second");
+        assert_eq!(resolved[1].name, "first");
     }
 }
