@@ -194,20 +194,27 @@ fn render_label_picker(frame: &mut Frame, area: Rect, app: &App) {
         let assigned = card_label_ids.contains(&label.id);
         let is_selected = i == app.label_picker_idx;
         let check = if assigned { "●" } else { "○" };
-        let prefix = if is_selected { "» " } else { "  " };
+        let label_style = Style::default().fg(label.color.to_ratatui_color());
 
-        let style = if is_selected {
-            Style::default()
-                .fg(label.color.to_ratatui_color())
-                .add_modifier(Modifier::BOLD)
+        if is_selected {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    "» ",
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!("{check} {}", label.name),
+                    label_style.add_modifier(Modifier::BOLD),
+                ),
+            ]));
         } else {
-            Style::default().fg(label.color.to_ratatui_color())
-        };
-
-        lines.push(Line::from(Span::styled(
-            format!("{prefix}{check} {}", label.name),
-            style,
-        )));
+            lines.push(Line::from(Span::styled(
+                format!("  {check} {}", label.name),
+                label_style,
+            )));
+        }
     }
 
     frame.render_widget(Paragraph::new(lines), inner);
@@ -261,23 +268,29 @@ fn render_label_manager(frame: &mut Frame, area: Rect, app: &App) {
     let mut lines = vec![];
     for (i, label) in labels.iter().enumerate() {
         let is_selected = i == app.label_picker_idx;
-        let prefix = if is_selected { "» " } else { "  " };
+        let label_style = Style::default()
+            .fg(Color::Black)
+            .bg(label.color.to_ratatui_color());
 
-        let style = if is_selected {
-            Style::default()
-                .fg(Color::Black)
-                .bg(label.color.to_ratatui_color())
-                .add_modifier(Modifier::BOLD)
+        if is_selected {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    "» ",
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!("● {}", label.name),
+                    label_style.add_modifier(Modifier::BOLD),
+                ),
+            ]));
         } else {
-            Style::default()
-                .fg(Color::Black)
-                .bg(label.color.to_ratatui_color())
-        };
-
-        lines.push(Line::from(Span::styled(
-            format!("{prefix}● {}", label.name),
-            style,
-        )));
+            lines.push(Line::from(Span::styled(
+                format!("  ● {}", label.name),
+                label_style,
+            )));
+        }
     }
 
     frame.render_widget(Paragraph::new(lines), inner);
