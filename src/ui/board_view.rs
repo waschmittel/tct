@@ -37,14 +37,6 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         ),
     ];
 
-    if board.is_grabbed() {
-        title_spans.push(Span::raw("  "));
-        title_spans.push(Span::styled(
-            " MOVING — h/j/k/l to move, Enter to confirm, Esc to cancel ",
-            Style::default().fg(Color::Black).bg(Color::Yellow),
-        ));
-    }
-
     if app.search_active {
         title_spans.push(Span::raw("  "));
         title_spans.push(Span::styled(

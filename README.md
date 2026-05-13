@@ -5,7 +5,7 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 ## Features
 
 - Multiple boards with named lists and cards, reorderable and archivable
-- Grab-and-move card reordering (within and across lists)
+- Shift+Arrow card movement (within and across lists)
 - Inline markdown description editor with syntax highlighting
 - Markdown syntax highlighting (code blocks, headings, bold/italic, inline code, lists)
 - Unified card detail view — description, checklist, labels, due date in one scrollable view
@@ -14,7 +14,6 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 - Due dates with overdueness display in both card list and detail view
 - Card archiving and un-archiving
 - Search with non-matching cards hidden and label filtering
-- Grab-and-move with confirm/abort (Esc restores card to original position)
 - Confirmation dialogs for destructive actions
 - Undo/redo in description editor
 - macOS Cmd key support (in supported terminals)
@@ -75,11 +74,13 @@ All writes are atomic (write to `.tmp`, then rename).
 
 | Key | Action |
 | --- | --- |
-| h/l, Left/Right | Switch lists |
-| j/k, Down/Up | Navigate cards |
+| Left/Right | Switch lists |
+| Up/Down | Navigate cards |
+| Shift+Left/Right | Move card to adjacent list |
+| Shift+Up/Down | Move card up/down within list |
 | g/G | First/last card |
-| e | Open card detail |
-| Enter | Quick-edit card title |
+| Enter | Open card detail |
+| e | Quick-edit card title |
 | n | New card |
 | N | New list |
 | r | Rename list |
@@ -87,11 +88,6 @@ All writes are atomic (write to `.tmp`, then rename).
 | D | Delete list (confirm) |
 | a | Archive card (confirm) |
 | v | View/restore/delete archived cards |
-| M | Grab card for moving |
-| h/j/k/l (grabbed) | Move card |
-| Enter (grabbed) | Confirm move |
-| Esc (grabbed) | Abort — restore to original position |
-| J/K | Reorder card up/down in list |
 | </>  | Reorder list left/right |
 | / | Search |
 | L | Manage labels |

@@ -13,7 +13,6 @@ pub fn render(
     card: &Card,
     selected: bool,
     dimmed: bool,
-    grabbed: bool,
     board_labels: &[Label],
     accent: Color,
 ) {
@@ -23,17 +22,13 @@ pub fn render(
 
     let base_style = if dimmed {
         Style::default().fg(Color::DarkGray)
-    } else if grabbed {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else if selected {
         Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
 
-    let border_style = if grabbed {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-    } else if selected {
+    let border_style = if selected {
         Style::default().fg(accent).add_modifier(Modifier::BOLD)
     } else if dimmed {
         Style::default().fg(Color::DarkGray)

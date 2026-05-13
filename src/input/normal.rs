@@ -1,43 +1,37 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{App, AppMode, DialogKind, GrabOrigin, InsertTarget};
+use crate::app::{App, AppMode, DialogKind, InsertTarget};
 use crate::storage::{board_store, card_store, list_store};
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    let grabbed = app.board.as_ref().map(|b| b.is_grabbed()).unwrap_or(false);
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 
-    match key.code {
-        KeyCode::Char('q') if !grabbed => app.should_quit = true,
-        KeyCode::Char('?') if !grabbed => app.mode = AppMode::Help,
-        KeyCode::Char('b') if !grabbed => {
+    match (key.code, shift) {
+        (KeyCode::Char('q'), _) => app.should_quit = true,
+        (KeyCode::Char('?'), _) => app.mode = AppMode::Help,
+        (KeyCode::Char('b'), _) => {
             app.board = None;
             app.reload_boards()?;
             app.mode = AppMode::BoardSelector;
         }
 
-        // Navigation — when grabbed, these move the card
-        KeyCode::Char('h') | KeyCode::Left => {
-            if grabbed {
-                move_card_left(app)?;
-            } else if let Some(board) = &mut app.board {
+        // Navigation — arrow keys only (no h/j/k/l)
+        (KeyCode::Left, false) => {
+            if let Some(board) = &mut app.board {
                 if board.selected_list > 0 {
                     board.selected_list -= 1;
                 }
             }
         }
-        KeyCode::Char('l') | KeyCode::Right => {
-            if grabbed {
-                move_card_right(app)?;
-            } else if let Some(board) = &mut app.board {
+        (KeyCode::Right, false) => {
+            if let Some(board) = &mut app.board {
                 if board.selected_list < board.lists.len().saturating_sub(1) {
                     board.selected_list += 1;
                 }
             }
         }
-        KeyCode::Char('j') | KeyCode::Down => {
-            if grabbed {
-                move_card_down(app)?;
-            } else if app.search_active {
+        (KeyCode::Down, false) => {
+            if app.search_active {
                 if let Some(board) = &mut app.board {
                     let li = board.selected_list;
                     let current = board.selected_card.get(li).copied().unwrap_or(0);
@@ -53,10 +47,8 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('k') | KeyCode::Up => {
-            if grabbed {
-                move_card_up(app)?;
-            } else if app.search_active {
+        (KeyCode::Up, false) => {
+            if app.search_active {
                 if let Some(board) = &mut app.board {
                     let li = board.selected_list;
                     let current = board.selected_card.get(li).copied().unwrap_or(0);
@@ -72,37 +64,13 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
 
-        // Grab / confirm / abort
-        KeyCode::Char('M') => {
-            if let Some(board) = &mut app.board {
-                if board.is_grabbed() {
-                    // Also confirm (like Enter)
-                    board.grabbed_card = None;
-                    board.grab_origin = None;
-                    app.set_status("Card placed".into());
-                } else if let Some(card_id) = board.current_card_id().cloned() {
-                    let origin = GrabOrigin {
-                        list_idx: board.selected_list,
-                        card_idx: board.selected_card[board.selected_list],
-                    };
-                    board.grabbed_card = Some(card_id);
-                    board.grab_origin = Some(origin);
-                    app.set_status("Card grabbed — h/j/k/l to move, Enter to confirm, Esc to cancel".into());
-                }
-            }
-        }
-        KeyCode::Enter if grabbed => {
-            if let Some(board) = &mut app.board {
-                board.grabbed_card = None;
-                board.grab_origin = None;
-                app.set_status("Card placed".into());
-            }
-        }
-        KeyCode::Esc if grabbed => {
-            abort_card_move(app)?;
-        }
+        // Shift+Arrow: move card
+        (KeyCode::Left, true) => move_card_left(app)?,
+        (KeyCode::Right, true) => move_card_right(app)?,
+        (KeyCode::Up, true) => move_card_up(app)?,
+        (KeyCode::Down, true) => move_card_down(app)?,
 
-        KeyCode::Char('g') if !grabbed => {
+        (KeyCode::Char('g'), _) => {
             if let Some(board) = &mut app.board {
                 let li = board.selected_list;
                 if li < board.selected_card.len() {
@@ -110,7 +78,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('G') if !grabbed => {
+        (KeyCode::Char('G'), _) => {
             if let Some(board) = &mut app.board {
                 let li = board.selected_list;
                 let max = board.visible_card_count(li).saturating_sub(1);
@@ -119,24 +87,18 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('e') if !grabbed => {
+
+        // Enter: open card detail (swapped — was 'e')
+        (KeyCode::Enter, _) => {
             if let Some(board) = &app.board {
                 if board.current_card_id().is_some() {
                     app.mode = AppMode::CardDetail;
                 }
             }
         }
-        KeyCode::Char('n') if !grabbed => {
-            if app.board.is_some() {
-                app.start_insert(InsertTarget::NewCardTitle);
-            }
-        }
-        KeyCode::Char('N') if !grabbed => {
-            if app.board.is_some() {
-                app.start_insert(InsertTarget::NewListName);
-            }
-        }
-        KeyCode::Enter if !grabbed => {
+
+        // e: quick-edit card title inline (swapped — was Enter)
+        (KeyCode::Char('e'), _) => {
             if let Some(board) = &app.board {
                 if let Some(card) = board.current_card() {
                     let title = card.title.clone();
@@ -144,7 +106,18 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('r') if !grabbed => {
+
+        (KeyCode::Char('n'), _) => {
+            if app.board.is_some() {
+                app.start_insert(InsertTarget::NewCardTitle);
+            }
+        }
+        (KeyCode::Char('N'), _) => {
+            if app.board.is_some() {
+                app.start_insert(InsertTarget::NewListName);
+            }
+        }
+        (KeyCode::Char('r'), _) => {
             if let Some(board) = &app.board {
                 if let Some(list) = board.lists.get(board.selected_list) {
                     let name = list.name.clone();
@@ -152,21 +125,21 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('d') if !grabbed => {
+        (KeyCode::Char('d'), _) => {
             if let Some(board) = &app.board {
                 if board.current_card_id().is_some() {
                     app.mode = AppMode::Dialog(DialogKind::ConfirmDeleteCard);
                 }
             }
         }
-        KeyCode::Char('D') if !grabbed => {
+        (KeyCode::Char('D'), _) => {
             if let Some(board) = &app.board {
                 if !board.lists.is_empty() {
                     app.mode = AppMode::Dialog(DialogKind::ConfirmDeleteList);
                 }
             }
         }
-        KeyCode::Char('<') if !grabbed => {
+        (KeyCode::Char('<'), _) => {
             if let Some(board) = &mut app.board {
                 if board.selected_list > 0 {
                     let i = board.selected_list;
@@ -179,7 +152,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('>') if !grabbed => {
+        (KeyCode::Char('>'), _) => {
             if let Some(board) = &mut app.board {
                 if board.selected_list < board.lists.len().saturating_sub(1) {
                     let i = board.selected_list;
@@ -192,14 +165,14 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('a') if !grabbed => {
+        (KeyCode::Char('a'), _) => {
             if let Some(board) = &app.board {
                 if board.current_card_id().is_some() {
                     app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveCard);
                 }
             }
         }
-        KeyCode::Char('v') if !grabbed => {
+        (KeyCode::Char('v'), _) => {
             if let Some(board) = &app.board {
                 let archived = card_store::list_archived_cards(&board.meta.id);
                 if archived.is_empty() {
@@ -211,78 +184,26 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('/') if !grabbed => {
+        (KeyCode::Char('/'), _) => {
             app.search_query.clear();
             app.mode = AppMode::Command;
         }
-        KeyCode::Char('f') if !grabbed => {
+        (KeyCode::Char('f'), _) => {
             app.label_picker_idx = 0;
             app.mode = AppMode::Dialog(DialogKind::LabelPicker);
         }
-        KeyCode::Char('F') if !grabbed => {
+        (KeyCode::Char('F'), _) => {
             app.search_active = false;
             app.search_query.clear();
             app.label_filter = None;
             app.set_status("Filters cleared".into());
         }
-        KeyCode::Char('L') if !grabbed => {
+        (KeyCode::Char('L'), _) => {
             app.label_picker_idx = 0;
             app.mode = AppMode::Dialog(DialogKind::LabelManager);
         }
         _ => {}
     }
-    Ok(())
-}
-
-fn abort_card_move(app: &mut App) -> anyhow::Result<()> {
-    let board = match &mut app.board {
-        Some(b) => b,
-        None => return Ok(()),
-    };
-
-    let origin = match board.grab_origin.take() {
-        Some(o) => o,
-        None => {
-            board.grabbed_card = None;
-            return Ok(());
-        }
-    };
-
-    let card_id = match board.grabbed_card.take() {
-        Some(id) => id,
-        None => return Ok(()),
-    };
-
-    // Find where the card currently is
-    let mut current_list = None;
-    let mut current_idx = None;
-    for (li, list) in board.lists.iter().enumerate() {
-        if let Some(ci) = list.card_ids.iter().position(|id| *id == card_id) {
-            current_list = Some(li);
-            current_idx = Some(ci);
-            break;
-        }
-    }
-
-    if let (Some(cur_li), Some(cur_ci)) = (current_list, current_idx) {
-        // Remove from current position
-        board.lists[cur_li].card_ids.remove(cur_ci);
-        list_store::save_list(&board.meta.id, &board.lists[cur_li])?;
-
-        // Insert at original position
-        let dest_li = origin.list_idx.min(board.lists.len().saturating_sub(1));
-        let dest_ci = origin.card_idx.min(board.lists[dest_li].card_ids.len());
-        board.lists[dest_li].card_ids.insert(dest_ci, card_id);
-        if cur_li != dest_li {
-            list_store::save_list(&board.meta.id, &board.lists[dest_li])?;
-        }
-
-        board.selected_list = dest_li;
-        board.clamp_selection();
-        board.selected_card[dest_li] = dest_ci.min(board.visible_card_count(dest_li).saturating_sub(1));
-    }
-
-    app.set_status("Move cancelled".into());
     Ok(())
 }
 

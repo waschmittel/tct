@@ -156,14 +156,8 @@ pub fn render(
             };
 
             let is_card_selected = is_selected && Some(card_id) == selected_card_id;
-            let dimmed = false;
-            let grabbed = board
-                .grabbed_card
-                .as_ref()
-                .map(|g| g == card_id)
-                .unwrap_or(false);
 
-            card_widget::render(frame, card_area, card, is_card_selected, dimmed, grabbed, &board.meta.labels, accent);
+            card_widget::render(frame, card_area, card, is_card_selected, false, &board.meta.labels, accent);
         }
     }
 

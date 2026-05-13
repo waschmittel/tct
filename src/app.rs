@@ -51,12 +51,6 @@ pub enum DialogKind {
     LabelManager,
 }
 
-#[derive(Debug, Clone)]
-pub struct GrabOrigin {
-    pub list_idx: usize,
-    pub card_idx: usize,
-}
-
 pub struct LoadedBoard {
     pub meta: BoardMeta,
     pub lists: Vec<CardList>,
@@ -66,8 +60,6 @@ pub struct LoadedBoard {
     pub scroll_offset: Vec<usize>,
     pub detail_item_idx: usize,
     pub detail_scroll: usize,
-    pub grabbed_card: Option<ShortId>,
-    pub grab_origin: Option<GrabOrigin>,
 }
 
 impl LoadedBoard {
@@ -108,10 +100,6 @@ impl LoadedBoard {
                 self.selected_card[i] = count - 1;
             }
         }
-    }
-
-    pub fn is_grabbed(&self) -> bool {
-        self.grabbed_card.is_some()
     }
 }
 
@@ -186,7 +174,6 @@ impl App {
     fn should_reload(&self) -> bool {
         self.board.is_some()
             && matches!(self.mode, AppMode::Normal | AppMode::Help | AppMode::CardDetail)
-            && self.board.as_ref().map(|b| !b.is_grabbed()).unwrap_or(true)
             && self.description_editor.is_none()
     }
 
@@ -277,8 +264,6 @@ impl App {
             scroll_offset: vec![0; num_lists],
             detail_item_idx: 0,
             detail_scroll: 0,
-            grabbed_card: None,
-            grab_origin: None,
         });
         self.mode = AppMode::Normal;
         Ok(())
