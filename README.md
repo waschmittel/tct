@@ -109,7 +109,7 @@ All writes are atomic (write to `.tmp`, then rename).
 | Enter | Edit selected checklist item |
 | x | Delete selected checklist item |
 | l | Assign/remove labels (label picker) |
-| L | Manage labels (create, rename, color, delete) |
+| L | Manage labels (create, rename, color, reorder, delete) |
 | u | Set due date |
 | U | Clear due date |
 | Esc | Close |

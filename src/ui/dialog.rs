@@ -66,6 +66,20 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 "Discard unsaved changes?",
             );
         }
+        DialogKind::ConfirmDeleteLabel => {
+            let name = app
+                .board
+                .as_ref()
+                .and_then(|b| b.meta.labels.get(app.label_picker_idx))
+                .map(|l| l.name.as_str())
+                .unwrap_or("this label");
+            render_confirm(
+                frame,
+                area,
+                "Delete Label",
+                &format!("Delete '{name}' from all cards?"),
+            );
+        }
         DialogKind::ArchivedCards => {
             render_archived_cards(frame, area, app);
         }
@@ -259,6 +273,8 @@ fn render_label_manager(frame: &mut Frame, area: Rect, app: &App) {
             Span::raw(":rename  "),
             Span::styled("c", Style::default().fg(accent(app))),
             Span::raw(":color  "),
+            Span::styled("S+↑/↓", Style::default().fg(accent(app))),
+            Span::raw(":reorder  "),
             Span::styled("x", Style::default().fg(accent(app))),
             Span::raw(":delete  "),
             Span::styled("Esc", Style::default().fg(accent(app))),

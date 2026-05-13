@@ -652,4 +652,110 @@ mod tests {
         let re_no = Regex::new(r"step 9:").unwrap();
         assert!(!card_matches_regex_pub(&card, &re_no, &[]));
     }
+
+    // ── Label reorder tests ───────────────────────────────────────────────────
+
+    #[test]
+    fn label_reorder_basic() {
+        let mut board = crate::model::board::BoardMeta::new("Board".into());
+        board.labels = vec![
+            Label::new("alpha".into(), LabelColor::Red),
+            Label::new("beta".into(), LabelColor::Green),
+            Label::new("gamma".into(), LabelColor::Blue),
+        ];
+        // Move "beta" down (swap 1 and 2)
+        board.labels.swap(1, 2);
+        assert_eq!(board.labels[0].name, "alpha");
+        assert_eq!(board.labels[1].name, "gamma");
+        assert_eq!(board.labels[2].name, "beta");
+    }
+
+    #[test]
+    fn label_reorder_persists() {
+        with_temp_dir(|| {
+            let mut board = board_store::create_board("Board".into()).unwrap();
+            board.labels = vec![
+                Label::new("first".into(), LabelColor::Red),
+                Label::new("second".into(), LabelColor::Green),
+                Label::new("third".into(), LabelColor::Blue),
+            ];
+            board_store::save_board(&board).unwrap();
+
+            // Swap "first" and "second"
+            board.labels.swap(0, 1);
+            board_store::save_board(&board).unwrap();
+
+            let loaded = board_store::load_board(&board.id).unwrap();
+            assert_eq!(loaded.labels[0].name, "second");
+            assert_eq!(loaded.labels[1].name, "first");
+            assert_eq!(loaded.labels[2].name, "third");
+        });
+    }
+
+    #[test]
+    fn label_reorder_move_last_to_first() {
+        with_temp_dir(|| {
+            let mut board = board_store::create_board("Board".into()).unwrap();
+            board.labels = vec![
+                Label::new("a".into(), LabelColor::Red),
+                Label::new("b".into(), LabelColor::Green),
+                Label::new("c".into(), LabelColor::Blue),
+            ];
+            // Move "c" up twice: c,b then c,a  (bubble-up style)
+            board.labels.swap(2, 1);
+            board.labels.swap(1, 0);
+            board_store::save_board(&board).unwrap();
+
+            let loaded = board_store::load_board(&board.id).unwrap();
+            assert_eq!(loaded.labels[0].name, "c");
+            assert_eq!(loaded.labels[1].name, "a");
+            assert_eq!(loaded.labels[2].name, "b");
+        });
+    }
+
+    #[test]
+    fn label_reorder_at_top_is_noop() {
+        let mut board = crate::model::board::BoardMeta::new("Board".into());
+        board.labels = vec![
+            Label::new("only".into(), LabelColor::Red),
+            Label::new("two".into(), LabelColor::Green),
+        ];
+        let idx = 0usize;
+        // Attempting to move up from index 0: idx > 0 is false, no swap
+        if idx > 0 {
+            board.labels.swap(idx, idx - 1);
+        }
+        assert_eq!(board.labels[0].name, "only");
+        assert_eq!(board.labels[1].name, "two");
+    }
+
+    #[test]
+    fn label_reorder_at_bottom_is_noop() {
+        let mut board = crate::model::board::BoardMeta::new("Board".into());
+        board.labels = vec![
+            Label::new("one".into(), LabelColor::Red),
+            Label::new("two".into(), LabelColor::Green),
+        ];
+        let idx = 1usize;
+        // Attempting to move down from last index: no swap
+        if idx + 1 < board.labels.len() {
+            board.labels.swap(idx, idx + 1);
+        }
+        assert_eq!(board.labels[0].name, "one");
+        assert_eq!(board.labels[1].name, "two");
+    }
+
+    #[test]
+    fn label_reorder_preserves_ids() {
+        let mut board = crate::model::board::BoardMeta::new("Board".into());
+        let l1 = Label::new("alpha".into(), LabelColor::Red);
+        let l2 = Label::new("beta".into(), LabelColor::Green);
+        let id1 = l1.id.clone();
+        let id2 = l2.id.clone();
+        board.labels = vec![l1, l2];
+        board.labels.swap(0, 1);
+        // IDs travel with their labels
+        assert_eq!(board.labels[0].id, id2);
+        assert_eq!(board.labels[1].id, id1);
+    }
 }

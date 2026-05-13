@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, AppMode, DialogKind, InsertTarget};
 use crate::storage::{board_store, card_store, list_store};
@@ -15,6 +15,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         DialogKind::ConfirmArchiveBoard => handle_confirm_archive_board(app, key),
         DialogKind::ConfirmArchiveCard => handle_confirm_archive_card(app, key),
         DialogKind::ConfirmCancelEdit => handle_confirm_cancel_edit(app, key),
+        DialogKind::ConfirmDeleteLabel => handle_confirm_delete_label(app, key),
         DialogKind::ArchivedCards => handle_archived_cards(app, key),
         DialogKind::ArchivedBoards => handle_archived_boards(app, key),
         DialogKind::LabelPicker => handle_label_picker(app, key),
@@ -324,22 +325,43 @@ fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         .as_ref()
         .map(|b| b.meta.labels.len())
         .unwrap_or(0);
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 
-    match key.code {
-        KeyCode::Down => {
+    match (key.code, shift) {
+        (KeyCode::Down, false) => {
             if label_count > 0 && app.label_picker_idx < label_count - 1 {
                 app.label_picker_idx += 1;
             }
         }
-        KeyCode::Up => {
+        (KeyCode::Up, false) => {
             if app.label_picker_idx > 0 {
                 app.label_picker_idx -= 1;
             }
         }
-        KeyCode::Char('n') => {
+        (KeyCode::Down, true) => {
+            if let Some(board) = &mut app.board {
+                let ii = app.label_picker_idx;
+                if ii + 1 < board.meta.labels.len() {
+                    board.meta.labels.swap(ii, ii + 1);
+                    app.label_picker_idx += 1;
+                    board_store::save_board(&board.meta)?;
+                }
+            }
+        }
+        (KeyCode::Up, true) => {
+            if let Some(board) = &mut app.board {
+                let ii = app.label_picker_idx;
+                if ii > 0 {
+                    board.meta.labels.swap(ii, ii - 1);
+                    app.label_picker_idx -= 1;
+                    board_store::save_board(&board.meta)?;
+                }
+            }
+        }
+        (KeyCode::Char('n'), _) => {
             app.start_insert(InsertTarget::NewLabelName);
         }
-        KeyCode::Char('e') => {
+        (KeyCode::Char('e'), _) => {
             if label_count > 0 {
                 if let Some(board) = &app.board {
                     if let Some(label) = board.meta.labels.get(app.label_picker_idx) {
@@ -349,7 +371,7 @@ fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('c') => {
+        (KeyCode::Char('c'), _) => {
             if label_count > 0 {
                 if let Some(board) = &mut app.board {
                     if let Some(label) = board.meta.labels.get_mut(app.label_picker_idx) {
@@ -359,12 +381,27 @@ fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('x') => {
+        (KeyCode::Char('x'), _) => {
             if label_count > 0 {
-                if let Some(board) = &mut app.board {
+                app.mode = AppMode::Dialog(DialogKind::ConfirmDeleteLabel);
+            }
+        }
+        (KeyCode::Esc, _) => {
+            app.mode = AppMode::Normal;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_confirm_delete_label(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            if let Some(board) = &mut app.board {
+                if app.label_picker_idx < board.meta.labels.len() {
                     let removed_id = board.meta.labels[app.label_picker_idx].id.clone();
+                    let label_name = board.meta.labels[app.label_picker_idx].name.clone();
                     board.meta.labels.remove(app.label_picker_idx);
-                    // Remove from all cards
                     for card in board.cards.values_mut() {
                         card.label_ids.retain(|id| *id != removed_id);
                     }
@@ -374,11 +411,13 @@ fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     {
                         app.label_picker_idx = board.meta.labels.len() - 1;
                     }
+                    app.set_status(format!("Label '{label_name}' deleted"));
                 }
             }
+            app.mode = AppMode::Dialog(DialogKind::LabelManager);
         }
-        KeyCode::Esc => {
-            app.mode = AppMode::Normal;
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            app.mode = AppMode::Dialog(DialogKind::LabelManager);
         }
         _ => {}
     }

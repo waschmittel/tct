@@ -45,6 +45,7 @@ pub enum DialogKind {
     ConfirmArchiveBoard,
     ConfirmArchiveCard,
     ConfirmCancelEdit,
+    ConfirmDeleteLabel,
     ArchivedCards,
     ArchivedBoards,
     LabelPicker,

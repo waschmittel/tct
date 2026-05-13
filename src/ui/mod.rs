@@ -53,6 +53,7 @@ pub fn render(frame: &mut Frame, app: &App) {
                     | AppMode::Dialog(crate::app::DialogKind::ConfirmDeleteList)
                     | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveCard)
                     | AppMode::Dialog(crate::app::DialogKind::ConfirmCancelEdit)
+                    | AppMode::Dialog(crate::app::DialogKind::ConfirmDeleteLabel)
                     | AppMode::Dialog(crate::app::DialogKind::ArchivedCards)
                     | AppMode::Dialog(crate::app::DialogKind::LabelPicker)
                     | AppMode::Dialog(crate::app::DialogKind::LabelManager)
