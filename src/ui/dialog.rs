@@ -50,6 +50,26 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 &format!("Delete board '{name}' and all its data?"),
             );
         }
+        DialogKind::ConfirmArchiveCard => {
+            let name = app
+                .board
+                .as_ref()
+                .and_then(|b| b.current_card())
+                .map(|c| c.title.as_str())
+                .unwrap_or("this card");
+            render_confirm(frame, area, "Archive Card", &format!("Archive '{name}'?"));
+        }
+        DialogKind::ConfirmCancelEdit => {
+            render_confirm(
+                frame,
+                area,
+                "Discard Changes",
+                "Discard unsaved changes?",
+            );
+        }
+        DialogKind::ArchivedCards => {
+            render_archived_cards(frame, area, app);
+        }
         DialogKind::LabelPicker => {
             render_label_picker(frame, area, app);
         }
@@ -82,6 +102,49 @@ fn render_confirm(frame: &mut Frame, area: Rect, title: &str, message: &str) {
             Span::raw(" No"),
         ]),
     ];
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn render_archived_cards(frame: &mut Frame, area: Rect, app: &App) {
+    let height = (app.archived_cards.len() as u16 + 4).min(area.height.saturating_sub(4)).max(6);
+    let width = 50u16.min(area.width.saturating_sub(4));
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = (area.height.saturating_sub(height)) / 2;
+    let popup = Rect::new(x, y, width, height);
+
+    frame.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .title(" Archived Cards (Enter: restore, Esc: close) ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    if app.archived_cards.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Span::styled("No archived cards", Style::default().fg(Color::DarkGray))),
+            inner,
+        );
+        return;
+    }
+
+    let mut lines = Vec::new();
+    for (i, card) in app.archived_cards.iter().enumerate() {
+        let is_selected = i == app.archived_selected;
+        let prefix = if is_selected { "» " } else { "  " };
+        let date = card.updated_at.format("%Y-%m-%d");
+        let style = if is_selected {
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+        };
+        lines.push(Line::from(Span::styled(
+            format!("{prefix}{} ({})", card.title, date),
+            style,
+        )));
+    }
+
     frame.render_widget(Paragraph::new(lines), inner);
 }
 

@@ -14,6 +14,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         DialogKind::ConfirmDeleteCard => handle_confirm_delete_card(app, key),
         DialogKind::ConfirmDeleteList => handle_confirm_delete_list(app, key),
         DialogKind::ConfirmDeleteBoard => handle_confirm_delete_board(app, key),
+        DialogKind::ConfirmArchiveCard => handle_confirm_archive_card(app, key),
+        DialogKind::ConfirmCancelEdit => handle_confirm_cancel_edit(app, key),
+        DialogKind::ArchivedCards => handle_archived_cards(app, key),
         DialogKind::LabelPicker => handle_label_picker(app, key),
     }
 }
@@ -89,6 +92,93 @@ fn handle_confirm_delete_board(app: &mut App, key: KeyEvent) -> anyhow::Result<(
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
             app.mode = AppMode::BoardSelector;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_confirm_archive_card(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            if let Some(board) = &mut app.board {
+                if let Some(card_id) = board.current_card_id().cloned() {
+                    if let Some(card) = board.cards.get_mut(&card_id) {
+                        card.archived = true;
+                        card.touch();
+                        card_store::save_card(&board.meta.id, card)?;
+                        if let Some(list) = board.lists.get_mut(board.selected_list) {
+                            list.card_ids.retain(|id| id != &card_id);
+                            list_store::save_list(&board.meta.id, list)?;
+                        }
+                        board.clamp_selection();
+                        app.set_status("Card archived".into());
+                    }
+                }
+            }
+            app.mode = AppMode::Normal;
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            app.mode = AppMode::Normal;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_confirm_cancel_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            app.description_editor = None;
+            app.description_original = None;
+            app.mode = AppMode::CardDetail;
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            app.mode = AppMode::Insert(crate::app::InsertTarget::EditCardDescription);
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_archived_cards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => {
+            if app.archived_selected < app.archived_cards.len().saturating_sub(1) {
+                app.archived_selected += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            if app.archived_selected > 0 {
+                app.archived_selected -= 1;
+            }
+        }
+        KeyCode::Enter => {
+            if app.archived_selected < app.archived_cards.len() {
+                let mut card = app.archived_cards.remove(app.archived_selected);
+                card.archived = false;
+                card.touch();
+                let title = card.title.clone();
+                if let Some(board) = &mut app.board {
+                    card_store::save_card(&board.meta.id, &card)?;
+                    if let Some(list) = board.lists.get_mut(board.selected_list) {
+                        list.card_ids.push(card.id.clone());
+                        list_store::save_list(&board.meta.id, list)?;
+                    }
+                    board.cards.insert(card.id.clone(), card);
+                }
+                app.set_status(format!("Restored '{title}'"));
+                if app.archived_selected > 0 && app.archived_selected >= app.archived_cards.len() {
+                    app.archived_selected = app.archived_cards.len().saturating_sub(1);
+                }
+                if app.archived_cards.is_empty() {
+                    app.mode = AppMode::Normal;
+                }
+            }
+        }
+        KeyCode::Esc => {
+            app.archived_cards.clear();
+            app.mode = AppMode::Normal;
         }
         _ => {}
     }

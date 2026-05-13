@@ -1,10 +1,15 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui_textarea::CursorMove;
 
-use crate::app::{App, AppMode, InsertTarget};
+use crate::app::{App, AppMode, DialogKind, InsertTarget};
 use crate::model::card::Card;
 use crate::model::list::CardList;
 use crate::storage::{board_store, card_store, list_store};
+use crate::ui::markdown;
+
+fn has_ctrl_or_cmd(modifiers: KeyModifiers) -> bool {
+    modifiers.contains(KeyModifiers::CONTROL) || modifiers.contains(KeyModifiers::SUPER)
+}
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     if matches!(
@@ -48,14 +53,14 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         KeyCode::End => {
             app.input_cursor = app.input_buffer.len();
         }
-        KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        KeyCode::Char('u') if has_ctrl_or_cmd(key.modifiers) => {
             app.input_buffer.clear();
             app.input_cursor = 0;
         }
-        KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        KeyCode::Char('a') if has_ctrl_or_cmd(key.modifiers) => {
             app.input_cursor = 0;
         }
-        KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        KeyCode::Char('e') if has_ctrl_or_cmd(key.modifiers) => {
             app.input_cursor = app.input_buffer.len();
         }
         KeyCode::Char(c) => {
@@ -69,39 +74,96 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 
 fn handle_description_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match (key.code, key.modifiers) {
-        (KeyCode::Char('s'), m) if m.contains(KeyModifiers::CONTROL) => {
+        // Save
+        (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
             confirm_description_save(app)?;
         }
+        // Cancel — with confirmation if changed
         (KeyCode::Esc, _) => {
-            app.description_editor = None;
-            app.mode = AppMode::CardDetail;
+            let changed = description_changed(app);
+            if changed {
+                app.mode = AppMode::Dialog(DialogKind::ConfirmCancelEdit);
+            } else {
+                app.description_editor = None;
+                app.description_original = None;
+                app.mode = AppMode::CardDetail;
+            }
         }
-        (KeyCode::Char('b'), m) if m.contains(KeyModifiers::CONTROL) => {
+        // Undo/Redo
+        (KeyCode::Char('z'), m) if has_ctrl_or_cmd(m) => {
+            if let Some(textarea) = &mut app.description_editor {
+                textarea.undo();
+            }
+        }
+        (KeyCode::Char('y'), m) if has_ctrl_or_cmd(m) => {
+            if let Some(textarea) = &mut app.description_editor {
+                textarea.redo();
+            }
+        }
+        // Formatting shortcuts
+        (KeyCode::Char('b'), m) if has_ctrl_or_cmd(m) => {
             wrap_selection_or_insert(app, "**", "**");
         }
-        (KeyCode::Char('i'), m) if m.contains(KeyModifiers::CONTROL) => {
+        (KeyCode::Char('i'), m) if has_ctrl_or_cmd(m) => {
             wrap_selection_or_insert(app, "*", "*");
         }
-        (KeyCode::Char('k'), m) if m.contains(KeyModifiers::CONTROL) => {
+        (KeyCode::Char('k'), m) if has_ctrl_or_cmd(m) => {
             wrap_selection_or_insert(app, "`", "`");
         }
-        (KeyCode::Char('l'), m) if m.contains(KeyModifiers::CONTROL) => {
+        (KeyCode::Char('l'), m) if has_ctrl_or_cmd(m) => {
             insert_at_line_start(app, "- ");
         }
-        (KeyCode::Char('t'), m) if m.contains(KeyModifiers::CONTROL) => {
+        (KeyCode::Char('t'), m) if has_ctrl_or_cmd(m) => {
             insert_table_template(app);
         }
+        // Tab in tables
+        (KeyCode::Tab, m) => {
+            if !handle_tab_in_table(app, m.contains(KeyModifiers::SHIFT)) {
+                if let Some(textarea) = &mut app.description_editor {
+                    textarea.input(key);
+                }
+            }
+        }
+        // Enter — auto-continue lists
+        (KeyCode::Enter, _) => {
+            handle_enter_in_list(app);
+        }
+        // Everything else → delegate to textarea
         _ => {
             if let Some(textarea) = &mut app.description_editor {
                 textarea.input(key);
             }
         }
     }
+    update_editor_scroll(app);
     Ok(())
+}
+
+fn update_editor_scroll(app: &mut App) {
+    if let Some(textarea) = &app.description_editor {
+        let ratatui_textarea::DataCursor(cursor_row, _) = textarea.cursor();
+        let visible_height = 20usize;
+        if cursor_row < app.editor_scroll {
+            app.editor_scroll = cursor_row;
+        } else if cursor_row >= app.editor_scroll + visible_height {
+            app.editor_scroll = cursor_row - visible_height + 1;
+        }
+    }
+}
+
+fn description_changed(app: &App) -> bool {
+    let current = app
+        .description_editor
+        .as_ref()
+        .map(|ta| ta.lines().join("\n"))
+        .unwrap_or_default();
+    let original = app.description_original.as_deref().unwrap_or("");
+    current != original
 }
 
 fn confirm_description_save(app: &mut App) -> anyhow::Result<()> {
     let text = app.finish_description_edit().unwrap_or_default();
+    let text = markdown::format_tables(&text);
     if let Some(board) = &mut app.board {
         if let Some(card_id) = board.current_card_id().cloned() {
             if let Some(card) = board.cards.get_mut(&card_id) {
@@ -112,8 +174,126 @@ fn confirm_description_save(app: &mut App) -> anyhow::Result<()> {
             }
         }
     }
+    app.description_original = None;
     app.mode = AppMode::CardDetail;
     Ok(())
+}
+
+fn handle_enter_in_list(app: &mut App) {
+    let Some(textarea) = &mut app.description_editor else {
+        return;
+    };
+    let ratatui_textarea::DataCursor(row, _col) = textarea.cursor();
+    let current_line = textarea.lines().get(row).cloned().unwrap_or_default();
+    let trimmed = current_line.trim_start();
+
+    // Check for empty list item — end the list
+    if trimmed == "-" || trimmed == "*" || trimmed == "- " || trimmed == "* " {
+        textarea.move_cursor(CursorMove::Head);
+        textarea.delete_line_by_end();
+        textarea.insert_newline();
+        return;
+    }
+    if let Some(num_str) = trimmed.strip_suffix(". ").or_else(|| trimmed.strip_suffix('.')) {
+        if num_str.parse::<u64>().is_ok() {
+            textarea.move_cursor(CursorMove::Head);
+            textarea.delete_line_by_end();
+            textarea.insert_newline();
+            return;
+        }
+    }
+
+    // Auto-continue unordered list
+    if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+        let indent = current_line.len() - trimmed.len();
+        let prefix_char = &trimmed[..2];
+        let indent_str = " ".repeat(indent);
+        textarea.move_cursor(CursorMove::End);
+        textarea.insert_newline();
+        textarea.insert_str(&format!("{indent_str}{prefix_char}"));
+        return;
+    }
+
+    // Auto-continue ordered list
+    if let Some(dot_pos) = trimmed.find(". ") {
+        let num_part = &trimmed[..dot_pos];
+        if let Ok(num) = num_part.parse::<u64>() {
+            let indent = current_line.len() - trimmed.len();
+            let indent_str = " ".repeat(indent);
+            textarea.move_cursor(CursorMove::End);
+            textarea.insert_newline();
+            textarea.insert_str(&format!("{indent_str}{}. ", num + 1));
+            return;
+        }
+    }
+
+    // Normal enter
+    textarea.insert_newline();
+}
+
+fn handle_tab_in_table(app: &mut App, shift: bool) -> bool {
+    let Some(textarea) = &mut app.description_editor else {
+        return false;
+    };
+    let ratatui_textarea::DataCursor(row, col) = textarea.cursor();
+    let line = match textarea.lines().get(row) {
+        Some(l) => l.clone(),
+        None => return false,
+    };
+
+    if !line.contains('|') {
+        return false;
+    }
+
+    if shift {
+        // Find previous | before cursor
+        if let Some(prev_pipe) = line[..col].rfind('|') {
+            if prev_pipe > 0 {
+                if let Some(before) = line[..prev_pipe].rfind('|') {
+                    let target = before + 2;
+                    textarea.move_cursor(CursorMove::Head);
+                    for _ in 0..target.min(line.len()) {
+                        textarea.move_cursor(CursorMove::Forward);
+                    }
+                    return true;
+                }
+            }
+            // At first cell, go to previous row
+            if row > 0 {
+                textarea.move_cursor(CursorMove::Up);
+                textarea.move_cursor(CursorMove::End);
+            }
+            return true;
+        }
+    } else {
+        // Find next | after cursor
+        if let Some(next_pipe) = line[col..].find('|') {
+            let abs_pos = col + next_pipe;
+            if abs_pos + 1 < line.len() {
+                let target = abs_pos + 2;
+                textarea.move_cursor(CursorMove::Head);
+                for _ in 0..target.min(line.len()) {
+                    textarea.move_cursor(CursorMove::Forward);
+                }
+                return true;
+            }
+        }
+        // At last cell, go to next row
+        let next_row = row + 1;
+        if next_row < textarea.lines().len() {
+            textarea.move_cursor(CursorMove::Down);
+            textarea.move_cursor(CursorMove::Head);
+            let next_line = textarea.lines().get(next_row).cloned().unwrap_or_default();
+            if let Some(first_pipe) = next_line.find('|') {
+                let target = first_pipe + 2;
+                for _ in 0..target.min(next_line.len()) {
+                    textarea.move_cursor(CursorMove::Forward);
+                }
+            }
+            return true;
+        }
+    }
+    true
 }
 
 fn wrap_selection_or_insert(app: &mut App, prefix: &str, suffix: &str) {
@@ -237,7 +417,6 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
             app.mode = AppMode::Normal;
         }
         InsertTarget::EditCardDescription => {
-            // Handled by handle_description_edit — should not reach here
             app.mode = AppMode::CardDetail;
         }
         InsertTarget::NewChecklistTitle => {

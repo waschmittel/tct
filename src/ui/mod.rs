@@ -47,6 +47,9 @@ pub fn render(frame: &mut Frame, app: &App) {
                 app.mode,
                 AppMode::Dialog(crate::app::DialogKind::ConfirmDeleteCard)
                     | AppMode::Dialog(crate::app::DialogKind::ConfirmDeleteList)
+                    | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveCard)
+                    | AppMode::Dialog(crate::app::DialogKind::ConfirmCancelEdit)
+                    | AppMode::Dialog(crate::app::DialogKind::ArchivedCards)
                     | AppMode::Dialog(crate::app::DialogKind::LabelPicker)
             ) {
                 dialog::render(frame, area, app);
@@ -69,7 +72,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
     use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
     let width = 60u16.min(area.width.saturating_sub(4));
-    let height = 34u16.min(area.height.saturating_sub(4));
+    let height = 40u16.min(area.height.saturating_sub(4));
     let x = (area.width.saturating_sub(width)) / 2;
     let y = (area.height.saturating_sub(height)) / 2;
     let popup = ratatui::layout::Rect::new(x, y, width, height);
@@ -94,7 +97,8 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
         Line::raw("  r                  Rename list"),
         Line::raw("  d                  Delete card"),
         Line::raw("  D                  Delete list"),
-        Line::raw("  a                  Archive card"),
+        Line::raw("  a                  Archive card (confirm)"),
+        Line::raw("  v                  View/restore archived"),
         Line::raw("  m                  Move card to another list"),
         Line::raw("  J/K                Reorder card up/down"),
         Line::raw("  </> (Shift+,/.)    Reorder list left/right"),
@@ -118,12 +122,15 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
         Line::raw(""),
         Line::from(Span::styled("Description Editor", Style::default().fg(Color::Cyan))),
         Line::raw("  Ctrl+S     Save"),
+        Line::raw("  Ctrl+Z/Y   Undo/redo"),
         Line::raw("  Ctrl+B     Bold (**text**)"),
         Line::raw("  Ctrl+I     Italic (*text*)"),
         Line::raw("  Ctrl+K     Code (`text`)"),
         Line::raw("  Ctrl+L     List item (- )"),
         Line::raw("  Ctrl+T     Table template"),
-        Line::raw("  Esc        Cancel"),
+        Line::raw("  Tab        Next table cell"),
+        Line::raw("  Enter      Auto-continue lists"),
+        Line::raw("  Esc        Cancel (confirm if changed)"),
     ];
 
     let paragraph = Paragraph::new(help_text).wrap(Wrap { trim: false });

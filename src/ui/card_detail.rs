@@ -127,7 +127,7 @@ fn render_description(
     app: &App,
 ) {
     if let Some(textarea) = &app.description_editor {
-        frame.render_widget(textarea, area);
+        render_description_editor(frame, area, textarea, app.editor_scroll);
         return;
     }
 
@@ -138,10 +138,62 @@ fn render_description(
         ));
         frame.render_widget(text, area);
     } else {
-        // Render markdown
         let lines = markdown::render_markdown(&card.description);
         let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
         frame.render_widget(paragraph, area);
+    }
+}
+
+fn render_description_editor(
+    frame: &mut Frame,
+    area: Rect,
+    textarea: &ratatui_textarea::TextArea<'static>,
+    editor_scroll: usize,
+) {
+    use ratatui::widgets::Borders;
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow))
+        .title(" Edit Description ");
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height == 0 || inner.width == 0 {
+        return;
+    }
+
+    let visible_height = inner.height as usize;
+    let lines = textarea.lines();
+    let ratatui_textarea::DataCursor(cursor_row, cursor_col) = textarea.cursor();
+
+    let scroll = editor_scroll;
+
+    let end = (scroll + visible_height).min(lines.len());
+    let start = scroll.min(end);
+
+    for (vi, li) in (start..end).enumerate() {
+        let line_text = &lines[li];
+        let highlighted = markdown::highlight_line(line_text);
+
+        let y = inner.y + vi as u16;
+        let line_area = Rect::new(inner.x, y, inner.width, 1);
+
+        if li == cursor_row {
+            frame.render_widget(
+                Paragraph::new(Line::from(highlighted))
+                    .style(Style::default().bg(Color::Rgb(30, 30, 40))),
+                line_area,
+            );
+        } else {
+            frame.render_widget(Paragraph::new(Line::from(highlighted)), line_area);
+        }
+    }
+
+    if cursor_row >= start && cursor_row < end {
+        let cx = inner.x + (cursor_col as u16).min(inner.width.saturating_sub(1));
+        let cy = inner.y + (cursor_row - start) as u16;
+        frame.set_cursor_position((cx, cy));
     }
 }
 

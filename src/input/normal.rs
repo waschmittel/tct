@@ -166,19 +166,21 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
         KeyCode::Char('a') if !grabbed => {
-            if let Some(board) = &mut app.board {
-                if let Some(card_id) = board.current_card_id().cloned() {
-                    if let Some(card) = board.cards.get_mut(&card_id) {
-                        card.archived = true;
-                        card.touch();
-                        card_store::save_card(&board.meta.id, card)?;
-                        if let Some(list) = board.lists.get_mut(board.selected_list) {
-                            list.card_ids.retain(|id| id != &card_id);
-                            list_store::save_list(&board.meta.id, list)?;
-                        }
-                        board.clamp_selection();
-                        app.set_status("Card archived".into());
-                    }
+            if let Some(board) = &app.board {
+                if board.current_card_id().is_some() {
+                    app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveCard);
+                }
+            }
+        }
+        KeyCode::Char('v') if !grabbed => {
+            if let Some(board) = &app.board {
+                let archived = card_store::list_archived_cards(&board.meta.id);
+                if archived.is_empty() {
+                    app.set_status("No archived cards".into());
+                } else {
+                    app.archived_cards = archived;
+                    app.archived_selected = 0;
+                    app.mode = AppMode::Dialog(DialogKind::ArchivedCards);
                 }
             }
         }

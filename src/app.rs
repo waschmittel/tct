@@ -41,6 +41,9 @@ pub enum DialogKind {
     ConfirmDeleteCard,
     ConfirmDeleteList,
     ConfirmDeleteBoard,
+    ConfirmArchiveCard,
+    ConfirmCancelEdit,
+    ArchivedCards,
     LabelPicker,
 }
 
@@ -144,6 +147,10 @@ pub struct App {
     pub input_cursor: usize,
     pub label_picker_idx: usize,
     pub description_editor: Option<TextArea<'static>>,
+    pub description_original: Option<String>,
+    pub editor_scroll: usize,
+    pub archived_cards: Vec<Card>,
+    pub archived_selected: usize,
 }
 
 impl App {
@@ -164,6 +171,10 @@ impl App {
             input_cursor: 0,
             label_picker_idx: 0,
             description_editor: None,
+            description_original: None,
+            editor_scroll: 0,
+            archived_cards: Vec::new(),
+            archived_selected: 0,
         })
     }
 
@@ -238,7 +249,9 @@ impl App {
                 .border_style(Style::default().fg(Color::Yellow))
                 .title(" Edit Description "),
         );
+        self.description_original = Some(initial.to_string());
         self.description_editor = Some(textarea);
+        self.editor_scroll = 0;
         self.mode = AppMode::Insert(InsertTarget::EditCardDescription);
     }
 
