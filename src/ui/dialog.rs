@@ -281,15 +281,15 @@ fn render_label_manager(frame: &mut Frame, area: Rect, app: &App) {
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
-                    format!("● {}", label.name),
+                    format!(" {} ", label.name),
                     label_style.add_modifier(Modifier::BOLD),
                 ),
             ]));
         } else {
-            lines.push(Line::from(Span::styled(
-                format!("  ● {}", label.name),
-                label_style,
-            )));
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(format!(" {} ", label.name), label_style),
+            ]));
         }
     }
 
