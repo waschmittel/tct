@@ -14,6 +14,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 app.search_active = false;
             } else {
                 app.search_active = true;
+                select_first_match(app);
             }
             app.mode = AppMode::Normal;
         }
@@ -26,4 +27,23 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         _ => {}
     }
     Ok(())
+}
+
+fn select_first_match(app: &mut App) {
+    let board = match &mut app.board {
+        Some(b) => b,
+        None => return,
+    };
+    let query = &app.search_query;
+    for li in 0..board.lists.len() {
+        for (ci, card_id) in board.lists[li].card_ids.iter().enumerate() {
+            if let Some(card) = board.cards.get(card_id) {
+                if !card.archived && card.matches_search(query, &board.meta.labels) {
+                    board.selected_list = li;
+                    board.selected_card[li] = ci;
+                    return;
+                }
+            }
+        }
+    }
 }

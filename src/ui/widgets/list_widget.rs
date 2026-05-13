@@ -8,7 +8,7 @@ use crate::model::list::CardList;
 
 use super::card_widget;
 
-const CARD_HEIGHT: u16 = 4;
+const CARD_HEIGHT: u16 = 5;
 
 pub fn render(
     frame: &mut Frame,
@@ -47,9 +47,28 @@ pub fn render(
         })
         .count();
 
+    let filtered_count = if app.search_active {
+        list.card_ids
+            .iter()
+            .filter(|id| {
+                board.cards.get(*id).map(|c| {
+                    !c.archived && c.matches_search(&app.search_query, &board.meta.labels)
+                }).unwrap_or(false)
+            })
+            .count()
+    } else {
+        active_count
+    };
+
+    let count_label = if app.search_active {
+        format!("{filtered_count}/{active_count}")
+    } else {
+        format!("{active_count}")
+    };
+
     let block = Block::default()
         .title_top(ratatui::text::Line::styled(
-            format!(" {} ({}) ", list.name, active_count),
+            format!(" {} ({}) ", list.name, count_label),
             title_style,
         ))
         .borders(Borders::ALL)
@@ -62,7 +81,9 @@ pub fn render(
         return;
     }
 
-    let visible_cards: Vec<&str> = list
+    let selected_card_idx = board.selected_card.get(list_index).copied().unwrap_or(0);
+
+    let all_visible: Vec<&str> = list
         .card_ids
         .iter()
         .filter(|id| {
@@ -75,6 +96,24 @@ pub fn render(
         .map(|id| id.as_str())
         .collect();
 
+    let selected_card_id = all_visible.get(selected_card_idx).copied();
+
+    let visible_cards: Vec<&str> = if app.search_active {
+        all_visible
+            .iter()
+            .filter(|id| {
+                board
+                    .cards
+                    .get(**id)
+                    .map(|c| c.matches_search(&app.search_query, &board.meta.labels))
+                    .unwrap_or(false)
+            })
+            .copied()
+            .collect()
+    } else {
+        all_visible
+    };
+
     if visible_cards.is_empty() {
         let empty = ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
             " (empty)",
@@ -85,15 +124,18 @@ pub fn render(
     }
 
     let max_visible = (inner.height / CARD_HEIGHT) as usize;
-    let selected_card_idx = board.selected_card.get(list_index).copied().unwrap_or(0);
 
-    // Compute scroll so selected card is always visible
+    let selected_pos_in_filtered = selected_card_id
+        .and_then(|sid| visible_cards.iter().position(|&id| id == sid))
+        .unwrap_or(0);
+
     let mut scroll = board.scroll_offset.get(list_index).copied().unwrap_or(0);
+    scroll = scroll.min(visible_cards.len().saturating_sub(1));
     if max_visible > 0 {
-        if selected_card_idx < scroll {
-            scroll = selected_card_idx;
-        } else if selected_card_idx >= scroll + max_visible {
-            scroll = selected_card_idx - max_visible + 1;
+        if selected_pos_in_filtered < scroll {
+            scroll = selected_pos_in_filtered;
+        } else if selected_pos_in_filtered >= scroll + max_visible {
+            scroll = selected_pos_in_filtered - max_visible + 1;
         }
     }
 
@@ -111,8 +153,8 @@ pub fn render(
                 height: CARD_HEIGHT.min(inner.height - vi as u16 * CARD_HEIGHT),
             };
 
-            let is_card_selected = is_selected && ci == selected_card_idx;
-            let dimmed = app.search_active && !card.matches_search(&app.search_query, &board.meta.labels);
+            let is_card_selected = is_selected && Some(card_id) == selected_card_id;
+            let dimmed = false;
             let grabbed = board
                 .grabbed_card
                 .as_ref()

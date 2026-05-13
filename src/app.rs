@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use ratatui::style::{Color, Style};
 use ratatui_textarea::TextArea;
@@ -132,6 +132,8 @@ pub struct App {
     pub editor_scroll: usize,
     pub archived_cards: Vec<Card>,
     pub archived_selected: usize,
+    pub last_reload: Instant,
+    pub reload_interval: Duration,
 }
 
 impl App {
@@ -156,15 +158,86 @@ impl App {
             editor_scroll: 0,
             archived_cards: Vec::new(),
             archived_selected: 0,
+            last_reload: Instant::now(),
+            reload_interval: Duration::from_secs(15),
         })
     }
 
     pub fn on_tick(&mut self) {
         if let Some((_, instant)) = &self.status_message {
-            if instant.elapsed() > std::time::Duration::from_secs(3) {
+            if instant.elapsed() > Duration::from_secs(3) {
                 self.status_message = None;
             }
         }
+
+        if self.last_reload.elapsed() >= self.reload_interval && self.should_reload() {
+            self.last_reload = Instant::now();
+            let _ = self.try_reload_board();
+        }
+    }
+
+    fn should_reload(&self) -> bool {
+        self.board.is_some()
+            && matches!(self.mode, AppMode::Normal | AppMode::Help | AppMode::CardDetail)
+            && self.board.as_ref().map(|b| !b.is_grabbed()).unwrap_or(true)
+            && self.description_editor.is_none()
+    }
+
+    fn try_reload_board(&mut self) {
+        let board_id = match &self.board {
+            Some(b) => b.meta.id.clone(),
+            None => return,
+        };
+
+        let old = self.board.as_ref().unwrap();
+        let old_selected_list = old.selected_list;
+        let old_selected_card = old.selected_card.clone();
+        let old_scroll_offset = old.scroll_offset.clone();
+        let old_detail_item_idx = old.detail_item_idx;
+        let old_detail_scroll = old.detail_scroll;
+
+        let meta = match board_store::load_board(&board_id) {
+            Ok(m) => m,
+            Err(_) => {
+                self.board = None;
+                let _ = self.reload_boards();
+                self.mode = AppMode::BoardSelector;
+                return;
+            }
+        };
+        let lists = match list_store::load_all_lists(&board_id, &meta.list_order) {
+            Ok(l) => l,
+            Err(_) => return,
+        };
+        let mut cards = HashMap::new();
+        for list in &lists {
+            for card_id in &list.card_ids {
+                if let Ok(card) = card_store::load_card(&board_id, card_id) {
+                    cards.insert(card_id.clone(), card);
+                }
+            }
+        }
+
+        let num_lists = lists.len();
+        let board = self.board.as_mut().unwrap();
+        board.meta = meta;
+        board.lists = lists;
+        board.cards = cards;
+
+        board.selected_card.resize(num_lists, 0);
+        board.scroll_offset.resize(num_lists, 0);
+        board.selected_list = old_selected_list.min(num_lists.saturating_sub(1));
+        for i in 0..num_lists {
+            if i < old_selected_card.len() {
+                board.selected_card[i] = old_selected_card[i];
+            }
+            if i < old_scroll_offset.len() {
+                board.scroll_offset[i] = old_scroll_offset[i];
+            }
+        }
+        board.detail_item_idx = old_detail_item_idx;
+        board.detail_scroll = old_detail_scroll;
+        board.clamp_selection();
     }
 
     pub fn set_status(&mut self, msg: String) {

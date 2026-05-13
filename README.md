@@ -7,19 +7,19 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 - Multiple boards with named lists and cards
 - Grab-and-move card reordering (within and across lists)
 - Inline markdown description editor with syntax highlighting
-- Markdown syntax highlighting (code blocks, headings, bold/italic, inline code, lists, tables)
+- Markdown syntax highlighting (code blocks, headings, bold/italic, inline code, lists)
 - Unified card detail view — description, checklist, labels, due date in one scrollable view
 - Checklist CRUD — add, edit, toggle, delete items
-- Board-level global labels with CRUD management
-- Due dates with overdueness display
+- Board-level global labels with auto-generated pastel colors
+- Due dates with overdueness display in both card list and detail view
 - Card archiving and un-archiving
-- Search and label filtering
+- Search with non-matching cards hidden and label filtering
 - Grab-and-move with confirm/abort (Esc restores card to original position)
 - Confirmation dialogs for destructive actions
 - Undo/redo in description editor
 - macOS Cmd key support (in supported terminals)
 - Auto-continuing lists in editor
-- Table auto-formatting on save
+- Periodic filesystem reload (every 15s) for background sync support
 
 ## Installation
 
@@ -153,7 +153,7 @@ src/
     dialog.rs          # Confirmation + picker dialogs
     search_bar.rs      # Search input bar
     status_bar.rs      # Mode + hints + status messages
-    markdown.rs        # Markdown rendering, table formatting, syntax highlighting
+    markdown.rs        # Markdown rendering, syntax highlighting
     theme.rs           # Color theme
     widgets/
       card_widget.rs   # Individual card rendering

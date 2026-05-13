@@ -37,6 +37,14 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         KeyCode::Char('j') | KeyCode::Down => {
             if grabbed {
                 move_card_down(app)?;
+            } else if app.search_active {
+                if let Some(board) = &mut app.board {
+                    let li = board.selected_list;
+                    let current = board.selected_card.get(li).copied().unwrap_or(0);
+                    if let Some(next) = next_matching_card(board, li, current, &app.search_query) {
+                        board.selected_card[li] = next;
+                    }
+                }
             } else if let Some(board) = &mut app.board {
                 let li = board.selected_list;
                 let max = board.visible_card_count(li).saturating_sub(1);
@@ -48,6 +56,14 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         KeyCode::Char('k') | KeyCode::Up => {
             if grabbed {
                 move_card_up(app)?;
+            } else if app.search_active {
+                if let Some(board) = &mut app.board {
+                    let li = board.selected_list;
+                    let current = board.selected_card.get(li).copied().unwrap_or(0);
+                    if let Some(prev) = prev_matching_card(board, li, current, &app.search_query) {
+                        board.selected_card[li] = prev;
+                    }
+                }
             } else if let Some(board) = &mut app.board {
                 let li = board.selected_list;
                 if board.selected_card.get(li).copied().unwrap_or(0) > 0 {
@@ -360,4 +376,65 @@ fn move_card_right(app: &mut App) -> anyhow::Result<()> {
     board.selected_list = dst;
     board.selected_card[dst] = board.lists[dst].card_ids.len().saturating_sub(1);
     Ok(())
+}
+
+fn visible_card_ids(board: &crate::app::LoadedBoard, list_idx: usize) -> Vec<usize> {
+    let list = match board.lists.get(list_idx) {
+        Some(l) => l,
+        None => return vec![],
+    };
+    list.card_ids
+        .iter()
+        .enumerate()
+        .filter(|(_, id)| {
+            board
+                .cards
+                .get(*id)
+                .map(|c| !c.archived)
+                .unwrap_or(false)
+        })
+        .map(|(i, _)| i)
+        .collect()
+}
+
+fn next_matching_card(
+    board: &crate::app::LoadedBoard,
+    list_idx: usize,
+    current: usize,
+    query: &str,
+) -> Option<usize> {
+    let indices = visible_card_ids(board, list_idx);
+    let list = board.lists.get(list_idx)?;
+    for &i in &indices {
+        if i > current {
+            let card_id = &list.card_ids[i];
+            if let Some(card) = board.cards.get(card_id) {
+                if card.matches_search(query, &board.meta.labels) {
+                    return Some(i);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn prev_matching_card(
+    board: &crate::app::LoadedBoard,
+    list_idx: usize,
+    current: usize,
+    query: &str,
+) -> Option<usize> {
+    let indices = visible_card_ids(board, list_idx);
+    let list = board.lists.get(list_idx)?;
+    for &i in indices.iter().rev() {
+        if i < current {
+            let card_id = &list.card_ids[i];
+            if let Some(card) = board.cards.get(card_id) {
+                if card.matches_search(query, &board.meta.labels) {
+                    return Some(i);
+                }
+            }
+        }
+    }
+    None
 }

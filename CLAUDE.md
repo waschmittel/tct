@@ -14,8 +14,10 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 - **DialogKind**: Enum for dialogs (delete confirmations, archive, cancel edit, label picker, archived cards). Handlers in `dialog_input.rs`, rendering in `dialog.rs`.
 - **Storage**: JSON files under `~/.tct/boards/`. All writes use `atomic_write` (write `.tmp`, then rename). Override path with `TCT_DATA_DIR` env var.
 - **Description editing**: Uses `ratatui-textarea` TextArea for editing, custom renderer in `card_detail.rs::render_description_editor()` for syntax highlighting via `markdown::highlight_line()`.
-- **Markdown rendering**: `pulldown-cmark` for read-only view (`markdown::render_markdown()`), hand-rolled line-level highlighter for editor (`markdown::highlight_line()`).
-- **Table formatting**: `markdown::format_tables()` aligns columns on save.
+- **Markdown rendering**: Hand-rolled line-level highlighter for editor (`markdown::highlight_line()`).
+- **Label colors**: `LabelColor` enum with named pastel variants + `Custom { r, g, b }`. New labels get auto-generated pastel colors via `LabelColor::generate_pastel()` which picks maximally distant hue from existing labels.
+- **Search**: When active, non-matching cards are hidden (not just dimmed). Navigation skips hidden cards. First match auto-selected on search confirm.
+- **Periodic reload**: `App::on_tick()` reloads board from filesystem every 15s (configurable via `reload_interval`). Skipped during editing/dialog/grab modes. Preserves selection state.
 
 ## How to Add Things
 

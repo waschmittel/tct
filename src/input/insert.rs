@@ -6,7 +6,6 @@ use crate::model::card::Card;
 use crate::model::label::Label;
 use crate::model::list::CardList;
 use crate::storage::{board_store, card_store, list_store};
-use crate::ui::markdown;
 
 fn has_ctrl_or_cmd(modifiers: KeyModifiers) -> bool {
     modifiers.contains(KeyModifiers::CONTROL) || modifiers.contains(KeyModifiers::SUPER)
@@ -147,7 +146,6 @@ fn description_changed(app: &App) -> bool {
 
 fn confirm_description_save(app: &mut App) -> anyhow::Result<()> {
     let text = app.finish_description_edit().unwrap_or_default();
-    let text = markdown::format_tables(&text);
     if let Some(board) = &mut app.board {
         if let Some(card_id) = board.current_card_id().cloned() {
             if let Some(card) = board.cards.get_mut(&card_id) {
@@ -393,7 +391,10 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
         }
         InsertTarget::NewLabelName => {
             if let Some(board) = &mut app.board {
-                let label = Label::new(text.clone(), crate::model::label::LabelColor::Blue);
+                let existing_colors: Vec<_> =
+                    board.meta.labels.iter().map(|l| l.color).collect();
+                let color = crate::model::label::LabelColor::generate_pastel(&existing_colors);
+                let label = Label::new(text.clone(), color);
                 board.meta.labels.push(label);
                 board_store::save_board(&board.meta)?;
                 app.label_picker_idx = board.meta.labels.len().saturating_sub(1);
