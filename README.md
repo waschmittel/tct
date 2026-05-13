@@ -141,7 +141,7 @@ tct --help                              Show all commands and options
 tct --board <name>                      Open TUI directly on a matching board
 ```
 
-Board, list, card, and label arguments use **case-insensitive partial name matching** or **ID prefix matching** (IDs are shown in listings as `[xxxxxxxx]`). Multiple matches produce an error listing all candidates.
+Board, list, card, and label arguments use **case-insensitive partial name matching** by default. Pass `--by-id` anywhere in the command to match all identifier arguments by **exact ID** instead of name. IDs are shown in listings as `[xxxxxxxx]`. Multiple name matches produce an error listing all candidates with their IDs.
 
 ### Boards
 
@@ -152,6 +152,9 @@ tct boards create <name>                Create a new board
 tct boards archive <name>               Archive a board
 tct boards restore <name>               Restore an archived board
 tct boards delete <name>                Permanently delete an archived board
+
+# Use --by-id to address by exact ID instead of name:
+tct boards archive a1b2c3d4 --by-id
 ```
 
 ### Lists

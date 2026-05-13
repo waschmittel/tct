@@ -57,9 +57,9 @@ COMMANDS:
   labels assign <board> <card> <label>  Assign a label to a card
   labels remove <board> <card> <label>  Remove a label from a card
 
-Board, list, card, and label arguments support case-insensitive partial name matching
-or exact/prefix ID matching (IDs are shown in listings as [xxxxxxxx]).
-Multiple matches or zero matches result in an error.
+Board, list, card, and label arguments use case-insensitive partial name matching by default.
+Pass --by-id to match by exact ID instead of name (IDs are shown in listings as [xxxxxxxx]).
+Multiple name matches or a missing ID result in an error.
 
 STORAGE:
     By default data is stored in ~/.tct/. If a .tct/ directory exists in the current
@@ -78,7 +78,7 @@ pub fn resolve_board_flag(args: &[String]) -> anyhow::Result<Option<String>> {
         if args[i] == "--board" {
             if i + 1 < args.len() {
                 let partial = &args[i + 1];
-                let board = find_board(partial)?;
+                let board = find_board(partial, false)?;
                 return Ok(Some(board.id));
             } else {
                 bail!("--board requires a board name argument");
@@ -91,21 +91,23 @@ pub fn resolve_board_flag(args: &[String]) -> anyhow::Result<Option<String>> {
 
 pub fn run(args: &[String]) -> anyhow::Result<()> {
     board_store::ensure_base_dirs()?;
+    let by_id = args.iter().any(|a| a == "--by-id");
+    let args: Vec<String> = args.iter().filter(|a| *a != "--by-id").cloned().collect();
     let sub = args[0].as_str();
     let rest = &args[1..];
     match sub {
-        "boards" => cmd_boards(rest),
-        "lists" => cmd_lists(rest),
-        "cards" => cmd_cards(rest),
-        "checklist" => cmd_checklist(rest),
-        "labels" => cmd_labels(rest),
+        "boards" => cmd_boards(rest, by_id),
+        "lists" => cmd_lists(rest, by_id),
+        "cards" => cmd_cards(rest, by_id),
+        "checklist" => cmd_checklist(rest, by_id),
+        "labels" => cmd_labels(rest, by_id),
         other => bail!("Unknown command '{other}'. Run 'tct --help' for usage."),
     }
 }
 
 // ── Boards ────────────────────────────────────────────────────────────────────
 
-fn cmd_boards(args: &[String]) -> anyhow::Result<()> {
+fn cmd_boards(args: &[String], by_id: bool) -> anyhow::Result<()> {
     match args.first().map(|s| s.as_str()) {
         None => {
             let boards = board_store::list_boards()?;
@@ -145,7 +147,7 @@ fn cmd_boards(args: &[String]) -> anyhow::Result<()> {
         }
         Some("archive") => {
             let partial = require_arg(args, 1, "board name")?;
-            let mut board = find_board(partial)?;
+            let mut board = find_board(partial, by_id)?;
             let name = board.name.clone();
             board.archived = true;
             board_store::save_board(&board)?;
@@ -154,7 +156,7 @@ fn cmd_boards(args: &[String]) -> anyhow::Result<()> {
         }
         Some("restore") => {
             let partial = require_arg(args, 1, "board name")?;
-            let mut board = find_archived_board(partial)?;
+            let mut board = find_archived_board(partial, by_id)?;
             let name = board.name.clone();
             board.archived = false;
             board_store::save_board(&board)?;
@@ -163,7 +165,7 @@ fn cmd_boards(args: &[String]) -> anyhow::Result<()> {
         }
         Some("delete") => {
             let partial = require_arg(args, 1, "board name")?;
-            let board = find_archived_board(partial)?;
+            let board = find_archived_board(partial, by_id)?;
             let name = board.name.clone();
             board_store::delete_board(&board.id)?;
             println!("Permanently deleted board '{name}'.");
@@ -175,17 +177,15 @@ fn cmd_boards(args: &[String]) -> anyhow::Result<()> {
 
 // ── Lists ─────────────────────────────────────────────────────────────────────
 
-fn cmd_lists(args: &[String]) -> anyhow::Result<()> {
+fn cmd_lists(args: &[String], by_id: bool) -> anyhow::Result<()> {
     match args.first().map(|s| s.as_str()) {
         None => bail!("Usage: tct lists <board> [create|rename|delete ...]"),
         Some(board_partial) => {
-            // Disambiguate: if first arg is a board name (non-subcommand when no second arg matches)
-            // Subcommands: create, rename, delete — all require a board as second arg
             let sub = args.get(1).map(|s| s.as_str());
             match sub {
                 None => {
                     // tct lists <board>
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
                     let all_cards = load_all_cards(&board.id, &lists);
                     println!("Board: {} [{}]", board.name, board.id);
@@ -199,7 +199,7 @@ fn cmd_lists(args: &[String]) -> anyhow::Result<()> {
                     }
                 }
                 Some("create") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let name = require_arg(args, 2, "list name")?;
                     let list = CardList::new(name.to_string());
                     list_store::save_list(&board.id, &list)?;
@@ -209,21 +209,21 @@ fn cmd_lists(args: &[String]) -> anyhow::Result<()> {
                     println!("Created list '{}' on board '{}'.", list.name, board.name);
                 }
                 Some("rename") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let list_partial = require_arg(args, 2, "list name")?;
                     let new_name = require_arg(args, 3, "new name")?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-                    let mut list = find_list(&lists, list_partial)?.clone();
+                    let mut list = find_list(&lists, list_partial, by_id)?.clone();
                     let old_name = list.name.clone();
                     list.name = new_name.to_string();
                     list_store::save_list(&board.id, &list)?;
                     println!("Renamed list '{old_name}' to '{new_name}'.");
                 }
                 Some("delete") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let list_partial = require_arg(args, 2, "list name")?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-                    let list = find_list(&lists, list_partial)?.clone();
+                    let list = find_list(&lists, list_partial, by_id)?.clone();
                     let name = list.name.clone();
                     for card_id in &list.card_ids {
                         let _ = card_store::delete_card(&board.id, card_id);
@@ -243,7 +243,7 @@ fn cmd_lists(args: &[String]) -> anyhow::Result<()> {
 
 // ── Cards ─────────────────────────────────────────────────────────────────────
 
-fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
+fn cmd_cards(args: &[String], by_id: bool) -> anyhow::Result<()> {
     match args.first().map(|s| s.as_str()) {
         None => bail!("Usage: tct cards <board> [subcommand ...]"),
         Some(board_partial) => {
@@ -251,7 +251,7 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
             match sub {
                 None => {
                     // tct cards <board> — list all active cards grouped by list
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
                     let all_cards = load_all_cards(&board.id, &lists);
                     println!("Board: {} [{}]", board.name, board.id);
@@ -269,7 +269,7 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                     }
                 }
                 Some("archived") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let archived = card_store::list_archived_cards(&board.id);
                     println!("Board: {} [{}]  (archived cards: {})", board.name, board.id, archived.len());
                     for (i, card) in archived.iter().enumerate() {
@@ -278,20 +278,20 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                     }
                 }
                 Some("show") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let card_partial = require_arg(args, 2, "card name")?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
                     let all_cards = load_all_cards(&board.id, &lists);
                     let (list, card) =
-                        find_card_in_lists(&lists, &all_cards, card_partial, false)?;
+                        find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
                     print_card_detail(&card, &board, &list);
                 }
                 Some("create") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let list_partial = require_arg(args, 2, "list name")?;
                     let title = require_arg(args, 3, "card title")?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-                    let mut list = find_list(&lists, list_partial)?.clone();
+                    let mut list = find_list(&lists, list_partial, by_id)?.clone();
                     let card = Card::new(title.to_string());
                     card_store::save_card(&board.id, &card)?;
                     list.card_ids.push(card.id.clone());
@@ -299,12 +299,12 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                     println!("Created card '{}' in list '{}' on board '{}'.", card.title, list.name, board.name);
                 }
                 Some("edit") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let card_partial = require_arg(args, 2, "card name")?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
                     let all_cards = load_all_cards(&board.id, &lists);
                     let (_, mut card) =
-                        find_card_in_lists(&lists, &all_cards, card_partial, false)?;
+                        find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
 
                     let new_title = flag_value(args, "--title");
                     let new_desc = flag_value(args, "--description");
@@ -335,12 +335,12 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                     println!("Updated card '{}'.", card.title);
                 }
                 Some("archive") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let card_partial = require_arg(args, 2, "card name")?;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
                     let all_cards = load_all_cards(&board.id, &lists);
                     let (mut list, mut card) =
-                        find_card_in_lists(&lists, &all_cards, card_partial, false)?;
+                        find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
                     let title = card.title.clone();
                     card.archived = true;
                     card.touch();
@@ -350,9 +350,9 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                     println!("Archived card '{title}'.");
                 }
                 Some("restore") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let card_partial = require_arg(args, 2, "card name")?;
-                    let mut card = find_archived_card(&board.id, card_partial)?;
+                    let mut card = find_archived_card(&board.id, card_partial, by_id)?;
                     let title = card.title.clone();
                     card.archived = false;
                     card.touch();
@@ -368,19 +368,19 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
                     println!("Restored card '{title}'.");
                 }
                 Some("delete") => {
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let card_partial = require_arg(args, 2, "card name")?;
-                    let card = find_archived_card(&board.id, card_partial)?;
+                    let card = find_archived_card(&board.id, card_partial, by_id)?;
                     let title = card.title.clone();
                     card_store::delete_card(&board.id, &card.id)?;
                     println!("Permanently deleted card '{title}'.");
                 }
                 Some(sub) if !sub.starts_with('-') => {
                     // tct cards <board> <list> — filter cards by list
-                    let board = find_board(board_partial)?;
+                    let board = find_board(board_partial, by_id)?;
                     let list_partial = sub;
                     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-                    let list = find_list(&lists, list_partial)?.clone();
+                    let list = find_list(&lists, list_partial, by_id)?.clone();
                     let all_cards = load_all_cards(&board.id, &lists);
                     let active: Vec<_> = list
                         .card_ids
@@ -402,18 +402,18 @@ fn cmd_cards(args: &[String]) -> anyhow::Result<()> {
 
 // ── Checklist ─────────────────────────────────────────────────────────────────
 
-fn cmd_checklist(args: &[String]) -> anyhow::Result<()> {
+fn cmd_checklist(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args.first().ok_or_else(|| anyhow::anyhow!("Usage: tct checklist <board> <card> [add|toggle|delete ...]"))?;
     let card_partial = require_arg(args, 1, "card name")?;
     let sub = args.get(2).map(|s| s.as_str());
 
-    let board = find_board(board_partial)?;
+    let board = find_board(board_partial, by_id)?;
     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
     let all_cards = load_all_cards(&board.id, &lists);
 
     match sub {
         None => {
-            let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false)?;
+            let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
             println!("Card: {}  Checklist: {}", card.title, fmt_progress(&card));
             if card.checklist.is_empty() {
                 println!("  (no items)");
@@ -426,7 +426,7 @@ fn cmd_checklist(args: &[String]) -> anyhow::Result<()> {
         }
         Some("add") => {
             let text = require_arg(args, 3, "item text")?;
-            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false)?;
+            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
             card.checklist.push(ChecklistItem { text: text.to_string(), completed: false });
             card.touch();
             card_store::save_card(&board.id, &card)?;
@@ -436,7 +436,7 @@ fn cmd_checklist(args: &[String]) -> anyhow::Result<()> {
             let n: usize = require_arg(args, 3, "item index")?
                 .parse()
                 .context("Item index must be a positive integer")?;
-            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false)?;
+            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
             let idx = n.checked_sub(1).ok_or_else(|| anyhow::anyhow!("Index must be >= 1"))?;
             let total = card.checklist.len();
             let item = card
@@ -454,7 +454,7 @@ fn cmd_checklist(args: &[String]) -> anyhow::Result<()> {
             let n: usize = require_arg(args, 3, "item index")?
                 .parse()
                 .context("Item index must be a positive integer")?;
-            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false)?;
+            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
             let idx = n.checked_sub(1).ok_or_else(|| anyhow::anyhow!("Index must be >= 1"))?;
             if idx >= card.checklist.len() {
                 bail!("Index {n} out of range (card has {} items)", card.checklist.len());
@@ -471,13 +471,13 @@ fn cmd_checklist(args: &[String]) -> anyhow::Result<()> {
 
 // ── Labels ────────────────────────────────────────────────────────────────────
 
-fn cmd_labels(args: &[String]) -> anyhow::Result<()> {
+fn cmd_labels(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args.first().ok_or_else(|| anyhow::anyhow!("Usage: tct labels <board> [create|delete|assign|remove ...]"))?;
     let sub = args.get(1).map(|s| s.as_str());
 
     match sub {
         None => {
-            let board = find_board(board_partial)?;
+            let board = find_board(board_partial, by_id)?;
             println!("Board: {} [{}]  Labels ({}):", board.name, board.id, board.labels.len());
             if board.labels.is_empty() {
                 println!("  (no labels)");
@@ -489,7 +489,7 @@ fn cmd_labels(args: &[String]) -> anyhow::Result<()> {
         }
         Some("create") => {
             let name = require_arg(args, 2, "label name")?;
-            let mut board = find_board(board_partial)?;
+            let mut board = find_board(board_partial, by_id)?;
             let existing: Vec<_> = board.labels.iter().map(|l| l.color).collect();
             let color = LabelColor::generate_pastel(&existing);
             let label = Label::new(name.to_string(), color);
@@ -499,8 +499,8 @@ fn cmd_labels(args: &[String]) -> anyhow::Result<()> {
         }
         Some("delete") => {
             let label_partial = require_arg(args, 2, "label name")?;
-            let mut board = find_board(board_partial)?;
-            let label = find_label(&board.labels, label_partial)?.clone();
+            let mut board = find_board(board_partial, by_id)?;
+            let label = find_label(&board.labels, label_partial, by_id)?.clone();
             let label_name = label.name.clone();
             board.labels.retain(|l| l.id != label.id);
             // Remove from all cards
@@ -522,11 +522,11 @@ fn cmd_labels(args: &[String]) -> anyhow::Result<()> {
         Some("assign") => {
             let card_partial = require_arg(args, 2, "card name")?;
             let label_partial = require_arg(args, 3, "label name")?;
-            let board = find_board(board_partial)?;
-            let label = find_label(&board.labels, label_partial)?.clone();
+            let board = find_board(board_partial, by_id)?;
+            let label = find_label(&board.labels, label_partial, by_id)?.clone();
             let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
             let all_cards = load_all_cards(&board.id, &lists);
-            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false)?;
+            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
             if !card.label_ids.contains(&label.id) {
                 card.label_ids.push(label.id.clone());
                 card.touch();
@@ -539,11 +539,11 @@ fn cmd_labels(args: &[String]) -> anyhow::Result<()> {
         Some("remove") => {
             let card_partial = require_arg(args, 2, "card name")?;
             let label_partial = require_arg(args, 3, "label name")?;
-            let board = find_board(board_partial)?;
-            let label = find_label(&board.labels, label_partial)?.clone();
+            let board = find_board(board_partial, by_id)?;
+            let label = find_label(&board.labels, label_partial, by_id)?.clone();
             let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
             let all_cards = load_all_cards(&board.id, &lists);
-            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false)?;
+            let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
             if card.label_ids.contains(&label.id) {
                 card.label_ids.retain(|id| id != &label.id);
                 card.touch();
@@ -560,56 +560,64 @@ fn cmd_labels(args: &[String]) -> anyhow::Result<()> {
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
 
-fn id_matches(id: &str, partial: &str) -> bool {
-    id.starts_with(partial)
-}
-
-fn find_board(partial: &str) -> anyhow::Result<BoardMeta> {
+fn find_board(partial: &str, by_id: bool) -> anyhow::Result<BoardMeta> {
     let boards = board_store::list_boards()?;
-    let q = partial.to_lowercase();
-    let matches: Vec<_> = boards
-        .into_iter()
-        .filter(|b| id_matches(&b.id, partial) || b.name.to_lowercase().contains(&q))
-        .collect();
-    match matches.len() {
-        0 => bail!("No active board matches '{partial}'."),
-        1 => Ok(matches.into_iter().next().unwrap()),
-        _ => {
-            let names: Vec<_> = matches.iter().map(|b| format!("{} [{}]", b.name, b.id)).collect();
-            bail!("Multiple boards match '{partial}': {}.", names.join(", "))
+    if by_id {
+        boards
+            .into_iter()
+            .find(|b| b.id == partial)
+            .ok_or_else(|| anyhow::anyhow!("No active board with ID '{partial}'."))
+    } else {
+        let q = partial.to_lowercase();
+        let matches: Vec<_> = boards.into_iter().filter(|b| b.name.to_lowercase().contains(&q)).collect();
+        match matches.len() {
+            0 => bail!("No active board matches '{partial}'."),
+            1 => Ok(matches.into_iter().next().unwrap()),
+            _ => {
+                let names: Vec<_> = matches.iter().map(|b| format!("{} [{}]", b.name, b.id)).collect();
+                bail!("Multiple boards match '{partial}': {}.", names.join(", "))
+            }
         }
     }
 }
 
-fn find_archived_board(partial: &str) -> anyhow::Result<BoardMeta> {
+fn find_archived_board(partial: &str, by_id: bool) -> anyhow::Result<BoardMeta> {
     let boards = board_store::list_archived_boards()?;
-    let q = partial.to_lowercase();
-    let matches: Vec<_> = boards
-        .into_iter()
-        .filter(|b| id_matches(&b.id, partial) || b.name.to_lowercase().contains(&q))
-        .collect();
-    match matches.len() {
-        0 => bail!("No archived board matches '{partial}'."),
-        1 => Ok(matches.into_iter().next().unwrap()),
-        _ => {
-            let names: Vec<_> = matches.iter().map(|b| format!("{} [{}]", b.name, b.id)).collect();
-            bail!("Multiple archived boards match '{partial}': {}.", names.join(", "))
+    if by_id {
+        boards
+            .into_iter()
+            .find(|b| b.id == partial)
+            .ok_or_else(|| anyhow::anyhow!("No archived board with ID '{partial}'."))
+    } else {
+        let q = partial.to_lowercase();
+        let matches: Vec<_> = boards.into_iter().filter(|b| b.name.to_lowercase().contains(&q)).collect();
+        match matches.len() {
+            0 => bail!("No archived board matches '{partial}'."),
+            1 => Ok(matches.into_iter().next().unwrap()),
+            _ => {
+                let names: Vec<_> = matches.iter().map(|b| format!("{} [{}]", b.name, b.id)).collect();
+                bail!("Multiple archived boards match '{partial}': {}.", names.join(", "))
+            }
         }
     }
 }
 
-fn find_list<'a>(lists: &'a [CardList], partial: &str) -> anyhow::Result<&'a CardList> {
-    let q = partial.to_lowercase();
-    let matches: Vec<_> = lists
-        .iter()
-        .filter(|l| id_matches(&l.id, partial) || l.name.to_lowercase().contains(&q))
-        .collect();
-    match matches.len() {
-        0 => bail!("No list matches '{partial}'."),
-        1 => Ok(matches.into_iter().next().unwrap()),
-        _ => {
-            let names: Vec<_> = matches.iter().map(|l| format!("{} [{}]", l.name, l.id)).collect();
-            bail!("Multiple lists match '{partial}': {}.", names.join(", "))
+fn find_list<'a>(lists: &'a [CardList], partial: &str, by_id: bool) -> anyhow::Result<&'a CardList> {
+    if by_id {
+        lists
+            .iter()
+            .find(|l| l.id == partial)
+            .ok_or_else(|| anyhow::anyhow!("No list with ID '{partial}'."))
+    } else {
+        let q = partial.to_lowercase();
+        let matches: Vec<_> = lists.iter().filter(|l| l.name.to_lowercase().contains(&q)).collect();
+        match matches.len() {
+            0 => bail!("No list matches '{partial}'."),
+            1 => Ok(matches.into_iter().next().unwrap()),
+            _ => {
+                let names: Vec<_> = matches.iter().map(|l| format!("{} [{}]", l.name, l.id)).collect();
+                bail!("Multiple lists match '{partial}': {}.", names.join(", "))
+            }
         }
     }
 }
@@ -619,59 +627,82 @@ fn find_card_in_lists(
     all_cards: &HashMap<ShortId, Card>,
     partial: &str,
     include_archived: bool,
+    by_id: bool,
 ) -> anyhow::Result<(CardList, Card)> {
-    let q = partial.to_lowercase();
     let mut matches: Vec<(CardList, Card)> = Vec::new();
-    for list in lists {
-        for card_id in &list.card_ids {
-            if let Some(card) = all_cards.get(card_id) {
-                if (include_archived || !card.archived)
-                    && (id_matches(&card.id, partial) || card.title.to_lowercase().contains(&q))
-                {
-                    matches.push((list.clone(), card.clone()));
+    if by_id {
+        for list in lists {
+            for card_id in &list.card_ids {
+                if let Some(card) = all_cards.get(card_id) {
+                    if (include_archived || !card.archived) && card.id == partial {
+                        matches.push((list.clone(), card.clone()));
+                    }
                 }
             }
         }
-    }
-    match matches.len() {
-        0 => bail!("No card matches '{partial}'."),
-        1 => Ok(matches.into_iter().next().unwrap()),
-        _ => {
-            let names: Vec<_> = matches.iter().map(|(_, c)| format!("{} [{}]", c.title, c.id)).collect();
-            bail!("Multiple cards match '{partial}': {}.", names.join(", "))
+        match matches.len() {
+            0 => bail!("No card with ID '{partial}'."),
+            _ => Ok(matches.into_iter().next().unwrap()),
+        }
+    } else {
+        let q = partial.to_lowercase();
+        for list in lists {
+            for card_id in &list.card_ids {
+                if let Some(card) = all_cards.get(card_id) {
+                    if (include_archived || !card.archived) && card.title.to_lowercase().contains(&q) {
+                        matches.push((list.clone(), card.clone()));
+                    }
+                }
+            }
+        }
+        match matches.len() {
+            0 => bail!("No card matches '{partial}'."),
+            1 => Ok(matches.into_iter().next().unwrap()),
+            _ => {
+                let names: Vec<_> = matches.iter().map(|(_, c)| format!("{} [{}]", c.title, c.id)).collect();
+                bail!("Multiple cards match '{partial}': {}.", names.join(", "))
+            }
         }
     }
 }
 
-fn find_archived_card(board_id: &str, partial: &str) -> anyhow::Result<Card> {
+fn find_archived_card(board_id: &str, partial: &str, by_id: bool) -> anyhow::Result<Card> {
     let cards = card_store::list_archived_cards(board_id);
-    let q = partial.to_lowercase();
-    let matches: Vec<_> = cards
-        .into_iter()
-        .filter(|c| id_matches(&c.id, partial) || c.title.to_lowercase().contains(&q))
-        .collect();
-    match matches.len() {
-        0 => bail!("No archived card matches '{partial}'."),
-        1 => Ok(matches.into_iter().next().unwrap()),
-        _ => {
-            let names: Vec<_> = matches.iter().map(|c| format!("{} [{}]", c.title, c.id)).collect();
-            bail!("Multiple archived cards match '{partial}': {}.", names.join(", "))
+    if by_id {
+        cards
+            .into_iter()
+            .find(|c| c.id == partial)
+            .ok_or_else(|| anyhow::anyhow!("No archived card with ID '{partial}'."))
+    } else {
+        let q = partial.to_lowercase();
+        let matches: Vec<_> = cards.into_iter().filter(|c| c.title.to_lowercase().contains(&q)).collect();
+        match matches.len() {
+            0 => bail!("No archived card matches '{partial}'."),
+            1 => Ok(matches.into_iter().next().unwrap()),
+            _ => {
+                let names: Vec<_> = matches.iter().map(|c| format!("{} [{}]", c.title, c.id)).collect();
+                bail!("Multiple archived cards match '{partial}': {}.", names.join(", "))
+            }
         }
     }
 }
 
-fn find_label<'a>(labels: &'a [Label], partial: &str) -> anyhow::Result<&'a Label> {
-    let q = partial.to_lowercase();
-    let matches: Vec<_> = labels
-        .iter()
-        .filter(|l| id_matches(&l.id, partial) || l.name.to_lowercase().contains(&q))
-        .collect();
-    match matches.len() {
-        0 => bail!("No label matches '{partial}'."),
-        1 => Ok(matches.into_iter().next().unwrap()),
-        _ => {
-            let names: Vec<_> = matches.iter().map(|l| format!("{} [{}]", l.name, l.id)).collect();
-            bail!("Multiple labels match '{partial}': {}.", names.join(", "))
+fn find_label<'a>(labels: &'a [Label], partial: &str, by_id: bool) -> anyhow::Result<&'a Label> {
+    if by_id {
+        labels
+            .iter()
+            .find(|l| l.id == partial)
+            .ok_or_else(|| anyhow::anyhow!("No label with ID '{partial}'."))
+    } else {
+        let q = partial.to_lowercase();
+        let matches: Vec<_> = labels.iter().filter(|l| l.name.to_lowercase().contains(&q)).collect();
+        match matches.len() {
+            0 => bail!("No label matches '{partial}'."),
+            1 => Ok(matches.into_iter().next().unwrap()),
+            _ => {
+                let names: Vec<_> = matches.iter().map(|l| format!("{} [{}]", l.name, l.id)).collect();
+                bail!("Multiple labels match '{partial}': {}.", names.join(", "))
+            }
         }
     }
 }
