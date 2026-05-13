@@ -1,0 +1,56 @@
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::Paragraph;
+use ratatui::Frame;
+
+use crate::app::{App, AppMode};
+
+pub fn render(frame: &mut Frame, area: Rect, app: &App) {
+    let mode_str = match &app.mode {
+        AppMode::BoardSelector => "BOARDS",
+        AppMode::Normal => "NORMAL",
+        AppMode::CardDetail => "DETAIL",
+        AppMode::Insert(_) => "INSERT",
+        AppMode::Command => "SEARCH",
+        AppMode::Dialog(_) => "DIALOG",
+        AppMode::Help => "HELP",
+    };
+
+    let hints = match &app.mode {
+        AppMode::BoardSelector => "j/k:navigate  Enter:open  n:new  d:delete  q:quit",
+        AppMode::Normal => "h/l:lists  j/k:cards  Enter:open  n:new card  N:new list  /:search  b:back  ?:help  q:quit",
+        AppMode::CardDetail => "Tab:section  e:edit  Space:toggle  a:add item  A:add checklist  l:labels  u:due  Esc:close",
+        AppMode::Insert(_) => "Enter:confirm  Esc:cancel  Ctrl+u:clear",
+        AppMode::Command => "Enter:search  Esc:cancel",
+        AppMode::Dialog(_) => "y:confirm  n:cancel",
+        AppMode::Help => "Esc:close",
+    };
+
+    let status = if let Some((msg, _)) = &app.status_message {
+        msg.as_str()
+    } else {
+        ""
+    };
+
+    let line1 = Line::from(vec![
+        Span::styled(
+            format!(" {mode_str} "),
+            Style::default().fg(Color::Black).bg(Color::Cyan),
+        ),
+        Span::raw(" "),
+        Span::styled(hints, Style::default().fg(Color::DarkGray)),
+    ]);
+
+    let line2 = if status.is_empty() {
+        Line::raw("")
+    } else {
+        Line::from(Span::styled(
+            format!(" {status}"),
+            Style::default().fg(Color::Yellow),
+        ))
+    };
+
+    let paragraph = Paragraph::new(vec![line1, line2]);
+    frame.render_widget(paragraph, area);
+}
