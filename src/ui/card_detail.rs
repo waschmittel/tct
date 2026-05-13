@@ -51,12 +51,14 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Span::raw(":title  "),
             Span::styled("e", Style::default().fg(accent)),
             Span::raw(":desc  "),
-            Span::styled("u", Style::default().fg(accent)),
-            Span::raw(":due  "),
+            Span::styled("u/U", Style::default().fg(accent)),
+            Span::raw(":due/clear  "),
             Span::styled("l", Style::default().fg(accent)),
             Span::raw(":labels  "),
             Span::styled("a", Style::default().fg(accent)),
             Span::raw(":add  "),
+            Span::styled("J/K", Style::default().fg(accent)),
+            Span::raw(":reorder  "),
             Span::styled("Space", Style::default().fg(accent)),
             Span::raw(":toggle "),
         ]
@@ -102,10 +104,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         }
     }
 
+    lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
-        "─".repeat(inner.width as usize),
+        "═".repeat(inner.width as usize),
         Style::default().fg(Color::DarkGray),
     )));
+    lines.push(Line::raw(""));
 
     // --- Checklist Section ---
     let (done, total) = card.checklist_progress().unwrap_or((0, 0));
@@ -147,10 +151,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         }
     }
 
+    lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
         "─".repeat(inner.width as usize),
         Style::default().fg(Color::DarkGray),
     )));
+    lines.push(Line::raw(""));
 
     // --- Labels Section ---
     lines.push(Line::from(Span::styled(
@@ -175,10 +181,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         }
     }
 
+    lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
         "─".repeat(inner.width as usize),
         Style::default().fg(Color::DarkGray),
     )));
+    lines.push(Line::raw(""));
 
     // --- Due Date Section ---
     lines.push(Line::from(Span::styled(

@@ -73,7 +73,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Grab / confirm / abort
-        KeyCode::Char('m') => {
+        KeyCode::Char('M') => {
             if let Some(board) = &mut app.board {
                 if board.is_grabbed() {
                     // Also confirm (like Enter)

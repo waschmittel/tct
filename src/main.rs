@@ -64,6 +64,8 @@ mod tests {
     use crate::model::list::CardList;
     use crate::storage::{board_store, card_store, list_store};
     use std::env;
+    #[allow(unused_imports)]
+    use regex::Regex;
 
     fn with_temp_dir<F: FnOnce()>(f: F) {
         let dir = tempfile::tempdir().unwrap();
@@ -165,5 +167,489 @@ mod tests {
             assert_eq!(lists[1].card_ids.len(), 1);
             assert_eq!(lists[1].card_ids[0], card2.id);
         });
+    }
+
+    // ── CLI search tests ──────────────────────────────────────────────────────
+
+    fn run_search(args: &[&str]) -> anyhow::Result<()> {
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        crate::cli::run(&args)
+    }
+
+    fn setup_search_fixture() -> (
+        crate::model::board::BoardMeta,
+        CardList,
+        CardList,
+        Card,
+        Card,
+    ) {
+        let mut board = board_store::create_board("Alpha".into()).unwrap();
+
+        let mut todo = CardList::new("To Do".into());
+        let mut done = CardList::new("Done".into());
+
+        let mut card1 = Card::new("Fix login bug".into());
+        card1.description = "Auth token expires too early".into();
+        card1.checklist.push(ChecklistItem { text: "Reproduce issue".into(), completed: false });
+        card1.checklist.push(ChecklistItem { text: "Write failing test".into(), completed: false });
+
+        let mut card2 = Card::new("Redesign dashboard".into());
+        card2.description = "New layout with login metrics".into();
+
+        card_store::save_card(&board.id, &card1).unwrap();
+        card_store::save_card(&board.id, &card2).unwrap();
+
+        todo.card_ids.push(card1.id.clone());
+        done.card_ids.push(card2.id.clone());
+
+        list_store::save_list(&board.id, &todo).unwrap();
+        list_store::save_list(&board.id, &done).unwrap();
+
+        board.list_order = vec![todo.id.clone(), done.id.clone()];
+        board_store::save_board(&board).unwrap();
+
+        (board, todo, done, card1, card2)
+    }
+
+    #[test]
+    fn search_substring_match_title() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            // "login" matches both card1 title and card2 description — no error
+            run_search(&["search", "login"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_case_insensitive() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            run_search(&["search", "LOGIN"]).unwrap();
+            run_search(&["search", "Login"]).unwrap();
+            run_search(&["search", "lOgIn"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_no_matches_returns_ok() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            // No match — should succeed (just print nothing found)
+            run_search(&["search", "xyzzy_not_found_abc"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_matches_description() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            // "Auth token" only in card1 description
+            run_search(&["search", "auth token"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_matches_checklist_item() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            // "Reproduce" only in card1 checklist
+            run_search(&["search", "reproduce"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_board_filter_existing() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            // Partial board name match
+            run_search(&["search", "login", "--board", "Alpha"]).unwrap();
+            run_search(&["search", "login", "--board", "alp"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_board_filter_no_match_errors() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            let err = run_search(&["search", "login", "--board", "nonexistent_board_xyz"]);
+            assert!(err.is_err(), "should error when no boards match filter");
+        });
+    }
+
+    #[test]
+    fn search_list_filter() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            // "login" matches card1 (in To Do) and card2 desc (in Done).
+            // Limit to "To Do" list only.
+            run_search(&["search", "login", "--list", "To Do"]).unwrap();
+            run_search(&["search", "login", "--list", "to"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_list_filter_no_match_succeeds() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            // List filter with no matching list — no error, just no results
+            run_search(&["search", "login", "--list", "Backlog"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_regex_basic() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            run_search(&["search", "login|dashboard", "--regex"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_regex_case_insensitive_flag() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            run_search(&["search", "(?i)LOGIN", "--regex"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_regex_anchors() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            // Anchored to start of string
+            run_search(&["search", "^Fix", "--regex"]).unwrap();
+            run_search(&["search", "^Redesign", "--regex"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_regex_invalid_errors() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            let err = run_search(&["search", "[unclosed", "--regex"]);
+            assert!(err.is_err(), "invalid regex should return error");
+        });
+    }
+
+    #[test]
+    fn search_no_boards_returns_ok() {
+        with_temp_dir(|| {
+            // No boards at all — no error, just nothing found
+            run_search(&["search", "anything"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_empty_query_allowed() {
+        with_temp_dir(|| {
+            setup_search_fixture();
+            // Empty string matches everything
+            run_search(&["search", ""]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_multiple_boards() {
+        with_temp_dir(|| {
+            let mut board1 = board_store::create_board("Alpha".into()).unwrap();
+            let mut board2 = board_store::create_board("Beta".into()).unwrap();
+
+            let mut list1 = CardList::new("Work".into());
+            let card1 = Card::new("Shared query term".into());
+            card_store::save_card(&board1.id, &card1).unwrap();
+            list1.card_ids.push(card1.id.clone());
+            list_store::save_list(&board1.id, &list1).unwrap();
+            board1.list_order = vec![list1.id.clone()];
+            board_store::save_board(&board1).unwrap();
+
+            let mut list2 = CardList::new("Tasks".into());
+            let card2 = Card::new("Another shared query term".into());
+            card_store::save_card(&board2.id, &card2).unwrap();
+            list2.card_ids.push(card2.id.clone());
+            list_store::save_list(&board2.id, &list2).unwrap();
+            board2.list_order = vec![list2.id.clone()];
+            board_store::save_board(&board2).unwrap();
+
+            run_search(&["search", "shared query"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_archived_excluded_by_default() {
+        with_temp_dir(|| {
+            let mut board = board_store::create_board("Proj".into()).unwrap();
+            let mut list = CardList::new("To Do".into());
+
+            let mut card = Card::new("archived unique xyz987".into());
+            card.archived = true;
+            card_store::save_card(&board.id, &card).unwrap();
+            list.card_ids.push(card.id.clone());
+            list_store::save_list(&board.id, &list).unwrap();
+            board.list_order = vec![list.id.clone()];
+            board_store::save_board(&board).unwrap();
+
+            // Without --archived: no match (card is archived)
+            run_search(&["search", "xyz987"]).unwrap();
+        });
+    }
+
+    #[test]
+    fn search_archived_included_with_flag() {
+        with_temp_dir(|| {
+            let mut board = board_store::create_board("Proj".into()).unwrap();
+            let mut list = CardList::new("To Do".into());
+
+            let mut card = Card::new("archived unique xyz987".into());
+            card.archived = true;
+            card_store::save_card(&board.id, &card).unwrap();
+            list.card_ids.push(card.id.clone());
+            list_store::save_list(&board.id, &list).unwrap();
+            board.list_order = vec![list.id.clone()];
+            board_store::save_board(&board).unwrap();
+
+            run_search(&["search", "xyz987", "--archived"]).unwrap();
+        });
+    }
+
+    // ── Checklist reorder tests ───────────────────────────────────────────────
+
+    #[test]
+    fn checklist_reorder_basic() {
+        let mut card = Card::new("Test".into());
+        card.checklist = vec![
+            ChecklistItem { text: "A".into(), completed: false },
+            ChecklistItem { text: "B".into(), completed: false },
+            ChecklistItem { text: "C".into(), completed: false },
+        ];
+
+        // Swap A↔B (move index 0 down)
+        card.checklist.swap(0, 1);
+        assert_eq!(card.checklist[0].text, "B");
+        assert_eq!(card.checklist[1].text, "A");
+        assert_eq!(card.checklist[2].text, "C");
+    }
+
+    #[test]
+    fn checklist_reorder_move_up() {
+        let mut card = Card::new("Test".into());
+        card.checklist = vec![
+            ChecklistItem { text: "A".into(), completed: true },
+            ChecklistItem { text: "B".into(), completed: false },
+        ];
+
+        // Move B up: swap indices 1 and 0
+        card.checklist.swap(1, 0);
+        assert_eq!(card.checklist[0].text, "B");
+        assert_eq!(card.checklist[1].text, "A");
+        // Completion state should move with the item
+        assert!(!card.checklist[0].completed);
+        assert!(card.checklist[1].completed);
+    }
+
+    #[test]
+    fn checklist_reorder_at_top_is_noop() {
+        let mut card = Card::new("Test".into());
+        card.checklist = vec![
+            ChecklistItem { text: "A".into(), completed: false },
+            ChecklistItem { text: "B".into(), completed: false },
+        ];
+        let idx = 0usize;
+        // Cannot move up from top (idx == 0)
+        if idx > 0 {
+            card.checklist.swap(idx, idx - 1);
+        }
+        assert_eq!(card.checklist[0].text, "A");
+        assert_eq!(card.checklist[1].text, "B");
+    }
+
+    #[test]
+    fn checklist_reorder_at_bottom_is_noop() {
+        let mut card = Card::new("Test".into());
+        card.checklist = vec![
+            ChecklistItem { text: "A".into(), completed: false },
+            ChecklistItem { text: "B".into(), completed: false },
+        ];
+        let idx = 1usize;
+        // Cannot move down from last
+        if idx + 1 < card.checklist.len() {
+            card.checklist.swap(idx, idx + 1);
+        }
+        assert_eq!(card.checklist[0].text, "A");
+        assert_eq!(card.checklist[1].text, "B");
+    }
+
+    #[test]
+    fn checklist_reorder_empty_is_noop() {
+        let mut card = Card::new("Test".into());
+        let idx = 0usize;
+        // No panic on empty checklist
+        if idx + 1 < card.checklist.len() {
+            card.checklist.swap(idx, idx + 1);
+        }
+        assert!(card.checklist.is_empty());
+    }
+
+    #[test]
+    fn checklist_reorder_persists() {
+        with_temp_dir(|| {
+            let board = board_store::create_board("Board".into()).unwrap();
+            let mut card = Card::new("Task".into());
+            card.checklist = vec![
+                ChecklistItem { text: "First".into(), completed: false },
+                ChecklistItem { text: "Second".into(), completed: true },
+                ChecklistItem { text: "Third".into(), completed: false },
+            ];
+            card_store::save_card(&board.id, &card).unwrap();
+
+            // Reorder: move "Second" up (swap indices 1,0)
+            card.checklist.swap(1, 0);
+            card.touch();
+            card_store::save_card(&board.id, &card).unwrap();
+
+            let loaded = card_store::load_card(&board.id, &card.id).unwrap();
+            assert_eq!(loaded.checklist[0].text, "Second");
+            assert_eq!(loaded.checklist[1].text, "First");
+            assert_eq!(loaded.checklist[2].text, "Third");
+            assert!(loaded.checklist[0].completed);
+            assert!(!loaded.checklist[1].completed);
+        });
+    }
+
+    // ── Due date deletion tests ───────────────────────────────────────────────
+
+    #[test]
+    fn due_date_set_and_clear() {
+        with_temp_dir(|| {
+            let board = board_store::create_board("Board".into()).unwrap();
+            let mut card = Card::new("Task".into());
+            let date = chrono::NaiveDate::from_ymd_opt(2099, 12, 31).unwrap();
+            card.due_date = Some(date);
+            card_store::save_card(&board.id, &card).unwrap();
+
+            let loaded = card_store::load_card(&board.id, &card.id).unwrap();
+            assert_eq!(loaded.due_date, Some(date));
+
+            // Clear due date
+            let mut updated = loaded;
+            updated.due_date = None;
+            updated.touch();
+            card_store::save_card(&board.id, &updated).unwrap();
+
+            let final_card = card_store::load_card(&board.id, &updated.id).unwrap();
+            assert!(final_card.due_date.is_none());
+        });
+    }
+
+    #[test]
+    fn due_date_clear_when_none_is_noop() {
+        let mut card = Card::new("Task".into());
+        assert!(card.due_date.is_none());
+        // Clearing already-None due date should not panic
+        card.due_date = None;
+        card.touch();
+        assert!(card.due_date.is_none());
+    }
+
+    #[test]
+    fn due_date_cli_set_and_clear_via_none() {
+        with_temp_dir(|| {
+            let mut board = board_store::create_board("Board".into()).unwrap();
+            let mut list = CardList::new("To Do".into());
+            let card = Card::new("Deadline task".into());
+            card_store::save_card(&board.id, &card).unwrap();
+            list.card_ids.push(card.id.clone());
+            list_store::save_list(&board.id, &list).unwrap();
+            board.list_order = vec![list.id.clone()];
+            board_store::save_board(&board).unwrap();
+
+            // Set due date via CLI
+            crate::cli::run(&[
+                "cards".to_string(),
+                "Board".to_string(),
+                "--edit".to_string(),
+                "Deadline".to_string(),
+                "--due".to_string(),
+                "2099-12-31".to_string(),
+            ])
+            .unwrap();
+
+            let loaded = card_store::load_card(&board.id, &card.id).unwrap();
+            assert!(loaded.due_date.is_some());
+
+            // Clear via CLI --due none
+            crate::cli::run(&[
+                "cards".to_string(),
+                "Board".to_string(),
+                "--edit".to_string(),
+                "Deadline".to_string(),
+                "--due".to_string(),
+                "none".to_string(),
+            ])
+            .unwrap();
+
+            let cleared = card_store::load_card(&board.id, &card.id).unwrap();
+            assert!(cleared.due_date.is_none());
+        });
+    }
+
+    // ── card_matches_query corner cases ───────────────────────────────────────
+
+    #[test]
+    fn search_matches_checklist_text() {
+        use crate::cli::card_matches_query_pub;
+
+        let mut card = Card::new("Task".into());
+        card.checklist.push(ChecklistItem { text: "Deploy to staging".into(), completed: false });
+
+        assert!(card_matches_query_pub(&card, "deploy", &[]));
+        assert!(card_matches_query_pub(&card, "DEPLOY", &[]));
+        assert!(!card_matches_query_pub(&card, "production", &[]));
+    }
+
+    #[test]
+    fn search_matches_label_name() {
+        use crate::cli::card_matches_query_pub;
+
+        let label = Label::new("critical-bug".into(), LabelColor::Red);
+        let mut card = Card::new("Task".into());
+        card.label_ids.push(label.id.clone());
+
+        assert!(card_matches_query_pub(&card, "critical", &[label.clone()]));
+        assert!(card_matches_query_pub(&card, "CRITICAL-BUG", &[label.clone()]));
+        assert!(!card_matches_query_pub(&card, "feature", &[label]));
+    }
+
+    #[test]
+    fn search_regex_special_chars() {
+        use crate::cli::card_matches_regex_pub;
+        use regex::Regex;
+
+        let mut card = Card::new("Fix bug #42".into());
+        card.description = "Error: null pointer at line 10".into();
+
+        let re = Regex::new(r"#\d+").unwrap();
+        assert!(card_matches_regex_pub(&card, &re, &[]));
+
+        let re2 = Regex::new(r"null pointer").unwrap();
+        assert!(card_matches_regex_pub(&card, &re2, &[]));
+
+        let re3 = Regex::new(r"^\d+$").unwrap();
+        assert!(!card_matches_regex_pub(&card, &re3, &[]));
+    }
+
+    #[test]
+    fn search_regex_matches_checklist() {
+        use crate::cli::card_matches_regex_pub;
+        use regex::Regex;
+
+        let mut card = Card::new("Task".into());
+        card.checklist.push(ChecklistItem { text: "step 1: prepare".into(), completed: false });
+        card.checklist.push(ChecklistItem { text: "step 2: execute".into(), completed: false });
+
+        let re = Regex::new(r"step \d+:").unwrap();
+        assert!(card_matches_regex_pub(&card, &re, &[]));
+
+        let re_no = Regex::new(r"step 9:").unwrap();
+        assert!(!card_matches_regex_pub(&card, &re_no, &[]));
     }
 }

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{bail, Context};
 use chrono::{NaiveDate, Utc};
+use regex::Regex;
 
 use crate::model::board::BoardMeta;
 use crate::model::card::{Card, ChecklistItem};
@@ -61,6 +62,12 @@ COMMANDS:
   labels <board> --assign <card> <label>   Assign a label to a card
   labels <board> --remove <card> <label>   Remove a label from a card
 
+  search <query>                      Search cards across all boards (case-insensitive substring)
+  search <query> --board <name>       Limit search to boards matching name (repeatable)
+  search <query> --list <name>        Limit search to lists matching name
+  search <query> --regex              Treat query as a regular expression
+  search <query> --archived           Include archived cards in results
+
 IDs are shown in listings as [xxxxxxxx]. Pass --by-id to match by ID instead of name.
 Multiple name matches or a missing ID result in an error.
 
@@ -104,6 +111,7 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
         "cards" => cmd_cards(rest, by_id),
         "checklist" => cmd_checklist(rest, by_id),
         "labels" => cmd_labels(rest, by_id),
+        "search" => cmd_search(rest),
         other => bail!("Unknown command '{other}'. Run 'tct --help' for usage."),
     }
 }
@@ -497,6 +505,128 @@ fn cmd_labels(args: &[String], by_id: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
+// ── Search ────────────────────────────────────────────────────────────────────
+
+fn cmd_search(args: &[String]) -> anyhow::Result<()> {
+    let query = args
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("Usage: tct search <query> [--board <name>] [--list <name>] [--regex] [--archived]"))?
+        .as_str();
+
+    let use_regex = has_flag(args, "--regex");
+    let include_archived = has_flag(args, "--archived");
+    let board_filters: Vec<&str> = flag_values_all(args, "--board");
+    let list_filter = flag_value(args, "--list");
+
+    let compiled_regex = if use_regex {
+        Some(Regex::new(query).context("Invalid regular expression")?)
+    } else {
+        None
+    };
+
+    let all_boards = board_store::list_boards()?;
+    let boards_to_search: Vec<BoardMeta> = if board_filters.is_empty() {
+        all_boards
+    } else {
+        all_boards
+            .into_iter()
+            .filter(|b| {
+                let name_lower = b.name.to_lowercase();
+                board_filters.iter().any(|f| name_lower.contains(&f.to_lowercase()))
+            })
+            .collect()
+    };
+
+    if boards_to_search.is_empty() && !board_filters.is_empty() {
+        bail!("No boards match the --board filter.");
+    }
+
+    let mode = if use_regex { "regex" } else { "substring" };
+    let board_count = boards_to_search.len();
+    println!(
+        "Searching {} board(s) for {:?} ({mode}):",
+        board_count, query
+    );
+
+    let mut total = 0usize;
+
+    for board in &boards_to_search {
+        let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
+        let all_cards = load_all_cards(&board.id, &lists);
+
+        for list in &lists {
+            if let Some(lf) = list_filter {
+                if !list.name.to_lowercase().contains(&lf.to_lowercase()) {
+                    continue;
+                }
+            }
+
+            let matching: Vec<&Card> = list
+                .card_ids
+                .iter()
+                .filter_map(|id| all_cards.get(id))
+                .filter(|card| {
+                    if !include_archived && card.archived {
+                        return false;
+                    }
+                    match &compiled_regex {
+                        Some(re) => card_matches_regex(card, re, &board.labels),
+                        None => card_matches_query(card, query, &board.labels),
+                    }
+                })
+                .collect();
+
+            if !matching.is_empty() {
+                println!(
+                    "\n  Board: {} [{}]  List: {} [{}]",
+                    board.name, board.id, list.name, list.id
+                );
+                for card in &matching {
+                    total += 1;
+                    print_card_line(total, card, &board.labels);
+                }
+            }
+        }
+    }
+
+    if total == 0 {
+        println!("\nNo cards found.");
+    } else {
+        println!("\nFound {} card(s).", total);
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn card_matches_query_pub(card: &Card, query: &str, board_labels: &[Label]) -> bool {
+    card_matches_query(card, query, board_labels)
+}
+
+#[cfg(test)]
+pub(crate) fn card_matches_regex_pub(card: &Card, re: &Regex, board_labels: &[Label]) -> bool {
+    card_matches_regex(card, re, board_labels)
+}
+
+fn card_matches_query(card: &Card, query: &str, board_labels: &[Label]) -> bool {
+    let q = query.to_lowercase();
+    card.title.to_lowercase().contains(&q)
+        || card.description.to_lowercase().contains(&q)
+        || card.checklist.iter().any(|item| item.text.to_lowercase().contains(&q))
+        || card.label_ids.iter().any(|lid| {
+            board_labels.iter().any(|l| l.id == *lid && l.name.to_lowercase().contains(&q))
+        })
+}
+
+fn card_matches_regex(card: &Card, re: &Regex, board_labels: &[Label]) -> bool {
+    re.is_match(&card.title)
+        || re.is_match(&card.description)
+        || card.checklist.iter().any(|item| re.is_match(&item.text))
+        || card.label_ids.iter().any(|lid| {
+            board_labels.iter().any(|l| l.id == *lid && re.is_match(&l.name))
+        })
+}
+
 // ── Lookup helpers ────────────────────────────────────────────────────────────
 
 fn find_board(partial: &str, by_id: bool) -> anyhow::Result<BoardMeta> {
@@ -692,6 +822,13 @@ fn flag_values2<'a>(args: &'a [String], flag: &str) -> Option<(&'a str, &'a str)
     args.windows(3)
         .find(|w| w[0] == flag)
         .map(|w| (w[1].as_str(), w[2].as_str()))
+}
+
+fn flag_values_all<'a>(args: &'a [String], flag: &str) -> Vec<&'a str> {
+    args.windows(2)
+        .filter(|w| w[0] == flag)
+        .map(|w| w[1].as_str())
+        .collect()
 }
 
 // ── Output formatting ─────────────────────────────────────────────────────────

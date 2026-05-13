@@ -30,6 +30,40 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
 
+        // Reorder checklist item down
+        KeyCode::Char('J') => {
+            if let Some(board) = &mut app.board {
+                if let Some(card_id) = board.current_card_id().cloned() {
+                    let ii = board.detail_item_idx;
+                    if let Some(card) = board.cards.get_mut(&card_id) {
+                        if ii + 1 < card.checklist.len() {
+                            card.checklist.swap(ii, ii + 1);
+                            board.detail_item_idx += 1;
+                            card.touch();
+                            crate::storage::card_store::save_card(&board.meta.id, card)?;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Reorder checklist item up
+        KeyCode::Char('K') => {
+            if let Some(board) = &mut app.board {
+                if let Some(card_id) = board.current_card_id().cloned() {
+                    let ii = board.detail_item_idx;
+                    if let Some(card) = board.cards.get_mut(&card_id) {
+                        if ii > 0 {
+                            card.checklist.swap(ii, ii - 1);
+                            board.detail_item_idx -= 1;
+                            card.touch();
+                            crate::storage::card_store::save_card(&board.meta.id, card)?;
+                        }
+                    }
+                }
+            }
+        }
+
         // Toggle checklist item
         KeyCode::Char(' ') => {
             if let Some(board) = &mut app.board {
@@ -126,6 +160,20 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                         .map(|d| d.format("%Y-%m-%d").to_string())
                         .unwrap_or_default();
                     app.start_insert_with(InsertTarget::EditDueDate, &date_str);
+                }
+            }
+        }
+
+        // Clear due date
+        KeyCode::Char('U') => {
+            if let Some(board) = &mut app.board {
+                if let Some(card_id) = board.current_card_id().cloned() {
+                    if let Some(card) = board.cards.get_mut(&card_id) {
+                        card.due_date = None;
+                        card.touch();
+                        crate::storage::card_store::save_card(&board.meta.id, card)?;
+                        app.set_status("Due date cleared".into());
+                    }
                 }
             }
         }

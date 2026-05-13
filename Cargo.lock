@@ -1416,6 +1416,7 @@ dependencies = [
  "dirs",
  "ratatui",
  "ratatui-textarea",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",

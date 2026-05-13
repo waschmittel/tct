@@ -87,7 +87,7 @@ All writes are atomic (write to `.tmp`, then rename).
 | D | Delete list (confirm) |
 | a | Archive card (confirm) |
 | v | View/restore/delete archived cards |
-| m | Grab card for moving |
+| M | Grab card for moving |
 | h/j/k/l (grabbed) | Move card |
 | Enter (grabbed) | Confirm move |
 | Esc (grabbed) | Abort — restore to original position |
@@ -107,6 +107,7 @@ All writes are atomic (write to `.tmp`, then rename).
 | t | Edit title |
 | e | Edit description |
 | j/k | Navigate checklist items |
+| J/K | Reorder selected checklist item down/up |
 | Space | Toggle checklist item |
 | a | Add checklist item |
 | Enter | Edit selected checklist item |
@@ -114,6 +115,7 @@ All writes are atomic (write to `.tmp`, then rename).
 | l | Assign/remove labels (label picker) |
 | L | Manage labels (create, rename, color, delete) |
 | u | Set due date |
+| U | Clear due date |
 | Esc | Close |
 
 ### Description Editor
@@ -203,6 +205,18 @@ tct labels <board> --delete <label>             Delete a label (removes from all
 tct labels <board> --assign <card> <label>      Assign a label to a card
 tct labels <board> --remove <card> <label>      Remove a label from a card
 ```
+
+### Search
+
+```
+tct search <query>                      Search cards on all boards (case-insensitive substring)
+tct search <query> --board <name>       Limit to boards matching name (flag is repeatable)
+tct search <query> --list <name>        Limit to lists matching name
+tct search <query> --regex              Treat query as a regular expression
+tct search <query> --archived           Include archived cards in results
+```
+
+Searches match against card title, description, checklist item text, and label names.
 
 ### Examples
 
