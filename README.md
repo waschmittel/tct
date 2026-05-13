@@ -141,65 +141,67 @@ tct --help                              Show all commands and options
 tct --board <name>                      Open TUI directly on a matching board
 ```
 
-Board, list, card, and label arguments use **case-insensitive partial name matching** by default. Pass `--by-id` anywhere in the command to match all identifier arguments by **exact ID** instead of name. IDs are shown in listings as `[xxxxxxxx]`. Multiple name matches produce an error listing all candidates with their IDs.
+Commands use the pattern `tct <entity> <board> --<action> [args]`. Board (and card for checklist) always come before the action flag. The default action for each entity is listing.
+
+Name arguments use **case-insensitive partial matching** by default. Pass `--by-id` anywhere in the command to match all identifier arguments by **exact ID** instead of name. IDs are shown in listings as `[xxxxxxxx]`. Multiple name matches produce an error listing all candidates with their IDs.
 
 ### Boards
 
 ```
 tct boards                              List active boards with card counts
-tct boards archived                     List archived boards
-tct boards create <name>                Create a new board
-tct boards archive <name>               Archive a board
-tct boards restore <name>               Restore an archived board
-tct boards delete <name>                Permanently delete an archived board
+tct boards --archived                   List archived boards
+tct boards --create <name>              Create a new board
+tct boards --archive <name>             Archive a board
+tct boards --restore <name>             Restore an archived board
+tct boards --delete <name>              Permanently delete an archived board
 
-# Use --by-id to address by exact ID instead of name:
-tct boards archive a1b2c3d4 --by-id
+# Use --by-id to address by exact ID:
+tct boards --archive a1b2c3d4 --by-id
 ```
 
 ### Lists
 
 ```
-tct lists <board>                       List all lists on a board
-tct lists create <board> <name>         Create a list
-tct lists rename <board> <list> <name>  Rename a list
-tct lists delete <board> <list>         Delete a list and all its cards
+tct lists <board>                         List all lists on a board
+tct lists <board> --create <name>         Create a list
+tct lists <board> --rename <list> <name>  Rename a list
+tct lists <board> --delete <list>         Delete a list and all its cards
 ```
 
 ### Cards
 
 ```
-tct cards <board>                       List all active cards grouped by list
-tct cards <board> <list>                List active cards in a specific list
-tct cards archived <board>              List archived cards
-tct cards show <board> <card>           Show full card detail
-tct cards create <board> <list> <title> Create a card
-tct cards edit <board> <card> [flags]   Edit card fields
-  --title <text>                          New title
-  --description <text>                    New description (replaces existing)
-  --due <YYYY-MM-DD|none>                 Set or clear due date
-tct cards archive <board> <card>        Archive a card
-tct cards restore <board> <card>        Restore an archived card to the first list
-tct cards delete <board> <card>         Permanently delete an archived card
+tct cards <board>                            List all active cards grouped by list
+tct cards <board> --list <list>              List active cards in a specific list
+tct cards <board> --archived                 List archived cards
+tct cards <board> --show <card>              Show full card detail
+tct cards <board> --create <list> <title>    Create a card
+tct cards <board> --edit <card> [flags]      Edit card fields
+  --title <text>                               New title
+  --description <text>                         New description (replaces existing)
+  --due <YYYY-MM-DD|none>                      Set or clear due date
+tct cards <board> --archive <card>           Archive a card
+tct cards <board> --restore <card>           Restore an archived card to the first list
+tct cards <board> --delete <card>            Permanently delete an archived card
 ```
 
 ### Checklist
 
 ```
-tct checklist <board> <card>            Show checklist
-tct checklist add <board> <card> <text> Add a checklist item
-tct checklist toggle <board> <card> <n> Toggle item n (1-based index)
-tct checklist delete <board> <card> <n> Delete item n (1-based index)
+tct checklist <board> <card>                  Show checklist
+tct checklist <board> <card> --add <text>     Add a checklist item
+tct checklist <board> <card> --toggle <n>     Toggle item n (1-based index)
+tct checklist <board> <card> --delete <n>     Delete item n (1-based index)
 ```
 
 ### Labels
 
 ```
-tct labels <board>                         List all labels
-tct labels create <board> <name>           Create a label
-tct labels delete <board> <label>          Delete a label (removes from all cards)
-tct labels assign <board> <card> <label>   Assign a label to a card
-tct labels remove <board> <card> <label>   Remove a label from a card
+tct labels <board>                              List all labels
+tct labels <board> --create <name>              Create a label
+tct labels <board> --delete <label>             Delete a label (removes from all cards)
+tct labels <board> --assign <card> <label>      Assign a label to a card
+tct labels <board> --remove <card> <label>      Remove a label from a card
 ```
 
 ## Architecture
