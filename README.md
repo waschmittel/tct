@@ -204,6 +204,54 @@ tct labels <board> --assign <card> <label>      Assign a label to a card
 tct labels <board> --remove <card> <label>      Remove a label from a card
 ```
 
+### Examples
+
+A typical workflow from scratch:
+
+```sh
+# Create a board and lists
+tct boards --create "My Project"
+tct lists "My Project" --create "To Do"
+tct lists "My Project" --create "In Progress"
+tct lists "My Project" --create "Done"
+
+# Add cards
+tct cards "My Project" --create "To Do" "Fix login bug"
+tct cards "My Project" --create "To Do" "Write tests"
+
+# View the board
+tct cards "My Project"
+
+# Edit a card
+tct cards "My Project" --edit "Fix login" --title "Fix login bug" --due 2099-12-31
+
+# Add checklist items
+tct checklist "My Project" "Fix login" --add "Reproduce the bug"
+tct checklist "My Project" "Fix login" --add "Write a failing test"
+tct checklist "My Project" "Fix login" --toggle 1
+
+# Create and assign labels
+tct labels "My Project" --create "bug"
+tct labels "My Project" --assign "Fix login" "bug"
+
+# Archive a finished card
+tct cards "My Project" --archive "Write tests"
+tct cards "My Project" --archived
+```
+
+Addressing items by ID (use `--by-id` when name matching is ambiguous):
+
+```sh
+# List boards to find the ID
+tct boards
+# Active boards (1):
+#   [a1b2c3d4]  My Project   3 lists, 1 active cards
+
+# Use ID for unambiguous operations (--by-id applies to all identifier args)
+tct lists a1b2c3d4 --by-id
+tct cards a1b2c3d4 --show e5f6a7b8 --by-id
+```
+
 ## Architecture
 
 ```
