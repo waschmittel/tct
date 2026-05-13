@@ -1,10 +1,12 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, AppMode, InsertTarget};
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Esc => {
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+
+    match (key.code, shift) {
+        (KeyCode::Esc, _) => {
             if let Some(board) = &mut app.board {
                 board.detail_item_idx = 0;
                 board.detail_scroll = 0;
@@ -13,7 +15,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Checklist item navigation
-        KeyCode::Char('j') | KeyCode::Down => {
+        (KeyCode::Down, false) => {
             if let Some(board) = &mut app.board {
                 if let Some(card) = board.current_card() {
                     if board.detail_item_idx < card.checklist.len().saturating_sub(1) {
@@ -22,7 +24,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('k') | KeyCode::Up => {
+        (KeyCode::Up, false) => {
             if let Some(board) = &mut app.board {
                 if board.detail_item_idx > 0 {
                     board.detail_item_idx -= 1;
@@ -31,7 +33,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Reorder checklist item down
-        KeyCode::Char('J') => {
+        (KeyCode::Down, true) => {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     let ii = board.detail_item_idx;
@@ -48,7 +50,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Reorder checklist item up
-        KeyCode::Char('K') => {
+        (KeyCode::Up, true) => {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     let ii = board.detail_item_idx;
@@ -65,7 +67,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Toggle checklist item
-        KeyCode::Char(' ') => {
+        (KeyCode::Char(' '), _) => {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     let ii = board.detail_item_idx;
@@ -81,12 +83,12 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Add checklist item
-        KeyCode::Char('a') => {
+        (KeyCode::Char('a'), _) => {
             app.start_insert(InsertTarget::NewChecklistItem);
         }
 
         // Delete checklist item
-        KeyCode::Char('x') => {
+        (KeyCode::Char('x'), _) => {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     let ii = board.detail_item_idx;
@@ -105,7 +107,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Edit checklist item text
-        KeyCode::Enter => {
+        (KeyCode::Enter, _) => {
             if let Some(board) = &app.board {
                 if let Some(card) = board.current_card() {
                     let ii = board.detail_item_idx;
@@ -118,7 +120,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Edit description
-        KeyCode::Char('e') => {
+        (KeyCode::Char('e'), _) => {
             if let Some(board) = &app.board {
                 if let Some(card) = board.current_card() {
                     let desc = card.description.clone();
@@ -128,7 +130,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Edit title
-        KeyCode::Char('t') => {
+        (KeyCode::Char('t'), _) => {
             if let Some(board) = &app.board {
                 if let Some(card) = board.current_card() {
                     let title = card.title.clone();
@@ -138,7 +140,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Labels
-        KeyCode::Char('l') => {
+        (KeyCode::Char('l'), _) => {
             if let Some(board) = &app.board {
                 if board.current_card_id().is_some() {
                     app.label_picker_idx = 0;
@@ -146,13 +148,13 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Char('L') => {
+        (KeyCode::Char('L'), _) => {
             app.label_picker_idx = 0;
             app.mode = AppMode::Dialog(crate::app::DialogKind::LabelManager);
         }
 
         // Due date
-        KeyCode::Char('u') => {
+        (KeyCode::Char('u'), _) => {
             if let Some(board) = &app.board {
                 if let Some(card) = board.current_card() {
                     let date_str = card
@@ -165,7 +167,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
 
         // Clear due date
-        KeyCode::Char('U') => {
+        (KeyCode::Char('U'), _) => {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {

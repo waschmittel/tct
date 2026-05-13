@@ -107,12 +107,12 @@ fn handle_confirm_archive_board(app: &mut App, key: KeyEvent) -> anyhow::Result<
 
 fn handle_archived_boards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
-        KeyCode::Char('j') | KeyCode::Down => {
+        KeyCode::Down => {
             if app.archived_selected < app.archived_boards.len().saturating_sub(1) {
                 app.archived_selected += 1;
             }
         }
-        KeyCode::Char('k') | KeyCode::Up => {
+        KeyCode::Up => {
             if app.archived_selected > 0 {
                 app.archived_selected -= 1;
             }
@@ -205,12 +205,12 @@ fn handle_confirm_cancel_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()
 
 fn handle_archived_cards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
-        KeyCode::Char('j') | KeyCode::Down => {
+        KeyCode::Down => {
             if app.archived_selected < app.archived_cards.len().saturating_sub(1) {
                 app.archived_selected += 1;
             }
         }
-        KeyCode::Char('k') | KeyCode::Up => {
+        KeyCode::Up => {
             if app.archived_selected > 0 {
                 app.archived_selected -= 1;
             }
@@ -278,12 +278,12 @@ fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     }
 
     match key.code {
-        KeyCode::Char('j') | KeyCode::Down => {
+        KeyCode::Down => {
             if app.label_picker_idx < label_count - 1 {
                 app.label_picker_idx += 1;
             }
         }
-        KeyCode::Char('k') | KeyCode::Up => {
+        KeyCode::Up => {
             if app.label_picker_idx > 0 {
                 app.label_picker_idx -= 1;
             }
@@ -326,12 +326,12 @@ fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         .unwrap_or(0);
 
     match key.code {
-        KeyCode::Char('j') | KeyCode::Down => {
+        KeyCode::Down => {
             if label_count > 0 && app.label_picker_idx < label_count - 1 {
                 app.label_picker_idx += 1;
             }
         }
-        KeyCode::Char('k') | KeyCode::Up => {
+        KeyCode::Up => {
             if app.label_picker_idx > 0 {
                 app.label_picker_idx -= 1;
             }

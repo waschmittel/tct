@@ -61,8 +61,8 @@ All writes are atomic (write to `.tmp`, then rename).
 
 | Key | Action |
 | --- | --- |
-| j/k | Navigate boards |
-| J/K | Reorder board up/down |
+| Up/Down | Navigate boards |
+| Shift+Up/Down | Reorder board up/down |
 | Enter | Open board |
 | n | New board |
 | c | Cycle board accent color |
@@ -102,8 +102,8 @@ All writes are atomic (write to `.tmp`, then rename).
 | --- | --- |
 | t | Edit title |
 | e | Edit description |
-| j/k | Navigate checklist items |
-| J/K | Reorder selected checklist item down/up |
+| Up/Down | Navigate checklist items |
+| Shift+Up/Down | Reorder selected checklist item |
 | Space | Toggle checklist item |
 | a | Add checklist item |
 | Enter | Edit selected checklist item |

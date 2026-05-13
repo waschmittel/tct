@@ -57,7 +57,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Span::raw(":labels  "),
             Span::styled("a", Style::default().fg(accent)),
             Span::raw(":add  "),
-            Span::styled("J/K", Style::default().fg(accent)),
+            Span::styled("S+↑/↓", Style::default().fg(accent)),
             Span::raw(":reorder  "),
             Span::styled("Space", Style::default().fg(accent)),
             Span::raw(":toggle "),

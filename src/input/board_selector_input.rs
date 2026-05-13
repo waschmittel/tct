@@ -1,49 +1,51 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, AppMode, DialogKind, InsertTarget};
 use crate::storage::board_store;
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Char('q') => app.should_quit = true,
-        KeyCode::Char('j') | KeyCode::Down => {
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+
+    match (key.code, shift) {
+        (KeyCode::Char('q'), _) => app.should_quit = true,
+        (KeyCode::Down, false) => {
             if !app.boards.is_empty() && app.selected_board_idx < app.boards.len() - 1 {
                 app.selected_board_idx += 1;
             }
         }
-        KeyCode::Char('k') | KeyCode::Up => {
+        (KeyCode::Up, false) => {
             if app.selected_board_idx > 0 {
                 app.selected_board_idx -= 1;
             }
         }
-        KeyCode::Char('J') => {
+        (KeyCode::Down, true) => {
             move_board(app, 1)?;
         }
-        KeyCode::Char('K') => {
+        (KeyCode::Up, true) => {
             move_board(app, -1)?;
         }
-        KeyCode::Enter => {
+        (KeyCode::Enter, _) => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let id = board.id.clone();
                 app.load_board(&id)?;
             }
         }
-        KeyCode::Char('n') => {
+        (KeyCode::Char('n'), _) => {
             app.start_insert(InsertTarget::NewBoardName);
         }
-        KeyCode::Char('c') => {
+        (KeyCode::Char('c'), _) => {
             if let Some(board) = app.boards.get_mut(app.selected_board_idx) {
                 board.accent_color = board.accent_color.next();
                 board_store::save_board(board)?;
                 app.set_status("Board color changed".into());
             }
         }
-        KeyCode::Char('d') => {
+        (KeyCode::Char('d'), _) => {
             if !app.boards.is_empty() {
                 app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveBoard);
             }
         }
-        KeyCode::Char('v') => {
+        (KeyCode::Char('v'), _) => {
             let archived = board_store::list_archived_boards()?;
             app.archived_boards = archived;
             app.archived_selected = 0;
