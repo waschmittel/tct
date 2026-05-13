@@ -12,10 +12,11 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match kind {
         DialogKind::ConfirmDeleteCard => handle_confirm_delete_card(app, key),
         DialogKind::ConfirmDeleteList => handle_confirm_delete_list(app, key),
-        DialogKind::ConfirmDeleteBoard => handle_confirm_delete_board(app, key),
+        DialogKind::ConfirmArchiveBoard => handle_confirm_archive_board(app, key),
         DialogKind::ConfirmArchiveCard => handle_confirm_archive_card(app, key),
         DialogKind::ConfirmCancelEdit => handle_confirm_cancel_edit(app, key),
         DialogKind::ArchivedCards => handle_archived_cards(app, key),
+        DialogKind::ArchivedBoards => handle_archived_boards(app, key),
         DialogKind::LabelPicker => handle_label_picker(app, key),
         DialogKind::LabelManager => handle_label_manager(app, key),
     }
@@ -79,18 +80,79 @@ fn handle_confirm_delete_list(app: &mut App, key: KeyEvent) -> anyhow::Result<()
     Ok(())
 }
 
-fn handle_confirm_delete_board(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+fn handle_confirm_archive_board(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let id = board.id.clone();
-                board_store::delete_board(&id)?;
+                let mut meta = board_store::load_board(&id)?;
+                meta.archived = true;
+                board_store::save_board(&meta)?;
+                board_store::remove_from_order(&id)?;
                 app.reload_boards()?;
-                app.set_status("Board deleted".into());
+                if app.selected_board_idx > 0 && app.selected_board_idx >= app.boards.len() {
+                    app.selected_board_idx = app.boards.len().saturating_sub(1);
+                }
+                app.set_status("Board archived".into());
             }
             app.mode = AppMode::BoardSelector;
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            app.mode = AppMode::BoardSelector;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_archived_boards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => {
+            if app.archived_selected < app.archived_boards.len().saturating_sub(1) {
+                app.archived_selected += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            if app.archived_selected > 0 {
+                app.archived_selected -= 1;
+            }
+        }
+        KeyCode::Enter => {
+            if app.archived_selected < app.archived_boards.len() {
+                let id = app.archived_boards[app.archived_selected].id.clone();
+                let name = app.archived_boards[app.archived_selected].name.clone();
+                let mut meta = board_store::load_board(&id)?;
+                meta.archived = false;
+                board_store::save_board(&meta)?;
+                board_store::append_to_order(&id)?;
+                app.archived_boards.remove(app.archived_selected);
+                if app.archived_selected > 0 && app.archived_selected >= app.archived_boards.len() {
+                    app.archived_selected = app.archived_boards.len().saturating_sub(1);
+                }
+                app.reload_boards()?;
+                app.set_status(format!("Restored board '{name}'"));
+                if app.archived_boards.is_empty() {
+                    app.mode = AppMode::BoardSelector;
+                }
+            }
+        }
+        KeyCode::Char('x') => {
+            if app.archived_selected < app.archived_boards.len() {
+                let id = app.archived_boards[app.archived_selected].id.clone();
+                let name = app.archived_boards[app.archived_selected].name.clone();
+                board_store::delete_board(&id)?;
+                app.archived_boards.remove(app.archived_selected);
+                if app.archived_selected > 0 && app.archived_selected >= app.archived_boards.len() {
+                    app.archived_selected = app.archived_boards.len().saturating_sub(1);
+                }
+                app.set_status(format!("Deleted board '{name}'"));
+                if app.archived_boards.is_empty() {
+                    app.mode = AppMode::BoardSelector;
+                }
+            }
+        }
+        KeyCode::Esc => {
+            app.archived_boards.clear();
             app.mode = AppMode::BoardSelector;
         }
         _ => {}

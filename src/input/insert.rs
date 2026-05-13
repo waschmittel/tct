@@ -275,6 +275,7 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
             meta.accent_color =
                 crate::model::label::LabelColor::generate_pastel(&existing_colors);
             board_store::save_board(&meta)?;
+            board_store::append_to_order(&meta.id)?;
             app.reload_boards()?;
             app.set_status(format!("Created board '{text}'"));
             app.mode = AppMode::BoardSelector;

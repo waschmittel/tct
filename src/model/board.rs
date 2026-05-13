@@ -14,6 +14,8 @@ pub struct BoardMeta {
     pub labels: Vec<Label>,
     #[serde(default)]
     pub accent_color: LabelColor,
+    #[serde(default)]
+    pub archived: bool,
     pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
 }
@@ -28,6 +30,7 @@ impl BoardMeta {
             list_order: Vec::new(),
             labels: Vec::new(),
             accent_color: LabelColor::default(),
+            archived: false,
             created_at: now,
             updated_at: now,
         }

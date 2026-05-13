@@ -18,10 +18,15 @@ pub fn render(frame: &mut Frame, app: &App) {
     match &app.mode {
         AppMode::BoardSelector
         | AppMode::Insert(InsertTarget::NewBoardName)
-        | AppMode::Dialog(crate::app::DialogKind::ConfirmDeleteBoard) => {
+        | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
+        | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards) => {
             board_selector::render(frame, area, app);
 
-            if matches!(app.mode, AppMode::Dialog(crate::app::DialogKind::ConfirmDeleteBoard)) {
+            if matches!(
+                app.mode,
+                AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
+                    | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
+            ) {
                 dialog::render(frame, area, app);
             }
         }
@@ -88,10 +93,12 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
     let help_text = vec![
         Line::from(Span::styled("Board Selector", Style::default().fg(Color::Cyan))),
         Line::raw("  j/k            Navigate boards"),
+        Line::raw("  J/K            Reorder board up/down"),
         Line::raw("  Enter          Open board"),
         Line::raw("  n              New board"),
         Line::raw("  c              Cycle board accent color"),
-        Line::raw("  d              Delete board"),
+        Line::raw("  d              Archive board"),
+        Line::raw("  v              View archived boards"),
         Line::raw("  q              Quit"),
         Line::raw(""),
         Line::from(Span::styled("Board View", Style::default().fg(Color::Cyan))),

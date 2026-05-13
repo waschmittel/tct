@@ -4,7 +4,7 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 
 ## Features
 
-- Multiple boards with named lists and cards
+- Multiple boards with named lists and cards, reorderable and archivable
 - Grab-and-move card reordering (within and across lists)
 - Inline markdown description editor with syntax highlighting
 - Markdown syntax highlighting (code blocks, headings, bold/italic, inline code, lists)
@@ -55,10 +55,12 @@ All writes are atomic (write to `.tmp`, then rename).
 | Key | Action |
 | --- | --- |
 | j/k | Navigate boards |
+| J/K | Reorder board up/down |
 | Enter | Open board |
 | n | New board |
 | c | Cycle board accent color |
-| d | Delete board |
+| d | Archive board |
+| v | View/restore archived boards |
 | q | Quit |
 
 ### Board View (Normal Mode)

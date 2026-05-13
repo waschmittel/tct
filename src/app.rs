@@ -42,10 +42,11 @@ pub enum InsertTarget {
 pub enum DialogKind {
     ConfirmDeleteCard,
     ConfirmDeleteList,
-    ConfirmDeleteBoard,
+    ConfirmArchiveBoard,
     ConfirmArchiveCard,
     ConfirmCancelEdit,
     ArchivedCards,
+    ArchivedBoards,
     LabelPicker,
     LabelManager,
 }
@@ -131,6 +132,7 @@ pub struct App {
     pub description_original: Option<String>,
     pub editor_scroll: usize,
     pub archived_cards: Vec<Card>,
+    pub archived_boards: Vec<crate::model::board::BoardMeta>,
     pub archived_selected: usize,
     pub last_reload: Instant,
     pub reload_interval: Duration,
@@ -157,6 +159,7 @@ impl App {
             description_original: None,
             editor_scroll: 0,
             archived_cards: Vec::new(),
+            archived_boards: Vec::new(),
             archived_selected: 0,
             last_reload: Instant::now(),
             reload_interval: Duration::from_secs(15),

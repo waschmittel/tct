@@ -13,6 +13,10 @@ pub fn boards_dir() -> PathBuf {
     base_dir().join("boards")
 }
 
+pub fn board_order_path() -> PathBuf {
+    base_dir().join("board_order.json")
+}
+
 pub fn board_dir(board_id: &str) -> PathBuf {
     boards_dir().join(board_id)
 }
