@@ -61,6 +61,10 @@ impl Card {
             })
     }
 
+    pub fn has_description(&self) -> bool {
+        !self.description.is_empty()
+    }
+
     pub fn touch(&mut self) {
         self.updated_at = Utc::now();
     }
@@ -103,6 +107,19 @@ mod tests {
             ChecklistItem { text: "C".into(), completed: true },
         ];
         assert_eq!(card.checklist_progress(), Some((2, 3)));
+    }
+
+    #[test]
+    fn has_description_false_when_empty() {
+        let card = Card::new("Test".into());
+        assert!(!card.has_description());
+    }
+
+    #[test]
+    fn has_description_true_when_set() {
+        let mut card = Card::new("Test".into());
+        card.description = "some content".into();
+        assert!(card.has_description());
     }
 
     #[test]

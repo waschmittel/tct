@@ -106,6 +106,17 @@ pub fn render(
             }
             info.push(Span::styled(format!("[{done}/{total}]"), style));
         }
+        if card.has_description() {
+            let style = if dimmed {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+            if !info.is_empty() {
+                info.push(Span::raw(" "));
+            }
+            info.push(Span::styled("≡", style));
+        }
         if !info.is_empty() {
             lines.push(Line::from(info));
         }

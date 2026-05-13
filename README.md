@@ -22,6 +22,7 @@ tct stores everything as **plain JSON files** — one file per card, list, and b
 - Checklist CRUD — add, edit, toggle, delete, reorder items
 - Board-level global labels with auto-generated pastel colors
 - Due dates with overdueness display in both card list and detail view
+- Description indicator (`≡`) in card list when a card has a description
 - Card and board archiving with restore and permanent delete
 - Search with non-matching cards hidden and label filtering
 - Confirmation dialogs for destructive actions
