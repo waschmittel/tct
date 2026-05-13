@@ -37,8 +37,6 @@ pub fn render(frame: &mut Frame, app: &App) {
                             | InsertTarget::NewChecklistItem
                             | InsertTarget::EditChecklistItem
                             | InsertTarget::EditDueDate
-                            | InsertTarget::NewLabelName
-                            | InsertTarget::EditLabelName
                     )
             ) {
                 card_detail::render(frame, area, app);
@@ -92,10 +90,10 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
         Line::raw("  h/l or Left/Right  Switch lists"),
         Line::raw("  j/k or Down/Up     Navigate cards"),
         Line::raw("  g/G                First/last card"),
-        Line::raw("  Enter              Open card detail"),
+        Line::raw("  e                  Open card detail"),
+        Line::raw("  Enter              Quick-edit card title"),
         Line::raw("  n                  New card"),
         Line::raw("  N                  New list"),
-        Line::raw("  e                  Quick-edit card title"),
         Line::raw("  r                  Rename list"),
         Line::raw("  d                  Delete card"),
         Line::raw("  D                  Delete list"),

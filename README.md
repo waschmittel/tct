@@ -66,10 +66,10 @@ All writes are atomic (write to `.tmp`, then rename).
 | h/l, Left/Right | Switch lists |
 | j/k, Down/Up | Navigate cards |
 | g/G | First/last card |
-| Enter | Open card detail |
+| e | Open card detail |
+| Enter | Quick-edit card title |
 | n | New card |
 | N | New list |
-| e | Quick-edit card title |
 | r | Rename list |
 | d | Delete card (confirm) |
 | D | Delete list (confirm) |

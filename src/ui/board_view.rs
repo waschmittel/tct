@@ -107,6 +107,18 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 app.input_cursor,
             );
         }
+        AppMode::Insert(InsertTarget::NewLabelName) => {
+            render_input_overlay(frame, area, "New Label", &app.input_buffer, app.input_cursor);
+        }
+        AppMode::Insert(InsertTarget::EditLabelName) => {
+            render_input_overlay(
+                frame,
+                area,
+                "Rename Label",
+                &app.input_buffer,
+                app.input_cursor,
+            );
+        }
         _ => {}
     }
 

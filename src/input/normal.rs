@@ -119,7 +119,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        KeyCode::Enter if !grabbed => {
+        KeyCode::Char('e') if !grabbed => {
             if let Some(board) = &app.board {
                 if board.current_card_id().is_some() {
                     app.mode = AppMode::CardDetail;
@@ -136,7 +136,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 app.start_insert(InsertTarget::NewListName);
             }
         }
-        KeyCode::Char('e') if !grabbed => {
+        KeyCode::Enter if !grabbed => {
             if let Some(board) = &app.board {
                 if let Some(card) = board.current_card() {
                     let title = card.title.clone();

@@ -363,31 +363,33 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
             app.mode = AppMode::CardDetail;
         }
         InsertTarget::EditDueDate => {
-            let mut status_msg = None;
-            if let Some(board) = &mut app.board {
-                if let Some(card_id) = board.current_card_id().cloned() {
-                    if let Some(card) = board.cards.get_mut(&card_id) {
-                        if text.is_empty() || text == "none" {
+            if text.is_empty() || text == "none" {
+                if let Some(board) = &mut app.board {
+                    if let Some(card_id) = board.current_card_id().cloned() {
+                        if let Some(card) = board.cards.get_mut(&card_id) {
                             card.due_date = None;
-                            status_msg = Some("Cleared due date".to_string());
-                        } else if let Ok(date) =
-                            chrono::NaiveDate::parse_from_str(&text, "%Y-%m-%d")
-                        {
-                            card.due_date = Some(date);
-                            status_msg = Some(format!("Due date set to {date}"));
-                        } else {
-                            status_msg =
-                                Some("Invalid date format. Use YYYY-MM-DD".to_string());
+                            card.touch();
+                            card_store::save_card(&board.meta.id, card)?;
                         }
-                        card.touch();
-                        card_store::save_card(&board.meta.id, card)?;
                     }
                 }
+                app.set_status("Cleared due date".into());
+                app.mode = AppMode::CardDetail;
+            } else if let Ok(date) = chrono::NaiveDate::parse_from_str(&text, "%Y-%m-%d") {
+                if let Some(board) = &mut app.board {
+                    if let Some(card_id) = board.current_card_id().cloned() {
+                        if let Some(card) = board.cards.get_mut(&card_id) {
+                            card.due_date = Some(date);
+                            card.touch();
+                            card_store::save_card(&board.meta.id, card)?;
+                        }
+                    }
+                }
+                app.set_status(format!("Due date set to {date}"));
+                app.mode = AppMode::CardDetail;
+            } else {
+                app.set_status("Invalid date format. Use YYYY-MM-DD".into());
             }
-            if let Some(msg) = status_msg {
-                app.set_status(msg);
-            }
-            app.mode = AppMode::CardDetail;
         }
         InsertTarget::NewLabelName => {
             if let Some(board) = &mut app.board {
