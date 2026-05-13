@@ -1,7 +1,7 @@
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::model::card::Card;
@@ -53,9 +53,7 @@ pub fn render(
 
     let mut lines = vec![];
 
-    let max_w = inner.width as usize;
-    let title = truncate(&card.title, max_w);
-    lines.push(Line::from(Span::styled(title, base_style.add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(Span::styled(card.title.clone(), base_style.add_modifier(Modifier::BOLD))));
 
     let resolved = card.resolved_labels(board_labels);
     if !resolved.is_empty() && inner.height > 1 {
@@ -118,16 +116,6 @@ pub fn render(
         }
     }
 
-    let paragraph = Paragraph::new(lines);
+    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
     frame.render_widget(paragraph, inner);
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        s.to_string()
-    } else if max > 3 {
-        format!("{}...", &s[..max - 3])
-    } else {
-        s[..max].to_string()
-    }
 }

@@ -77,13 +77,18 @@ fn render_input_dialog(frame: &mut Frame, area: Rect, title: &str, input: &str, 
     let inner = block.inner(dialog_area);
     frame.render_widget(block, dialog_area);
 
-    let display = format!(" {input}");
-    let text = Paragraph::new(Line::from(vec![
-        Span::raw(&display),
-    ]));
+    let visible_w = inner.width as usize;
+    let scroll = if cursor >= visible_w {
+        cursor - visible_w + 1
+    } else {
+        0
+    };
+    let end = (scroll + visible_w).min(input.len());
+    let visible = &input[scroll..end];
+    let text = Paragraph::new(Line::from(Span::raw(visible.to_string())));
     frame.render_widget(text, inner);
 
-    let cx = inner.x + 1 + cursor as u16;
+    let cx = inner.x + (cursor - scroll) as u16;
     let cy = inner.y;
     if cx < inner.x + inner.width {
         frame.set_cursor_position((cx, cy));
