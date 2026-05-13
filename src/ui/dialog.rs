@@ -124,7 +124,15 @@ fn render_archived_cards(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Clear, popup);
 
     let block = Block::default()
-        .title(" Archived Cards (Enter: restore, Esc: close) ")
+        .title(" Archived Cards ")
+        .title_bottom(Line::from(vec![
+            Span::styled(" Enter", Style::default().fg(Color::Green)),
+            Span::raw(":restore  "),
+            Span::styled("x", Style::default().fg(Color::Red)),
+            Span::raw(":delete  "),
+            Span::styled("Esc", Style::default().fg(Color::Yellow)),
+            Span::raw(":close "),
+        ]))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow));
     let inner = block.inner(popup);

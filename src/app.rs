@@ -139,10 +139,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(open_board_id: Option<String>) -> anyhow::Result<Self> {
         board_store::ensure_base_dirs()?;
         let boards = board_store::list_boards()?;
-        Ok(Self {
+        let mut app = Self {
             mode: AppMode::BoardSelector,
             should_quit: false,
             status_message: None,
@@ -163,7 +163,11 @@ impl App {
             archived_selected: 0,
             last_reload: Instant::now(),
             reload_interval: Duration::from_secs(15),
-        })
+        };
+        if let Some(board_id) = open_board_id {
+            app.load_board(&board_id)?;
+        }
+        Ok(app)
     }
 
     pub fn on_tick(&mut self) {

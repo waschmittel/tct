@@ -113,7 +113,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
         Line::raw("  d                  Delete card"),
         Line::raw("  D                  Delete list"),
         Line::raw("  a                  Archive card (confirm)"),
-        Line::raw("  v                  View/restore archived"),
+        Line::raw("  v                  View/restore/delete archived"),
         Line::raw("  m                  Grab card to move (Enter:confirm, Esc:abort)"),
         Line::raw("  J/K                Reorder card up/down"),
         Line::raw("  </> (Shift+,/.)    Reorder list left/right"),

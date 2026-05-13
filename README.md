@@ -21,6 +21,7 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 - Auto-continuing lists in editor
 - Per-board configurable accent color (pastel palette, cycle with 'c')
 - Periodic filesystem reload (every 15s) for background sync support
+- Full CLI interface for scripting and AI agent use (`tct --help`)
 
 ## Installation
 
@@ -78,7 +79,7 @@ All writes are atomic (write to `.tmp`, then rename).
 | d | Delete card (confirm) |
 | D | Delete list (confirm) |
 | a | Archive card (confirm) |
-| v | View/restore archived cards |
+| v | View/restore/delete archived cards |
 | m | Grab card for moving |
 | h/j/k/l (grabbed) | Move card |
 | Enter (grabbed) | Confirm move |
@@ -124,11 +125,79 @@ All writes are atomic (write to `.tmp`, then rename).
 
 On macOS, Cmd can be used instead of Ctrl in terminals that support it (kitty, alacritty, WezTerm).
 
+## CLI Usage
+
+tct can be used as a CLI tool without opening the TUI — useful for scripting or AI agent integration.
+
+```
+tct --help                              Show all commands and options
+tct --board <name>                      Open TUI directly on a matching board
+```
+
+Board, list, card, and label names use **case-insensitive partial matching**. Multiple matches produce an error listing all candidates.
+
+### Boards
+
+```
+tct boards                              List active boards with card counts
+tct boards archived                     List archived boards
+tct boards create <name>                Create a new board
+tct boards archive <name>               Archive a board
+tct boards restore <name>               Restore an archived board
+tct boards delete <name>                Permanently delete an archived board
+```
+
+### Lists
+
+```
+tct lists <board>                       List all lists on a board
+tct lists create <board> <name>         Create a list
+tct lists rename <board> <list> <name>  Rename a list
+tct lists delete <board> <list>         Delete a list and all its cards
+```
+
+### Cards
+
+```
+tct cards <board>                       List all active cards grouped by list
+tct cards <board> <list>                List active cards in a specific list
+tct cards archived <board>              List archived cards
+tct cards show <board> <card>           Show full card detail
+tct cards create <board> <list> <title> Create a card
+tct cards edit <board> <card> [flags]   Edit card fields
+  --title <text>                          New title
+  --description <text>                    New description (replaces existing)
+  --due <YYYY-MM-DD|none>                 Set or clear due date
+tct cards archive <board> <card>        Archive a card
+tct cards restore <board> <card>        Restore an archived card to the first list
+tct cards delete <board> <card>         Permanently delete an archived card
+```
+
+### Checklist
+
+```
+tct checklist <board> <card>            Show checklist
+tct checklist add <board> <card> <text> Add a checklist item
+tct checklist toggle <board> <card> <n> Toggle item n (1-based index)
+tct checklist delete <board> <card> <n> Delete item n (1-based index)
+```
+
+### Labels
+
+```
+tct labels <board>                         List all labels
+tct labels create <board> <name>           Create a label
+tct labels delete <board> <label>          Delete a label (removes from all cards)
+tct labels assign <board> <card> <label>   Assign a label to a card
+tct labels remove <board> <card> <label>   Remove a label from a card
+```
+
 ## Architecture
 
 ```
 src/
-  main.rs          # Event loop, terminal setup
+  main.rs          # Entry point, CLI dispatch, TUI event loop
+  cli.rs           # All CLI subcommands (boards/lists/cards/checklist/labels)
   app.rs           # App state, modes, board loading
   model/
     board.rs       # BoardMeta

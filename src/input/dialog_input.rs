@@ -238,6 +238,22 @@ fn handle_archived_cards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
+        KeyCode::Char('x') => {
+            if app.archived_selected < app.archived_cards.len() {
+                let card = app.archived_cards.remove(app.archived_selected);
+                let title = card.title.clone();
+                if let Some(board) = &app.board {
+                    card_store::delete_card(&board.meta.id, &card.id)?;
+                }
+                app.set_status(format!("Deleted '{title}'"));
+                if app.archived_selected > 0 && app.archived_selected >= app.archived_cards.len() {
+                    app.archived_selected = app.archived_cards.len().saturating_sub(1);
+                }
+                if app.archived_cards.is_empty() {
+                    app.mode = AppMode::Normal;
+                }
+            }
+        }
         KeyCode::Esc => {
             app.archived_cards.clear();
             app.mode = AppMode::Normal;

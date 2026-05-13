@@ -1,4 +1,5 @@
 mod app;
+mod cli;
 mod event;
 mod input;
 mod model;
@@ -11,8 +12,28 @@ use app::App;
 use event::{AppEvent, EventHandler};
 
 fn main() -> anyhow::Result<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // Help flag (check before anything else so it always works)
+    if args.iter().any(|a| a == "--help" || a == "-h") || args.first().map(|a| a.as_str()) == Some("help") {
+        cli::print_help();
+        return Ok(());
+    }
+
+    // Subcommand mode: first arg is a non-flag word
+    if args.first().map(|a| !a.starts_with('-')).unwrap_or(false) {
+        if let Err(e) = cli::run(&args) {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
+
+    // TUI mode — resolve optional --board flag before initialising the terminal
+    let open_board_id = cli::resolve_board_flag(&args)?;
+
     let mut terminal = ratatui::init();
-    let mut app = App::new()?;
+    let mut app = App::new(open_board_id)?;
     let events = EventHandler::new(Duration::from_millis(250));
 
     let result = run_app(&mut terminal, &mut app, &events);
