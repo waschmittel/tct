@@ -2,6 +2,16 @@
 
 A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your terminal.
 
+tct stores everything as **plain JSON files** — one file per card, list, and board. Put them in a git repo, Dropbox, or any synced folder and every team member sees the same boards. tct watches the filesystem and picks up changes automatically, making it a natural fit for **background file sync** workflows.
+
+## Why tct?
+
+- **Files are the API** — every entity is a standalone JSON file. Human-readable, git-friendly, scriptable.
+- **Sync-friendly by default** — one file per entity, atomic writes, periodic reload. Works with git, Dropbox, Syncthing, or any file sync tool.
+- **Keyboard-first** — every action reachable via keyboard. Modal input (like Vim) keeps bindings contextual and safe.
+- **Dual interface** — interactive TUI for humans, headless CLI for scripts and AI agents. Same data.
+- **Zero infrastructure** — single binary. No database. No server. No account.
+
 ## Features
 
 - Multiple boards with named lists and cards, reorderable and archivable
@@ -9,10 +19,10 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 - Inline markdown description editor with syntax highlighting
 - Markdown syntax highlighting (code blocks, headings, bold/italic, inline code, lists)
 - Unified card detail view — description, checklist, labels, due date in one scrollable view
-- Checklist CRUD — add, edit, toggle, delete items
+- Checklist CRUD — add, edit, toggle, delete, reorder items
 - Board-level global labels with auto-generated pastel colors
 - Due dates with overdueness display in both card list and detail view
-- Card archiving and un-archiving
+- Card and board archiving with restore and permanent delete
 - Search with non-matching cards hidden and label filtering
 - Confirmation dialogs for destructive actions
 - Undo/redo in description editor
@@ -34,7 +44,7 @@ Or build and run directly:
 cargo run
 ```
 
-## Storage
+## Storage and Sync
 
 Data is stored as JSON files. Storage location is resolved in this order:
 
@@ -46,14 +56,28 @@ This means you can keep project-specific boards alongside your code by creating 
 
 ```
 .tct/  (or ~/.tct/)
+  board_order.json        # Board display order
   boards/
     <board-id>/
-      board.json          # Board metadata + list order
+      board.json          # Board metadata + list order + labels
       list-<id>.json      # List name + card ID order
       card-<id>.json      # Card data (title, description, labels, etc.)
 ```
 
-All writes are atomic (write to `.tmp`, then rename).
+All writes are atomic (write to `.tmp`, then rename) — no partial files, even on crash.
+
+### Setting up shared boards with git
+
+```sh
+mkdir .tct
+echo ".tct/**/*.tmp" >> .gitignore
+tct boards --create "Sprint Board"
+git add .tct/ && git commit -m "Add project board"
+```
+
+Team members who pull will see the board when they run `tct` from that project directory. Different cards never conflict. tct auto-reloads from disk every 15 seconds.
+
+For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs/user-guide.md).
 
 ## Keybindings
 
@@ -128,7 +152,7 @@ All writes are atomic (write to `.tmp`, then rename).
 | Enter | Auto-continue list items |
 | Esc | Cancel (confirms if changes exist) |
 
-On macOS, Cmd can be used instead of Ctrl in terminals that support it (kitty, alacritty, WezTerm).
+On macOS, Cmd can be used instead of Ctrl in terminals that support it (kitty, Alacritty, WezTerm).
 
 ## CLI Usage
 
@@ -261,6 +285,11 @@ tct boards
 tct lists a1b2c3d4 --by-id
 tct cards a1b2c3d4 --show e5f6a7b8 --by-id
 ```
+
+## Documentation
+
+- **[User Guide](docs/user-guide.md)** — detailed usage, sync workflows, troubleshooting, data format reference
+- **[Architecture (arc42)](docs/arc42.md)** — system context, building blocks, runtime views, ADRs, quality scenarios
 
 ## Architecture
 
