@@ -1,6 +1,8 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
+pub const WRAP_WIDTH: usize = 80;
+
 pub fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     let mut in_code_block = false;
@@ -23,10 +25,80 @@ pub fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
             continue;
         }
 
-        lines.push(Line::from(highlight_line(line, accent)));
+        let highlighted = highlight_line(line, accent);
+        let wrapped = wrap_spans(highlighted, WRAP_WIDTH);
+        lines.extend(wrapped);
     }
 
     lines
+}
+
+pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'static>> {
+    if max_width == 0 {
+        return vec![Line::from(spans)];
+    }
+
+    let total_len: usize = spans.iter().map(|s| s.content.len()).sum();
+    if total_len <= max_width {
+        return vec![Line::from(spans)];
+    }
+
+    let mut result: Vec<Line<'static>> = Vec::new();
+    let mut current_spans: Vec<Span<'static>> = Vec::new();
+    let mut current_len: usize = 0;
+
+    for span in spans {
+        let style = span.style;
+        let text = span.content.to_string();
+
+        if current_len + text.len() <= max_width {
+            current_len += text.len();
+            current_spans.push(Span::styled(text, style));
+            continue;
+        }
+
+        let mut remaining = text.as_str();
+        while !remaining.is_empty() {
+            let budget = max_width.saturating_sub(current_len);
+            if budget == 0 {
+                result.push(Line::from(std::mem::take(&mut current_spans)));
+                current_len = 0;
+                continue;
+            }
+
+            if remaining.len() <= budget {
+                current_len += remaining.len();
+                current_spans.push(Span::styled(remaining.to_string(), style));
+                break;
+            }
+
+            let slice = &remaining[..budget];
+            let break_at = match slice.rfind(' ') {
+                Some(pos) if pos > 0 => pos,
+                _ => budget,
+            };
+
+            let (chunk, rest) = remaining.split_at(break_at);
+            let rest = rest.strip_prefix(' ').unwrap_or(rest);
+
+            if !chunk.is_empty() {
+                current_spans.push(Span::styled(chunk.to_string(), style));
+            }
+            result.push(Line::from(std::mem::take(&mut current_spans)));
+            current_len = 0;
+            remaining = rest;
+        }
+    }
+
+    if !current_spans.is_empty() {
+        result.push(Line::from(current_spans));
+    }
+
+    if result.is_empty() {
+        result.push(Line::from(Vec::<Span<'static>>::new()));
+    }
+
+    result
 }
 
 pub fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
@@ -215,6 +287,53 @@ mod tests {
     fn test_highlight_line_bold() {
         let spans = highlight_line("this is **bold** text", Color::Cyan);
         assert!(!spans.is_empty());
+    }
+
+    #[test]
+    fn test_wrap_spans_no_wrap_needed() {
+        let spans = vec![Span::raw("short text")];
+        let lines = wrap_spans(spans, 80);
+        assert_eq!(lines.len(), 1);
+    }
+
+    #[test]
+    fn test_wrap_spans_wraps_at_boundary() {
+        let text = "word ".repeat(20); // 100 chars
+        let spans = vec![Span::raw(text)];
+        let lines = wrap_spans(spans, 80);
+        assert!(lines.len() >= 2);
+        for line in &lines {
+            let len: usize = line.spans.iter().map(|s| s.content.len()).sum();
+            assert!(len <= 80, "line length {len} exceeds 80");
+        }
+    }
+
+    #[test]
+    fn test_wrap_spans_preserves_style() {
+        let text = "word ".repeat(20);
+        let style = Style::default().fg(Color::Red);
+        let spans = vec![Span::styled(text, style)];
+        let lines = wrap_spans(spans, 80);
+        assert!(lines.len() >= 2);
+        for line in &lines {
+            for span in &line.spans {
+                assert_eq!(span.style.fg, Some(Color::Red));
+            }
+        }
+    }
+
+    #[test]
+    fn test_wrap_spans_zero_width() {
+        let spans = vec![Span::raw("hello")];
+        let lines = wrap_spans(spans, 0);
+        assert_eq!(lines.len(), 1);
+    }
+
+    #[test]
+    fn test_highlight_lines_wraps_long_paragraph() {
+        let text = "word ".repeat(30); // 150 chars paragraph
+        let lines = highlight_lines(&text, Color::Cyan);
+        assert!(lines.len() >= 2);
     }
 
 }

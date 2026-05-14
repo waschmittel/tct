@@ -43,17 +43,27 @@ impl Default for LabelColor {
 
 impl LabelColor {
     pub fn to_ratatui_color(self) -> Color {
+        let (r, g, b) = self.to_rgb();
+        Color::Rgb(r, g, b)
+    }
+
+    pub fn to_rgb(self) -> (u8, u8, u8) {
         match self {
-            Self::Red => Color::Rgb(255, 179, 186),
-            Self::Orange => Color::Rgb(255, 209, 170),
-            Self::Yellow => Color::Rgb(255, 250, 170),
-            Self::Green => Color::Rgb(186, 255, 186),
-            Self::Blue => Color::Rgb(170, 200, 255),
-            Self::Purple => Color::Rgb(215, 180, 255),
-            Self::Pink => Color::Rgb(255, 200, 220),
-            Self::Cyan => Color::Rgb(170, 240, 240),
-            Self::Custom { r, g, b } => Color::Rgb(r, g, b),
+            Self::Red => (255, 179, 186),
+            Self::Orange => (255, 209, 170),
+            Self::Yellow => (255, 250, 170),
+            Self::Green => (186, 255, 186),
+            Self::Blue => (170, 200, 255),
+            Self::Purple => (215, 180, 255),
+            Self::Pink => (255, 200, 220),
+            Self::Cyan => (170, 240, 240),
+            Self::Custom { r, g, b } => (r, g, b),
         }
+    }
+
+    pub fn tinted_bg(self) -> Color {
+        let (r, g, b) = self.to_rgb();
+        Color::Rgb(r / 15, g / 15, b / 15)
     }
 
     pub fn next(self) -> Self {
@@ -211,5 +221,27 @@ mod tests {
         let n = c.next();
         assert!(matches!(n, LabelColor::Custom { .. }));
         assert_ne!(c, n);
+    }
+
+    #[test]
+    fn to_rgb_matches_ratatui_color() {
+        let c = LabelColor::Cyan;
+        let (r, g, b) = c.to_rgb();
+        assert_eq!(c.to_ratatui_color(), Color::Rgb(r, g, b));
+    }
+
+    #[test]
+    fn tinted_bg_is_subtle() {
+        let c = LabelColor::Blue;
+        let (r, g, b) = c.to_rgb();
+        let bg = c.tinted_bg();
+        if let Color::Rgb(br, bg_g, bb) = bg {
+            assert!(br < r / 2, "tinted red {br} not subtle enough");
+            assert!(bg_g < g / 2, "tinted green {bg_g} not subtle enough");
+            assert!(bb < b / 2, "tinted blue {bb} not subtle enough");
+            assert!(br > 0 || bg_g > 0 || bb > 0, "tinted bg is pure black");
+        } else {
+            panic!("expected Rgb color");
+        }
     }
 }

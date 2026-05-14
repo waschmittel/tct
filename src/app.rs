@@ -319,6 +319,13 @@ impl App {
             .map(|b| b.meta.accent_color.to_ratatui_color())
             .unwrap_or(Color::Cyan)
     }
+
+    pub fn accent_label_color(&self) -> crate::model::label::LabelColor {
+        self.board
+            .as_ref()
+            .map(|b| b.meta.accent_color)
+            .unwrap_or_default()
+    }
 }
 
 fn migrate_labels(meta: &mut BoardMeta, cards: &mut HashMap<ShortId, Card>) {

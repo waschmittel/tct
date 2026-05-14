@@ -79,7 +79,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // If editing description, render the editor instead
     if is_editing_desc {
         if let Some(textarea) = &app.description_editor {
-            render_description_editor(frame, inner, textarea, app.editor_scroll, accent);
+            let desc_bg = app.accent_label_color().tinted_bg();
+            render_description_editor(frame, inner, textarea, app.editor_scroll, accent, desc_bg);
         }
         return;
     }
@@ -88,6 +89,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let mut lines: Vec<Line<'static>> = Vec::new();
 
     // --- Description Section ---
+    let desc_bg = app.accent_label_color().tinted_bg();
+
     lines.push(Line::from(Span::styled(
         "Description",
         Style::default().fg(accent).add_modifier(Modifier::BOLD),
@@ -95,12 +98,22 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if card.description.is_empty() {
         lines.push(Line::from(Span::styled(
             "  (no description — press 'e' to add)",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::DarkGray).bg(desc_bg),
         )));
     } else {
         let desc_lines = markdown::highlight_lines(&card.description, accent);
         for dl in desc_lines {
-            lines.push(dl);
+            let tinted: Vec<Span<'static>> = dl
+                .spans
+                .into_iter()
+                .map(|mut s| {
+                    if s.style.bg.is_none() {
+                        s.style.bg = Some(desc_bg);
+                    }
+                    s
+                })
+                .collect();
+            lines.push(Line::from(tinted));
         }
     }
 
@@ -254,6 +267,7 @@ fn render_description_editor(
     textarea: &ratatui_textarea::TextArea<'static>,
     editor_scroll: usize,
     accent: Color,
+    desc_bg: Color,
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
@@ -270,31 +284,80 @@ fn render_description_editor(
     let lines = textarea.lines();
     let ratatui_textarea::DataCursor(cursor_row, cursor_col) = textarea.cursor();
 
-    let scroll = editor_scroll;
-    let end = (scroll + visible_height).min(lines.len());
+    let wrap_width = markdown::WRAP_WIDTH.min(inner.width as usize);
+
+    // Build visual lines: Vec<(source_line_idx, Line)>
+    let mut visual_lines: Vec<(usize, Line<'static>)> = Vec::new();
+    for (li, line_text) in lines.iter().enumerate() {
+        let highlighted = markdown::highlight_line(line_text, accent);
+        let wrapped = markdown::wrap_spans(highlighted, wrap_width);
+        for wl in wrapped {
+            visual_lines.push((li, wl));
+        }
+    }
+
+    // Find visual row for cursor
+    let mut cursor_visual_row = 0;
+    let mut cursor_visual_col = cursor_col;
+    {
+        let mut vrow = 0;
+        for (li, vline) in &visual_lines {
+            if *li == cursor_row {
+                let vline_len: usize = vline.spans.iter().map(|s| s.content.len()).sum();
+                if cursor_visual_col <= vline_len || vrow + 1 >= visual_lines.len() || visual_lines[vrow + 1].0 != cursor_row {
+                    cursor_visual_row = vrow;
+                    break;
+                }
+                cursor_visual_col -= vline_len;
+            }
+            vrow += 1;
+        }
+    }
+
+    // Adjust scroll to keep cursor visible
+    let scroll = if cursor_visual_row < editor_scroll {
+        cursor_visual_row
+    } else if cursor_visual_row >= editor_scroll + visible_height {
+        cursor_visual_row - visible_height + 1
+    } else {
+        editor_scroll
+    };
+
+    let end = (scroll + visible_height).min(visual_lines.len());
     let start = scroll.min(end);
 
-    for (vi, li) in (start..end).enumerate() {
-        let line_text = &lines[li];
-        let highlighted = markdown::highlight_line(line_text, accent);
+    for (vi, idx) in (start..end).enumerate() {
+        let (src_li, ref vline) = visual_lines[idx];
 
         let y = inner.y + vi as u16;
         let line_area = Rect::new(inner.x, y, inner.width, 1);
 
-        if li == cursor_row {
+        let tinted: Vec<Span<'static>> = vline
+            .spans
+            .iter()
+            .map(|s| {
+                let mut s = s.clone();
+                if s.style.bg.is_none() {
+                    s.style.bg = Some(desc_bg);
+                }
+                s
+            })
+            .collect();
+
+        if src_li == cursor_row && idx == cursor_visual_row {
             frame.render_widget(
-                Paragraph::new(Line::from(highlighted))
+                Paragraph::new(Line::from(tinted))
                     .style(Style::default().bg(Color::Rgb(30, 30, 40))),
                 line_area,
             );
         } else {
-            frame.render_widget(Paragraph::new(Line::from(highlighted)), line_area);
+            frame.render_widget(Paragraph::new(Line::from(tinted)), line_area);
         }
     }
 
-    if cursor_row >= start && cursor_row < end {
-        let cx = inner.x + (cursor_col as u16).min(inner.width.saturating_sub(1));
-        let cy = inner.y + (cursor_row - start) as u16;
+    if cursor_visual_row >= start && cursor_visual_row < end {
+        let cx = inner.x + (cursor_visual_col as u16).min(inner.width.saturating_sub(1));
+        let cy = inner.y + (cursor_visual_row - start) as u16;
         frame.set_cursor_position((cx, cy));
     }
 }
