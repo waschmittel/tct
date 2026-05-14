@@ -334,4 +334,19 @@ mod tests {
         // line1: "aa aa", line2: "aa aa" → 2 lines
         assert_eq!(wrapped_line_count("aa aa aa aa", 5), 2);
     }
+
+    #[test]
+    fn card_height_with_info_no_labels() {
+        let mut card = Card::new("Title".into());
+        card.description = "desc".into();
+        // title(1) + info(1) + borders(2) = 4
+        assert_eq!(card_height(&card, &[], 20), 4);
+    }
+
+    #[test]
+    fn card_height_title_only() {
+        let card = Card::new("Title".into());
+        // title(1) + borders(2) = 3
+        assert_eq!(card_height(&card, &[], 20), 3);
+    }
 }

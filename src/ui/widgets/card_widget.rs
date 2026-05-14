@@ -51,7 +51,7 @@ pub fn render(
     lines.push(Line::from(Span::styled(card.title.clone(), base_style.add_modifier(Modifier::BOLD))));
 
     let resolved = card.resolved_labels(board_labels);
-    if !resolved.is_empty() && inner.height > 1 {
+    if !resolved.is_empty() && (lines.len() as u16) < inner.height {
         let label_spans: Vec<Span> = resolved
             .iter()
             .map(|l| {
@@ -70,7 +70,7 @@ pub fn render(
         lines.push(Line::from(label_spans));
     }
 
-    if inner.height > 2 {
+    if (lines.len() as u16) < inner.height {
         let mut info = vec![];
         if let Some(due) = &card.due_date {
             let today = chrono::Local::now().date_naive();
@@ -124,4 +124,87 @@ pub fn render(
 
     let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
     frame.render_widget(paragraph, inner);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::card::ChecklistItem;
+
+    fn build_lines(card: &Card, board_labels: &[Label], inner_height: u16) -> Vec<Line<'static>> {
+        let base_style = Style::default();
+        let mut lines = vec![];
+        lines.push(Line::from(Span::styled(
+            card.title.clone(),
+            base_style.add_modifier(Modifier::BOLD),
+        )));
+
+        let resolved = card.resolved_labels(board_labels);
+        if !resolved.is_empty() && (lines.len() as u16) < inner_height {
+            let label_spans: Vec<Span> = resolved
+                .iter()
+                .map(|l| {
+                    Span::styled(
+                        format!("[{}]", l.name),
+                        Style::default()
+                            .fg(Color::Black)
+                            .bg(l.color.to_ratatui_color()),
+                    )
+                })
+                .collect();
+            lines.push(Line::from(label_spans));
+        }
+
+        if (lines.len() as u16) < inner_height {
+            let mut info = vec![];
+            if card.due_date.is_some() {
+                info.push(Span::raw("due"));
+            }
+            if card.checklist_progress().is_some() {
+                info.push(Span::raw("checklist"));
+            }
+            if card.has_description() {
+                info.push(Span::styled("≡", Style::default()));
+            }
+            if !info.is_empty() {
+                lines.push(Line::from(info));
+            }
+        }
+        lines
+    }
+
+    #[test]
+    fn info_line_shown_without_labels() {
+        let mut card = Card::new("Test".into());
+        card.description = "has desc".into();
+        card.checklist = vec![ChecklistItem {
+            text: "item".into(),
+            completed: false,
+        }];
+        // inner_height = 2 (title + info, no labels)
+        let lines = build_lines(&card, &[], 2);
+        assert_eq!(lines.len(), 2);
+    }
+
+    #[test]
+    fn info_line_shown_with_labels() {
+        let mut card = Card::new("Test".into());
+        card.description = "has desc".into();
+        let label = Label {
+            id: "l1".into(),
+            name: "bug".into(),
+            color: crate::model::label::LabelColor::Red,
+        };
+        card.label_ids = vec!["l1".into()];
+        // inner_height = 3 (title + labels + info)
+        let lines = build_lines(&card, &[label], 3);
+        assert_eq!(lines.len(), 3);
+    }
+
+    #[test]
+    fn no_info_line_when_no_metadata() {
+        let card = Card::new("Test".into());
+        let lines = build_lines(&card, &[], 2);
+        assert_eq!(lines.len(), 1);
+    }
 }
