@@ -758,4 +758,53 @@ mod tests {
         assert_eq!(board.labels[0].id, id2);
         assert_eq!(board.labels[1].id, id1);
     }
+
+    #[test]
+    fn move_card_between_lists_preserves_position() {
+        with_temp_dir(|| {
+            let meta = board_store::create_board("Board".into()).unwrap();
+
+            let mut list_a = CardList::new("A".into());
+            let mut list_b = CardList::new("B".into());
+
+            let c1 = Card::new("card1".into());
+            let c2 = Card::new("card2".into());
+            let c3 = Card::new("card3".into());
+            let c4 = Card::new("card4".into());
+
+            card_store::save_card(&meta.id, &c1).unwrap();
+            card_store::save_card(&meta.id, &c2).unwrap();
+            card_store::save_card(&meta.id, &c3).unwrap();
+            card_store::save_card(&meta.id, &c4).unwrap();
+
+            list_a.card_ids = vec![c1.id.clone(), c2.id.clone(), c3.id.clone()];
+            list_b.card_ids = vec![c4.id.clone()];
+
+            // Move c2 (index 1) from list_a to list_b at same position
+            let ci = 1;
+            let card_id = list_a.card_ids.remove(ci);
+            let insert_at = ci.min(list_b.card_ids.len());
+            list_b.card_ids.insert(insert_at, card_id);
+
+            assert_eq!(list_a.card_ids, vec![c1.id.clone(), c3.id.clone()]);
+            assert_eq!(
+                list_b.card_ids,
+                vec![c4.id.clone(), c2.id.clone()]
+            );
+            assert_eq!(insert_at, 1);
+        });
+    }
+
+    #[test]
+    fn move_card_clamps_to_end_when_dst_shorter() {
+        // Moving card at index 4 to a list with only 2 items → inserts at index 2
+        let mut src = vec!["a", "b", "c", "d", "e"];
+        let mut dst = vec!["x", "y"];
+        let ci = 4;
+        let card = src.remove(ci);
+        let insert_at = ci.min(dst.len());
+        dst.insert(insert_at, card);
+        assert_eq!(dst, vec!["x", "y", "e"]);
+        assert_eq!(insert_at, 2);
+    }
 }

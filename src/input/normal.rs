@@ -261,12 +261,13 @@ fn move_card_left(app: &mut App) -> anyhow::Result<()> {
     board.lists[src].card_ids.remove(ci);
     list_store::save_list(&board.meta.id, &board.lists[src])?;
 
-    board.lists[dst].card_ids.push(card_id);
+    let insert_at = ci.min(board.lists[dst].card_ids.len());
+    board.lists[dst].card_ids.insert(insert_at, card_id);
     list_store::save_list(&board.meta.id, &board.lists[dst])?;
 
     board.clamp_selection();
     board.selected_list = dst;
-    board.selected_card[dst] = board.lists[dst].card_ids.len().saturating_sub(1);
+    board.selected_card[dst] = insert_at;
     Ok(())
 }
 
@@ -290,12 +291,13 @@ fn move_card_right(app: &mut App) -> anyhow::Result<()> {
     board.lists[src].card_ids.remove(ci);
     list_store::save_list(&board.meta.id, &board.lists[src])?;
 
-    board.lists[dst].card_ids.push(card_id);
+    let insert_at = ci.min(board.lists[dst].card_ids.len());
+    board.lists[dst].card_ids.insert(insert_at, card_id);
     list_store::save_list(&board.meta.id, &board.lists[dst])?;
 
     board.clamp_selection();
     board.selected_list = dst;
-    board.selected_card[dst] = board.lists[dst].card_ids.len().saturating_sub(1);
+    board.selected_card[dst] = insert_at;
     Ok(())
 }
 
