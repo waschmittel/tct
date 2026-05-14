@@ -146,6 +146,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
         Line::raw("  Ctrl+I     Italic (*text*)"),
         Line::raw("  Ctrl+K     Code (`text`)"),
         Line::raw("  Ctrl+L     List item (- )"),
+        Line::raw("  Up/Down    Move by visual (wrapped) line"),
         Line::raw("  Enter      Auto-continue lists"),
         Line::raw("  Esc        Cancel (confirm if changed)"),
     ];

@@ -112,6 +112,12 @@ fn handle_description_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         (KeyCode::Enter, _) => {
             handle_enter_in_list(app);
         }
+        (KeyCode::Up, _) => {
+            move_cursor_visual(app, -1);
+        }
+        (KeyCode::Down, _) => {
+            move_cursor_visual(app, 1);
+        }
         _ => {
             if let Some(textarea) = &mut app.description_editor {
                 textarea.input(key);
@@ -132,6 +138,41 @@ fn update_editor_scroll(app: &mut App) {
             app.editor_scroll = cursor_row - visible_height + 1;
         }
     }
+}
+
+fn move_cursor_visual(app: &mut App, direction: i32) {
+    use crate::ui::markdown;
+
+    let accent = app.accent_color();
+    let Some(textarea) = &app.description_editor else {
+        return;
+    };
+    let ratatui_textarea::DataCursor(cursor_row, cursor_col) = textarea.cursor();
+    let lines: Vec<String> = textarea.lines().to_vec();
+
+    let visual_map = markdown::build_visual_map(&lines, accent, markdown::WRAP_WIDTH);
+    let (current_vrow, visual_col) = markdown::source_to_visual(&visual_map, cursor_row, cursor_col);
+
+    let target_vrow = if direction < 0 {
+        current_vrow.checked_sub(1)
+    } else {
+        let next = current_vrow + 1;
+        if next < visual_map.len() {
+            Some(next)
+        } else {
+            None
+        }
+    };
+
+    let Some(target_vrow) = target_vrow else {
+        return;
+    };
+
+    let (target_src_row, target_src_offset, target_vlen) = visual_map[target_vrow];
+    let target_col = target_src_offset + visual_col.min(target_vlen);
+
+    let textarea = app.description_editor.as_mut().unwrap();
+    textarea.move_cursor(CursorMove::Jump(target_src_row as u16, target_col as u16));
 }
 
 fn description_changed(app: &App) -> bool {

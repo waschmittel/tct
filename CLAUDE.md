@@ -77,3 +77,4 @@ When changing keybindings or features, update ALL of:
 - `card.touch()` — updates `updated_at` timestamp
 - `board.clamp_selection()` — fix selection indices after card removal
 - `markdown::wrap_spans()` / `markdown::WRAP_WIDTH` — word-wrap styled spans at 80 chars
+- `markdown::build_visual_map()` / `markdown::source_to_visual()` — map source cursor ↔ visual (wrapped) line position

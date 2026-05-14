@@ -150,6 +150,7 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | Ctrl+I | Italic (\*text\*) |
 | Ctrl+K | Inline code (\`text\`) |
 | Ctrl+L | Insert list item (- ) |
+| Up/Down | Move by visual (wrapped) line |
 | Enter | Auto-continue list items |
 | Esc | Cancel (confirms if changes exist) |
 

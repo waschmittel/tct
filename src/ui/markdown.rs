@@ -101,6 +101,50 @@ pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'stat
     result
 }
 
+/// Visual line map entry: (source_row, source_col_offset, visual_line_len).
+pub fn build_visual_map(lines: &[String], accent: Color, wrap_width: usize) -> Vec<(usize, usize, usize)> {
+    let mut map = Vec::new();
+    for (li, line_text) in lines.iter().enumerate() {
+        let highlighted = highlight_line(line_text, accent);
+        let wrapped = wrap_spans(highlighted, wrap_width);
+        let source_bytes = line_text.as_bytes();
+        let mut source_offset = 0;
+        for wl in &wrapped {
+            let vlen: usize = wl.spans.iter().map(|s| s.content.len()).sum();
+            map.push((li, source_offset, vlen));
+            let gap = if source_offset + vlen < source_bytes.len()
+                && source_bytes[source_offset + vlen] == b' '
+            {
+                1
+            } else {
+                0
+            };
+            source_offset += vlen + gap;
+        }
+    }
+    map
+}
+
+/// Find visual row and column for a source cursor position.
+pub fn source_to_visual(
+    visual_map: &[(usize, usize, usize)],
+    cursor_row: usize,
+    cursor_col: usize,
+) -> (usize, usize) {
+    for (vi, &(src_row, src_offset, vlen)) in visual_map.iter().enumerate() {
+        if src_row == cursor_row {
+            let col_in_segment = cursor_col.saturating_sub(src_offset);
+            if col_in_segment <= vlen
+                || vi + 1 >= visual_map.len()
+                || visual_map[vi + 1].0 != cursor_row
+            {
+                return (vi, col_in_segment);
+            }
+        }
+    }
+    (0, cursor_col)
+}
+
 pub fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
     let mut spans = Vec::new();
     let owned = line.to_string();
@@ -334,6 +378,66 @@ mod tests {
         let text = "word ".repeat(30); // 150 chars paragraph
         let lines = highlight_lines(&text, Color::Cyan);
         assert!(lines.len() >= 2);
+    }
+
+    #[test]
+    fn test_visual_map_single_line_no_wrap() {
+        let lines = vec!["short line".to_string()];
+        let map = build_visual_map(&lines, Color::Cyan, 80);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map[0], (0, 0, 10));
+    }
+
+    #[test]
+    fn test_visual_map_wrapped_line() {
+        // 100 chars, wraps at 80
+        let text = "word ".repeat(20);
+        let lines = vec![text.trim_end().to_string()];
+        let map = build_visual_map(&lines, Color::Cyan, 20);
+        assert!(map.len() >= 2, "expected wrapping, got {} entries", map.len());
+        // All entries should reference source row 0
+        for entry in &map {
+            assert_eq!(entry.0, 0);
+        }
+        // Source offsets should be strictly increasing
+        for w in map.windows(2) {
+            assert!(w[1].1 > w[0].1);
+        }
+    }
+
+    #[test]
+    fn test_source_to_visual_no_wrap() {
+        let lines = vec!["hello world".to_string()];
+        let map = build_visual_map(&lines, Color::Cyan, 80);
+        let (vrow, vcol) = source_to_visual(&map, 0, 5);
+        assert_eq!(vrow, 0);
+        assert_eq!(vcol, 5);
+    }
+
+    #[test]
+    fn test_source_to_visual_after_wrap() {
+        // "aaaa bbbb cccc dddd" wraps at 10 → "aaaa bbbb" (9) + "cccc dddd" (9)
+        let lines = vec!["aaaa bbbb cccc dddd".to_string()];
+        let map = build_visual_map(&lines, Color::Cyan, 10);
+        assert_eq!(map.len(), 2);
+        // Source col 0 → visual row 0, col 0
+        assert_eq!(source_to_visual(&map, 0, 0), (0, 0));
+        // Source col 10 ('c') → visual row 1, col 0
+        let (vrow, vcol) = source_to_visual(&map, 0, 10);
+        assert_eq!(vrow, 1);
+        assert_eq!(vcol, 0);
+        // Source col 14 ('d') → visual row 1, col 4
+        let (vrow, vcol) = source_to_visual(&map, 0, 14);
+        assert_eq!(vrow, 1);
+        assert_eq!(vcol, 4);
+    }
+
+    #[test]
+    fn test_source_to_visual_multiline() {
+        let lines = vec!["short".to_string(), "also short".to_string()];
+        let map = build_visual_map(&lines, Color::Cyan, 80);
+        assert_eq!(map.len(), 2);
+        assert_eq!(source_to_visual(&map, 1, 5), (1, 5));
     }
 
     #[test]

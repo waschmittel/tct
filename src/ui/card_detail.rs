@@ -305,7 +305,7 @@ fn render_description_editor(
 
     let wrap_width = markdown::WRAP_WIDTH.min(inner.width as usize);
 
-    // Build visual lines: Vec<(source_line_idx, Line)>
+    // Build visual lines for rendering
     let mut visual_lines: Vec<(usize, Line<'static>)> = Vec::new();
     for (li, line_text) in lines.iter().enumerate() {
         let highlighted = markdown::highlight_line(line_text, accent);
@@ -315,34 +315,10 @@ fn render_description_editor(
         }
     }
 
-    // Find visual row for cursor, accounting for spaces stripped by wrap_spans
-    let mut cursor_visual_row = 0;
-    let mut cursor_visual_col = cursor_col;
-    {
-        let source_text = &lines[cursor_row];
-        let source_bytes = source_text.as_bytes();
-        let mut source_consumed: usize = 0;
-        let mut vrow = 0;
-        for (li, vline) in &visual_lines {
-            if *li == cursor_row {
-                let vline_len: usize = vline.spans.iter().map(|s| s.content.len()).sum();
-                if cursor_visual_col <= vline_len || vrow + 1 >= visual_lines.len() || visual_lines[vrow + 1].0 != cursor_row {
-                    cursor_visual_row = vrow;
-                    break;
-                }
-                let gap = if source_consumed + vline_len < source_bytes.len()
-                    && source_bytes[source_consumed + vline_len] == b' '
-                {
-                    1
-                } else {
-                    0
-                };
-                source_consumed += vline_len + gap;
-                cursor_visual_col -= vline_len + gap;
-            }
-            vrow += 1;
-        }
-    }
+    let lines_owned: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
+    let visual_map = markdown::build_visual_map(&lines_owned, accent, wrap_width);
+    let (cursor_visual_row, cursor_visual_col) =
+        markdown::source_to_visual(&visual_map, cursor_row, cursor_col);
 
     // Adjust scroll to keep cursor visible
     let scroll = if cursor_visual_row < editor_scroll {
