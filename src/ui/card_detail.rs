@@ -85,17 +85,30 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    // --- Description Section (rendered separately with tinted background) ---
+    // --- Description Header (no tinted bg) ---
+    let header_lines: Vec<Line<'static>> = vec![
+        Line::raw(""),
+        Line::from(Span::styled(
+            "Description",
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        )),
+    ];
+    let header_height = (header_lines.len() as u16).min(inner.height);
+    let header_area = Rect::new(inner.x, inner.y, inner.width, header_height);
+    frame.render_widget(Paragraph::new(header_lines), header_area);
+
+    let md_y = inner.y + header_height;
+    let md_max_height = inner.height.saturating_sub(header_height);
+
+    // --- Description Body (tinted bg, 2-char horizontal padding) ---
     let desc_bg = app.accent_label_color().tinted_bg();
+    let pad: u16 = 2;
+    let md_inner_width = inner.width.saturating_sub(pad * 2);
 
     let mut desc_lines: Vec<Line<'static>> = Vec::new();
-    desc_lines.push(Line::from(Span::styled(
-        "Description",
-        Style::default().fg(accent).add_modifier(Modifier::BOLD),
-    )));
     if card.description.is_empty() {
         desc_lines.push(Line::from(Span::styled(
-            "  (no description — press 'e' to add)",
+            "(no description — press 'e' to add)",
             Style::default().fg(Color::DarkGray),
         )));
     } else {
@@ -110,16 +123,16 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .iter()
         .map(|line| {
             let len: usize = line.spans.iter().map(|s| s.content.len()).sum();
-            let w = inner.width as usize;
+            let w = md_inner_width as usize;
             if w == 0 { 1 } else { ((len.max(1) + w - 1) / w) as u16 }
         })
         .sum();
-    let desc_height = desc_visual_lines.min(inner.height);
-    let desc_area = Rect::new(inner.x, inner.y, inner.width, desc_height);
+    let desc_height = desc_visual_lines.min(md_max_height);
+    let desc_area = Rect::new(inner.x + pad, md_y, md_inner_width, desc_height);
     frame.render_widget(desc_paragraph, desc_area);
 
-    let rest_y = inner.y + desc_height;
-    let rest_height = inner.height.saturating_sub(desc_height);
+    let rest_y = md_y + desc_height;
+    let rest_height = inner.height.saturating_sub(rest_y - inner.y);
     if rest_height < 2 {
         return;
     }
