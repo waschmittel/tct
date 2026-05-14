@@ -85,38 +85,48 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    // Unified view: render all sections vertically
-    let mut lines: Vec<Line<'static>> = Vec::new();
-
-    // --- Description Section ---
+    // --- Description Section (rendered separately with tinted background) ---
     let desc_bg = app.accent_label_color().tinted_bg();
 
-    lines.push(Line::from(Span::styled(
+    let mut desc_lines: Vec<Line<'static>> = Vec::new();
+    desc_lines.push(Line::from(Span::styled(
         "Description",
         Style::default().fg(accent).add_modifier(Modifier::BOLD),
     )));
     if card.description.is_empty() {
-        lines.push(Line::from(Span::styled(
+        desc_lines.push(Line::from(Span::styled(
             "  (no description — press 'e' to add)",
-            Style::default().fg(Color::DarkGray).bg(desc_bg),
+            Style::default().fg(Color::DarkGray),
         )));
     } else {
-        let desc_lines = markdown::highlight_lines(&card.description, accent);
-        for dl in desc_lines {
-            let tinted: Vec<Span<'static>> = dl
-                .spans
-                .into_iter()
-                .map(|mut s| {
-                    if s.style.bg.is_none() {
-                        s.style.bg = Some(desc_bg);
-                    }
-                    s
-                })
-                .collect();
-            lines.push(Line::from(tinted));
-        }
+        let highlighted = markdown::highlight_lines(&card.description, accent);
+        desc_lines.extend(highlighted);
     }
 
+    let desc_paragraph = Paragraph::new(desc_lines.clone())
+        .style(Style::default().bg(desc_bg))
+        .wrap(Wrap { trim: false });
+    let desc_visual_lines: u16 = desc_lines
+        .iter()
+        .map(|line| {
+            let len: usize = line.spans.iter().map(|s| s.content.len()).sum();
+            let w = inner.width as usize;
+            if w == 0 { 1 } else { ((len.max(1) + w - 1) / w) as u16 }
+        })
+        .sum();
+    let desc_height = desc_visual_lines.min(inner.height);
+    let desc_area = Rect::new(inner.x, inner.y, inner.width, desc_height);
+    frame.render_widget(desc_paragraph, desc_area);
+
+    let rest_y = inner.y + desc_height;
+    let rest_height = inner.height.saturating_sub(desc_height);
+    if rest_height < 2 {
+        return;
+    }
+    let rest_area = Rect::new(inner.x, rest_y, inner.width, rest_height);
+
+    // Remaining sections rendered below description
+    let mut lines: Vec<Line<'static>> = Vec::new();
     lines.push(Line::raw(""));
     lines.push(Line::from(Span::styled(
         "═".repeat(inner.width as usize),
@@ -235,7 +245,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, inner);
+    frame.render_widget(paragraph, rest_area);
 
     // Input dialogs rendered on top
     match &app.mode {
@@ -351,7 +361,11 @@ fn render_description_editor(
                 line_area,
             );
         } else {
-            frame.render_widget(Paragraph::new(Line::from(tinted)), line_area);
+            frame.render_widget(
+                Paragraph::new(Line::from(tinted))
+                    .style(Style::default().bg(desc_bg)),
+                line_area,
+            );
         }
     }
 
