@@ -336,4 +336,22 @@ mod tests {
         assert!(lines.len() >= 2);
     }
 
+    #[test]
+    fn test_wrap_spans_content_matches_source() {
+        let source = "hello world foo bar baz qux quux corge grault";
+        let spans = vec![Span::raw(source.to_string())];
+        let lines = wrap_spans(spans, 20);
+        // Concatenating all visual line content + one space per break should reconstruct source
+        let mut reconstructed = String::new();
+        for (i, line) in lines.iter().enumerate() {
+            if i > 0 {
+                reconstructed.push(' ');
+            }
+            for span in &line.spans {
+                reconstructed.push_str(&span.content);
+            }
+        }
+        assert_eq!(reconstructed, source);
+    }
+
 }

@@ -306,10 +306,13 @@ fn render_description_editor(
         }
     }
 
-    // Find visual row for cursor
+    // Find visual row for cursor, accounting for spaces stripped by wrap_spans
     let mut cursor_visual_row = 0;
     let mut cursor_visual_col = cursor_col;
     {
+        let source_text = &lines[cursor_row];
+        let source_bytes = source_text.as_bytes();
+        let mut source_consumed: usize = 0;
         let mut vrow = 0;
         for (li, vline) in &visual_lines {
             if *li == cursor_row {
@@ -318,7 +321,15 @@ fn render_description_editor(
                     cursor_visual_row = vrow;
                     break;
                 }
-                cursor_visual_col -= vline_len;
+                let gap = if source_consumed + vline_len < source_bytes.len()
+                    && source_bytes[source_consumed + vline_len] == b' '
+                {
+                    1
+                } else {
+                    0
+                };
+                source_consumed += vline_len + gap;
+                cursor_visual_col -= vline_len + gap;
             }
             vrow += 1;
         }

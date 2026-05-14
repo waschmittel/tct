@@ -63,7 +63,7 @@ impl LabelColor {
 
     pub fn tinted_bg(self) -> Color {
         let (r, g, b) = self.to_rgb();
-        Color::Rgb(r / 15, g / 15, b / 15)
+        Color::Rgb(r / 5, g / 5, b / 5)
     }
 
     pub fn next(self) -> Self {
@@ -231,7 +231,7 @@ mod tests {
     }
 
     #[test]
-    fn tinted_bg_is_subtle() {
+    fn tinted_bg_is_subtle_but_visible() {
         let c = LabelColor::Blue;
         let (r, g, b) = c.to_rgb();
         let bg = c.tinted_bg();
@@ -239,7 +239,10 @@ mod tests {
             assert!(br < r / 2, "tinted red {br} not subtle enough");
             assert!(bg_g < g / 2, "tinted green {bg_g} not subtle enough");
             assert!(bb < b / 2, "tinted blue {bb} not subtle enough");
-            assert!(br > 0 || bg_g > 0 || bb > 0, "tinted bg is pure black");
+            assert!(
+                br >= 20 || bg_g >= 20 || bb >= 20,
+                "tinted bg too dark to be visible: ({br}, {bg_g}, {bb})"
+            );
         } else {
             panic!("expected Rgb color");
         }

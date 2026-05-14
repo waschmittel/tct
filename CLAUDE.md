@@ -77,6 +77,6 @@ When changing keybindings or features, update ALL of:
 - `board.current_card()` / `board.current_card_id()` — get currently selected card
 - `card.touch()` — updates `updated_at` timestamp
 - `board.clamp_selection()` — fix selection indices after card removal
-- `LabelColor::tinted_bg()` — returns subtle accent-tinted background Color (RGB / 15)
+- `LabelColor::tinted_bg()` — returns subtle accent-tinted background Color (RGB / 5)
 - `app.accent_label_color()` — returns raw `LabelColor` (vs `accent_color()` which returns `ratatui::Color`)
 - `markdown::wrap_spans()` / `markdown::WRAP_WIDTH` — word-wrap styled spans at 80 chars
