@@ -15,7 +15,6 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 - **Storage**: JSON files under `~/.tct/boards/`. All writes use `atomic_write` (write `.tmp`, then rename). Override path with `TCT_DATA_DIR` env var.
 - **Description editing**: Uses `ratatui-textarea` TextArea for editing, custom renderer in `card_detail.rs::render_description_editor()` for syntax highlighting via `markdown::highlight_line()`.
 - **Markdown rendering**: Hand-rolled line-level highlighter for editor (`markdown::highlight_line()`). Word-wrap at `WRAP_WIDTH` (80 chars) via `markdown::wrap_spans()`.
-- **Description background**: Description area uses `LabelColor::tinted_bg()` to apply a subtle accent-colored background, differentiating it from other card detail sections.
 - **Label colors**: `LabelColor` enum with named pastel variants + `Custom { r, g, b }`. New labels get auto-generated pastel colors via `LabelColor::generate_pastel()` which picks maximally distant hue from existing labels.
 - **Board accent color**: Each board has an `accent_color: LabelColor` field in `BoardMeta`. All UI highlight/accent colors use `app.accent_color()` instead of hardcoded `Color::Cyan`. New boards auto-get a differentiated pastel color. Users cycle with 'c' in board selector. Help overlay keeps structural Cyan.
 - **Search**: When active, non-matching cards are hidden (not just dimmed). Navigation skips hidden cards. First match auto-selected on search confirm.
@@ -77,6 +76,4 @@ When changing keybindings or features, update ALL of:
 - `board.current_card()` / `board.current_card_id()` — get currently selected card
 - `card.touch()` — updates `updated_at` timestamp
 - `board.clamp_selection()` — fix selection indices after card removal
-- `LabelColor::tinted_bg()` — returns subtle accent-tinted background Color (RGB / 5)
-- `app.accent_label_color()` — returns raw `LabelColor` (vs `accent_color()` which returns `ratatui::Color`)
 - `markdown::wrap_spans()` / `markdown::WRAP_WIDTH` — word-wrap styled spans at 80 chars

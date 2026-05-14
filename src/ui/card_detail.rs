@@ -79,8 +79,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // If editing description, render the editor instead
     if is_editing_desc {
         if let Some(textarea) = &app.description_editor {
-            let desc_bg = app.accent_label_color().tinted_bg();
-            render_description_editor(frame, inner, textarea, app.editor_scroll, accent, desc_bg);
+            render_description_editor(frame, inner, textarea, app.editor_scroll, accent);
         }
         return;
     }
@@ -100,8 +99,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let md_y = inner.y + header_height;
     let md_max_height = inner.height.saturating_sub(header_height);
 
-    // --- Description Body (tinted bg, 2-char horizontal padding) ---
-    let desc_bg = app.accent_label_color().tinted_bg();
+    // --- Description Body (2-char horizontal padding) ---
     let pad: u16 = 2;
     let md_inner_width = inner.width.saturating_sub(pad * 2);
 
@@ -117,7 +115,6 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     let desc_paragraph = Paragraph::new(desc_lines.clone())
-        .style(Style::default().bg(desc_bg))
         .wrap(Wrap { trim: false });
     let desc_visual_lines: u16 = desc_lines
         .iter()
@@ -290,7 +287,6 @@ fn render_description_editor(
     textarea: &ratatui_textarea::TextArea<'static>,
     editor_scroll: usize,
     accent: Color,
-    desc_bg: Color,
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
@@ -366,30 +362,16 @@ fn render_description_editor(
         let y = inner.y + vi as u16;
         let line_area = Rect::new(inner.x, y, inner.width, 1);
 
-        let tinted: Vec<Span<'static>> = vline
-            .spans
-            .iter()
-            .map(|s| {
-                let mut s = s.clone();
-                if s.style.bg.is_none() {
-                    s.style.bg = Some(desc_bg);
-                }
-                s
-            })
-            .collect();
+        let line_spans: Vec<Span<'static>> = vline.spans.to_vec();
 
         if src_li == cursor_row && idx == cursor_visual_row {
             frame.render_widget(
-                Paragraph::new(Line::from(tinted))
+                Paragraph::new(Line::from(line_spans))
                     .style(Style::default().bg(Color::Rgb(30, 30, 40))),
                 line_area,
             );
         } else {
-            frame.render_widget(
-                Paragraph::new(Line::from(tinted))
-                    .style(Style::default().bg(desc_bg)),
-                line_area,
-            );
+            frame.render_widget(Paragraph::new(Line::from(line_spans)), line_area);
         }
     }
 
