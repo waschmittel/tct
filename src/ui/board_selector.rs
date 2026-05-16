@@ -57,6 +57,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if let AppMode::Insert(InsertTarget::NewBoardName) = &app.mode {
         render_input_dialog(frame, area, "New Board", &app.input_buffer, app.input_cursor);
     }
+    if let AppMode::Insert(InsertTarget::RenameBoard) = &app.mode {
+        render_input_dialog(frame, area, "Rename Board", &app.input_buffer, app.input_cursor);
+    }
 
     super::status_bar::render(frame, chunks[2], app);
 }

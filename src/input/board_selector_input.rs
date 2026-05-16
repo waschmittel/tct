@@ -33,6 +33,15 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         (KeyCode::Char('n'), _) => {
             app.start_insert(InsertTarget::NewBoardName);
         }
+        (KeyCode::Char('r'), _) => {
+            if let Some(board) = app.boards.get(app.selected_board_idx) {
+                let name = board.name.clone();
+                app.start_insert_with(InsertTarget::RenameBoard, &name);
+            }
+        }
+        (KeyCode::Char('?'), _) => {
+            app.mode = AppMode::Help;
+        }
         (KeyCode::Char('c'), _) => {
             if let Some(board) = app.boards.get_mut(app.selected_board_idx) {
                 board.accent_color = board.accent_color.next();

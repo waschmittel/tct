@@ -15,60 +15,46 @@ use crate::app::{App, AppMode, InsertTarget};
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
 
-    match &app.mode {
+    // 1. Determine and render the base background layer
+    let is_board_selector_base = app.board.is_none() || matches!(
+        app.mode,
         AppMode::BoardSelector
-        | AppMode::Insert(InsertTarget::NewBoardName)
-        | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
-        | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards) => {
-            board_selector::render(frame, area, app);
+            | AppMode::Insert(InsertTarget::NewBoardName)
+            | AppMode::Insert(InsertTarget::RenameBoard)
+            | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
+            | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
+    );
 
-            if matches!(
-                app.mode,
-                AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
-                    | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
-            ) {
-                dialog::render(frame, area, app);
-            }
+    if is_board_selector_base {
+        board_selector::render(frame, area, app);
+    } else {
+        board_view::render(frame, area, app);
+    }
+
+    // 2. Render Overlays
+    match &app.mode {
+        AppMode::Help => {
+            render_help(frame, area);
         }
-        _ => {
-            board_view::render(frame, area, app);
-
-            if matches!(
-                app.mode,
-                AppMode::CardDetail
-                    | AppMode::Insert(
-                        InsertTarget::EditCardTitle
-                            | InsertTarget::EditCardDescription
-                            | InsertTarget::NewChecklistItem
-                            | InsertTarget::EditChecklistItem
-                            | InsertTarget::EditDueDate
-                    )
-            ) {
-                card_detail::render(frame, area, app);
-            }
-
-            if matches!(
-                app.mode,
-                AppMode::Dialog(crate::app::DialogKind::ConfirmDeleteCard)
-                    | AppMode::Dialog(crate::app::DialogKind::ConfirmDeleteList)
-                    | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveCard)
-                    | AppMode::Dialog(crate::app::DialogKind::ConfirmCancelEdit)
-                    | AppMode::Dialog(crate::app::DialogKind::ConfirmDeleteLabel)
-                    | AppMode::Dialog(crate::app::DialogKind::ArchivedCards)
-                    | AppMode::Dialog(crate::app::DialogKind::LabelPicker)
-                    | AppMode::Dialog(crate::app::DialogKind::LabelManager)
-            ) {
-                dialog::render(frame, area, app);
-            }
-
-            if matches!(app.mode, AppMode::Command) {
-                search_bar::render(frame, area, app);
-            }
-
-            if matches!(app.mode, AppMode::Help) {
-                render_help(frame, area);
-            }
+        AppMode::Command => {
+            search_bar::render(frame, area, app);
         }
+        AppMode::CardDetail
+        | AppMode::Insert(
+            InsertTarget::EditCardTitle
+            | InsertTarget::EditCardDescription
+            | InsertTarget::NewChecklistItem
+            | InsertTarget::EditChecklistItem
+            | InsertTarget::EditDueDate
+        ) => {
+            card_detail::render(frame, area, app);
+        }
+        AppMode::Dialog(_kind) => {
+            // Some dialogs are specific to BoardSelector and already rendered background above.
+            // Some are specific to BoardView. dialog::render handles the specific popup content.
+            dialog::render(frame, area, app);
+        }
+        _ => {}
     }
 }
 
@@ -153,4 +139,79 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect) {
 
     let paragraph = Paragraph::new(help_text).wrap(Wrap { trim: false });
     frame.render_widget(paragraph, inner);
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::app::{App, InsertTarget, AppMode};
+
+    #[test]
+    fn test_render_completeness() {
+        let mut app = App::new(None).unwrap();
+        
+        let all_targets = vec![
+            InsertTarget::NewCardTitle,
+            InsertTarget::EditCardTitle,
+            InsertTarget::EditCardTitleInline,
+            InsertTarget::EditCardDescription,
+            InsertTarget::NewListName,
+            InsertTarget::RenameList,
+            InsertTarget::NewChecklistItem,
+            InsertTarget::EditChecklistItem,
+            InsertTarget::NewBoardName,
+            InsertTarget::RenameBoard,
+            InsertTarget::EditDueDate,
+            InsertTarget::NewLabelName,
+            InsertTarget::EditLabelName,
+        ];
+
+        // Case 1: No board loaded (BoardSelector background for ALL)
+        for target in &all_targets {
+            app.mode = AppMode::Insert(target.clone());
+            
+            let is_selector = app.board.is_none() || matches!(
+                app.mode,
+                AppMode::BoardSelector
+                    | AppMode::Insert(InsertTarget::NewBoardName)
+                    | AppMode::Insert(InsertTarget::RenameBoard)
+                    | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
+                    | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
+            );
+
+            assert!(is_selector, "When no board is loaded, base should be BoardSelector for target {:?}", target);
+        }
+
+        // Case 2: Board IS loaded (BoardView background for card-related targets)
+        // Simulate a loaded board
+        let board_meta = crate::model::board::BoardMeta::new("Test".into());
+        app.board = Some(crate::app::LoadedBoard {
+            meta: board_meta,
+            lists: vec![],
+            cards: std::collections::HashMap::new(),
+            selected_list: 0,
+            selected_card: vec![],
+            scroll_offset: vec![],
+            detail_item_idx: 0,
+            detail_scroll: 0,
+        });
+
+        for target in all_targets {
+            app.mode = AppMode::Insert(target.clone());
+            
+            let is_selector = app.board.is_none() || matches!(
+                app.mode,
+                AppMode::BoardSelector
+                    | AppMode::Insert(InsertTarget::NewBoardName)
+                    | AppMode::Insert(InsertTarget::RenameBoard)
+                    | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
+                    | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
+            );
+
+            if target == InsertTarget::NewBoardName || target == InsertTarget::RenameBoard {
+                assert!(is_selector, "Target {:?} should always use BoardSelector background", target);
+            } else {
+                assert!(!is_selector, "Target {:?} should use BoardView background when board is loaded", target);
+            }
+        }
+    }
 }

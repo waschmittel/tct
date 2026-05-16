@@ -287,7 +287,7 @@ fn cancel_insert(app: &mut App) {
         _ => return,
     };
     app.mode = match target {
-        InsertTarget::NewBoardName => AppMode::BoardSelector,
+        InsertTarget::NewBoardName | InsertTarget::RenameBoard => AppMode::BoardSelector,
         InsertTarget::NewCardTitle
         | InsertTarget::NewListName
         | InsertTarget::RenameList
@@ -326,6 +326,14 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
             board_store::append_to_order(&meta.id)?;
             app.reload_boards()?;
             app.set_status(format!("Created board '{text}'"));
+            app.mode = AppMode::BoardSelector;
+        }
+        InsertTarget::RenameBoard => {
+            if let Some(board) = app.boards.get_mut(app.selected_board_idx) {
+                board.name = text.clone();
+                board_store::save_board(board)?;
+                app.set_status(format!("Renamed board to '{text}'"));
+            }
             app.mode = AppMode::BoardSelector;
         }
         InsertTarget::NewCardTitle => {

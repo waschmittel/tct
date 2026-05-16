@@ -18,7 +18,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     };
 
     let hints = match &app.mode {
-        AppMode::BoardSelector => "↑/↓:navigate  Shift+↑/↓:reorder  Enter:open  n:new  c:color  d:archive  v:archived  q:quit",
+        AppMode::BoardSelector => "↑/↓:navigate  Shift+↑/↓:reorder  Enter:open  n:new  r:rename  c:color  d:archive  v:archived  ?:help  q:quit",
         AppMode::Normal => "←/→:lists  ↑/↓:cards  Enter:open  e:title  n:new  N:list  a:archive  v:unarchive  Shift+Arrow:move  y:copy  /:search  ?:help  q:quit",
         AppMode::CardDetail => "↑/↓:items  S+↑/↓:reorder  Space:toggle  a:add  x:del  Enter:edit  e:desc  t:title  y:copy  l:labels  u:due  Esc:close",
         AppMode::Insert(_) => "Enter:confirm  Esc:cancel  Ctrl+u:clear",

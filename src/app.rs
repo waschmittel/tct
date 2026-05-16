@@ -34,6 +34,7 @@ pub enum InsertTarget {
     NewChecklistItem,
     EditChecklistItem,
     NewBoardName,
+    RenameBoard,
     EditDueDate,
     NewLabelName,
     EditLabelName,
