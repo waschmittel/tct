@@ -38,44 +38,53 @@ pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'stat
         return vec![Line::from(spans)];
     }
 
-    let total_len: usize = spans.iter().map(|s| s.content.len()).sum();
-    if total_len <= max_width {
-        return vec![Line::from(spans)];
-    }
-
     let mut result: Vec<Line<'static>> = Vec::new();
     let mut current_spans: Vec<Span<'static>> = Vec::new();
-    let mut current_len: usize = 0;
+    let mut current_width: usize = 0;
 
     for span in spans {
         let style = span.style;
         let text = span.content.to_string();
 
-        if current_len + text.len() <= max_width {
-            current_len += text.len();
+        let span_width = text.chars().count();
+
+        if current_width + span_width <= max_width {
+            current_width += span_width;
             current_spans.push(Span::styled(text, style));
             continue;
         }
 
         let mut remaining = text.as_str();
         while !remaining.is_empty() {
-            let budget = max_width.saturating_sub(current_len);
+            let budget = max_width.saturating_sub(current_width);
             if budget == 0 {
                 result.push(Line::from(std::mem::take(&mut current_spans)));
-                current_len = 0;
+                current_width = 0;
                 continue;
             }
 
-            if remaining.len() <= budget {
-                current_len += remaining.len();
+            let rem_width = remaining.chars().count();
+            if rem_width <= budget {
+                current_width += rem_width;
                 current_spans.push(Span::styled(remaining.to_string(), style));
                 break;
             }
 
-            let slice = &remaining[..budget];
+            // Find the character boundary for the budget
+            let mut split_idx = 0;
+            let mut char_count = 0;
+            for (idx, c) in remaining.char_indices() {
+                if char_count >= budget {
+                    break;
+                }
+                split_idx = idx + c.len_utf8();
+                char_count += 1;
+            }
+
+            let slice = &remaining[..split_idx];
             let break_at = match slice.rfind(' ') {
                 Some(pos) if pos > 0 => pos,
-                _ => budget,
+                _ => split_idx,
             };
 
             let (chunk, rest) = remaining.split_at(break_at);
@@ -85,7 +94,7 @@ pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'stat
                 current_spans.push(Span::styled(chunk.to_string(), style));
             }
             result.push(Line::from(std::mem::take(&mut current_spans)));
-            current_len = 0;
+            current_width = 0;
             remaining = rest;
         }
     }
@@ -107,19 +116,22 @@ pub fn build_visual_map(lines: &[String], accent: Color, wrap_width: usize) -> V
     for (li, line_text) in lines.iter().enumerate() {
         let highlighted = highlight_line(line_text, accent);
         let wrapped = wrap_spans(highlighted, wrap_width);
-        let source_bytes = line_text.as_bytes();
-        let mut source_offset = 0;
+        
+        let line_chars: Vec<char> = line_text.chars().collect();
+        let mut source_char_offset = 0;
+        
         for wl in &wrapped {
-            let vlen: usize = wl.spans.iter().map(|s| s.content.len()).sum();
-            map.push((li, source_offset, vlen));
-            let gap = if source_offset + vlen < source_bytes.len()
-                && source_bytes[source_offset + vlen] == b' '
+            let v_char_len: usize = wl.spans.iter().map(|s| s.content.chars().count()).sum();
+            map.push((li, source_char_offset, v_char_len));
+            
+            let gap = if source_char_offset + v_char_len < line_chars.len()
+                && line_chars[source_char_offset + v_char_len] == ' '
             {
                 1
             } else {
                 0
             };
-            source_offset += vlen + gap;
+            source_char_offset += v_char_len + gap;
         }
     }
     map
@@ -458,4 +470,11 @@ mod tests {
         assert_eq!(reconstructed, source);
     }
 
+    #[test]
+    fn test_wrap_spans_umlaut_panic() {
+        let span = Span::raw("äöü"); // 6 bytes
+        let spans = vec![span];
+        // If we wrap at 1, it might try to slice at byte 1, which is middle of 'ä'.
+        wrap_spans(spans, 1);
+    }
 }

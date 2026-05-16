@@ -17,7 +17,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     ]);
     frame.render_widget(Paragraph::new(line), bar_area);
 
-    let cx = bar_area.x + 2 + app.search_query.len() as u16;
+    let cx = bar_area.x + 2 + app.search_query.chars().count() as u16;
     if cx < bar_area.x + bar_area.width {
         frame.set_cursor_position((cx, bar_area.y));
     }

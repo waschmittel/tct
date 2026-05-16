@@ -28,8 +28,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
         KeyCode::Backspace => {
             if app.input_cursor > 0 {
-                app.input_cursor -= 1;
-                app.input_buffer.remove(app.input_cursor);
+                if let Some((idx, _)) = app.input_buffer[..app.input_cursor].char_indices().last() {
+                    app.input_buffer.remove(idx);
+                    app.input_cursor = idx;
+                }
             }
         }
         KeyCode::Delete => {
@@ -39,12 +41,16 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
         KeyCode::Left => {
             if app.input_cursor > 0 {
-                app.input_cursor -= 1;
+                if let Some((idx, _)) = app.input_buffer[..app.input_cursor].char_indices().last() {
+                    app.input_cursor = idx;
+                }
             }
         }
         KeyCode::Right => {
             if app.input_cursor < app.input_buffer.len() {
-                app.input_cursor += 1;
+                if let Some(c) = app.input_buffer[app.input_cursor..].chars().next() {
+                    app.input_cursor += c.len_utf8();
+                }
             }
         }
         KeyCode::Home => {
@@ -65,7 +71,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
         KeyCode::Char(c) => {
             app.input_buffer.insert(app.input_cursor, c);
-            app.input_cursor += 1;
+            app.input_cursor += c.len_utf8();
         }
         _ => {}
     }
@@ -462,4 +468,66 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyEvent, KeyCode, KeyModifiers};
+    use crate::app::{App, AppMode, InsertTarget};
+
+    #[test]
+    fn test_umlaut_insertion_panic() {
+        // App::new might fail if directories don't exist, but it calls board_store::ensure_base_dirs()
+        // which might fail in a restricted environment. We'll see.
+        let mut app = App::new(None).unwrap();
+        app.mode = AppMode::Insert(InsertTarget::NewCardTitle);
+        app.input_buffer.clear();
+        app.input_cursor = 0;
+
+        // Insert an umlaut 'ä' (2 bytes in UTF-8: 0xC3 0xA4)
+        handle(&mut app, KeyEvent::new(KeyCode::Char('ä'), KeyModifiers::empty())).unwrap();
+        
+        // If the bug exists, app.input_cursor will be 1, which is NOT a char boundary.
+        // The next insertion will panic.
+        handle(&mut app, KeyEvent::new(KeyCode::Char('b'), KeyModifiers::empty())).unwrap();
+        
+        assert_eq!(app.input_buffer, "äb");
+        assert_eq!(app.input_cursor, 3); // 2 bytes for 'ä' + 1 byte for 'b'
+    }
+
+    #[test]
+    fn test_utf8_navigation_and_deletion() {
+        let mut app = App::new(None).unwrap();
+        app.mode = AppMode::Insert(InsertTarget::NewCardTitle);
+        app.input_buffer = "äöü".to_string();
+        app.input_cursor = app.input_buffer.len(); // at the end, 6 bytes
+
+        // Backspace once: removes 'ü' (2 bytes)
+        handle(&mut app, KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty())).unwrap();
+        assert_eq!(app.input_buffer, "äö");
+        assert_eq!(app.input_cursor, 4);
+
+        // Move left: cursor moves from 4 to 2 (pointing at 'ö')
+        handle(&mut app, KeyEvent::new(KeyCode::Left, KeyModifiers::empty())).unwrap();
+        assert_eq!(app.input_cursor, 2);
+
+        // Delete: removes 'ö'
+        handle(&mut app, KeyEvent::new(KeyCode::Delete, KeyModifiers::empty())).unwrap();
+        assert_eq!(app.input_buffer, "ä");
+        assert_eq!(app.input_cursor, 2);
+
+        // Move left: cursor moves from 2 to 0
+        handle(&mut app, KeyEvent::new(KeyCode::Left, KeyModifiers::empty())).unwrap();
+        assert_eq!(app.input_cursor, 0);
+
+        // Move right: cursor moves from 0 to 2
+        handle(&mut app, KeyEvent::new(KeyCode::Right, KeyModifiers::empty())).unwrap();
+        assert_eq!(app.input_cursor, 2);
+
+        // Backspace: removes 'ä'
+        handle(&mut app, KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty())).unwrap();
+        assert_eq!(app.input_buffer, "");
+        assert_eq!(app.input_cursor, 0);
+    }
 }

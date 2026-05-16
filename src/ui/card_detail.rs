@@ -377,13 +377,14 @@ fn render_input_dialog(frame: &mut Frame, area: Rect, title: &str, input: &str, 
     let chunks = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).split(inner);
 
     let visible_w = chunks[0].width as usize;
-    let scroll = if cursor >= visible_w {
-        cursor - visible_w + 1
+    let cursor_char_idx = input[..cursor].chars().count();
+    let scroll = if cursor_char_idx >= visible_w {
+        cursor_char_idx - visible_w + 1
     } else {
         0
     };
-    let end = (scroll + visible_w).min(input.len());
-    let visible = &input[scroll..end];
+    
+    let visible: String = input.chars().skip(scroll).take(visible_w).collect();
     frame.render_widget(Paragraph::new(visible), chunks[0]);
     frame.render_widget(
         Paragraph::new(Span::styled(
@@ -393,7 +394,7 @@ fn render_input_dialog(frame: &mut Frame, area: Rect, title: &str, input: &str, 
         chunks[1],
     );
 
-    let cx = inner.x + (cursor - scroll) as u16;
+    let cx = inner.x + (cursor_char_idx - scroll) as u16;
     if cx < inner.x + inner.width {
         frame.set_cursor_position((cx, inner.y));
     }
