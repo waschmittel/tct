@@ -97,6 +97,15 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
 
+        (KeyCode::Char('y'), _) => {
+            if let Some(board) = &app.board {
+                if let Some(card) = board.current_card() {
+                    let title = card.title.clone();
+                    app.copy_to_clipboard(title);
+                }
+            }
+        }
+
         // e: quick-edit card title inline (swapped — was Enter)
         (KeyCode::Char('e'), _) => {
             if let Some(board) = &app.board {

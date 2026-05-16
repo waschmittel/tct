@@ -139,6 +139,16 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
 
+        // Copy description
+        (KeyCode::Char('y'), _) => {
+            if let Some(board) = &app.board {
+                if let Some(card) = board.current_card() {
+                    let desc = card.description.clone();
+                    app.copy_to_clipboard(desc);
+                }
+            }
+        }
+
         // Labels
         (KeyCode::Char('l'), _) => {
             if let Some(board) = &app.board {

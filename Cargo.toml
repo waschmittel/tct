@@ -16,6 +16,7 @@ dirs = "6.0"
 thiserror = "2.0.18"
 ratatui-textarea = "0.9"
 regex = "1"
+arboard = "3.4"
 
 [dev-dependencies]
 tempfile = "3.27.0"

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use arboard::Clipboard;
 use ratatui::style::{Color, Style};
 use ratatui_textarea::TextArea;
 
@@ -237,6 +238,21 @@ impl App {
 
     pub fn set_status(&mut self, msg: String) {
         self.status_message = Some((msg, Instant::now()));
+    }
+
+    pub fn copy_to_clipboard(&mut self, text: String) {
+        match Clipboard::new() {
+            Ok(mut clipboard) => {
+                if let Err(e) = clipboard.set_text(text) {
+                    self.set_status(format!("Clipboard error: {}", e));
+                } else {
+                    self.set_status("Copied to clipboard".into());
+                }
+            }
+            Err(e) => {
+                self.set_status(format!("Clipboard not available: {}", e));
+            }
+        }
     }
 
     pub fn load_board(&mut self, board_id: &str) -> anyhow::Result<()> {
