@@ -174,8 +174,9 @@ fn move_cursor_visual(app: &mut App, direction: i32) {
         return;
     };
 
-    let (target_src_row, target_src_offset, target_vlen) = visual_map[target_vrow];
-    let target_col = target_src_offset + visual_col.min(target_vlen);
+    let (target_src_row, target_src_offset, target_vlen, target_vindent) = visual_map[target_vrow];
+    let actual_target_vlen = target_vlen.saturating_sub(target_vindent);
+    let target_col = target_src_offset + (visual_col.saturating_sub(target_vindent)).min(actual_target_vlen);
 
     let textarea = app.description_editor.as_mut().unwrap();
     textarea.move_cursor(CursorMove::Jump(target_src_row as u16, target_col as u16));

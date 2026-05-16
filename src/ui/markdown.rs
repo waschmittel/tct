@@ -25,8 +25,25 @@ pub fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
             continue;
         }
 
+        let trimmed = line.trim_start();
+        let base_indent = line.len() - trimmed.len();
+        let mut list_indent = 0;
+
+        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+            list_indent = base_indent + 2;
+        } else if let Some(dot_pos) = trimmed.find(". ") {
+            let num_part = &trimmed[..dot_pos];
+            if num_part.parse::<u64>().is_ok() {
+                list_indent = base_indent + dot_pos + 2;
+            }
+        }
+
         let highlighted = highlight_line(line, accent);
-        let wrapped = wrap_spans(highlighted, WRAP_WIDTH);
+        let wrapped = if list_indent > 0 {
+            wrap_spans_with_indent(highlighted, WRAP_WIDTH, list_indent)
+        } else {
+            wrap_spans(highlighted, WRAP_WIDTH)
+        };
         lines.extend(wrapped);
     }
 
@@ -34,6 +51,14 @@ pub fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
 }
 
 pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'static>> {
+    wrap_spans_with_indent(spans, max_width, 0)
+}
+
+pub fn wrap_spans_with_indent(
+    spans: Vec<Span<'static>>,
+    max_width: usize,
+    indent: usize,
+) -> Vec<Line<'static>> {
     if max_width == 0 {
         return vec![Line::from(spans)];
     }
@@ -41,14 +66,20 @@ pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'stat
     let mut result: Vec<Line<'static>> = Vec::new();
     let mut current_spans: Vec<Span<'static>> = Vec::new();
     let mut current_width: usize = 0;
+    let mut is_first_line = true;
 
     for span in spans {
         let style = span.style;
         let text = span.content.to_string();
-
         let span_width = text.chars().count();
 
-        if current_width + span_width <= max_width {
+        let effective_width = if is_first_line {
+            max_width
+        } else {
+            max_width.saturating_sub(indent)
+        };
+
+        if current_width + span_width <= effective_width {
             current_width += span_width;
             current_spans.push(Span::styled(text, style));
             continue;
@@ -56,10 +87,18 @@ pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'stat
 
         let mut remaining = text.as_str();
         while !remaining.is_empty() {
-            let budget = max_width.saturating_sub(current_width);
+            let budget = effective_width.saturating_sub(current_width);
             if budget == 0 {
                 result.push(Line::from(std::mem::take(&mut current_spans)));
+                is_first_line = false;
                 current_width = 0;
+                // Re-calculate effective_width for the new line
+                let new_effective_width = max_width.saturating_sub(indent);
+                if new_effective_width == 0 {
+                    // Cannot wrap further
+                    current_spans.push(Span::styled(remaining.to_string(), style));
+                    break;
+                }
                 continue;
             }
 
@@ -94,6 +133,7 @@ pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'stat
                 current_spans.push(Span::styled(chunk.to_string(), style));
             }
             result.push(Line::from(std::mem::take(&mut current_spans)));
+            is_first_line = false;
             current_width = 0;
             remaining = rest;
         }
@@ -107,31 +147,65 @@ pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'stat
         result.push(Line::from(Vec::<Span<'static>>::new()));
     }
 
+    // Apply indentation to all lines except the first one
+    if indent > 0 && result.len() > 1 {
+        let indent_str = " ".repeat(indent);
+        for line in result.iter_mut().skip(1) {
+            line.spans.insert(0, Span::raw(indent_str.clone()));
+        }
+    }
+
     result
 }
 
-/// Visual line map entry: (source_row, source_col_offset, visual_line_len).
-pub fn build_visual_map(lines: &[String], accent: Color, wrap_width: usize) -> Vec<(usize, usize, usize)> {
+/// Visual line map entry: (source_row, source_col_offset, visual_line_len, visual_indent).
+pub fn build_visual_map(lines: &[String], accent: Color, wrap_width: usize) -> Vec<(usize, usize, usize, usize)> {
     let mut map = Vec::new();
     for (li, line_text) in lines.iter().enumerate() {
+        let trimmed = line_text.trim_start();
+        let base_indent = line_text.len() - trimmed.len();
+        let mut list_indent = 0;
+
+        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+            list_indent = base_indent + 2;
+        } else if let Some(dot_pos) = trimmed.find(". ") {
+            let num_part = &trimmed[..dot_pos];
+            if num_part.parse::<u64>().is_ok() {
+                list_indent = base_indent + dot_pos + 2;
+            }
+        }
+
         let highlighted = highlight_line(line_text, accent);
-        let wrapped = wrap_spans(highlighted, wrap_width);
+        let wrapped = if list_indent > 0 {
+            wrap_spans_with_indent(highlighted, wrap_width, list_indent)
+        } else {
+            wrap_spans(highlighted, wrap_width)
+        };
         
         let line_chars: Vec<char> = line_text.chars().collect();
         let mut source_char_offset = 0;
         
-        for wl in &wrapped {
-            let v_char_len: usize = wl.spans.iter().map(|s| s.content.chars().count()).sum();
-            map.push((li, source_char_offset, v_char_len));
+        for (wi, wl) in wrapped.iter().enumerate() {
+            let display_v_char_len: usize = wl.spans.iter().map(|s| s.content.chars().count()).sum();
             
-            let gap = if source_char_offset + v_char_len < line_chars.len()
-                && line_chars[source_char_offset + v_char_len] == ' '
+            let mut actual_source_len = display_v_char_len;
+            let mut current_v_indent = 0;
+            
+            if wi > 0 && list_indent > 0 {
+                actual_source_len = display_v_char_len.saturating_sub(list_indent);
+                current_v_indent = list_indent;
+            }
+
+            map.push((li, source_char_offset, display_v_char_len, current_v_indent));
+            
+            let gap = if source_char_offset + actual_source_len < line_chars.len()
+                && line_chars[source_char_offset + actual_source_len] == ' '
             {
                 1
             } else {
                 0
             };
-            source_char_offset += v_char_len + gap;
+            source_char_offset += actual_source_len + gap;
         }
     }
     map
@@ -139,18 +213,20 @@ pub fn build_visual_map(lines: &[String], accent: Color, wrap_width: usize) -> V
 
 /// Find visual row and column for a source cursor position.
 pub fn source_to_visual(
-    visual_map: &[(usize, usize, usize)],
+    visual_map: &[(usize, usize, usize, usize)],
     cursor_row: usize,
     cursor_col: usize,
 ) -> (usize, usize) {
-    for (vi, &(src_row, src_offset, vlen)) in visual_map.iter().enumerate() {
+    for (vi, &(src_row, src_offset, vlen, vindent)) in visual_map.iter().enumerate() {
         if src_row == cursor_row {
+            let actual_src_len = vlen.saturating_sub(vindent);
             let col_in_segment = cursor_col.saturating_sub(src_offset);
-            if col_in_segment <= vlen
+            
+            if col_in_segment <= actual_src_len
                 || vi + 1 >= visual_map.len()
                 || visual_map[vi + 1].0 != cursor_row
             {
-                return (vi, col_in_segment);
+                return (vi, col_in_segment.min(actual_src_len) + vindent);
             }
         }
     }
@@ -397,7 +473,7 @@ mod tests {
         let lines = vec!["short line".to_string()];
         let map = build_visual_map(&lines, Color::Cyan, 80);
         assert_eq!(map.len(), 1);
-        assert_eq!(map[0], (0, 0, 10));
+        assert_eq!(map[0], (0, 0, 10, 0));
     }
 
     #[test]
@@ -476,5 +552,26 @@ mod tests {
         let spans = vec![span];
         // If we wrap at 1, it might try to slice at byte 1, which is middle of 'ä'.
         wrap_spans(spans, 1);
+    }
+
+    #[test]
+    fn test_list_indentation_wrapping() {
+        let text = "- This is a very long list item that should be wrapped and indented correctly.";
+        let accent = Color::Cyan;
+        
+        // Test unsorted list
+        let highlighted = highlight_line(text, accent);
+        let wrapped = wrap_spans_with_indent(highlighted, 20, 2);
+        
+        assert!(wrapped.len() > 1);
+        // Second line should start with 2 spaces
+        assert!(wrapped[1].spans[0].content.starts_with("  "));
+
+        // Test numbered list
+        let text2 = "123. This is another long list item.";
+        let highlighted2 = highlight_line(text2, accent);
+        let wrapped2 = wrap_spans_with_indent(highlighted2, 10, 5);
+        assert!(wrapped2.len() > 1);
+        assert!(wrapped2[1].spans[0].content.starts_with("     "));
     }
 }

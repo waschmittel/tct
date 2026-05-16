@@ -308,8 +308,25 @@ fn render_description_editor(
     // Build visual lines for rendering
     let mut visual_lines: Vec<(usize, Line<'static>)> = Vec::new();
     for (li, line_text) in lines.iter().enumerate() {
+        let trimmed = line_text.trim_start();
+        let base_indent = line_text.len() - trimmed.len();
+        let mut list_indent = 0;
+
+        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+            list_indent = base_indent + 2;
+        } else if let Some(dot_pos) = trimmed.find(". ") {
+            let num_part = &trimmed[..dot_pos];
+            if num_part.parse::<u64>().is_ok() {
+                list_indent = base_indent + dot_pos + 2;
+            }
+        }
+
         let highlighted = markdown::highlight_line(line_text, accent);
-        let wrapped = markdown::wrap_spans(highlighted, wrap_width);
+        let wrapped = if list_indent > 0 {
+            markdown::wrap_spans_with_indent(highlighted, wrap_width, list_indent)
+        } else {
+            markdown::wrap_spans(highlighted, wrap_width)
+        };
         for wl in wrapped {
             visual_lines.push((li, wl));
         }
