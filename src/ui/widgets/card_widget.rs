@@ -1,7 +1,7 @@
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{Block, BorderType, Borders, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::model::card::Card;
@@ -38,7 +38,12 @@ pub fn render(
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(border_style);
+        .border_style(border_style)
+        .border_type(if selected {
+            BorderType::Thick
+        } else {
+            BorderType::Plain
+        });
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
