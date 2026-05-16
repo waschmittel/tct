@@ -8,7 +8,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 
     match (key.code, shift) {
         (KeyCode::Char('q'), _) => app.should_quit = true,
-        (KeyCode::Char('?'), _) => app.mode = AppMode::Help,
+        (KeyCode::Char('?'), _) => {
+            app.previous_mode = Some(app.mode.clone());
+            app.mode = AppMode::Help;
+        }
         (KeyCode::Char('b'), _) => {
             app.board = None;
             app.reload_boards()?;

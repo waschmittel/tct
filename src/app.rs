@@ -108,6 +108,7 @@ impl LoadedBoard {
 
 pub struct App {
     pub mode: AppMode,
+    pub previous_mode: Option<AppMode>,
     pub should_quit: bool,
     pub status_message: Option<(String, Instant)>,
     pub boards: Vec<BoardMeta>,
@@ -135,6 +136,7 @@ impl App {
         let boards = board_store::list_boards()?;
         let mut app = Self {
             mode: AppMode::BoardSelector,
+            previous_mode: None,
             should_quit: false,
             status_message: None,
             boards,

@@ -40,6 +40,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
         (KeyCode::Char('?'), _) => {
+            app.previous_mode = Some(app.mode.clone());
             app.mode = AppMode::Help;
         }
         (KeyCode::Char('c'), _) => {

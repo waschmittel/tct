@@ -23,7 +23,9 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         AppMode::Dialog(_) => dialog_input::handle(app, key),
         AppMode::Help => {
             if matches!(key.code, crossterm::event::KeyCode::Esc | crossterm::event::KeyCode::Char('q')) {
-                if app.board.is_some() {
+                if let Some(prev) = app.previous_mode.take() {
+                    app.mode = prev;
+                } else if app.board.is_some() {
                     app.mode = AppMode::Normal;
                 } else {
                     app.mode = AppMode::BoardSelector;
