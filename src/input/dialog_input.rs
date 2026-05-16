@@ -273,7 +273,11 @@ fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 
     if label_count == 0 {
         if matches!(key.code, KeyCode::Esc) {
-            app.mode = AppMode::CardDetail;
+            if let Some(prev) = app.previous_mode.take() {
+                app.mode = prev;
+            } else {
+                app.mode = AppMode::CardDetail;
+            }
         }
         return Ok(());
     }
@@ -290,6 +294,7 @@ fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
         KeyCode::Enter | KeyCode::Char(' ') => {
+            // ... (existing code for setting label)
             if let Some(board) = &mut app.board {
                 let label_id = board
                     .meta
@@ -312,7 +317,11 @@ fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
         KeyCode::Esc => {
-            app.mode = AppMode::CardDetail;
+            if let Some(prev) = app.previous_mode.take() {
+                app.mode = prev;
+            } else {
+                app.mode = AppMode::CardDetail;
+            }
         }
         _ => {}
     }

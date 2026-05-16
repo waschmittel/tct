@@ -300,12 +300,14 @@ impl App {
     pub fn start_insert(&mut self, target: InsertTarget) {
         self.input_buffer.clear();
         self.input_cursor = 0;
+        self.previous_mode = Some(self.mode.clone());
         self.mode = AppMode::Insert(target);
     }
 
     pub fn start_insert_with(&mut self, target: InsertTarget, initial: &str) {
         self.input_buffer = initial.to_string();
         self.input_cursor = initial.len();
+        self.previous_mode = Some(self.mode.clone());
         self.mode = AppMode::Insert(target);
     }
 

@@ -116,6 +116,16 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 accent,
             );
         }
+        AppMode::Insert(InsertTarget::EditDueDate) => {
+            render_input_overlay(
+                frame,
+                area,
+                "Due Date (YYYY-MM-DD)",
+                &app.input_buffer,
+                app.input_cursor,
+                accent,
+            );
+        }
         _ => {}
     }
 

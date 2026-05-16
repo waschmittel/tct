@@ -282,24 +282,28 @@ fn insert_at_line_start(app: &mut App, prefix: &str) {
 }
 
 fn cancel_insert(app: &mut App) {
-    let target = match &app.mode {
-        AppMode::Insert(t) => t.clone(),
-        _ => return,
-    };
-    app.mode = match target {
-        InsertTarget::NewBoardName | InsertTarget::RenameBoard => AppMode::BoardSelector,
-        InsertTarget::NewCardTitle
-        | InsertTarget::NewListName
-        | InsertTarget::RenameList
-        | InsertTarget::EditCardTitleInline => AppMode::Normal,
-        InsertTarget::EditCardTitle
-        | InsertTarget::EditCardDescription
-        | InsertTarget::NewChecklistItem
-        | InsertTarget::EditChecklistItem
-        | InsertTarget::EditDueDate
-        | InsertTarget::NewLabelName
-        | InsertTarget::EditLabelName => AppMode::CardDetail,
-    };
+    if let Some(prev) = app.previous_mode.take() {
+        app.mode = prev;
+    } else {
+        let target = match &app.mode {
+            AppMode::Insert(t) => t.clone(),
+            _ => return,
+        };
+        app.mode = match target {
+            InsertTarget::NewBoardName | InsertTarget::RenameBoard => AppMode::BoardSelector,
+            InsertTarget::NewCardTitle
+            | InsertTarget::NewListName
+            | InsertTarget::RenameList
+            | InsertTarget::EditCardTitleInline => AppMode::Normal,
+            InsertTarget::EditCardTitle
+            | InsertTarget::EditCardDescription
+            | InsertTarget::NewChecklistItem
+            | InsertTarget::EditChecklistItem
+            | InsertTarget::EditDueDate
+            | InsertTarget::NewLabelName
+            | InsertTarget::EditLabelName => AppMode::CardDetail,
+        };
+    }
 }
 
 fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
@@ -316,6 +320,7 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
     }
 
     match target {
+        // ... (implementation of target handlers)
         InsertTarget::NewBoardName => {
             let existing_colors: Vec<_> =
                 app.boards.iter().map(|b| b.accent_color).collect();
@@ -375,11 +380,6 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
             app.mode = AppMode::Normal;
         }
         InsertTarget::EditCardTitle | InsertTarget::EditCardTitleInline => {
-            let return_mode = if target == InsertTarget::EditCardTitleInline {
-                AppMode::Normal
-            } else {
-                AppMode::CardDetail
-            };
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
@@ -389,10 +389,10 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                     }
                 }
             }
-            app.mode = return_mode;
+            cancel_insert(app);
         }
         InsertTarget::EditCardDescription => {
-            app.mode = AppMode::CardDetail;
+            cancel_insert(app);
         }
         InsertTarget::NewChecklistItem => {
             if let Some(board) = &mut app.board {
@@ -408,7 +408,7 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                     }
                 }
             }
-            app.mode = AppMode::CardDetail;
+            cancel_insert(app);
         }
         InsertTarget::EditChecklistItem => {
             if let Some(board) = &mut app.board {
@@ -422,7 +422,7 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                     }
                 }
             }
-            app.mode = AppMode::CardDetail;
+            cancel_insert(app);
         }
         InsertTarget::EditDueDate => {
             if text.is_empty() || text == "none" {
@@ -436,7 +436,7 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                     }
                 }
                 app.set_status("Cleared due date".into());
-                app.mode = AppMode::CardDetail;
+                cancel_insert(app);
             } else if let Ok(date) = chrono::NaiveDate::parse_from_str(&text, "%Y-%m-%d") {
                 if let Some(board) = &mut app.board {
                     if let Some(card_id) = board.current_card_id().cloned() {
@@ -448,7 +448,7 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                     }
                 }
                 app.set_status(format!("Due date set to {date}"));
-                app.mode = AppMode::CardDetail;
+                cancel_insert(app);
             } else {
                 app.set_status("Invalid date format. Use YYYY-MM-DD".into());
             }

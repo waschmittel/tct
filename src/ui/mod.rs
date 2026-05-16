@@ -51,9 +51,13 @@ pub fn render(frame: &mut Frame, app: &App) {
             | InsertTarget::EditCardDescription
             | InsertTarget::NewChecklistItem
             | InsertTarget::EditChecklistItem
-            | InsertTarget::EditDueDate
         ) => {
             card_detail::render(frame, area, app);
+        }
+        AppMode::Insert(InsertTarget::EditDueDate) => {
+            if effective_mode == &AppMode::CardDetail {
+                card_detail::render(frame, area, app);
+            }
         }
         AppMode::Dialog(_kind) => {
             // Some dialogs are specific to BoardSelector and already rendered background above.
@@ -194,7 +198,10 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             Line::raw("  /                  Search"),
             Line::raw("  f                  Filter by label"),
             Line::raw("  F                  Clear all filters"),
+            Line::raw("  l                  Assign/remove labels"),
             Line::raw("  L                  Manage labels"),
+            Line::raw("  u                  Set due date"),
+            Line::raw("  U                  Clear due date"),
             Line::raw("  b                  Back to board selector"),
             Line::raw("  q                  Quit"),
         ]);

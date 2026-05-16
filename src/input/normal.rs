@@ -210,9 +210,41 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             app.label_filter = None;
             app.set_status("Filters cleared".into());
         }
+        (KeyCode::Char('l'), _) => {
+            if let Some(board) = &app.board {
+                if board.current_card_id().is_some() {
+                    app.previous_mode = Some(app.mode.clone());
+                    app.label_picker_idx = 0;
+                    app.mode = AppMode::Dialog(DialogKind::LabelPicker);
+                }
+            }
+        }
         (KeyCode::Char('L'), _) => {
             app.label_picker_idx = 0;
             app.mode = AppMode::Dialog(DialogKind::LabelManager);
+        }
+        (KeyCode::Char('u'), _) => {
+            if let Some(board) = &app.board {
+                if let Some(card) = board.current_card() {
+                    let date_str = card
+                        .due_date
+                        .map(|d| d.format("%Y-%m-%d").to_string())
+                        .unwrap_or_default();
+                    app.start_insert_with(InsertTarget::EditDueDate, &date_str);
+                }
+            }
+        }
+        (KeyCode::Char('U'), _) => {
+            if let Some(board) = &mut app.board {
+                if let Some(card_id) = board.current_card_id().cloned() {
+                    if let Some(card) = board.cards.get_mut(&card_id) {
+                        card.due_date = None;
+                        card.touch();
+                        card_store::save_card(&board.meta.id, card)?;
+                        app.set_status("Due date cleared".into());
+                    }
+                }
+            }
         }
         _ => {}
     }
