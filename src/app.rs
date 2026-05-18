@@ -259,7 +259,7 @@ impl App {
     }
 
     pub fn load_board(&mut self, board_id: &str) -> anyhow::Result<()> {
-        let mut meta = board_store::load_board(board_id)?;
+        let meta = board_store::load_board(board_id)?;
         let lists = list_store::load_all_lists(board_id, &meta.list_order)?;
         let mut cards = HashMap::new();
         for list in &lists {
@@ -269,10 +269,6 @@ impl App {
                 }
             }
         }
-
-        // Migrate old per-card labels to board-level labels
-        migrate_labels(&mut meta, &mut cards);
-        board_store::save_board(&meta)?;
 
         let num_lists = lists.len();
         self.board = Some(LoadedBoard {
@@ -343,16 +339,4 @@ impl App {
 
 }
 
-fn migrate_labels(meta: &mut BoardMeta, cards: &mut HashMap<ShortId, Card>) {
-    if !meta.labels.is_empty() {
-        return;
-    }
 
-    // Collect all unique label (name, color) combos across cards by reading raw JSON
-    // Since we already migrated cards in load_card and dropped old labels,
-    // we only need to migrate if there were labels that were preserved.
-    // The card_store migration drops old labels, so board-level migration
-    // happens only if labels already exist on the board (handled by serde(default)).
-    // This function is a no-op safety net.
-    let _ = (meta, cards);
-}

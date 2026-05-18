@@ -315,7 +315,7 @@ fn ambiguous_and_missing_name_errors() {
 
     // Ambiguous partial
     let e = fail(&tmp, &["boards", "--archive", "Alpha"]);
-    assert!(e.contains("Multiple boards match 'Alpha'"), "{e}");
+    assert!(e.contains("Multiple active boards match 'Alpha'"), "{e}");
     assert!(e.contains("Alpha Project"), "{e}");
     assert!(e.contains("Alpha Staging"), "{e}");
 

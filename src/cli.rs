@@ -571,7 +571,7 @@ fn cmd_search(args: &[String]) -> anyhow::Result<()> {
                     }
                     match &compiled_regex {
                         Some(re) => card_matches_regex(card, re, &board.labels),
-                        None => card_matches_query(card, query, &board.labels),
+                        None => card.matches_search(query, &board.labels),
                     }
                 })
                 .collect();
@@ -599,23 +599,8 @@ fn cmd_search(args: &[String]) -> anyhow::Result<()> {
 }
 
 #[cfg(test)]
-pub(crate) fn card_matches_query_pub(card: &Card, query: &str, board_labels: &[Label]) -> bool {
-    card_matches_query(card, query, board_labels)
-}
-
-#[cfg(test)]
 pub(crate) fn card_matches_regex_pub(card: &Card, re: &Regex, board_labels: &[Label]) -> bool {
     card_matches_regex(card, re, board_labels)
-}
-
-fn card_matches_query(card: &Card, query: &str, board_labels: &[Label]) -> bool {
-    let q = query.to_lowercase();
-    card.title.to_lowercase().contains(&q)
-        || card.description.to_lowercase().contains(&q)
-        || card.checklist.iter().any(|item| item.text.to_lowercase().contains(&q))
-        || card.label_ids.iter().any(|lid| {
-            board_labels.iter().any(|l| l.id == *lid && l.name.to_lowercase().contains(&q))
-        })
 }
 
 fn card_matches_regex(card: &Card, re: &Regex, board_labels: &[Label]) -> bool {
@@ -629,66 +614,70 @@ fn card_matches_regex(card: &Card, re: &Regex, board_labels: &[Label]) -> bool {
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
 
-fn find_board(partial: &str, by_id: bool) -> anyhow::Result<BoardMeta> {
-    let boards = board_store::list_boards()?;
+/// Find one item from a borrowed slice by exact ID or by case-insensitive name substring.
+fn resolve_one_ref<'a, T>(
+    items: &'a [T],
+    partial: &str,
+    by_id: bool,
+    id_of: impl Fn(&T) -> &str,
+    name_of: impl Fn(&T) -> &str,
+    entity: &str,
+) -> anyhow::Result<&'a T> {
     if by_id {
-        boards
-            .into_iter()
-            .find(|b| b.id == partial)
-            .ok_or_else(|| anyhow::anyhow!("No active board with ID '{partial}'."))
-    } else {
-        let q = partial.to_lowercase();
-        let matches: Vec<_> = boards.into_iter().filter(|b| b.name.to_lowercase().contains(&q)).collect();
-        match matches.len() {
-            0 => bail!("No active board matches '{partial}'."),
-            1 => Ok(matches.into_iter().next().unwrap()),
-            _ => {
-                let names: Vec<_> = matches.iter().map(|b| format!("{} [{}]", b.name, b.id)).collect();
-                bail!("Multiple boards match '{partial}': {}.", names.join(", "))
-            }
+        return items
+            .iter()
+            .find(|x| id_of(x) == partial)
+            .ok_or_else(|| anyhow::anyhow!("No {entity} with ID '{partial}'."));
+    }
+    let q = partial.to_lowercase();
+    let matches: Vec<&T> = items.iter().filter(|x| name_of(x).to_lowercase().contains(&q)).collect();
+    match matches.len() {
+        0 => bail!("No {entity} matches '{partial}'."),
+        1 => Ok(matches.into_iter().next().unwrap()),
+        _ => {
+            let descs: Vec<_> = matches.iter().map(|x| format!("{} [{}]", name_of(x), id_of(x))).collect();
+            bail!("Multiple {}s match '{partial}': {}.", entity, descs.join(", "))
         }
     }
+}
+
+/// Find one item from an owned Vec by exact ID or by case-insensitive name substring.
+fn resolve_one_owned<T>(
+    items: Vec<T>,
+    partial: &str,
+    by_id: bool,
+    id_of: impl Fn(&T) -> &str,
+    name_of: impl Fn(&T) -> &str,
+    entity: &str,
+) -> anyhow::Result<T> {
+    if by_id {
+        return items
+            .into_iter()
+            .find(|x| id_of(x) == partial)
+            .ok_or_else(|| anyhow::anyhow!("No {entity} with ID '{partial}'."));
+    }
+    let q = partial.to_lowercase();
+    let matches: Vec<T> = items.into_iter().filter(|x| name_of(x).to_lowercase().contains(&q)).collect();
+    match matches.len() {
+        0 => bail!("No {entity} matches '{partial}'."),
+        1 => Ok(matches.into_iter().next().unwrap()),
+        _ => {
+            let descs: Vec<_> = matches.iter().map(|x| format!("{} [{}]", name_of(x), id_of(x))).collect();
+            bail!("Multiple {}s match '{partial}': {}.", entity, descs.join(", "))
+        }
+    }
+}
+
+fn find_board(partial: &str, by_id: bool) -> anyhow::Result<BoardMeta> {
+    resolve_one_owned(board_store::list_boards()?, partial, by_id, |b| &b.id, |b| &b.name, "active board")
 }
 
 fn find_archived_board(partial: &str, by_id: bool) -> anyhow::Result<BoardMeta> {
-    let boards = board_store::list_archived_boards()?;
-    if by_id {
-        boards
-            .into_iter()
-            .find(|b| b.id == partial)
-            .ok_or_else(|| anyhow::anyhow!("No archived board with ID '{partial}'."))
-    } else {
-        let q = partial.to_lowercase();
-        let matches: Vec<_> = boards.into_iter().filter(|b| b.name.to_lowercase().contains(&q)).collect();
-        match matches.len() {
-            0 => bail!("No archived board matches '{partial}'."),
-            1 => Ok(matches.into_iter().next().unwrap()),
-            _ => {
-                let names: Vec<_> = matches.iter().map(|b| format!("{} [{}]", b.name, b.id)).collect();
-                bail!("Multiple archived boards match '{partial}': {}.", names.join(", "))
-            }
-        }
-    }
+    resolve_one_owned(board_store::list_archived_boards()?, partial, by_id, |b| &b.id, |b| &b.name, "archived board")
 }
 
 fn find_list<'a>(lists: &'a [CardList], partial: &str, by_id: bool) -> anyhow::Result<&'a CardList> {
-    if by_id {
-        lists
-            .iter()
-            .find(|l| l.id == partial)
-            .ok_or_else(|| anyhow::anyhow!("No list with ID '{partial}'."))
-    } else {
-        let q = partial.to_lowercase();
-        let matches: Vec<_> = lists.iter().filter(|l| l.name.to_lowercase().contains(&q)).collect();
-        match matches.len() {
-            0 => bail!("No list matches '{partial}'."),
-            1 => Ok(matches.into_iter().next().unwrap()),
-            _ => {
-                let names: Vec<_> = matches.iter().map(|l| format!("{} [{}]", l.name, l.id)).collect();
-                bail!("Multiple lists match '{partial}': {}.", names.join(", "))
-            }
-        }
-    }
+    resolve_one_ref(lists, partial, by_id, |l| &l.id, |l| &l.name, "list")
 }
 
 fn find_card_in_lists(
@@ -736,44 +725,11 @@ fn find_card_in_lists(
 }
 
 fn find_archived_card(board_id: &str, partial: &str, by_id: bool) -> anyhow::Result<Card> {
-    let cards = card_store::list_archived_cards(board_id);
-    if by_id {
-        cards
-            .into_iter()
-            .find(|c| c.id == partial)
-            .ok_or_else(|| anyhow::anyhow!("No archived card with ID '{partial}'."))
-    } else {
-        let q = partial.to_lowercase();
-        let matches: Vec<_> = cards.into_iter().filter(|c| c.title.to_lowercase().contains(&q)).collect();
-        match matches.len() {
-            0 => bail!("No archived card matches '{partial}'."),
-            1 => Ok(matches.into_iter().next().unwrap()),
-            _ => {
-                let names: Vec<_> = matches.iter().map(|c| format!("{} [{}]", c.title, c.id)).collect();
-                bail!("Multiple archived cards match '{partial}': {}.", names.join(", "))
-            }
-        }
-    }
+    resolve_one_owned(card_store::list_archived_cards(board_id), partial, by_id, |c| &c.id, |c| &c.title, "archived card")
 }
 
 fn find_label<'a>(labels: &'a [Label], partial: &str, by_id: bool) -> anyhow::Result<&'a Label> {
-    if by_id {
-        labels
-            .iter()
-            .find(|l| l.id == partial)
-            .ok_or_else(|| anyhow::anyhow!("No label with ID '{partial}'."))
-    } else {
-        let q = partial.to_lowercase();
-        let matches: Vec<_> = labels.iter().filter(|l| l.name.to_lowercase().contains(&q)).collect();
-        match matches.len() {
-            0 => bail!("No label matches '{partial}'."),
-            1 => Ok(matches.into_iter().next().unwrap()),
-            _ => {
-                let names: Vec<_> = matches.iter().map(|l| format!("{} [{}]", l.name, l.id)).collect();
-                bail!("Multiple labels match '{partial}': {}.", names.join(", "))
-            }
-        }
-    }
+    resolve_one_ref(labels, partial, by_id, |l| &l.id, |l| &l.name, "label")
 }
 
 // ── Data loading helpers ──────────────────────────────────────────────────────

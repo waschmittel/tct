@@ -596,27 +596,23 @@ mod tests {
 
     #[test]
     fn search_matches_checklist_text() {
-        use crate::cli::card_matches_query_pub;
-
         let mut card = Card::new("Task".into());
         card.checklist.push(ChecklistItem { text: "Deploy to staging".into(), completed: false });
 
-        assert!(card_matches_query_pub(&card, "deploy", &[]));
-        assert!(card_matches_query_pub(&card, "DEPLOY", &[]));
-        assert!(!card_matches_query_pub(&card, "production", &[]));
+        assert!(card.matches_search("deploy", &[]));
+        assert!(card.matches_search("DEPLOY", &[]));
+        assert!(!card.matches_search("production", &[]));
     }
 
     #[test]
     fn search_matches_label_name() {
-        use crate::cli::card_matches_query_pub;
-
         let label = Label::new("critical-bug".into(), LabelColor::Red);
         let mut card = Card::new("Task".into());
         card.label_ids.push(label.id.clone());
 
-        assert!(card_matches_query_pub(&card, "critical", &[label.clone()]));
-        assert!(card_matches_query_pub(&card, "CRITICAL-BUG", &[label.clone()]));
-        assert!(!card_matches_query_pub(&card, "feature", &[label]));
+        assert!(card.matches_search("critical", &[label.clone()]));
+        assert!(card.matches_search("CRITICAL-BUG", &[label.clone()]));
+        assert!(!card.matches_search("feature", &[label]));
     }
 
     #[test]
