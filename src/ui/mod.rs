@@ -204,6 +204,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 header("Card"),
                 row("t", "Edit title"),
                 row("e", "Edit description"),
+                row("PgUp / PgDn", "Scroll description"),
                 row("y", "Copy description"),
                 row("Y", "Copy checklist (md)"),
                 Line::raw(""),

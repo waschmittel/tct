@@ -93,8 +93,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 
         // Enter: open card detail (swapped — was 'e')
         (KeyCode::Enter, _) => {
-            if let Some(board) = &app.board {
+            if let Some(board) = &mut app.board {
                 if board.current_card_id().is_some() {
+                    board.detail_item_idx = 0;
+                    board.detail_scroll = 0;
                     app.mode = AppMode::CardDetail;
                 }
             }

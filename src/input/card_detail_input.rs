@@ -32,6 +32,14 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
 
+        // Description scrolling
+        (KeyCode::PageDown, _) => {
+            scroll_description(app, 5, true);
+        }
+        (KeyCode::PageUp, _) => {
+            scroll_description(app, 5, false);
+        }
+
         // Reorder checklist item down
         (KeyCode::Down, true) => {
             if let Some(board) = &mut app.board {
@@ -215,4 +223,29 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         _ => {}
     }
     Ok(())
+}
+
+fn scroll_description(app: &mut App, step: usize, down: bool) {
+    let accent = app.accent_color();
+    let visual_count = if let Some(board) = &app.board {
+        if let Some(card) = board.current_card() {
+            if card.description.is_empty() {
+                1
+            } else {
+                crate::ui::markdown::highlight_lines(&card.description, accent).len()
+            }
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+    let max_scroll = visual_count.saturating_sub(1);
+    if let Some(board) = &mut app.board {
+        if down {
+            board.detail_scroll = (board.detail_scroll + step).min(max_scroll);
+        } else {
+            board.detail_scroll = board.detail_scroll.saturating_sub(step);
+        }
+    }
 }

@@ -4,6 +4,14 @@ use ratatui::text::{Line, Span};
 pub const WRAP_WIDTH: usize = 80;
 
 pub fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
+    highlight_lines_with_width(text, accent, WRAP_WIDTH)
+}
+
+pub fn highlight_lines_with_width(
+    text: &str,
+    accent: Color,
+    wrap_width: usize,
+) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     let mut in_code_block = false;
 
@@ -40,9 +48,9 @@ pub fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
 
         let highlighted = highlight_line(line, accent);
         let wrapped = if list_indent > 0 {
-            wrap_spans_with_indent(highlighted, WRAP_WIDTH, list_indent)
+            wrap_spans_with_indent(highlighted, wrap_width, list_indent)
         } else {
-            wrap_spans(highlighted, WRAP_WIDTH)
+            wrap_spans(highlighted, wrap_width)
         };
         lines.extend(wrapped);
     }

@@ -1,7 +1,7 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::app::{App, AppMode, InsertTarget};
@@ -43,6 +43,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         vec![
             Span::styled(" ?", Style::default().fg(accent)),
             Span::raw(":help  "),
+            Span::styled("PgUp/PgDn", Style::default().fg(accent)),
+            Span::raw(":scroll desc  "),
             Span::styled("Esc", Style::default().fg(accent)),
             Span::raw(":close "),
         ]
@@ -68,150 +70,71 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    // --- Description Header (no tinted bg) ---
-    let header_lines: Vec<Line<'static>> = vec![
-        Line::raw(""),
-        Line::from(Span::styled(
-            "Description",
-            Style::default().fg(accent).add_modifier(Modifier::BOLD),
-        )),
-    ];
-    let header_height = (header_lines.len() as u16).min(inner.height);
-    let header_area = Rect::new(inner.x, inner.y, inner.width, header_height);
-    frame.render_widget(Paragraph::new(header_lines), header_area);
-
-    let md_y = inner.y + header_height;
-    let md_max_height = inner.height.saturating_sub(header_height);
-
-    // --- Description Body (2-char horizontal padding) ---
     let pad: u16 = 2;
     let md_inner_width = inner.width.saturating_sub(pad * 2);
+    let desc_wrap_width = (md_inner_width as usize).min(markdown::WRAP_WIDTH);
 
-    let mut desc_lines: Vec<Line<'static>> = Vec::new();
-    if card.description.is_empty() {
-        desc_lines.push(Line::from(Span::styled(
+    // --- Build content for each section ---
+    let desc_lines: Vec<Line<'static>> = if card.description.is_empty() {
+        vec![Line::from(Span::styled(
             "(no description — press 'e' to add)",
             Style::default().fg(Color::DarkGray),
-        )));
+        ))]
+    } else if desc_wrap_width == 0 {
+        Vec::new()
     } else {
-        let highlighted = markdown::highlight_lines(&card.description, accent);
-        desc_lines.extend(highlighted);
-    }
+        markdown::highlight_lines_with_width(&card.description, accent, desc_wrap_width)
+    };
 
-    let desc_paragraph = Paragraph::new(desc_lines.clone())
-        .wrap(Wrap { trim: false });
-    let desc_visual_lines: u16 = desc_lines
-        .iter()
-        .map(|line| {
-            let len: usize = line.spans.iter().map(|s| s.content.len()).sum();
-            let w = md_inner_width as usize;
-            if w == 0 { 1 } else { ((len.max(1) + w - 1) / w) as u16 }
-        })
-        .sum();
-    let desc_height = desc_visual_lines.min(md_max_height);
-    let desc_area = Rect::new(inner.x + pad, md_y, md_inner_width, desc_height);
-    frame.render_widget(desc_paragraph, desc_area);
-
-    let rest_y = md_y + desc_height;
-    let rest_height = inner.height.saturating_sub(rest_y - inner.y);
-    if rest_height < 2 {
-        return;
-    }
-    let rest_area = Rect::new(inner.x, rest_y, inner.width, rest_height);
-
-    // Remaining sections rendered below description
-    let mut lines: Vec<Line<'static>> = Vec::new();
-    lines.push(Line::raw(""));
-    lines.push(Line::from(Span::styled(
-        "═".repeat(inner.width as usize),
-        Style::default().fg(Color::DarkGray),
-    )));
-    lines.push(Line::raw(""));
-
-    // --- Checklist Section ---
-    let (done, total) = card.checklist_progress().unwrap_or((0, 0));
-    if total > 0 {
-        lines.push(Line::from(Span::styled(
-            format!("Checklist [{done}/{total}]"),
-            Style::default().fg(accent).add_modifier(Modifier::BOLD),
-        )));
-    } else {
-        lines.push(Line::from(Span::styled(
-            "Checklist",
-            Style::default().fg(accent).add_modifier(Modifier::BOLD),
-        )));
-    }
-
-    if card.checklist.is_empty() {
-        lines.push(Line::from(Span::styled(
+    let checklist_lines: Vec<Line<'static>> = if card.checklist.is_empty() {
+        vec![Line::from(Span::styled(
             "  (no items — press 'a' to add)",
             Style::default().fg(Color::DarkGray),
-        )));
+        ))]
     } else {
-        for (ii, item) in card.checklist.iter().enumerate() {
-            let is_active = ii == board.detail_item_idx;
-            let check = if item.completed { "✓" } else { " " };
-            let style = if is_active {
-                Style::default()
-                    .fg(accent)
-                    .add_modifier(Modifier::BOLD)
-            } else if item.completed {
-                Style::default().fg(Color::Green)
-            } else {
-                Style::default()
-            };
-            let prefix = if is_active { "» " } else { "  " };
-            lines.push(Line::from(Span::styled(
-                format!("{prefix}[{check}] {}", item.text),
-                style,
-            )));
-        }
-    }
-
-    lines.push(Line::raw(""));
-    lines.push(Line::from(Span::styled(
-        "─".repeat(inner.width as usize),
-        Style::default().fg(Color::DarkGray),
-    )));
-    lines.push(Line::raw(""));
-
-    // --- Labels Section ---
-    lines.push(Line::from(Span::styled(
-        "Labels",
-        Style::default().fg(accent).add_modifier(Modifier::BOLD),
-    )));
+        card.checklist
+            .iter()
+            .enumerate()
+            .map(|(ii, item)| {
+                let is_active = ii == board.detail_item_idx;
+                let check = if item.completed { "✓" } else { " " };
+                let style = if is_active {
+                    Style::default().fg(accent).add_modifier(Modifier::BOLD)
+                } else if item.completed {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default()
+                };
+                let prefix = if is_active { "» " } else { "  " };
+                Line::from(Span::styled(
+                    format!("{prefix}[{check}] {}", item.text),
+                    style,
+                ))
+            })
+            .collect()
+    };
 
     let resolved = card.resolved_labels(&board.meta.labels);
-    if resolved.is_empty() {
-        lines.push(Line::from(Span::styled(
+    let labels_lines: Vec<Line<'static>> = if resolved.is_empty() {
+        vec![Line::from(Span::styled(
             "  (no labels — press 'l' to add)",
             Style::default().fg(Color::DarkGray),
-        )));
+        ))]
     } else {
-        for label in &resolved {
-            lines.push(Line::from(Span::styled(
-                format!("  ● {}", label.name),
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(label.color.to_ratatui_color()),
-            )));
-        }
-    }
+        resolved
+            .iter()
+            .map(|label| {
+                Line::from(Span::styled(
+                    format!("  ● {}", label.name),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(label.color.to_ratatui_color()),
+                ))
+            })
+            .collect()
+    };
 
-    lines.push(Line::raw(""));
-    lines.push(Line::from(Span::styled(
-        "─".repeat(inner.width as usize),
-        Style::default().fg(Color::DarkGray),
-    )));
-    lines.push(Line::raw(""));
-
-    // --- Due Date Section ---
-    lines.push(Line::from(Span::styled(
-        "Due Date",
-        Style::default().fg(accent).add_modifier(Modifier::BOLD),
-    )));
-
-    if let Some(due) = card.due_date {
+    let due_lines: Vec<Line<'static>> = if let Some(due) = card.due_date {
         let today = chrono::Local::now().date_naive();
         let days = (due - today).num_days();
         let (status, color) = if days < 0 {
@@ -223,23 +146,216 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         } else {
             (format!("Due in {} days", days), Color::Green)
         };
-        lines.push(Line::from(Span::styled(
-            format!("  {}", due.format("%Y-%m-%d")),
-            Style::default().fg(Color::White),
-        )));
-        lines.push(Line::from(Span::styled(
-            format!("  {status}"),
-            Style::default().fg(color),
-        )));
+        vec![
+            Line::from(Span::styled(
+                format!("  {}", due.format("%Y-%m-%d")),
+                Style::default().fg(Color::White),
+            )),
+            Line::from(Span::styled(
+                format!("  {status}"),
+                Style::default().fg(color),
+            )),
+        ]
     } else {
-        lines.push(Line::from(Span::styled(
+        vec![Line::from(Span::styled(
             "  (no due date — press 'u' to set)",
             Style::default().fg(Color::DarkGray),
-        )));
+        ))]
+    };
+
+    // --- Compute heights with caps for scrollable sections ---
+    // Fixed chrome:
+    //  1 (top blank) + 1 (desc header)
+    //  + 3 (divider ═)
+    //  + 1 (checklist header)
+    //  + 3 (divider ─)
+    //  + 1 (labels header)
+    //  + 3 (divider ─)
+    //  + 1 (due header)
+    // = 14
+    let top_pad: u16 = 1;
+    let desc_header_h: u16 = 1;
+    let ck_header_h: u16 = 1;
+    let labels_header_h: u16 = 1;
+    let due_header_h: u16 = 1;
+    let div_h: u16 = 3;
+
+    let labels_full = labels_lines.len() as u16;
+    let due_full = due_lines.len() as u16;
+
+    // Reserve full space for labels + due; they're small.
+    let bottom_h = div_h + labels_header_h + labels_full + div_h + due_header_h + due_full;
+    let fixed_top = top_pad + desc_header_h + div_h + ck_header_h;
+    let available = inner.height.saturating_sub(fixed_top + bottom_h);
+
+    let desc_full = desc_lines.len() as u16;
+    let ck_full = checklist_lines.len() as u16;
+    let (desc_h, ck_h) = split_available(desc_full, ck_full, available);
+
+    // Clamp description scroll
+    let desc_max_scroll = desc_full.saturating_sub(desc_h);
+    let desc_scroll = (board.detail_scroll as u16).min(desc_max_scroll);
+
+    // Auto-scroll checklist to keep selected item visible
+    let ck_max_scroll = ck_full.saturating_sub(ck_h);
+    let ck_scroll = if ck_h == 0 {
+        0
+    } else {
+        let idx = board.detail_item_idx as u16;
+        idx.saturating_sub(ck_h.saturating_sub(1)).min(ck_max_scroll)
+    };
+
+    // --- Render sections sequentially ---
+    let mut y = inner.y;
+
+    // Top blank
+    y += top_pad;
+
+    // Description header (with optional scroll hint)
+    let desc_header_text = if desc_full > desc_h {
+        let total_visual_lines = desc_full.max(1);
+        let bottom = (desc_scroll + desc_h).min(total_visual_lines);
+        format!("Description  [{}-{} / {}]", desc_scroll + 1, bottom, total_visual_lines)
+    } else {
+        "Description".to_string()
+    };
+    if y < inner.y + inner.height {
+        let header_area = Rect::new(inner.x, y, inner.width, desc_header_h);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                desc_header_text,
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            ))),
+            header_area,
+        );
+        y += desc_header_h;
     }
 
-    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, rest_area);
+    // Description body
+    if desc_h > 0 && y < inner.y + inner.height {
+        let desc_area = Rect::new(inner.x + pad, y, md_inner_width, desc_h);
+        let desc_paragraph =
+            Paragraph::new(desc_lines.clone()).scroll((desc_scroll, 0));
+        frame.render_widget(desc_paragraph, desc_area);
+        y += desc_h;
+    }
+
+    // Divider (blank + ═ + blank)
+    if y + div_h <= inner.y + inner.height {
+        let divider_area = Rect::new(inner.x, y, inner.width, div_h);
+        let lines = vec![
+            Line::raw(""),
+            Line::from(Span::styled(
+                "═".repeat(inner.width as usize),
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::raw(""),
+        ];
+        frame.render_widget(Paragraph::new(lines), divider_area);
+        y += div_h;
+    }
+
+    // Checklist header
+    let (done, total) = card.checklist_progress().unwrap_or((0, 0));
+    let ck_header_text = if total > 0 {
+        if ck_full > ck_h {
+            format!("Checklist [{done}/{total}]  ({} hidden)", ck_full - ck_h)
+        } else {
+            format!("Checklist [{done}/{total}]")
+        }
+    } else {
+        "Checklist".to_string()
+    };
+    if y < inner.y + inner.height {
+        let header_area = Rect::new(inner.x, y, inner.width, ck_header_h);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                ck_header_text,
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            ))),
+            header_area,
+        );
+        y += ck_header_h;
+    }
+
+    // Checklist body (sliced)
+    if ck_h > 0 && y < inner.y + inner.height {
+        let start = ck_scroll as usize;
+        let end = (start + ck_h as usize).min(checklist_lines.len());
+        let visible: Vec<Line<'static>> = checklist_lines[start..end].to_vec();
+        let ck_area = Rect::new(inner.x, y, inner.width, ck_h);
+        frame.render_widget(Paragraph::new(visible), ck_area);
+        y += ck_h;
+    }
+
+    // Divider
+    if y + div_h <= inner.y + inner.height {
+        let divider_area = Rect::new(inner.x, y, inner.width, div_h);
+        let lines = vec![
+            Line::raw(""),
+            Line::from(Span::styled(
+                "─".repeat(inner.width as usize),
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::raw(""),
+        ];
+        frame.render_widget(Paragraph::new(lines), divider_area);
+        y += div_h;
+    }
+
+    // Labels header + body
+    if y < inner.y + inner.height {
+        let header_area = Rect::new(inner.x, y, inner.width, labels_header_h);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "Labels",
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            ))),
+            header_area,
+        );
+        y += labels_header_h;
+    }
+    if labels_full > 0 && y < inner.y + inner.height {
+        let remaining = (inner.y + inner.height).saturating_sub(y);
+        let h = labels_full.min(remaining);
+        let labels_area = Rect::new(inner.x, y, inner.width, h);
+        frame.render_widget(Paragraph::new(labels_lines), labels_area);
+        y += h;
+    }
+
+    // Divider
+    if y + div_h <= inner.y + inner.height {
+        let divider_area = Rect::new(inner.x, y, inner.width, div_h);
+        let lines = vec![
+            Line::raw(""),
+            Line::from(Span::styled(
+                "─".repeat(inner.width as usize),
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::raw(""),
+        ];
+        frame.render_widget(Paragraph::new(lines), divider_area);
+        y += div_h;
+    }
+
+    // Due date header + body
+    if y < inner.y + inner.height {
+        let header_area = Rect::new(inner.x, y, inner.width, due_header_h);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "Due Date",
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            ))),
+            header_area,
+        );
+        y += due_header_h;
+    }
+    if due_full > 0 && y < inner.y + inner.height {
+        let remaining = (inner.y + inner.height).saturating_sub(y);
+        let h = due_full.min(remaining);
+        let due_area = Rect::new(inner.x, y, inner.width, h);
+        frame.render_widget(Paragraph::new(due_lines), due_area);
+    }
 
     // Input dialogs rendered on top
     match &app.mode {
@@ -262,6 +378,29 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             );
         }
         _ => {}
+    }
+}
+
+fn split_available(desc_full: u16, ck_full: u16, avail: u16) -> (u16, u16) {
+    if avail == 0 {
+        return (0, 0);
+    }
+    if desc_full + ck_full <= avail {
+        return (desc_full, ck_full);
+    }
+    let half = avail / 2;
+    let other = avail - half;
+    if desc_full <= half {
+        return (desc_full, avail - desc_full);
+    }
+    if ck_full <= half {
+        return (avail - ck_full, ck_full);
+    }
+    // Both bigger than half: give bigger of the two slightly more
+    if desc_full >= ck_full {
+        (other, half)
+    } else {
+        (half, other)
     }
 }
 
