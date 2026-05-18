@@ -110,7 +110,7 @@ graph LR
 graph TD
     subgraph "tct process"
         MAIN[main.rs<br>Entry + event loop]
-        CLI[cli.rs<br>CLI dispatch]
+        CLI[cli/<br>CLI dispatch + subcommands]
         APP[app.rs<br>App state]
         INPUT[input/<br>Key handlers]
         UI[ui/<br>Rendering]
@@ -163,7 +163,17 @@ graph TB
     subgraph "tct"
         direction TB
         ENTRY["main.rs<br><i>Entry point, CLI dispatch, TUI event loop</i>"]
-        CLI_MOD["cli.rs<br><i>All CLI subcommands</i>"]
+        subgraph "cli/"
+            CLI_MOD["mod.rs<br>dispatch + help text"]
+            CLI_BOARDS["boards.rs"]
+            CLI_LISTS["lists.rs"]
+            CLI_CARDS["cards.rs"]
+            CLI_CHECKLIST["checklist.rs"]
+            CLI_LABELS["labels.rs"]
+            CLI_SEARCH["search.rs"]
+            CLI_LOOKUP["lookup.rs<br>id/name resolution"]
+            CLI_UTIL["util.rs<br>flags + formatting"]
+        end
         APP_MOD["app.rs<br><i>App state, modes, board loading</i>"]
 
         subgraph "model/"
@@ -186,7 +196,12 @@ graph TB
             INPUT_MOD["mod.rs<br>Input dispatch by AppMode"]
             NORMAL_I["normal.rs<br>Board view keys"]
             DETAIL_I["card_detail_input.rs<br>Card detail keys"]
-            INSERT_I["insert.rs<br>Text input + desc editor"]
+            subgraph "insert/"
+                INSERT_MOD["mod.rs<br>dispatch + plain text-buffer"]
+                INSERT_DESC["description.rs<br>desc editor keys"]
+                INSERT_LIST["list_editing.rs<br>list autocontinue / renumber"]
+                INSERT_DUE["due_date.rs<br>date picker"]
+            end
             DIALOG_I["dialog_input.rs<br>Dialog handlers"]
             BSEL_I["board_selector_input.rs<br>Board selector keys"]
             CMD_I["command.rs<br>Search command"]
@@ -252,7 +267,7 @@ graph TB
 | `board_selector_input.rs` | `BoardSelector` |
 | `normal.rs` | `Normal` (board view) |
 | `card_detail_input.rs` | `CardDetail` |
-| `insert.rs` | `Insert(*)` — all text editing |
+| `insert/` | `Insert(*)` — all text editing (split into `description.rs`, `list_editing.rs`, `due_date.rs`) |
 | `dialog_input.rs` | `Dialog(*)` — all dialogs |
 | `command.rs` | `Command` (search bar) |
 
@@ -269,6 +284,7 @@ graph TB
 | `markdown.rs` | Line-level Markdown syntax highlighting |
 | `widgets/card_widget.rs` | Individual card rendering (title, labels, due, checklist progress) |
 | `widgets/list_widget.rs` | List column with card stack |
+| `widgets/date_picker.rs` | Calendar grid for the due-date picker |
 
 ---
 

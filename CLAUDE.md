@@ -10,7 +10,7 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 ## Architecture
 
 - **Modal input**: `AppMode` enum in `app.rs` drives which handler in `input/` runs. Modes: BoardSelector, Normal, CardDetail, Insert(target), Command, Dialog(kind), Help.
-- **InsertTarget**: Enum for what's being edited (card title, description, list name, checklist, due date). Each variant has input handling in `insert.rs` and rendering in `card_detail.rs`.
+- **InsertTarget**: Enum for what's being edited (card title, description, list name, checklist, due date). Each variant has input handling in `input/insert/` (split into `mod.rs` dispatch, `description.rs` editor, `list_editing.rs` list autocontinue, `due_date.rs` picker) and rendering in `card_detail.rs`.
 - **DialogKind**: Enum for dialogs (delete confirmations, archive, cancel edit, label picker, archived cards). Handlers in `dialog_input.rs`, rendering in `dialog.rs`.
 - **Storage**: JSON files under `~/.tct/boards/`. All writes use `atomic_write` (write `.tmp`, then rename). Override path with `TCT_DATA_DIR` env var.
 - **Description editing**: Uses `ratatui-textarea` TextArea for editing, custom renderer in `card_detail.rs::render_description_editor()` for syntax highlighting via `markdown::highlight_line()`.
@@ -51,12 +51,19 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 2. Add `CardDetailTab` variant in `app.rs` if it needs its own tab
 3. Add render function in `ui/card_detail.rs`
 4. Add input handling in `input/card_detail_input.rs`
-5. If editable via insert: add `InsertTarget` variant, handle in `input/insert.rs`
+5. If editable via insert: add `InsertTarget` variant, handle in `input/insert/mod.rs`
 
 ### New InsertTarget
 1. Add variant to `InsertTarget` in `app.rs`
-2. Handle in `cancel_insert()` and `confirm_insert()` in `input/insert.rs`
+2. Handle in `cancel_insert()` and `confirm_insert()` in `input/insert/mod.rs`
 3. Add rendering (popup dialog or inline) in `ui/card_detail.rs`
+
+### New CLI subcommand
+1. Add a `<name>.rs` module in `src/cli/` with a `pub(super) fn run`
+2. Add `mod <name>;` in `src/cli/mod.rs`
+3. Wire the dispatch arm in `cli::run`'s `match sub`
+4. Add the command's usage block to the `HELP` string in `cli/mod.rs`
+5. Update README.md CLI section
 
 ## Keep in Sync
 
@@ -69,7 +76,7 @@ When changing keybindings or features, update ALL of:
 
 ## Key Patterns
 
-- `has_ctrl_or_cmd()` in `insert.rs` — checks both Ctrl and Cmd (macOS Super) modifiers
+- `has_ctrl_or_cmd()` in `input/insert/mod.rs` — checks both Ctrl and Cmd (macOS Super) modifiers
 - `LoadedBoard` in `app.rs` — holds all board state including selection indices
 - `app.start_insert()` / `app.start_insert_with()` — enter insert mode with optional pre-fill
 - `app.start_description_edit()` — initializes TextArea + stores original for change detection

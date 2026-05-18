@@ -90,9 +90,11 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | Shift+Up/Down | Reorder board up/down |
 | Enter | Open board |
 | n | New board |
+| r | Rename board |
 | c | Cycle board accent color |
 | d | Archive board |
 | v | View/restore archived boards |
+| ? | Help |
 | q | Quit |
 
 ### Board View (Normal Mode)
@@ -107,6 +109,7 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | Enter | Open card detail |
 | t | Quick-edit card title |
 | e | Edit card description |
+| y | Copy card title to clipboard |
 | n | New card |
 | N | New list |
 | r | Rename list |
@@ -117,8 +120,12 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | V | View/restore/delete archived lists |
 | </>  | Reorder list left/right |
 | / | Search |
-| L | Manage labels |
+| f | Filter by label |
 | F | Clear filters |
+| l | Assign/remove labels (label picker) |
+| L | Manage labels |
+| u | Set due date (opens picker) |
+| U | Clear due date |
 | b | Back to board selector |
 | ? | Help |
 | q | Quit |
@@ -143,7 +150,9 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | u | Set due date (opens picker) |
 | U | Clear due date |
 | h | View card change history |
+| ? | Help |
 | Esc | Close |
+| q | Quit |
 
 In the due-date picker: arrow keys navigate the calendar (←→ ±day, ↑↓ ±week), PgUp/PgDn jump months (Shift = ±year), `t` jumps to today, typing digits/hyphens edits the text input, Enter saves, Esc cancels. Clearing the buffer (Ctrl+U) and pressing Enter removes the due date.
 
@@ -312,8 +321,17 @@ tct cards a1b2c3d4 --show e5f6a7b8 --by-id
 ```
 src/
   main.rs          # Entry point, CLI dispatch, TUI event loop
-  cli.rs           # All CLI subcommands (boards/lists/cards/checklist/labels)
   app.rs           # App state, modes, board loading
+  cli/
+    mod.rs         # CLI dispatch, help text
+    boards.rs      # `tct boards` subcommand
+    lists.rs       # `tct lists` subcommand
+    cards.rs       # `tct cards` subcommand
+    checklist.rs   # `tct checklist` subcommand
+    labels.rs      # `tct labels` subcommand
+    search.rs      # `tct search` subcommand
+    lookup.rs      # ID/name resolution shared by all subcommands
+    util.rs        # Flag parsing + output formatting helpers
   model/
     board.rs       # BoardMeta
     card.rs        # Card, ChecklistItem
@@ -329,10 +347,15 @@ src/
   input/
     mod.rs         # Input dispatch by mode
     normal.rs      # Board view keybindings
-    insert.rs      # Text input + description editor
+    insert/
+      mod.rs           # Insert-mode dispatch + plain text-buffer editing
+      description.rs   # Markdown description editor keybindings
+      list_editing.rs  # List autocontinue, indent, renumber
+      due_date.rs      # Due-date calendar picker
     card_detail_input.rs  # Card detail keybindings
     dialog_input.rs       # Dialog handlers
     board_selector_input.rs  # Board selector keybindings
+    command.rs            # `:` command-mode input
   ui/
     mod.rs         # Render dispatch + help overlay
     board_view.rs  # Board columns layout
@@ -346,6 +369,7 @@ src/
     widgets/
       card_widget.rs   # Individual card rendering
       list_widget.rs   # List column rendering
+      date_picker.rs   # Calendar grid for due-date picker
 ```
 
 Modal input dispatch: `AppMode` enum determines which input handler processes keys. `InsertTarget` tracks what's being edited. `DialogKind` tracks which dialog is showing.

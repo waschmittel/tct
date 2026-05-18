@@ -16,8 +16,8 @@ pub fn load_card(board_id: &str, card_id: &str) -> Result<Card> {
     let mut migrated = false;
 
     // Migrate old "checklists" (Vec<{title, items}>) → flat "checklist" (Vec<ChecklistItem>)
-    if let Some(checklists) = val.get("checklists") {
-        if checklists.is_array() {
+    if let Some(checklists) = val.get("checklists")
+        && checklists.is_array() {
             let mut flat_items = Vec::new();
             if let Some(arr) = checklists.as_array() {
                 for cl in arr {
@@ -34,12 +34,11 @@ pub fn load_card(board_id: &str, card_id: &str) -> Result<Card> {
                 .insert("checklist".to_string(), serde_json::Value::Array(flat_items));
             migrated = true;
         }
-    }
 
     // Migrate old "labels" (Vec<{name, color}>) → "label_ids" (Vec<ShortId>)
     // Old labels without "id" are dropped here; they'll be re-created during board-level migration
-    if let Some(labels) = val.get("labels") {
-        if labels.is_array() {
+    if let Some(labels) = val.get("labels")
+        && labels.is_array() {
             val.as_object_mut().unwrap().remove("labels");
             if !val.as_object().unwrap().contains_key("label_ids") {
                 val.as_object_mut().unwrap().insert(
@@ -49,7 +48,6 @@ pub fn load_card(board_id: &str, card_id: &str) -> Result<Card> {
             }
             migrated = true;
         }
-    }
 
     let card: Card = serde_json::from_value(val)?;
 
@@ -245,17 +243,14 @@ pub fn list_archived_cards(board_id: &str) -> Vec<Card> {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if name.starts_with("card-") && name.ends_with(".json") {
-                if let Ok(data) = fs::read_to_string(entry.path()) {
-                    if let Ok(card) = serde_json::from_str::<Card>(&data) {
-                        if card.archived {
+            if name.starts_with("card-") && name.ends_with(".json")
+                && let Ok(data) = fs::read_to_string(entry.path())
+                    && let Ok(card) = serde_json::from_str::<Card>(&data)
+                        && card.archived {
                             cards.push(card);
                         }
-                    }
-                }
-            }
         }
     }
-    cards.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    cards.sort_by_key(|c| std::cmp::Reverse(c.updated_at));
     cards
 }

@@ -44,15 +44,12 @@ pub fn list_archived_lists(board_id: &str) -> Vec<CardList> {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if name.starts_with("list-") && name.ends_with(".json") {
-                if let Ok(data) = fs::read_to_string(entry.path()) {
-                    if let Ok(list) = serde_json::from_str::<CardList>(&data) {
-                        if list.archived {
+            if name.starts_with("list-") && name.ends_with(".json")
+                && let Ok(data) = fs::read_to_string(entry.path())
+                    && let Ok(list) = serde_json::from_str::<CardList>(&data)
+                        && list.archived {
                             lists.push(list);
                         }
-                    }
-                }
-            }
         }
     }
     lists.sort_by(|a, b| a.name.cmp(&b.name));

@@ -215,9 +215,11 @@ The first screen you see. Lists all active boards.
 | Shift+Up / Shift+Down | Reorder board in list |
 | Enter | Open selected board |
 | n | Create new board |
+| r | Rename selected board |
 | c | Cycle board accent color |
 | d | Archive board (with confirmation) |
 | v | View / restore archived boards |
+| ? | Help overlay |
 | q | Quit |
 
 ### Board View (Kanban columns)
@@ -238,10 +240,12 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 | Key | Action |
 |-----|--------|
 | Enter | Open card detail view |
-| e | Quick-edit card title (inline) |
+| t | Quick-edit card title (inline) |
+| e | Edit card description |
+| y | Copy card title to clipboard |
 | n | Create new card in current list |
-| d | Delete card (with confirmation) |
 | a | Archive card (with confirmation) |
+| h | View card change history |
 
 **Card movement:**
 
@@ -256,17 +260,32 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 |-----|--------|
 | N | Create new list |
 | r | Rename current list |
-| D | Delete list and all its cards (with confirmation) |
+| D | Archive list (with confirmation) |
+| V | View / restore / delete archived lists |
 | < (Shift+,) | Move list left |
 | > (Shift+.) | Move list right |
+
+**Labels & due dates:**
+
+| Key | Action |
+|-----|--------|
+| l | Assign / remove labels (label picker) |
+| L | Open label manager |
+| u | Set due date (opens calendar picker) |
+| U | Clear due date |
+
+**Search & filter:**
+
+| Key | Action |
+|-----|--------|
+| / | Open search bar |
+| f | Filter by label |
+| F | Clear all filters (search + label) |
 
 **Other:**
 
 | Key | Action |
 |-----|--------|
-| / | Open search bar |
-| L | Open label manager |
-| F | Clear all filters (search + label) |
 | v | View / restore / delete archived cards |
 | b | Back to board selector |
 | ? | Help overlay |
@@ -280,6 +299,9 @@ A full overlay showing all card properties: title, description, checklist, label
 |-----|--------|
 | t | Edit title |
 | e | Edit description (opens Markdown editor) |
+| PgUp / PgDn | Scroll description |
+| y | Copy description to clipboard |
+| Y | Copy entire checklist as Markdown to clipboard |
 | Up / Down | Navigate checklist items |
 | Shift+Up / Shift+Down | Reorder selected checklist item |
 | Space | Toggle checklist item done/undone |
@@ -288,9 +310,12 @@ A full overlay showing all card properties: title, description, checklist, label
 | x | Delete selected checklist item |
 | l | Assign / remove labels (label picker) |
 | L | Manage board labels (create, rename, recolor, reorder, delete) |
-| u | Set due date (YYYY-MM-DD format) |
+| u | Set due date (opens calendar picker) |
 | U | Clear due date |
+| h | View card change history |
+| ? | Help overlay |
 | Esc | Close card detail |
+| q | Quit |
 
 ### Description Editor
 
@@ -305,7 +330,10 @@ A full Markdown editor with syntax highlighting. Supports headings, bold, italic
 | Ctrl+I | Toggle italic (`*text*`) |
 | Ctrl+K | Toggle inline code (`` `text` ``) |
 | Ctrl+L | Insert list item (`- `) |
-| Enter | Auto-continue list items (if on a `- ` line) |
+| Up / Down | Move by visual (wrapped) line |
+| Enter | Auto-continue bullet / numbered list items; renumbers numbered runs |
+| Tab | Nest the current list item one level deeper (3 spaces) |
+| Shift+Tab | Un-nest the current list item one level |
 | Esc | Cancel — prompts to confirm if changes exist |
 
 On macOS, **Cmd** can substitute for Ctrl in terminals that support it (kitty, Alacritty, WezTerm).
@@ -361,8 +389,11 @@ Labels display on cards in **board-level order** (the order shown in the label m
 
 ## Due Dates
 
-- Press `u` in card detail to set a due date (format: `YYYY-MM-DD`)
-- Press `U` to clear the due date
+- Press `u` in card detail (or in board view, on the selected card) to open the calendar picker
+- In the picker: arrow keys move by day/week, PgUp/PgDn jump months (Shift = year), `t` jumps to today, Home/End jump to first/last day of month
+- Type digits and `-` to edit the date text directly (`YYYY-MM-DD`); the calendar reparses as you type
+- Press Enter to save, Esc to cancel; clearing the buffer (Ctrl+U) and pressing Enter removes the due date
+- Press `U` to clear the due date without opening the picker
 - **Overdue** cards show a visual indicator in both the card list and detail view
 - Due dates are visible in CLI output (`tct cards <board>`) and search results
 
@@ -384,8 +415,17 @@ Archiving is a **soft delete** — the data stays on disk but is hidden from nor
 |--------|-----|
 | Archive card | `a` in board view (with confirmation) |
 | View archived cards | `v` in board view |
-| Restore archived card | Select in archive view, press `r` |
-| Permanently delete | Select in archive view, press `d` |
+| Restore archived card | Select in archive view, press `Enter` |
+| Permanently delete | Select in archive view, press `x` |
+
+### Lists
+
+| Action | How |
+|--------|-----|
+| Archive list | `D` in board view (with confirmation) |
+| View archived lists | `V` in board view |
+| Restore archived list | Select in archive view, press `Enter` |
+| Permanently delete | Select in archive view, press `x` |
 
 ### Boards
 
@@ -393,8 +433,8 @@ Archiving is a **soft delete** — the data stays on disk but is hidden from nor
 |--------|-----|
 | Archive board | `d` in board selector (with confirmation) |
 | View archived boards | `v` in board selector |
-| Restore archived board | Select in archive view, press `r` |
-| Permanently delete | Select in archive view, press `d` |
+| Restore archived board | Select in archive view, press `Enter` |
+| Permanently delete | Select in archive view, press `x` |
 
 ---
 

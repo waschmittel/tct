@@ -119,13 +119,11 @@ pub fn wrap_spans_with_indent(
 
             // Find the character boundary for the budget
             let mut split_idx = 0;
-            let mut char_count = 0;
-            for (idx, c) in remaining.char_indices() {
-                if char_count >= budget {
+            for (count, (idx, c)) in remaining.char_indices().enumerate() {
+                if count >= budget {
                     break;
                 }
                 split_idx = idx + c.len_utf8();
-                char_count += 1;
             }
 
             let slice = &remaining[..split_idx];
@@ -269,10 +267,10 @@ pub fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
         }
     }
 
-    if owned.starts_with("> ") {
+    if let Some(quoted) = owned.strip_prefix("> ") {
         spans.push(Span::styled("> ".to_string(), Style::default().fg(Color::Yellow)));
         spans.push(Span::styled(
-            owned[2..].to_string(),
+            quoted.to_string(),
             Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC),
         ));
         return spans;
@@ -312,8 +310,8 @@ fn highlight_inline(text: &str, spans: &mut Vec<Span<'static>>) {
     let mut buf = String::new();
 
     while i < chars.len() {
-        if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == '*' {
-            if let Some(end) = find_closing(&chars, i + 2, &['*', '*']) {
+        if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == '*'
+            && let Some(end) = find_closing(&chars, i + 2, &['*', '*']) {
                 if !buf.is_empty() {
                     spans.push(Span::raw(std::mem::take(&mut buf)));
                 }
@@ -324,10 +322,9 @@ fn highlight_inline(text: &str, spans: &mut Vec<Span<'static>>) {
                 i = end + 2;
                 continue;
             }
-        }
 
-        if i + 1 < chars.len() && chars[i] == '~' && chars[i + 1] == '~' {
-            if let Some(end) = find_closing(&chars, i + 2, &['~', '~']) {
+        if i + 1 < chars.len() && chars[i] == '~' && chars[i + 1] == '~'
+            && let Some(end) = find_closing(&chars, i + 2, &['~', '~']) {
                 if !buf.is_empty() {
                     spans.push(Span::raw(std::mem::take(&mut buf)));
                 }
@@ -341,10 +338,9 @@ fn highlight_inline(text: &str, spans: &mut Vec<Span<'static>>) {
                 i = end + 2;
                 continue;
             }
-        }
 
-        if chars[i] == '*' && (i + 1 >= chars.len() || chars[i + 1] != '*') {
-            if let Some(end) = find_closing_single(&chars, i + 1, '*') {
+        if chars[i] == '*' && (i + 1 >= chars.len() || chars[i + 1] != '*')
+            && let Some(end) = find_closing_single(&chars, i + 1, '*') {
                 if !buf.is_empty() {
                     spans.push(Span::raw(std::mem::take(&mut buf)));
                 }
@@ -358,10 +354,9 @@ fn highlight_inline(text: &str, spans: &mut Vec<Span<'static>>) {
                 i = end + 1;
                 continue;
             }
-        }
 
-        if chars[i] == '`' {
-            if let Some(end) = find_closing_single(&chars, i + 1, '`') {
+        if chars[i] == '`'
+            && let Some(end) = find_closing_single(&chars, i + 1, '`') {
                 if !buf.is_empty() {
                     spans.push(Span::raw(std::mem::take(&mut buf)));
                 }
@@ -375,7 +370,6 @@ fn highlight_inline(text: &str, spans: &mut Vec<Span<'static>>) {
                 i = end + 1;
                 continue;
             }
-        }
 
         buf.push(chars[i]);
         i += 1;
@@ -390,21 +384,17 @@ fn find_closing(chars: &[char], start: usize, pattern: &[char]) -> Option<usize>
     if pattern.len() != 2 {
         return None;
     }
-    for i in start..chars.len().saturating_sub(1) {
-        if chars[i] == pattern[0] && chars[i + 1] == pattern[1] {
-            return Some(i);
-        }
-    }
-    None
+    (start..chars.len().saturating_sub(1))
+        .find(|&i| chars[i] == pattern[0] && chars[i + 1] == pattern[1])
 }
 
 fn find_closing_single(chars: &[char], start: usize, ch: char) -> Option<usize> {
-    for i in start..chars.len() {
-        if chars[i] == ch {
-            return Some(i);
-        }
-    }
-    None
+    chars
+        .iter()
+        .enumerate()
+        .skip(start)
+        .find(|(_, c)| **c == ch)
+        .map(|(i, _)| i)
 }
 
 #[cfg(test)]

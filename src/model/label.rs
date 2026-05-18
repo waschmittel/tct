@@ -22,6 +22,7 @@ impl Label {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum LabelColor {
     Red,
     Orange,
@@ -30,16 +31,12 @@ pub enum LabelColor {
     Blue,
     Purple,
     Pink,
+    #[default]
     Cyan,
     #[serde(rename = "custom")]
     Custom { r: u8, g: u8, b: u8 },
 }
 
-impl Default for LabelColor {
-    fn default() -> Self {
-        Self::Cyan
-    }
-}
 
 impl LabelColor {
     pub fn to_ratatui_color(self) -> Color {

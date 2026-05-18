@@ -87,18 +87,16 @@ fn handle_confirm_archive_list(app: &mut App, key: KeyEvent) -> anyhow::Result<(
 
 fn handle_archived_lists(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
-        KeyCode::Down => {
-            if app.archived_selected < app.archived_lists.len().saturating_sub(1) {
+        KeyCode::Down
+            if app.archived_selected < app.archived_lists.len().saturating_sub(1) => {
                 app.archived_selected += 1;
             }
-        }
-        KeyCode::Up => {
-            if app.archived_selected > 0 {
+        KeyCode::Up
+            if app.archived_selected > 0 => {
                 app.archived_selected -= 1;
             }
-        }
-        KeyCode::Enter => {
-            if app.archived_selected < app.archived_lists.len() {
+        KeyCode::Enter
+            if app.archived_selected < app.archived_lists.len() => {
                 let mut list = app.archived_lists.remove(app.archived_selected);
                 list.archived = false;
                 let name = list.name.clone();
@@ -125,9 +123,8 @@ fn handle_archived_lists(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     app.mode = AppMode::Normal;
                 }
             }
-        }
-        KeyCode::Char('x') => {
-            if app.archived_selected < app.archived_lists.len() {
+        KeyCode::Char('x')
+            if app.archived_selected < app.archived_lists.len() => {
                 let list = app.archived_lists.remove(app.archived_selected);
                 let name = list.name.clone();
                 if let Some(board) = &app.board {
@@ -144,7 +141,6 @@ fn handle_archived_lists(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     app.mode = AppMode::Normal;
                 }
             }
-        }
         KeyCode::Esc => {
             app.archived_lists.clear();
             app.mode = AppMode::Normal;
@@ -181,18 +177,16 @@ fn handle_confirm_archive_board(app: &mut App, key: KeyEvent) -> anyhow::Result<
 
 fn handle_archived_boards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
-        KeyCode::Down => {
-            if app.archived_selected < app.archived_boards.len().saturating_sub(1) {
+        KeyCode::Down
+            if app.archived_selected < app.archived_boards.len().saturating_sub(1) => {
                 app.archived_selected += 1;
             }
-        }
-        KeyCode::Up => {
-            if app.archived_selected > 0 {
+        KeyCode::Up
+            if app.archived_selected > 0 => {
                 app.archived_selected -= 1;
             }
-        }
-        KeyCode::Enter => {
-            if app.archived_selected < app.archived_boards.len() {
+        KeyCode::Enter
+            if app.archived_selected < app.archived_boards.len() => {
                 let id = app.archived_boards[app.archived_selected].id.clone();
                 let name = app.archived_boards[app.archived_selected].name.clone();
                 let mut meta = board_store::load_board(&id)?;
@@ -209,9 +203,8 @@ fn handle_archived_boards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     app.mode = AppMode::BoardSelector;
                 }
             }
-        }
-        KeyCode::Char('x') => {
-            if app.archived_selected < app.archived_boards.len() {
+        KeyCode::Char('x')
+            if app.archived_selected < app.archived_boards.len() => {
                 let id = app.archived_boards[app.archived_selected].id.clone();
                 let name = app.archived_boards[app.archived_selected].name.clone();
                 board_store::delete_board(&id)?;
@@ -224,7 +217,6 @@ fn handle_archived_boards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     app.mode = AppMode::BoardSelector;
                 }
             }
-        }
         KeyCode::Esc => {
             app.archived_boards.clear();
             app.mode = AppMode::BoardSelector;
@@ -237,9 +229,9 @@ fn handle_archived_boards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 fn handle_confirm_archive_card(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if let Some(board) = &mut app.board {
-                if let Some(card_id) = board.current_card_id().cloned() {
-                    if let Some(card) = board.cards.get_mut(&card_id) {
+            if let Some(board) = &mut app.board
+                && let Some(card_id) = board.current_card_id().cloned()
+                    && let Some(card) = board.cards.get_mut(&card_id) {
                         card.archived = true;
                         card.log("Archived");
                         card_store::save_card(&board.meta.id, card)?;
@@ -250,8 +242,6 @@ fn handle_confirm_archive_card(app: &mut App, key: KeyEvent) -> anyhow::Result<(
                         board.clamp_selection();
                         app.set_status("Card archived".into());
                     }
-                }
-            }
             app.mode = AppMode::Normal;
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
@@ -279,18 +269,16 @@ fn handle_confirm_cancel_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()
 
 fn handle_archived_cards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
-        KeyCode::Down => {
-            if app.archived_selected < app.archived_cards.len().saturating_sub(1) {
+        KeyCode::Down
+            if app.archived_selected < app.archived_cards.len().saturating_sub(1) => {
                 app.archived_selected += 1;
             }
-        }
-        KeyCode::Up => {
-            if app.archived_selected > 0 {
+        KeyCode::Up
+            if app.archived_selected > 0 => {
                 app.archived_selected -= 1;
             }
-        }
-        KeyCode::Enter => {
-            if app.archived_selected < app.archived_cards.len() {
+        KeyCode::Enter
+            if app.archived_selected < app.archived_cards.len() => {
                 let mut card = app.archived_cards.remove(app.archived_selected);
                 card.archived = false;
                 card.log("Restored from archive");
@@ -311,9 +299,8 @@ fn handle_archived_cards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     app.mode = AppMode::Normal;
                 }
             }
-        }
-        KeyCode::Char('x') => {
-            if app.archived_selected < app.archived_cards.len() {
+        KeyCode::Char('x')
+            if app.archived_selected < app.archived_cards.len() => {
                 let card = app.archived_cards.remove(app.archived_selected);
                 let title = card.title.clone();
                 if let Some(board) = &app.board {
@@ -327,7 +314,6 @@ fn handle_archived_cards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     app.mode = AppMode::Normal;
                 }
             }
-        }
         KeyCode::Esc => {
             app.archived_cards.clear();
             app.mode = AppMode::Normal;
@@ -356,16 +342,14 @@ fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     }
 
     match key.code {
-        KeyCode::Down => {
-            if app.label_picker_idx < label_count - 1 {
+        KeyCode::Down
+            if app.label_picker_idx < label_count - 1 => {
                 app.label_picker_idx += 1;
             }
-        }
-        KeyCode::Up => {
-            if app.label_picker_idx > 0 {
+        KeyCode::Up
+            if app.label_picker_idx > 0 => {
                 app.label_picker_idx -= 1;
             }
-        }
         KeyCode::Enter | KeyCode::Char(' ') => {
             if let Some(board) = &mut app.board {
                 let label = board
@@ -373,9 +357,9 @@ fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     .labels
                     .get(app.label_picker_idx)
                     .map(|l| (l.id.clone(), l.name.clone()));
-                if let Some((lid, lname)) = label {
-                    if let Some(card_id) = board.current_card_id().cloned() {
-                        if let Some(card) = board.cards.get_mut(&card_id) {
+                if let Some((lid, lname)) = label
+                    && let Some(card_id) = board.current_card_id().cloned()
+                        && let Some(card) = board.cards.get_mut(&card_id) {
                             let action = if let Some(pos) =
                                 card.label_ids.iter().position(|id| *id == lid)
                             {
@@ -388,8 +372,6 @@ fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                             card.log(action);
                             card_store::save_card(&board.meta.id, card)?;
                         }
-                    }
-                }
             }
         }
         KeyCode::Esc => {
@@ -413,16 +395,14 @@ fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 
     match (key.code, shift) {
-        (KeyCode::Down, false) => {
-            if label_count > 0 && app.label_picker_idx < label_count - 1 {
+        (KeyCode::Down, false)
+            if label_count > 0 && app.label_picker_idx < label_count - 1 => {
                 app.label_picker_idx += 1;
             }
-        }
-        (KeyCode::Up, false) => {
-            if app.label_picker_idx > 0 {
+        (KeyCode::Up, false)
+            if app.label_picker_idx > 0 => {
                 app.label_picker_idx -= 1;
             }
-        }
         (KeyCode::Down, true) => {
             if let Some(board) = &mut app.board {
                 let ii = app.label_picker_idx;
@@ -447,30 +427,25 @@ fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             app.start_insert(InsertTarget::NewLabelName);
         }
         (KeyCode::Char('e'), _) => {
-            if label_count > 0 {
-                if let Some(board) = &app.board {
-                    if let Some(label) = board.meta.labels.get(app.label_picker_idx) {
+            if label_count > 0
+                && let Some(board) = &app.board
+                    && let Some(label) = board.meta.labels.get(app.label_picker_idx) {
                         let name = label.name.clone();
                         app.start_insert_with(InsertTarget::EditLabelName, &name);
                     }
-                }
-            }
         }
         (KeyCode::Char('c'), _) => {
-            if label_count > 0 {
-                if let Some(board) = &mut app.board {
-                    if let Some(label) = board.meta.labels.get_mut(app.label_picker_idx) {
+            if label_count > 0
+                && let Some(board) = &mut app.board
+                    && let Some(label) = board.meta.labels.get_mut(app.label_picker_idx) {
                         label.color = label.color.next();
                         board_store::save_board(&board.meta)?;
                     }
-                }
-            }
         }
-        (KeyCode::Char('x'), _) => {
-            if label_count > 0 {
+        (KeyCode::Char('x'), _)
+            if label_count > 0 => {
                 app.mode = AppMode::Dialog(DialogKind::ConfirmDeleteLabel);
             }
-        }
         (KeyCode::Esc, _) => {
             app.mode = AppMode::Normal;
         }
@@ -482,8 +457,8 @@ fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 fn handle_confirm_delete_label(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if let Some(board) = &mut app.board {
-                if app.label_picker_idx < board.meta.labels.len() {
+            if let Some(board) = &mut app.board
+                && app.label_picker_idx < board.meta.labels.len() {
                     let removed_id = board.meta.labels[app.label_picker_idx].id.clone();
                     let label_name = board.meta.labels[app.label_picker_idx].name.clone();
                     board.meta.labels.remove(app.label_picker_idx);
@@ -498,7 +473,6 @@ fn handle_confirm_delete_label(app: &mut App, key: KeyEvent) -> anyhow::Result<(
                     }
                     app.set_status(format!("Label '{label_name}' deleted"));
                 }
-            }
             app.mode = AppMode::Dialog(DialogKind::LabelManager);
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {

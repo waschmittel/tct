@@ -20,18 +20,16 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 
         // Navigation — arrow keys only (no h/j/k/l)
         (KeyCode::Left, false) => {
-            if let Some(board) = &mut app.board {
-                if board.selected_list > 0 {
+            if let Some(board) = &mut app.board
+                && board.selected_list > 0 {
                     board.selected_list -= 1;
                 }
-            }
         }
         (KeyCode::Right, false) => {
-            if let Some(board) = &mut app.board {
-                if board.selected_list < board.lists.len().saturating_sub(1) {
+            if let Some(board) = &mut app.board
+                && board.selected_list < board.lists.len().saturating_sub(1) {
                     board.selected_list += 1;
                 }
-            }
         }
         (KeyCode::Down, false) => {
             if app.search_active {
@@ -93,72 +91,64 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 
         // Enter: open card detail (swapped — was 'e')
         (KeyCode::Enter, _) => {
-            if let Some(board) = &mut app.board {
-                if board.current_card_id().is_some() {
+            if let Some(board) = &mut app.board
+                && board.current_card_id().is_some() {
                     board.detail_item_idx = 0;
                     board.detail_scroll = 0;
                     app.mode = AppMode::CardDetail;
                 }
-            }
         }
 
         (KeyCode::Char('y'), _) => {
-            if let Some(board) = &app.board {
-                if let Some(card) = board.current_card() {
+            if let Some(board) = &app.board
+                && let Some(card) = board.current_card() {
                     let title = card.title.clone();
                     app.copy_to_clipboard(title);
                 }
-            }
         }
 
         // e: edit description (consistent with card detail view)
         (KeyCode::Char('e'), _) => {
-            if let Some(board) = &app.board {
-                if let Some(card) = board.current_card() {
+            if let Some(board) = &app.board
+                && let Some(card) = board.current_card() {
                     let desc = card.description.clone();
                     app.start_description_edit(&desc);
                 }
-            }
         }
 
         // t: edit card title inline (consistent with card detail view)
         (KeyCode::Char('t'), _) => {
-            if let Some(board) = &app.board {
-                if let Some(card) = board.current_card() {
+            if let Some(board) = &app.board
+                && let Some(card) = board.current_card() {
                     let title = card.title.clone();
                     app.start_insert_with(InsertTarget::EditCardTitleInline, &title);
                 }
-            }
         }
 
-        (KeyCode::Char('n'), _) => {
-            if app.board.is_some() {
+        (KeyCode::Char('n'), _)
+            if app.board.is_some() => {
                 app.start_insert(InsertTarget::NewCardTitle);
             }
-        }
-        (KeyCode::Char('N'), _) => {
-            if app.board.is_some() {
+        (KeyCode::Char('N'), _)
+            if app.board.is_some() => {
                 app.start_insert(InsertTarget::NewListName);
             }
-        }
         (KeyCode::Char('r'), _) => {
-            if let Some(board) = &app.board {
-                if let Some(list) = board.lists.get(board.selected_list) {
+            if let Some(board) = &app.board
+                && let Some(list) = board.lists.get(board.selected_list) {
                     let name = list.name.clone();
                     app.start_insert_with(InsertTarget::RenameList, &name);
                 }
-            }
         }
         (KeyCode::Char('D'), _) => {
-            if let Some(board) = &app.board {
-                if !board.lists.is_empty() {
+            if let Some(board) = &app.board
+                && !board.lists.is_empty() {
                     app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveList);
                 }
-            }
         }
         (KeyCode::Char('<'), _) => {
-            if let Some(board) = &mut app.board {
-                if board.selected_list > 0 {
+            if let Some(board) = &mut app.board
+                && board.selected_list > 0 {
                     let i = board.selected_list;
                     board.lists.swap(i, i - 1);
                     board.meta.list_order.swap(i, i - 1);
@@ -167,11 +157,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     board.selected_list -= 1;
                     board_store::save_board(&board.meta)?;
                 }
-            }
         }
         (KeyCode::Char('>'), _) => {
-            if let Some(board) = &mut app.board {
-                if board.selected_list < board.lists.len().saturating_sub(1) {
+            if let Some(board) = &mut app.board
+                && board.selected_list < board.lists.len().saturating_sub(1) {
                     let i = board.selected_list;
                     board.lists.swap(i, i + 1);
                     board.meta.list_order.swap(i, i + 1);
@@ -180,14 +169,12 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     board.selected_list += 1;
                     board_store::save_board(&board.meta)?;
                 }
-            }
         }
         (KeyCode::Char('a'), _) => {
-            if let Some(board) = &app.board {
-                if board.current_card_id().is_some() {
+            if let Some(board) = &app.board
+                && board.current_card_id().is_some() {
                     app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveCard);
                 }
-            }
         }
         (KeyCode::Char('v'), _) => {
             if let Some(board) = &app.board {
@@ -228,42 +215,39 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             app.set_status("Filters cleared".into());
         }
         (KeyCode::Char('l'), _) => {
-            if let Some(board) = &app.board {
-                if board.current_card_id().is_some() {
+            if let Some(board) = &app.board
+                && board.current_card_id().is_some() {
                     app.previous_mode = Some(app.mode.clone());
                     app.label_picker_idx = 0;
                     app.mode = AppMode::Dialog(DialogKind::LabelPicker);
                 }
-            }
         }
         (KeyCode::Char('L'), _) => {
             app.label_picker_idx = 0;
             app.mode = AppMode::Dialog(DialogKind::LabelManager);
         }
         (KeyCode::Char('u'), _) => {
-            if let Some(board) = &app.board {
-                if let Some(card) = board.current_card() {
+            if let Some(board) = &app.board
+                && let Some(card) = board.current_card() {
                     let date_str = card
                         .due_date
                         .map(|d| d.format("%Y-%m-%d").to_string())
                         .unwrap_or_default();
                     app.start_due_date_picker(&date_str);
                 }
-            }
         }
         (KeyCode::Char('h'), _) => {
-            if let Some(board) = &app.board {
-                if board.current_card_id().is_some() {
+            if let Some(board) = &app.board
+                && board.current_card_id().is_some() {
                     app.previous_mode = Some(app.mode.clone());
                     app.history_scroll = 0;
                     app.mode = AppMode::Dialog(DialogKind::CardHistory);
                 }
-            }
         }
         (KeyCode::Char('U'), _) => {
-            if let Some(board) = &mut app.board {
-                if let Some(card_id) = board.current_card_id().cloned() {
-                    if let Some(card) = board.cards.get_mut(&card_id) {
+            if let Some(board) = &mut app.board
+                && let Some(card_id) = board.current_card_id().cloned()
+                    && let Some(card) = board.cards.get_mut(&card_id) {
                         let was_set = card.due_date.is_some();
                         card.due_date = None;
                         if was_set {
@@ -274,8 +258,6 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                         card_store::save_card(&board.meta.id, card)?;
                         app.set_status("Due date cleared".into());
                     }
-                }
-            }
         }
         _ => {}
     }
@@ -289,13 +271,12 @@ fn move_card_down(app: &mut App) -> anyhow::Result<()> {
     };
     let li = board.selected_list;
     let ci = board.selected_card.get(li).copied().unwrap_or(0);
-    if let Some(list) = board.lists.get_mut(li) {
-        if ci < list.card_ids.len().saturating_sub(1) {
+    if let Some(list) = board.lists.get_mut(li)
+        && ci < list.card_ids.len().saturating_sub(1) {
             list.card_ids.swap(ci, ci + 1);
             board.selected_card[li] = ci + 1;
             list_store::save_list(&board.meta.id, list)?;
         }
-    }
     Ok(())
 }
 
@@ -306,13 +287,12 @@ fn move_card_up(app: &mut App) -> anyhow::Result<()> {
     };
     let li = board.selected_list;
     let ci = board.selected_card.get(li).copied().unwrap_or(0);
-    if ci > 0 {
-        if let Some(list) = board.lists.get_mut(li) {
+    if ci > 0
+        && let Some(list) = board.lists.get_mut(li) {
             list.card_ids.swap(ci, ci - 1);
             board.selected_card[li] = ci - 1;
             list_store::save_list(&board.meta.id, list)?;
         }
-    }
     Ok(())
 }
 
@@ -406,11 +386,10 @@ fn next_matching_card(
     for &i in &indices {
         if i > current {
             let card_id = &list.card_ids[i];
-            if let Some(card) = board.cards.get(card_id) {
-                if card.matches_search(query, &board.meta.labels) {
+            if let Some(card) = board.cards.get(card_id)
+                && card.matches_search(query, &board.meta.labels) {
                     return Some(i);
                 }
-            }
         }
     }
     None
@@ -427,11 +406,10 @@ fn prev_matching_card(
     for &i in indices.iter().rev() {
         if i < current {
             let card_id = &list.card_ids[i];
-            if let Some(card) = board.cards.get(card_id) {
-                if card.matches_search(query, &board.meta.labels) {
+            if let Some(card) = board.cards.get(card_id)
+                && card.matches_search(query, &board.meta.labels) {
                     return Some(i);
                 }
-            }
         }
     }
     None

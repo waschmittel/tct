@@ -187,8 +187,8 @@ pub fn render(
     let fitting_from = |start: usize| -> usize {
         let mut h = 0u16;
         let mut count = 0usize;
-        for ci in start..visible_cards.len() {
-            let ch = get_height(visible_cards[ci]);
+        for &card_id in visible_cards.iter().skip(start) {
+            let ch = get_height(card_id);
             if h + ch > inner.height {
                 break;
             }
@@ -229,8 +229,7 @@ pub fn render(
     let mut y_offset = 0u16;
     let mut rendered_count = 0usize;
 
-    for ci in scroll..visible_cards.len() {
-        let card_id = visible_cards[ci];
+    for &card_id in visible_cards.iter().skip(scroll) {
         if let Some(card) = board.cards.get(card_id) {
             let ch = card_height(card, &board.meta.labels, card_inner_width);
             if y_offset + ch > inner.height {

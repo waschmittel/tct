@@ -66,8 +66,8 @@ pub fn render(frame: &mut Frame, app: &App) {
         }
         _ => {
             // If we are in Help, we might still need to render CardDetail as an intermediate layer
-            if let AppMode::Help = app.mode {
-                if matches!(
+            if let AppMode::Help = app.mode
+                && matches!(
                     effective_mode,
                     AppMode::CardDetail
                         | AppMode::Insert(
@@ -80,7 +80,6 @@ pub fn render(frame: &mut Frame, app: &App) {
                 ) {
                     card_detail::render(frame, area, app);
                 }
-            }
         }
     }
 }

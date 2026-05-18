@@ -171,15 +171,14 @@ impl App {
     }
 
     pub fn on_tick(&mut self) {
-        if let Some((_, instant)) = &self.status_message {
-            if instant.elapsed() > Duration::from_secs(3) {
+        if let Some((_, instant)) = &self.status_message
+            && instant.elapsed() > Duration::from_secs(3) {
                 self.status_message = None;
             }
-        }
 
         if self.last_reload.elapsed() >= self.reload_interval && self.should_reload() {
             self.last_reload = Instant::now();
-            let _ = self.try_reload_board();
+            self.try_reload_board();
         }
     }
 
