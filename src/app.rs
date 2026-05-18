@@ -321,6 +321,7 @@ impl App {
         self.description_original = Some(initial.to_string());
         self.description_editor = Some(textarea);
         self.editor_scroll = 0;
+        self.previous_mode = Some(self.mode.clone());
         self.mode = AppMode::Insert(InsertTarget::EditCardDescription);
     }
 

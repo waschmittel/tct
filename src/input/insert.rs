@@ -90,7 +90,7 @@ fn handle_description_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             } else {
                 app.description_editor = None;
                 app.description_original = None;
-                app.mode = AppMode::CardDetail;
+                app.mode = app.previous_mode.take().unwrap_or(AppMode::CardDetail);
             }
         }
         (KeyCode::Char('z'), m) if has_ctrl_or_cmd(m) => {
@@ -205,7 +205,7 @@ fn confirm_description_save(app: &mut App) -> anyhow::Result<()> {
         }
     }
     app.description_original = None;
-    app.mode = AppMode::CardDetail;
+    app.mode = app.previous_mode.take().unwrap_or(AppMode::CardDetail);
     Ok(())
 }
 

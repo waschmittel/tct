@@ -105,7 +105,8 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | Shift+Up/Down | Move card up/down within list |
 | g/G | First/last card |
 | Enter | Open card detail |
-| e | Quick-edit card title |
+| t | Quick-edit card title |
+| e | Edit card description |
 | n | New card |
 | N | New list |
 | r | Rename list |

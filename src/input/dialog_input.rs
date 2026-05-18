@@ -194,7 +194,7 @@ fn handle_confirm_cancel_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()
         KeyCode::Char('y') | KeyCode::Char('Y') => {
             app.description_editor = None;
             app.description_original = None;
-            app.mode = AppMode::CardDetail;
+            app.mode = app.previous_mode.take().unwrap_or(AppMode::CardDetail);
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
             app.mode = AppMode::Insert(InsertTarget::EditCardDescription);

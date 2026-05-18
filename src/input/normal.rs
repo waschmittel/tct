@@ -109,8 +109,18 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
 
-        // e: quick-edit card title inline (swapped — was Enter)
+        // e: edit description (consistent with card detail view)
         (KeyCode::Char('e'), _) => {
+            if let Some(board) = &app.board {
+                if let Some(card) = board.current_card() {
+                    let desc = card.description.clone();
+                    app.start_description_edit(&desc);
+                }
+            }
+        }
+
+        // t: edit card title inline (consistent with card detail view)
+        (KeyCode::Char('t'), _) => {
             if let Some(board) = &app.board {
                 if let Some(card) = board.current_card() {
                     let title = card.title.clone();
@@ -794,6 +804,47 @@ mod tests {
     fn next_matching_card_helper_returns_none_for_no_match() {
         let board = loaded_board(vec![fixed_card("c1", "alpha")]);
         assert!(next_matching_card(&board, 0, 0, "zzz").is_none());
+    }
+
+    #[test]
+    fn t_starts_inline_title_edit() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            handle(&mut app, key(KeyCode::Char('t'))).unwrap();
+            assert!(matches!(
+                app.mode,
+                AppMode::Insert(InsertTarget::EditCardTitleInline)
+            ));
+            // Title pre-filled
+            assert_eq!(app.input_buffer, a_cards[0].title);
+            // Return path: previous_mode set to Normal
+            assert_eq!(app.previous_mode, Some(AppMode::Normal));
+        });
+    }
+
+    #[test]
+    fn e_starts_description_edit() {
+        with_temp_dir(|| {
+            let (mut app, meta, a_cards, _) = fixture();
+            // Pre-populate description on selected card
+            let cid = a_cards[0].id.clone();
+            {
+                let board = app.board.as_mut().unwrap();
+                let card = board.cards.get_mut(&cid).unwrap();
+                card.description = "hello desc".into();
+                card_store::save_card(&meta.id, card).unwrap();
+            }
+            handle(&mut app, key(KeyCode::Char('e'))).unwrap();
+            assert!(matches!(
+                app.mode,
+                AppMode::Insert(InsertTarget::EditCardDescription)
+            ));
+            // Description editor active with initial content
+            let editor = app.description_editor.as_ref().expect("editor active");
+            assert_eq!(editor.lines().join("\n"), "hello desc");
+            // Return path: previous_mode set to Normal
+            assert_eq!(app.previous_mode, Some(AppMode::Normal));
+        });
     }
 
     #[test]
