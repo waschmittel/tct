@@ -86,25 +86,20 @@ pub fn render(frame: &mut Frame, app: &App) {
 }
 
 fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
-    use ratatui::style::{Color, Style};
+    use ratatui::layout::{Constraint, Layout};
+    use ratatui::style::{Color, Modifier, Style};
     use ratatui::text::{Line, Span};
     use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
-    let width = 60u16.min(area.width.saturating_sub(4));
-    let height = 30u16.min(area.height.saturating_sub(4));
+    let accent = app.accent_color();
+
+    let width = 90u16.min(area.width.saturating_sub(4)).max(40);
+    let height = 32u16.min(area.height.saturating_sub(4)).max(10);
     let x = (area.width.saturating_sub(width)) / 2;
     let y = (area.height.saturating_sub(height)) / 2;
     let popup = ratatui::layout::Rect::new(x, y, width, height);
 
     frame.render_widget(Clear, popup);
-    let block = Block::default()
-        .title(" Help (Esc to close) ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
-
-    let mut help_text = Vec::new();
 
     let effective_mode = app.previous_mode.as_ref().unwrap_or(&app.mode);
 
@@ -117,20 +112,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
     );
 
-    if is_board_selector_base {
-        help_text.extend(vec![
-            Line::from(Span::styled("Board Selector", Style::default().fg(Color::Cyan))),
-            Line::raw("  Up/Down        Navigate boards"),
-            Line::raw("  Shift+Up/Down  Reorder board up/down"),
-            Line::raw("  Enter          Open board"),
-            Line::raw("  n              New board"),
-            Line::raw("  r              Rename board"),
-            Line::raw("  c              Cycle board accent color"),
-            Line::raw("  d              Archive board"),
-            Line::raw("  v              View archived boards"),
-            Line::raw("  q              Quit"),
-        ]);
-    } else if matches!(
+    let is_card_detail = matches!(
         effective_mode,
         AppMode::CardDetail
             | AppMode::Insert(
@@ -140,79 +122,188 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                     | InsertTarget::EditChecklistItem
                     | InsertTarget::EditDueDate
             )
-    ) {
-        help_text.extend(vec![
-            Line::from(Span::styled("Card Detail", Style::default().fg(Color::Cyan))),
-            Line::raw("  t              Edit title"),
-            Line::raw("  e              Edit description"),
-            Line::raw("  y              Copy description"),
-            Line::raw("  Y              Copy checklist as markdown"),
-            Line::raw("  Up/Down        Navigate checklist items"),
-            Line::raw("  Shift+Up/Down  Reorder checklist item"),
-            Line::raw("  Space          Toggle checklist item"),
-            Line::raw("  a              Add checklist item"),
-            Line::raw("  Enter          Edit checklist item"),
-            Line::raw("  x              Delete checklist item"),
-            Line::raw("  l              Assign/remove labels"),
-            Line::raw("  L              Manage labels"),
-            Line::raw("  u              Set due date"),
-            Line::raw("  U              Clear due date"),
-            Line::raw("  Esc            Close"),
-            Line::raw("  q              Quit"),
-        ]);
+    );
 
-        if matches!(effective_mode, AppMode::Insert(InsertTarget::EditCardDescription)) {
-            help_text.extend(vec![
-                Line::raw(""),
-                Line::from(Span::styled("Description Editor", Style::default().fg(Color::Cyan))),
-                Line::raw("  Ctrl+S     Save"),
-                Line::raw("  Ctrl+Z/Y   Undo/redo"),
-                Line::raw("  Ctrl+B     Bold (**text**)"),
-                Line::raw("  Ctrl+I     Italic (*text*)"),
-                Line::raw("  Ctrl+K     Code (`text`)"),
-                Line::raw("  Ctrl+L     List item (- )"),
-                Line::raw("  Up/Down    Move by visual (wrapped) line"),
-                Line::raw("  Enter      Auto-continue lists (plain newline at start of doc)"),
-                Line::raw("  Tab        Nest list item (numbered restart at 1)"),
-                Line::raw("  Shift+Tab  Un-nest list item"),
-                Line::raw("  Esc        Cancel"),
-            ]);
-        }
+    let is_editing_desc = matches!(
+        effective_mode,
+        AppMode::Insert(InsertTarget::EditCardDescription)
+    );
+
+    let title = if is_editing_desc {
+        " Help — Description Editor "
+    } else if is_card_detail {
+        " Help — Card Detail "
+    } else if is_board_selector_base {
+        " Help — Board Selector "
     } else {
-        // Default to Board View help
-        help_text.extend(vec![
-            Line::from(Span::styled("Board View", Style::default().fg(Color::Cyan))),
-            Line::raw("  Left/Right         Switch lists"),
-            Line::raw("  Up/Down            Navigate cards"),
-            Line::raw("  Shift+Left/Right   Move card to adjacent list"),
-            Line::raw("  Shift+Up/Down      Move card up/down within list"),
-            Line::raw("  g/G                First/last card"),
-            Line::raw("  Enter              Open card detail"),
-            Line::raw("  t                  Quick-edit card title inline"),
-            Line::raw("  e                  Edit card description"),
-            Line::raw("  y                  Copy card title"),
-            Line::raw("  n                  New card"),
-            Line::raw("  N                  New list"),
-            Line::raw("  r                  Rename list"),
-            Line::raw("  d                  Delete card"),
-            Line::raw("  D                  Delete list"),
-            Line::raw("  a                  Archive card"),
-            Line::raw("  v                  View archived cards"),
-            Line::raw("  </>                Reorder list left/right"),
-            Line::raw("  /                  Search"),
-            Line::raw("  f                  Filter by label"),
-            Line::raw("  F                  Clear all filters"),
-            Line::raw("  l                  Assign/remove labels"),
-            Line::raw("  L                  Manage labels"),
-            Line::raw("  u                  Set due date"),
-            Line::raw("  U                  Clear due date"),
-            Line::raw("  b                  Back to board selector"),
-            Line::raw("  q                  Quit"),
-        ]);
-    }
+        " Help — Board View "
+    };
 
-    let paragraph = Paragraph::new(help_text).wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, inner);
+    let block = Block::default()
+        .title(title)
+        .title_bottom(Line::from(Span::styled(
+            " Esc:close ",
+            Style::default().fg(Color::DarkGray),
+        )))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(accent));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let columns = Layout::horizontal([
+        Constraint::Percentage(50),
+        Constraint::Percentage(50),
+    ])
+    .spacing(2)
+    .split(inner);
+
+    let header = |s: &str| -> Line<'static> {
+        Line::from(Span::styled(
+            s.to_string(),
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        ))
+    };
+    let row = |key: &str, action: &str| -> Line<'static> {
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(
+                format!("{:<16}", key),
+                Style::default().fg(Color::Yellow),
+            ),
+            Span::raw(action.to_string()),
+        ])
+    };
+
+    let (left, right): (Vec<Line>, Vec<Line>) = if is_editing_desc {
+        (
+            vec![
+                header("File"),
+                row("Ctrl+S", "Save"),
+                row("Esc", "Cancel"),
+                row("Ctrl+Z / Ctrl+Y", "Undo / redo"),
+                Line::raw(""),
+                header("Format"),
+                row("Ctrl+B", "Bold (**text**)"),
+                row("Ctrl+I", "Italic (*text*)"),
+                row("Ctrl+K", "Inline code (`text`)"),
+                row("Ctrl+L", "Insert list item (- )"),
+            ],
+            vec![
+                header("Lists"),
+                row("Enter", "Auto-continue list"),
+                row("Tab", "Nest item"),
+                row("Shift+Tab", "Un-nest item"),
+                Line::raw(""),
+                header("Navigation"),
+                row("Up / Down", "Move by visual line"),
+            ],
+        )
+    } else if is_card_detail {
+        (
+            vec![
+                header("Card"),
+                row("t", "Edit title"),
+                row("e", "Edit description"),
+                row("y", "Copy description"),
+                row("Y", "Copy checklist (md)"),
+                Line::raw(""),
+                header("Checklist"),
+                row("Up / Down", "Navigate items"),
+                row("Shift+Up/Down", "Reorder item"),
+                row("Space", "Toggle item"),
+                row("a", "Add item"),
+                row("Enter", "Edit item"),
+                row("x", "Delete item"),
+            ],
+            vec![
+                header("Labels & Due"),
+                row("l", "Assign / remove labels"),
+                row("L", "Manage labels"),
+                row("u", "Set due date"),
+                row("U", "Clear due date"),
+                Line::raw(""),
+                header("App"),
+                row("Esc", "Close"),
+                row("q", "Quit"),
+            ],
+        )
+    } else if is_board_selector_base {
+        (
+            vec![
+                header("Navigation"),
+                row("Up / Down", "Navigate boards"),
+                row("Shift+Up/Down", "Reorder board"),
+                row("Enter", "Open board"),
+            ],
+            vec![
+                header("Actions"),
+                row("n", "New board"),
+                row("r", "Rename board"),
+                row("c", "Cycle accent color"),
+                row("d", "Archive board"),
+                row("v", "View archived"),
+                Line::raw(""),
+                header("App"),
+                row("?", "Help"),
+                row("q", "Quit"),
+            ],
+        )
+    } else {
+        (
+            vec![
+                header("Navigation"),
+                row("Left / Right", "Switch lists"),
+                row("Up / Down", "Navigate cards"),
+                row("g / G", "First / last card"),
+                row("Enter", "Open card detail"),
+                Line::raw(""),
+                header("Card"),
+                row("t", "Quick-edit title"),
+                row("e", "Edit description"),
+                row("y", "Copy title"),
+                row("n", "New card"),
+                row("d", "Delete card"),
+                row("a", "Archive card"),
+                row("v", "View archived"),
+                Line::raw(""),
+                header("Move"),
+                row("Shift+Left/Right", "Move to adjacent list"),
+                row("Shift+Up/Down", "Move within list"),
+            ],
+            vec![
+                header("Lists"),
+                row("N", "New list"),
+                row("r", "Rename list"),
+                row("D", "Delete list"),
+                row("< / >", "Reorder list"),
+                Line::raw(""),
+                header("Search & Filter"),
+                row("/", "Search"),
+                row("f", "Filter by label"),
+                row("F", "Clear filters"),
+                Line::raw(""),
+                header("Labels & Due"),
+                row("l", "Assign / remove labels"),
+                row("L", "Manage labels"),
+                row("u", "Set due date"),
+                row("U", "Clear due date"),
+                Line::raw(""),
+                header("App"),
+                row("b", "Back to selector"),
+                row("?", "Help"),
+                row("q", "Quit"),
+            ],
+        )
+    };
+
+    frame.render_widget(
+        Paragraph::new(left).wrap(Wrap { trim: false }),
+        columns[0],
+    );
+    frame.render_widget(
+        Paragraph::new(right).wrap(Wrap { trim: false }),
+        columns[1],
+    );
 }
 
 #[cfg(test)]

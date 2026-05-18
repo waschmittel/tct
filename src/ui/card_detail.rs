@@ -37,32 +37,14 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled(" Ctrl+S", Style::default().fg(Color::Yellow)),
             Span::raw(":save  "),
             Span::styled("Esc", Style::default().fg(accent)),
-            Span::raw(":cancel  "),
-            Span::styled("Ctrl+B/I/K", Style::default().fg(accent)),
-            Span::raw(":format  "),
-            Span::styled("Ctrl+L", Style::default().fg(accent)),
-            Span::raw(":list "),
+            Span::raw(":cancel "),
         ]
     } else {
         vec![
-            Span::styled(" Esc", Style::default().fg(accent)),
-            Span::raw(":close  "),
-            Span::styled("t", Style::default().fg(accent)),
-            Span::raw(":title  "),
-            Span::styled("e", Style::default().fg(accent)),
-            Span::raw(":desc  "),
-            Span::styled("y/Y", Style::default().fg(accent)),
-            Span::raw(":copy desc/list  "),
-            Span::styled("u/U", Style::default().fg(accent)),
-            Span::raw(":due/clear  "),
-            Span::styled("l", Style::default().fg(accent)),
-            Span::raw(":labels  "),
-            Span::styled("a", Style::default().fg(accent)),
-            Span::raw(":add  "),
-            Span::styled("S+↑/↓", Style::default().fg(accent)),
-            Span::raw(":reorder  "),
-            Span::styled("Space", Style::default().fg(accent)),
-            Span::raw(":toggle "),
+            Span::styled(" ?", Style::default().fg(accent)),
+            Span::raw(":help  "),
+            Span::styled("Esc", Style::default().fg(accent)),
+            Span::raw(":close "),
         ]
     };
 
