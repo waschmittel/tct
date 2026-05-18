@@ -54,6 +54,7 @@ impl Card {
         let q = query.to_lowercase();
         self.title.to_lowercase().contains(&q)
             || self.description.to_lowercase().contains(&q)
+            || self.checklist.iter().any(|item| item.text.to_lowercase().contains(&q))
             || self.label_ids.iter().any(|lid| {
                 board_labels
                     .iter()
@@ -128,6 +129,15 @@ mod tests {
         assert!(card.matches_search("login", &[]));
         assert!(card.matches_search("LOGIN", &[]));
         assert!(!card.matches_search("signup", &[]));
+    }
+
+    #[test]
+    fn search_matches_checklist() {
+        let mut card = Card::new("Task".into());
+        card.checklist.push(ChecklistItem { text: "Deploy to staging".into(), completed: false });
+        assert!(card.matches_search("deploy", &[]));
+        assert!(card.matches_search("DEPLOY", &[]));
+        assert!(!card.matches_search("production", &[]));
     }
 
     #[test]

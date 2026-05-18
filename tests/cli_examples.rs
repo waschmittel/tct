@@ -324,6 +324,82 @@ fn ambiguous_and_missing_name_errors() {
     assert!(e.contains("No active board matches 'Zeta'"), "{e}");
 }
 
+// ── Checklist error-path tests ────────────────────────────────────────────────
+
+#[test]
+fn checklist_toggle_index_zero_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "My card"]);
+    ok(&tmp, &["checklist", "Proj", "My card", "--add", "item"]);
+
+    let e = fail(&tmp, &["checklist", "Proj", "My card", "--toggle", "0"]);
+    assert!(e.contains("Index must be >= 1"), "{e}");
+}
+
+#[test]
+fn checklist_toggle_out_of_range_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "My card"]);
+    ok(&tmp, &["checklist", "Proj", "My card", "--add", "only item"]);
+
+    let e = fail(&tmp, &["checklist", "Proj", "My card", "--toggle", "99"]);
+    assert!(e.contains("out of range"), "{e}");
+}
+
+#[test]
+fn checklist_delete_index_zero_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "My card"]);
+    ok(&tmp, &["checklist", "Proj", "My card", "--add", "item"]);
+
+    let e = fail(&tmp, &["checklist", "Proj", "My card", "--delete", "0"]);
+    assert!(e.contains("Index must be >= 1"), "{e}");
+}
+
+#[test]
+fn cards_edit_no_fields_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "My card"]);
+
+    let e = fail(&tmp, &["cards", "Proj", "--edit", "My card"]);
+    assert!(e.contains("--title") || e.contains("--description") || e.contains("--due"), "{e}");
+}
+
+#[test]
+fn labels_assign_duplicate_is_idempotent() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "My card"]);
+    ok(&tmp, &["labels", "Proj", "--create", "bug"]);
+    ok(&tmp, &["labels", "Proj", "--assign", "My card", "bug"]);
+
+    // Second assign should succeed (idempotent) and say "already assigned"
+    let out = ok(&tmp, &["labels", "Proj", "--assign", "My card", "bug"]);
+    assert!(out.contains("already assigned"), "{out}");
+}
+
+#[test]
+fn labels_remove_not_assigned_is_ok() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "My card"]);
+    ok(&tmp, &["labels", "Proj", "--create", "bug"]);
+
+    // Remove label that was never assigned — should succeed with info message
+    let out = ok(&tmp, &["labels", "Proj", "--remove", "My card", "bug"]);
+    assert!(out.contains("not assigned"), "{out}");
+}
+
 // ── Local .tct discovery test ─────────────────────────────────────────────────
 
 #[test]
