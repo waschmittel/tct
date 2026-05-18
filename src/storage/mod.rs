@@ -29,3 +29,43 @@ fn atomic_write(path: &Path, contents: &[u8]) -> io::Result<()> {
     fs::rename(&tmp, path)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn atomic_write_creates_file() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("data.json");
+        atomic_write(&target, b"hello").unwrap();
+        assert_eq!(fs::read_to_string(&target).unwrap(), "hello");
+    }
+
+    #[test]
+    fn atomic_write_overwrites_existing() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("data.json");
+        fs::write(&target, "old").unwrap();
+        atomic_write(&target, b"new").unwrap();
+        assert_eq!(fs::read_to_string(&target).unwrap(), "new");
+    }
+
+    #[test]
+    fn atomic_write_no_tmp_orphan_on_success() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("file.json");
+        atomic_write(&target, b"x").unwrap();
+        let tmp = target.with_extension("tmp");
+        assert!(!tmp.exists(), "tmp file should not remain after success");
+    }
+
+    #[test]
+    fn atomic_write_fails_on_missing_parent() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("missing_subdir/data.json");
+        let err = atomic_write(&target, b"x");
+        assert!(err.is_err());
+    }
+}

@@ -555,6 +555,118 @@ mod tests {
     }
 
     #[test]
+    fn test_highlight_lines_empty_input() {
+        let lines = highlight_lines("", Color::Cyan);
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn test_highlight_line_empty_string() {
+        let spans = highlight_line("", Color::Cyan);
+        assert!(spans.is_empty());
+    }
+
+    #[test]
+    fn test_wrap_spans_empty() {
+        let lines = wrap_spans(vec![], 80);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].spans.is_empty());
+    }
+
+    #[test]
+    fn test_wrap_long_no_space_word() {
+        // 200-char word, no spaces — must hard-wrap
+        let text: String = std::iter::repeat('x').take(200).collect();
+        let lines = wrap_spans(vec![Span::raw(text)], 80);
+        assert!(lines.len() >= 3);
+        for line in &lines {
+            let len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+            assert!(len <= 80, "line length {len} exceeds 80");
+        }
+    }
+
+    #[test]
+    fn test_wrap_spans_emoji_no_panic() {
+        // Multi-byte emoji at wrap boundary
+        let text = "😀 ".repeat(40);
+        wrap_spans(vec![Span::raw(text)], 10);
+    }
+
+    #[test]
+    fn test_wrap_spans_combining_chars_no_panic() {
+        // Combining diacritic
+        let text = "é\u{0301}".repeat(20); // many combining marks
+        wrap_spans(vec![Span::raw(text)], 5);
+    }
+
+    #[test]
+    fn test_source_to_visual_eol_boundary() {
+        // "aaaa bbbb" wrapped at 4 → "aaaa" + "bbbb"
+        let lines = vec!["aaaa bbbb".to_string()];
+        let map = build_visual_map(&lines, Color::Cyan, 4);
+        // Cursor at col 4 (end of first word, before space) — should land on row 0 col 4
+        let (vrow, _vcol) = source_to_visual(&map, 0, 4);
+        assert!(vrow <= 1);
+    }
+
+    #[test]
+    fn test_build_visual_map_empty_lines() {
+        let lines: Vec<String> = vec![];
+        let map = build_visual_map(&lines, Color::Cyan, 80);
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn test_build_visual_map_blank_line() {
+        let lines = vec!["".to_string()];
+        let map = build_visual_map(&lines, Color::Cyan, 80);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map[0].0, 0);
+    }
+
+    #[test]
+    fn test_highlight_lines_nested_backtick_in_text() {
+        // ` inside text, not a fence — should not crash
+        let lines = highlight_lines("inline `code` and **bold**", Color::Cyan);
+        assert!(!lines.is_empty());
+    }
+
+    #[test]
+    fn test_highlight_lines_code_block_with_inline_markers() {
+        // Inside a code block, ** should not be interpreted as bold
+        let lines = highlight_lines("```\n**not bold**\n```", Color::Cyan);
+        assert_eq!(lines.len(), 3);
+        // Middle line should be styled as code (green)
+        let middle_style = lines[1].spans[0].style;
+        assert_eq!(middle_style.fg, Some(Color::Green));
+    }
+
+    #[test]
+    fn test_highlight_lines_unterminated_code_block() {
+        // Opening ``` with no close — all subsequent lines styled as code
+        let lines = highlight_lines("```\ncode line\nstill code", Color::Cyan);
+        assert_eq!(lines.len(), 3);
+    }
+
+    #[test]
+    fn test_highlight_line_unclosed_bold() {
+        // ** with no closing — should not crash, render as literal
+        let spans = highlight_line("this is **unclosed", Color::Cyan);
+        assert!(!spans.is_empty());
+    }
+
+    #[test]
+    fn test_wrap_spans_unicode_text_within_budget() {
+        // CJK chars count as 1 char each; should not overflow
+        let text = "你好世界".repeat(5); // 20 chars
+        let lines = wrap_spans(vec![Span::raw(text)], 10);
+        for line in &lines {
+            let len: usize = line.spans.iter().map(|s| s.content.chars().count()).sum();
+            assert!(len <= 10);
+        }
+    }
+
+    #[test]
     fn test_list_indentation_wrapping() {
         let text = "- This is a very long list item that should be wrapped and indented correctly.";
         let accent = Color::Cyan;

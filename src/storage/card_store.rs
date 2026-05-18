@@ -138,6 +138,85 @@ mod tests {
     }
 
     #[test]
+    fn load_missing_card_returns_not_found() {
+        with_temp_dir(|| {
+            let board = make_board();
+            let err = load_card(&board.id, "doesnotxx").unwrap_err();
+            assert!(matches!(err, StorageError::CardNotFound(_)));
+        });
+    }
+
+    #[test]
+    fn load_corrupt_json_returns_error() {
+        with_temp_dir(|| {
+            let board = make_board();
+            let path = paths::card_path(&board.id, "bad12345");
+            std::fs::write(&path, "{ not valid json").unwrap();
+            let err = load_card(&board.id, "bad12345").unwrap_err();
+            assert!(matches!(err, StorageError::Json(_)));
+        });
+    }
+
+    #[test]
+    fn save_then_load_preserves_all_fields() {
+        with_temp_dir(|| {
+            let board = make_board();
+            let mut card = Card::new("Roundtrip".into());
+            card.description = "desc".into();
+            card.due_date = Some(chrono::NaiveDate::from_ymd_opt(2030, 1, 15).unwrap());
+            card.checklist.push(crate::model::card::ChecklistItem {
+                text: "step".into(),
+                completed: true,
+            });
+            save_card(&board.id, &card).unwrap();
+            let loaded = load_card(&board.id, &card.id).unwrap();
+            assert_eq!(loaded.title, card.title);
+            assert_eq!(loaded.description, card.description);
+            assert_eq!(loaded.due_date, card.due_date);
+            assert_eq!(loaded.checklist.len(), 1);
+            assert!(loaded.checklist[0].completed);
+        });
+    }
+
+    #[test]
+    fn delete_missing_card_is_ok() {
+        with_temp_dir(|| {
+            let board = make_board();
+            // No card exists; delete should not error
+            delete_card(&board.id, "nonexist").unwrap();
+        });
+    }
+
+    #[test]
+    fn save_overwrites_existing_card() {
+        with_temp_dir(|| {
+            let board = make_board();
+            let mut card = Card::new("First".into());
+            save_card(&board.id, &card).unwrap();
+            card.title = "Second".into();
+            save_card(&board.id, &card).unwrap();
+            let loaded = load_card(&board.id, &card.id).unwrap();
+            assert_eq!(loaded.title, "Second");
+        });
+    }
+
+    #[test]
+    fn list_archived_cards_filters() {
+        with_temp_dir(|| {
+            let board = make_board();
+            let active = Card::new("Active".into());
+            let mut archived = Card::new("Archived".into());
+            archived.archived = true;
+            save_card(&board.id, &active).unwrap();
+            save_card(&board.id, &archived).unwrap();
+
+            let list = list_archived_cards(&board.id);
+            assert_eq!(list.len(), 1);
+            assert_eq!(list[0].title, "Archived");
+        });
+    }
+
+    #[test]
     fn migration_old_labels_format() {
         with_temp_dir(|| {
             let board = make_board();

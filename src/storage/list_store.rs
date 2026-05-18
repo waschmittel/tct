@@ -36,3 +36,99 @@ pub fn load_all_lists(board_id: &str, list_order: &[ShortId]) -> Result<Vec<Card
     }
     Ok(lists)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::board_store;
+    use std::env;
+
+    fn with_temp_dir<F: FnOnce()>(f: F) {
+        let dir = tempfile::tempdir().unwrap();
+        unsafe { env::set_var("TCT_DATA_DIR", dir.path()) };
+        board_store::ensure_base_dirs().unwrap();
+        f();
+        unsafe { env::remove_var("TCT_DATA_DIR") };
+    }
+
+    #[test]
+    fn save_load_roundtrip() {
+        with_temp_dir(|| {
+            let board = board_store::create_board("Board".into()).unwrap();
+            let list = CardList::new("Backlog".into());
+            save_list(&board.id, &list).unwrap();
+            let loaded = load_list(&board.id, &list.id).unwrap();
+            assert_eq!(loaded.name, "Backlog");
+            assert!(loaded.card_ids.is_empty());
+        });
+    }
+
+    #[test]
+    fn load_missing_list_returns_not_found() {
+        with_temp_dir(|| {
+            let board = board_store::create_board("Board".into()).unwrap();
+            let err = load_list(&board.id, "missing1").unwrap_err();
+            assert!(matches!(err, StorageError::ListNotFound(_)));
+        });
+    }
+
+    #[test]
+    fn load_corrupt_list_returns_json_error() {
+        with_temp_dir(|| {
+            let board = board_store::create_board("Board".into()).unwrap();
+            let path = paths::list_path(&board.id, "broken12");
+            std::fs::write(&path, "not json").unwrap();
+            let err = load_list(&board.id, "broken12").unwrap_err();
+            assert!(matches!(err, StorageError::Json(_)));
+        });
+    }
+
+    #[test]
+    fn delete_list_file_removes_it() {
+        with_temp_dir(|| {
+            let board = board_store::create_board("Board".into()).unwrap();
+            let list = CardList::new("Tmp".into());
+            save_list(&board.id, &list).unwrap();
+            assert!(paths::list_path(&board.id, &list.id).exists());
+            delete_list_file(&board.id, &list.id).unwrap();
+            assert!(!paths::list_path(&board.id, &list.id).exists());
+        });
+    }
+
+    #[test]
+    fn delete_missing_list_is_ok() {
+        with_temp_dir(|| {
+            let board = board_store::create_board("Board".into()).unwrap();
+            delete_list_file(&board.id, "nope1234").unwrap();
+        });
+    }
+
+    #[test]
+    fn load_all_lists_preserves_order() {
+        with_temp_dir(|| {
+            let board = board_store::create_board("Board".into()).unwrap();
+            let a = CardList::new("A".into());
+            let b = CardList::new("B".into());
+            let c = CardList::new("C".into());
+            save_list(&board.id, &a).unwrap();
+            save_list(&board.id, &b).unwrap();
+            save_list(&board.id, &c).unwrap();
+            // Request order: C, A, B
+            let order = vec![c.id.clone(), a.id.clone(), b.id.clone()];
+            let loaded = load_all_lists(&board.id, &order).unwrap();
+            assert_eq!(loaded[0].name, "C");
+            assert_eq!(loaded[1].name, "A");
+            assert_eq!(loaded[2].name, "B");
+        });
+    }
+
+    #[test]
+    fn load_all_lists_errors_on_missing_id() {
+        with_temp_dir(|| {
+            let board = board_store::create_board("Board".into()).unwrap();
+            let order = vec!["doesnotxx".to_string()];
+            let err = load_all_lists(&board.id, &order).unwrap_err();
+            assert!(matches!(err, StorageError::ListNotFound(_)));
+        });
+    }
+}

@@ -167,6 +167,60 @@ mod tests {
     }
 
     #[test]
+    fn touch_advances_updated_at() {
+        let mut card = Card::new("Task".into());
+        let original = card.updated_at;
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        card.touch();
+        assert!(card.updated_at > original);
+    }
+
+    #[test]
+    fn checklist_progress_all_done() {
+        let mut card = Card::new("Test".into());
+        card.checklist = vec![
+            ChecklistItem { text: "A".into(), completed: true },
+            ChecklistItem { text: "B".into(), completed: true },
+        ];
+        assert_eq!(card.checklist_progress(), Some((2, 2)));
+    }
+
+    #[test]
+    fn checklist_progress_none_done() {
+        let mut card = Card::new("Test".into());
+        card.checklist = vec![
+            ChecklistItem { text: "A".into(), completed: false },
+            ChecklistItem { text: "B".into(), completed: false },
+        ];
+        assert_eq!(card.checklist_progress(), Some((0, 2)));
+    }
+
+    #[test]
+    fn archive_round_trip() {
+        let mut card = Card::new("Task".into());
+        assert!(!card.archived);
+        card.archived = true;
+        assert!(card.archived);
+        card.archived = false;
+        assert!(!card.archived);
+    }
+
+    #[test]
+    fn search_empty_query_matches_everything() {
+        let card = Card::new("Anything".into());
+        assert!(card.matches_search("", &[]));
+    }
+
+    #[test]
+    fn search_matches_description() {
+        let mut card = Card::new("Title".into());
+        card.description = "Auth token expires".into();
+        assert!(card.matches_search("auth", &[]));
+        assert!(card.matches_search("EXPIRES", &[]));
+        assert!(!card.matches_search("nothing", &[]));
+    }
+
+    #[test]
     fn resolved_labels_reflect_reorder() {
         let l1 = Label::new("first".into(), LabelColor::Red);
         let l2 = Label::new("second".into(), LabelColor::Green);

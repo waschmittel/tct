@@ -225,4 +225,70 @@ mod tests {
         assert_eq!(c.to_ratatui_color(), Color::Rgb(r, g, b));
     }
 
+    #[test]
+    fn custom_color_serde_roundtrip() {
+        let c = LabelColor::Custom { r: 12, g: 34, b: 250 };
+        let json = serde_json::to_string(&c).unwrap();
+        let back: LabelColor = serde_json::from_str(&json).unwrap();
+        assert_eq!(c, back);
+    }
+
+    #[test]
+    fn named_color_serde_roundtrip() {
+        for c in [
+            LabelColor::Red, LabelColor::Orange, LabelColor::Yellow,
+            LabelColor::Green, LabelColor::Blue, LabelColor::Purple,
+            LabelColor::Pink, LabelColor::Cyan,
+        ] {
+            let json = serde_json::to_string(&c).unwrap();
+            let back: LabelColor = serde_json::from_str(&json).unwrap();
+            assert_eq!(c, back);
+        }
+    }
+
+    #[test]
+    fn named_color_serializes_snake_case() {
+        let json = serde_json::to_string(&LabelColor::Red).unwrap();
+        assert_eq!(json, "\"red\"");
+        let json = serde_json::to_string(&LabelColor::Cyan).unwrap();
+        assert_eq!(json, "\"cyan\"");
+    }
+
+    #[test]
+    fn default_is_cyan() {
+        assert_eq!(LabelColor::default(), LabelColor::Cyan);
+    }
+
+    #[test]
+    fn pastel_collision_avoids_existing_customs() {
+        // Pre-existing custom colors at fixed hues
+        let existing = vec![
+            LabelColor::Custom { r: 255, g: 100, b: 100 }, // reddish
+            LabelColor::Custom { r: 100, g: 255, b: 100 }, // greenish
+            LabelColor::Custom { r: 100, g: 100, b: 255 }, // bluish
+        ];
+        let new = LabelColor::generate_pastel(&existing);
+        let new_h = match new {
+            LabelColor::Custom { r, g, b } => rgb_to_hsl(r, g, b).0,
+            _ => unreachable!(),
+        };
+        // New hue must be at least some distance from each existing hue
+        for e in &existing {
+            let eh = e.hue();
+            let diff = (new_h - eh).abs();
+            let diff = diff.min(360.0 - diff);
+            assert!(diff > 30.0, "new hue {new_h} too close to existing {eh}");
+        }
+    }
+
+    #[test]
+    fn pastel_seven_existing_returns_distinct() {
+        let existing = vec![
+            LabelColor::Red, LabelColor::Orange, LabelColor::Yellow,
+            LabelColor::Green, LabelColor::Blue, LabelColor::Purple,
+            LabelColor::Pink,
+        ];
+        let new = LabelColor::generate_pastel(&existing);
+        assert!(matches!(new, LabelColor::Custom { .. }));
+    }
 }

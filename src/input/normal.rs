@@ -405,3 +405,437 @@ fn prev_matching_card(
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::{App, LoadedBoard};
+    use crate::model::board::BoardMeta;
+    use crate::model::card::Card;
+    use crate::model::list::CardList;
+    use crate::storage::{board_store, card_store, list_store};
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+    use std::env;
+
+    fn with_temp_dir<F: FnOnce()>(f: F) {
+        let dir = tempfile::tempdir().unwrap();
+        unsafe { env::set_var("TCT_DATA_DIR", dir.path()) };
+        board_store::ensure_base_dirs().unwrap();
+        f();
+        unsafe { env::remove_var("TCT_DATA_DIR") };
+    }
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }
+    }
+
+    fn shift_key(code: KeyCode) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers: KeyModifiers::SHIFT,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }
+    }
+
+    /// Build an App with a board having two lists; list 0 has 3 cards, list 1 has 1.
+    fn fixture() -> (App, BoardMeta, Vec<Card>, Vec<Card>) {
+        let mut meta = board_store::create_board("Board".into()).unwrap();
+        let mut list_a = CardList::new("A".into());
+        let mut list_b = CardList::new("B".into());
+
+        let a_cards: Vec<Card> = (0..3).map(|i| Card::new(format!("a{i}"))).collect();
+        let b_cards = vec![Card::new("b0".into())];
+
+        for c in &a_cards {
+            card_store::save_card(&meta.id, c).unwrap();
+            list_a.card_ids.push(c.id.clone());
+        }
+        for c in &b_cards {
+            card_store::save_card(&meta.id, c).unwrap();
+            list_b.card_ids.push(c.id.clone());
+        }
+        list_store::save_list(&meta.id, &list_a).unwrap();
+        list_store::save_list(&meta.id, &list_b).unwrap();
+        meta.list_order = vec![list_a.id.clone(), list_b.id.clone()];
+        board_store::save_board(&meta).unwrap();
+
+        let app = App::new(Some(meta.id.clone())).unwrap();
+        (app, meta, a_cards, b_cards)
+    }
+
+    #[test]
+    fn down_moves_selection() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            assert_eq!(app.board.as_ref().unwrap().selected_card[0], 0);
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            assert_eq!(app.board.as_ref().unwrap().selected_card[0], 1);
+        });
+    }
+
+    #[test]
+    fn down_stops_at_last_card() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            for _ in 0..10 {
+                handle(&mut app, key(KeyCode::Down)).unwrap();
+            }
+            // Max for list 0 (3 cards) is index 2
+            assert_eq!(app.board.as_ref().unwrap().selected_card[0], 2);
+        });
+    }
+
+    #[test]
+    fn up_stops_at_zero() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            for _ in 0..5 {
+                handle(&mut app, key(KeyCode::Up)).unwrap();
+            }
+            assert_eq!(app.board.as_ref().unwrap().selected_card[0], 0);
+        });
+    }
+
+    #[test]
+    fn right_moves_to_next_list() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, key(KeyCode::Right)).unwrap();
+            assert_eq!(app.board.as_ref().unwrap().selected_list, 1);
+        });
+    }
+
+    #[test]
+    fn right_stops_at_last_list() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            for _ in 0..5 {
+                handle(&mut app, key(KeyCode::Right)).unwrap();
+            }
+            assert_eq!(app.board.as_ref().unwrap().selected_list, 1);
+        });
+    }
+
+    #[test]
+    fn left_stops_at_zero() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            for _ in 0..5 {
+                handle(&mut app, key(KeyCode::Left)).unwrap();
+            }
+            assert_eq!(app.board.as_ref().unwrap().selected_list, 0);
+        });
+    }
+
+    #[test]
+    fn g_jumps_to_top() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            app.board.as_mut().unwrap().selected_card[0] = 2;
+            handle(&mut app, key(KeyCode::Char('g'))).unwrap();
+            assert_eq!(app.board.as_ref().unwrap().selected_card[0], 0);
+        });
+    }
+
+    #[test]
+    fn shift_g_jumps_to_bottom() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, shift_key(KeyCode::Char('G'))).unwrap();
+            assert_eq!(app.board.as_ref().unwrap().selected_card[0], 2);
+        });
+    }
+
+    #[test]
+    fn shift_down_moves_card_within_list() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            // Cards initially [a0, a1, a2]; selection at 0
+            handle(&mut app, shift_key(KeyCode::Down)).unwrap();
+            let board = app.board.as_ref().unwrap();
+            assert_eq!(board.lists[0].card_ids[0], a_cards[1].id);
+            assert_eq!(board.lists[0].card_ids[1], a_cards[0].id);
+            assert_eq!(board.selected_card[0], 1);
+        });
+    }
+
+    #[test]
+    fn shift_up_at_top_is_noop() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            handle(&mut app, shift_key(KeyCode::Up)).unwrap();
+            let board = app.board.as_ref().unwrap();
+            assert_eq!(board.lists[0].card_ids[0], a_cards[0].id);
+            assert_eq!(board.selected_card[0], 0);
+        });
+    }
+
+    #[test]
+    fn shift_down_at_bottom_is_noop() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            app.board.as_mut().unwrap().selected_card[0] = 2;
+            handle(&mut app, shift_key(KeyCode::Down)).unwrap();
+            let board = app.board.as_ref().unwrap();
+            assert_eq!(board.lists[0].card_ids[2], a_cards[2].id);
+            assert_eq!(board.selected_card[0], 2);
+        });
+    }
+
+    #[test]
+    fn shift_right_moves_card_to_next_list() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            handle(&mut app, shift_key(KeyCode::Right)).unwrap();
+            let board = app.board.as_ref().unwrap();
+            // a0 moved to list 1 at index 0
+            assert_eq!(board.lists[0].card_ids.len(), 2);
+            assert!(board.lists[1].card_ids.contains(&a_cards[0].id));
+            assert_eq!(board.selected_list, 1);
+        });
+    }
+
+    #[test]
+    fn shift_left_from_first_list_is_noop() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            handle(&mut app, shift_key(KeyCode::Left)).unwrap();
+            let board = app.board.as_ref().unwrap();
+            assert_eq!(board.lists[0].card_ids.len(), 3);
+            assert_eq!(board.lists[0].card_ids[0], a_cards[0].id);
+        });
+    }
+
+    #[test]
+    fn shift_right_from_last_list_is_noop() {
+        with_temp_dir(|| {
+            let (mut app, _, _, b_cards) = fixture();
+            handle(&mut app, key(KeyCode::Right)).unwrap();
+            assert_eq!(app.board.as_ref().unwrap().selected_list, 1);
+            handle(&mut app, shift_key(KeyCode::Right)).unwrap();
+            let board = app.board.as_ref().unwrap();
+            assert_eq!(board.lists[1].card_ids.len(), 1);
+            assert_eq!(board.lists[1].card_ids[0], b_cards[0].id);
+        });
+    }
+
+    #[test]
+    fn q_sets_should_quit() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, key(KeyCode::Char('q'))).unwrap();
+            assert!(app.should_quit);
+        });
+    }
+
+    #[test]
+    fn question_enters_help() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, key(KeyCode::Char('?'))).unwrap();
+            assert_eq!(app.mode, AppMode::Help);
+        });
+    }
+
+    #[test]
+    fn b_returns_to_board_selector() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, key(KeyCode::Char('b'))).unwrap();
+            assert!(app.board.is_none());
+            assert_eq!(app.mode, AppMode::BoardSelector);
+        });
+    }
+
+    #[test]
+    fn enter_opens_card_detail() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, key(KeyCode::Enter)).unwrap();
+            assert_eq!(app.mode, AppMode::CardDetail);
+        });
+    }
+
+    #[test]
+    fn slash_enters_command_and_clears_query() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            app.search_query = "old".into();
+            handle(&mut app, key(KeyCode::Char('/'))).unwrap();
+            assert_eq!(app.mode, AppMode::Command);
+            assert!(app.search_query.is_empty());
+        });
+    }
+
+    #[test]
+    fn shift_f_clears_filters() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            app.search_active = true;
+            app.search_query = "x".into();
+            app.label_filter = Some(crate::model::label::LabelColor::Red);
+            handle(&mut app, shift_key(KeyCode::Char('F'))).unwrap();
+            assert!(!app.search_active);
+            assert!(app.search_query.is_empty());
+            assert!(app.label_filter.is_none());
+        });
+    }
+
+    #[test]
+    fn shift_u_clears_due_date() {
+        with_temp_dir(|| {
+            let (mut app, meta, a_cards, _) = fixture();
+            // Set a due date on selected card
+            let cid = a_cards[0].id.clone();
+            {
+                let board = app.board.as_mut().unwrap();
+                let card = board.cards.get_mut(&cid).unwrap();
+                card.due_date = Some(chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap());
+                card_store::save_card(&meta.id, card).unwrap();
+            }
+            handle(&mut app, shift_key(KeyCode::Char('U'))).unwrap();
+            let board = app.board.as_ref().unwrap();
+            assert!(board.cards.get(&cid).unwrap().due_date.is_none());
+            // Verify persisted
+            let on_disk = card_store::load_card(&meta.id, &cid).unwrap();
+            assert!(on_disk.due_date.is_none());
+        });
+    }
+
+    #[test]
+    fn search_nav_skips_non_matching_cards() {
+        with_temp_dir(|| {
+            // Manually craft a board where only middle card matches
+            let mut meta = board_store::create_board("Board".into()).unwrap();
+            let mut list = CardList::new("L".into());
+            let c1 = Card::new("alpha".into());
+            let c2 = Card::new("BINGO match".into());
+            let c3 = Card::new("gamma".into());
+            for c in [&c1, &c2, &c3] {
+                card_store::save_card(&meta.id, c).unwrap();
+                list.card_ids.push(c.id.clone());
+            }
+            list_store::save_list(&meta.id, &list).unwrap();
+            meta.list_order = vec![list.id.clone()];
+            board_store::save_board(&meta).unwrap();
+
+            let mut app = App::new(Some(meta.id.clone())).unwrap();
+            app.search_active = true;
+            app.search_query = "BINGO".into();
+            // From index 0, next match is index 1
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            assert_eq!(app.board.as_ref().unwrap().selected_card[0], 1);
+            // From index 1, no further match → stays at 1
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            assert_eq!(app.board.as_ref().unwrap().selected_card[0], 1);
+        });
+    }
+
+    #[test]
+    fn search_nav_up_finds_previous_match() {
+        with_temp_dir(|| {
+            let mut meta = board_store::create_board("Board".into()).unwrap();
+            let mut list = CardList::new("L".into());
+            let c1 = Card::new("BINGO one".into());
+            let c2 = Card::new("nope".into());
+            let c3 = Card::new("BINGO three".into());
+            for c in [&c1, &c2, &c3] {
+                card_store::save_card(&meta.id, c).unwrap();
+                list.card_ids.push(c.id.clone());
+            }
+            list_store::save_list(&meta.id, &list).unwrap();
+            meta.list_order = vec![list.id.clone()];
+            board_store::save_board(&meta).unwrap();
+
+            let mut app = App::new(Some(meta.id.clone())).unwrap();
+            app.search_active = true;
+            app.search_query = "BINGO".into();
+            app.board.as_mut().unwrap().selected_card[0] = 2;
+            handle(&mut app, key(KeyCode::Up)).unwrap();
+            assert_eq!(app.board.as_ref().unwrap().selected_card[0], 0);
+        });
+    }
+
+    #[test]
+    fn shift_left_arrow_swaps_lists() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, key(KeyCode::Right)).unwrap(); // move to list 1
+            handle(&mut app, shift_key(KeyCode::Char('<'))).unwrap();
+            let board = app.board.as_ref().unwrap();
+            assert_eq!(board.lists[0].name, "B");
+            assert_eq!(board.lists[1].name, "A");
+            assert_eq!(board.selected_list, 0);
+        });
+    }
+
+    #[test]
+    fn shift_right_arrow_swaps_lists() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, shift_key(KeyCode::Char('>'))).unwrap();
+            let board = app.board.as_ref().unwrap();
+            assert_eq!(board.lists[0].name, "B");
+            assert_eq!(board.lists[1].name, "A");
+            assert_eq!(board.selected_list, 1);
+        });
+    }
+
+    #[test]
+    fn next_matching_card_helper_returns_none_for_no_match() {
+        let board = LoadedBoard {
+            meta: BoardMeta::new("X".into()),
+            lists: vec![CardList { id: "l1".into(), name: "L".into(), card_ids: vec!["c1".into()] }],
+            cards: {
+                let mut m = std::collections::HashMap::new();
+                let mut c = Card::new("alpha".into());
+                c.id = "c1".into();
+                m.insert("c1".to_string(), c);
+                m
+            },
+            selected_list: 0,
+            selected_card: vec![0],
+            scroll_offset: vec![0],
+            detail_item_idx: 0,
+            detail_scroll: 0,
+        };
+        assert!(next_matching_card(&board, 0, 0, "zzz").is_none());
+    }
+
+    #[test]
+    fn visible_card_ids_skips_archived() {
+        let mut c1 = Card::new("a".into());
+        let mut c2 = Card::new("b".into());
+        c1.id = "id1".into();
+        c2.id = "id2".into();
+        c2.archived = true;
+
+        let board = LoadedBoard {
+            meta: BoardMeta::new("X".into()),
+            lists: vec![CardList {
+                id: "l".into(),
+                name: "L".into(),
+                card_ids: vec!["id1".into(), "id2".into()],
+            }],
+            cards: {
+                let mut m = std::collections::HashMap::new();
+                m.insert("id1".to_string(), c1);
+                m.insert("id2".to_string(), c2);
+                m
+            },
+            selected_list: 0,
+            selected_card: vec![0],
+            scroll_offset: vec![0],
+            detail_item_idx: 0,
+            detail_scroll: 0,
+        };
+        let visible = visible_card_ids(&board, 0);
+        assert_eq!(visible, vec![0]);
+    }
+}

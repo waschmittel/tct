@@ -400,6 +400,303 @@ fn labels_remove_not_assigned_is_ok() {
     assert!(out.contains("not assigned"), "{out}");
 }
 
+// ── Additional gap-filling tests ──────────────────────────────────────────────
+
+#[test]
+fn cards_archive_nonexistent_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+
+    let e = fail(&tmp, &["cards", "Proj", "--archive", "ghost"]);
+    assert!(e.contains("No card matches"), "{e}");
+}
+
+#[test]
+fn cards_show_nonexistent_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+
+    let e = fail(&tmp, &["cards", "Proj", "--show", "ghost"]);
+    assert!(e.contains("No card matches"), "{e}");
+}
+
+#[test]
+fn cards_restore_nonexistent_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+
+    let e = fail(&tmp, &["cards", "Proj", "--restore", "ghost"]);
+    assert!(e.contains("No archived card"), "{e}");
+}
+
+#[test]
+fn cards_delete_nonexistent_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+
+    let e = fail(&tmp, &["cards", "Proj", "--delete", "ghost"]);
+    assert!(e.contains("No archived card"), "{e}");
+}
+
+#[test]
+fn lists_rename_nonexistent_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    let e = fail(&tmp, &["lists", "Proj", "--rename", "ghost", "newname"]);
+    assert!(e.contains("No list matches"), "{e}");
+}
+
+#[test]
+fn lists_delete_nonexistent_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    let e = fail(&tmp, &["lists", "Proj", "--delete", "ghost"]);
+    assert!(e.contains("No list matches"), "{e}");
+}
+
+#[test]
+fn boards_restore_nonexistent_errors() {
+    let tmp = TempDir::new().unwrap();
+    let e = fail(&tmp, &["boards", "--restore", "ghost"]);
+    assert!(e.contains("No archived board"), "{e}");
+}
+
+#[test]
+fn boards_delete_nonarchived_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    // --delete only works on archived boards
+    let e = fail(&tmp, &["boards", "--delete", "Proj"]);
+    assert!(e.contains("No archived board"), "{e}");
+}
+
+#[test]
+fn cards_create_in_nonexistent_list_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    let e = fail(&tmp, &["cards", "Proj", "--create", "ghost", "title"]);
+    assert!(e.contains("No list matches"), "{e}");
+}
+
+#[test]
+fn cards_edit_due_invalid_date_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
+
+    let e = fail(&tmp, &["cards", "Proj", "--edit", "Card", "--due", "not-a-date"]);
+    assert!(e.contains("Invalid date format"), "{e}");
+}
+
+#[test]
+fn cards_edit_description() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
+
+    ok(&tmp, &["cards", "Proj", "--edit", "Card", "--description", "new desc text"]);
+    let out = ok(&tmp, &["cards", "Proj", "--show", "Card"]);
+    assert!(out.contains("new desc text"), "{out}");
+}
+
+#[test]
+fn cards_edit_due_clear_via_none() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
+
+    ok(&tmp, &["cards", "Proj", "--edit", "Card", "--due", "2099-01-01"]);
+    let out = ok(&tmp, &["cards", "Proj", "--show", "Card"]);
+    assert!(out.contains("2099-01-01"), "{out}");
+
+    ok(&tmp, &["cards", "Proj", "--edit", "Card", "--due", "none"]);
+    let out = ok(&tmp, &["cards", "Proj", "--show", "Card"]);
+    assert!(!out.contains("2099-01-01"), "{out}");
+    assert!(!out.contains("Due:"), "{out}");
+}
+
+#[test]
+fn labels_delete_nonexistent_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    let e = fail(&tmp, &["labels", "Proj", "--delete", "ghost"]);
+    assert!(e.contains("No label matches"), "{e}");
+}
+
+#[test]
+fn labels_assign_nonexistent_label_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
+    let e = fail(&tmp, &["labels", "Proj", "--assign", "Card", "ghost"]);
+    assert!(e.contains("No label matches"), "{e}");
+}
+
+#[test]
+fn search_regex_invalid_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    let e = fail(&tmp, &["search", "[unclosed", "--regex"]);
+    assert!(e.contains("Invalid regular expression"), "{e}");
+}
+
+#[test]
+fn search_no_query_errors() {
+    let tmp = TempDir::new().unwrap();
+    let e = fail(&tmp, &["search"]);
+    assert!(e.contains("Usage:") || e.contains("query"), "{e}");
+}
+
+#[test]
+fn unknown_command_errors() {
+    let tmp = TempDir::new().unwrap();
+    let e = fail(&tmp, &["badcommand"]);
+    assert!(e.contains("Unknown command"), "{e}");
+}
+
+#[test]
+fn help_via_long_flag() {
+    let tmp = TempDir::new().unwrap();
+    let out = ok(&tmp, &["--help"]);
+    assert!(out.contains("Terminal Card Tracker"), "{out}");
+}
+
+#[test]
+fn help_via_short_flag() {
+    let tmp = TempDir::new().unwrap();
+    let out = ok(&tmp, &["-h"]);
+    assert!(out.contains("Terminal Card Tracker"), "{out}");
+}
+
+#[test]
+fn help_via_subcommand() {
+    let tmp = TempDir::new().unwrap();
+    let out = ok(&tmp, &["help"]);
+    assert!(out.contains("Terminal Card Tracker"), "{out}");
+}
+
+#[test]
+fn boards_create_assigns_distinct_accent_colors() {
+    let tmp = TempDir::new().unwrap();
+    // Two boards should not have the same accent color (auto-differentiation)
+    ok(&tmp, &["boards", "--create", "Board1"]);
+    ok(&tmp, &["boards", "--create", "Board2"]);
+    ok(&tmp, &["boards", "--create", "Board3"]);
+
+    // Read both board.json files and compare accent_color fields
+    let boards_dir = tmp.path().join("boards");
+    let mut colors: Vec<serde_json::Value> = Vec::new();
+    for entry in std::fs::read_dir(&boards_dir).unwrap() {
+        let path = entry.unwrap().path().join("board.json");
+        let data = std::fs::read_to_string(&path).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&data).unwrap();
+        colors.push(v["accent_color"].clone());
+    }
+    assert_eq!(colors.len(), 3);
+    // At least one pair must differ
+    assert!(!(colors[0] == colors[1] && colors[1] == colors[2]),
+        "all three boards got same accent: {colors:?}");
+}
+
+#[test]
+fn cards_show_ambiguous_match_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Alpha one"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Alpha two"]);
+
+    let e = fail(&tmp, &["cards", "Proj", "--show", "Alpha"]);
+    assert!(e.contains("Multiple cards match"), "{e}");
+}
+
+#[test]
+fn search_with_query_matches() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Find me"]);
+
+    let out = ok(&tmp, &["search", "Find"]);
+    assert!(out.contains("Find me"), "{out}");
+    assert!(out.contains("Found 1 card"), "{out}");
+}
+
+#[test]
+fn checklist_show_empty() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
+
+    let out = ok(&tmp, &["checklist", "Proj", "Card"]);
+    assert!(out.contains("no items"), "{out}");
+}
+
+#[test]
+fn checklist_delete_out_of_range_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
+    ok(&tmp, &["checklist", "Proj", "Card", "--add", "item"]);
+
+    let e = fail(&tmp, &["checklist", "Proj", "Card", "--delete", "99"]);
+    assert!(e.contains("out of range"), "{e}");
+}
+
+#[test]
+fn checklist_toggle_non_numeric_errors() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
+    ok(&tmp, &["checklist", "Proj", "Card", "--add", "item"]);
+
+    let e = fail(&tmp, &["checklist", "Proj", "Card", "--toggle", "abc"]);
+    assert!(e.contains("positive integer"), "{e}");
+}
+
+#[test]
+fn deleting_list_removes_its_cards() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Doomed"]);
+    ok(&tmp, &["lists", "Proj", "--delete", "Tasks"]);
+
+    // Card should no longer appear in archived either (it's deleted, not archived)
+    let out = ok(&tmp, &["cards", "Proj", "--archived"]);
+    assert!(!out.contains("Doomed"), "{out}");
+}
+
+#[test]
+fn deleting_label_removes_from_card() {
+    let tmp = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Proj"]);
+    ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
+    ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
+    ok(&tmp, &["labels", "Proj", "--create", "bug"]);
+    ok(&tmp, &["labels", "Proj", "--assign", "Card", "bug"]);
+
+    // Verify assigned
+    let out = ok(&tmp, &["cards", "Proj", "--show", "Card"]);
+    assert!(out.contains("Labels:"), "{out}");
+
+    // Delete the label
+    ok(&tmp, &["labels", "Proj", "--delete", "bug"]);
+
+    // Card should no longer have label
+    let out = ok(&tmp, &["cards", "Proj", "--show", "Card"]);
+    assert!(!out.contains("Labels:"), "{out}");
+}
+
 // ── Local .tct discovery test ─────────────────────────────────────────────────
 
 #[test]

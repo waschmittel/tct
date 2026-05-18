@@ -132,3 +132,149 @@ pub fn delete_board(board_id: &str) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    fn with_temp_dir<F: FnOnce()>(f: F) {
+        let dir = tempfile::tempdir().unwrap();
+        unsafe { env::set_var("TCT_DATA_DIR", dir.path()) };
+        ensure_base_dirs().unwrap();
+        f();
+        unsafe { env::remove_var("TCT_DATA_DIR") };
+    }
+
+    #[test]
+    fn load_missing_board_returns_not_found() {
+        with_temp_dir(|| {
+            let err = load_board("nope1234").unwrap_err();
+            assert!(matches!(err, StorageError::BoardNotFound(_)));
+        });
+    }
+
+    #[test]
+    fn list_boards_excludes_archived() {
+        with_temp_dir(|| {
+            let mut a = create_board("Active".into()).unwrap();
+            let mut b = create_board("Archived".into()).unwrap();
+            b.archived = true;
+            save_board(&b).unwrap();
+            // active list should not include b
+            let active = list_boards().unwrap();
+            assert!(active.iter().any(|x| x.name == "Active"));
+            assert!(!active.iter().any(|x| x.name == "Archived"));
+            // archived list should include b only
+            let archived = list_archived_boards().unwrap();
+            assert_eq!(archived.len(), 1);
+            assert_eq!(archived[0].name, "Archived");
+            // touch a to silence unused mut warning
+            a.name = a.name.clone();
+        });
+    }
+
+    #[test]
+    fn board_order_roundtrip() {
+        with_temp_dir(|| {
+            let b1 = create_board("One".into()).unwrap();
+            let b2 = create_board("Two".into()).unwrap();
+            let order = vec![b2.id.clone(), b1.id.clone()];
+            save_board_order(&order).unwrap();
+            let loaded = load_board_order().unwrap();
+            assert_eq!(loaded, order);
+        });
+    }
+
+    #[test]
+    fn list_boards_respects_order() {
+        with_temp_dir(|| {
+            let b1 = create_board("Alpha".into()).unwrap();
+            let b2 = create_board("Beta".into()).unwrap();
+            let b3 = create_board("Gamma".into()).unwrap();
+            save_board_order(&[b3.id.clone(), b1.id.clone(), b2.id.clone()]).unwrap();
+            let listed = list_boards().unwrap();
+            assert_eq!(listed[0].name, "Gamma");
+            assert_eq!(listed[1].name, "Alpha");
+            assert_eq!(listed[2].name, "Beta");
+        });
+    }
+
+    #[test]
+    fn unordered_boards_alphabetical_fallback() {
+        with_temp_dir(|| {
+            // No saved order — fall back to alphabetical
+            let _ = create_board("Charlie".into()).unwrap();
+            let _ = create_board("Alpha".into()).unwrap();
+            let _ = create_board("Bravo".into()).unwrap();
+            let listed = list_boards().unwrap();
+            assert_eq!(listed[0].name, "Alpha");
+            assert_eq!(listed[1].name, "Bravo");
+            assert_eq!(listed[2].name, "Charlie");
+        });
+    }
+
+    #[test]
+    fn append_to_order_no_duplicate() {
+        with_temp_dir(|| {
+            let b = create_board("X".into()).unwrap();
+            append_to_order(&b.id).unwrap();
+            append_to_order(&b.id).unwrap();
+            let order = load_board_order().unwrap();
+            assert_eq!(order.iter().filter(|id| **id == b.id).count(), 1);
+        });
+    }
+
+    #[test]
+    fn remove_from_order_works() {
+        with_temp_dir(|| {
+            let b1 = create_board("One".into()).unwrap();
+            let b2 = create_board("Two".into()).unwrap();
+            append_to_order(&b1.id).unwrap();
+            append_to_order(&b2.id).unwrap();
+            remove_from_order(&b1.id).unwrap();
+            let order = load_board_order().unwrap();
+            assert!(!order.contains(&b1.id));
+            assert!(order.contains(&b2.id));
+        });
+    }
+
+    #[test]
+    fn delete_missing_board_is_ok() {
+        with_temp_dir(|| {
+            delete_board("doesnotxx").unwrap();
+        });
+    }
+
+    #[test]
+    fn save_creates_dir_and_meta() {
+        with_temp_dir(|| {
+            let meta = BoardMeta::new("New".into());
+            save_board(&meta).unwrap();
+            assert!(paths::board_dir(&meta.id).exists());
+            assert!(paths::board_meta_path(&meta.id).exists());
+        });
+    }
+
+    #[test]
+    fn accent_color_persists() {
+        with_temp_dir(|| {
+            let mut meta = BoardMeta::new("Acc".into());
+            meta.accent_color = crate::model::label::LabelColor::Purple;
+            save_board(&meta).unwrap();
+            let loaded = load_board(&meta.id).unwrap();
+            assert_eq!(loaded.accent_color, crate::model::label::LabelColor::Purple);
+        });
+    }
+
+    #[test]
+    fn rename_board_persists() {
+        with_temp_dir(|| {
+            let mut meta = create_board("Old".into()).unwrap();
+            meta.name = "New".into();
+            save_board(&meta).unwrap();
+            let loaded = load_board(&meta.id).unwrap();
+            assert_eq!(loaded.name, "New");
+        });
+    }
+}
