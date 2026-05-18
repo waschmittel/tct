@@ -302,7 +302,8 @@ fn cmd_cards(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let board = find_board(board_partial, by_id)?;
         let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
         let mut list = find_list(&lists, list_partial, by_id)?.clone();
-        let card = Card::new(title.to_string());
+        let mut card = Card::new(title.to_string());
+        card.log("Created");
         card_store::save_card(&board.id, &card)?;
         list.card_ids.push(card.id.clone());
         list_store::save_list(&board.id, &list)?;
@@ -320,23 +321,41 @@ fn cmd_cards(args: &[String], by_id: bool) -> anyhow::Result<()> {
         if new_title.is_none() && new_desc.is_none() && new_due.is_none() {
             bail!("cards --edit requires at least one of: --title, --description, --due");
         }
+        let mut actions: Vec<String> = Vec::new();
         if let Some(t) = new_title {
+            if card.title != t {
+                actions.push("Edited title".into());
+            }
             card.title = t.to_string();
         }
         if let Some(d) = new_desc {
+            if card.description != d {
+                actions.push("Edited description".into());
+            }
             card.description = d.to_string();
         }
         if let Some(due_str) = new_due {
             if due_str == "none" {
+                if card.due_date.is_some() {
+                    actions.push("Cleared due date".into());
+                }
                 card.due_date = None;
             } else {
-                card.due_date = Some(
-                    NaiveDate::parse_from_str(due_str, "%Y-%m-%d")
-                        .context("Invalid date format. Use YYYY-MM-DD or 'none'.")?,
-                );
+                let d = NaiveDate::parse_from_str(due_str, "%Y-%m-%d")
+                    .context("Invalid date format. Use YYYY-MM-DD or 'none'.")?;
+                if card.due_date != Some(d) {
+                    actions.push(format!("Set due date to {d}"));
+                }
+                card.due_date = Some(d);
             }
         }
-        card.touch();
+        if actions.is_empty() {
+            card.touch();
+        } else {
+            for a in actions {
+                card.log(a);
+            }
+        }
         card_store::save_card(&board.id, &card)?;
         println!("Updated card '{}'.", card.title);
     } else if let Some(card_partial) = flag_value(args, "--archive") {
@@ -346,7 +365,7 @@ fn cmd_cards(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let (mut list, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         let title = card.title.clone();
         card.archived = true;
-        card.touch();
+        card.log("Archived");
         card_store::save_card(&board.id, &card)?;
         list.card_ids.retain(|id| id != &card.id);
         list_store::save_list(&board.id, &list)?;
@@ -356,7 +375,7 @@ fn cmd_cards(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let mut card = find_archived_card(&board.id, card_partial, by_id)?;
         let title = card.title.clone();
         card.archived = false;
-        card.touch();
+        card.log("Restored from archive");
         card_store::save_card(&board.id, &card)?;
         let meta = board_store::load_board(&board.id)?;
         if let Some(first_list_id) = meta.list_order.first() {
@@ -413,7 +432,7 @@ fn cmd_checklist(args: &[String], by_id: bool) -> anyhow::Result<()> {
     if let Some(text) = flag_value(args, "--add") {
         let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         card.checklist.push(ChecklistItem { text: text.to_string(), completed: false });
-        card.touch();
+        card.log(format!("Added checklist item '{text}'"));
         card_store::save_card(&board.id, &card)?;
         println!("Added checklist item '{}' to card '{}'.", text, card.title);
     } else if let Some(n_str) = flag_value(args, "--toggle") {
@@ -428,7 +447,12 @@ fn cmd_checklist(args: &[String], by_id: bool) -> anyhow::Result<()> {
         item.completed = !item.completed;
         let state = if item.completed { "done" } else { "undone" };
         let text = item.text.clone();
-        card.touch();
+        let action = if item.completed {
+            format!("Completed checklist item '{text}'")
+        } else {
+            format!("Uncompleted checklist item '{text}'")
+        };
+        card.log(action);
         card_store::save_card(&board.id, &card)?;
         println!("Toggled item {n} ('{text}') → {state}.");
     } else if let Some(n_str) = flag_value(args, "--delete") {
@@ -439,7 +463,7 @@ fn cmd_checklist(args: &[String], by_id: bool) -> anyhow::Result<()> {
             bail!("Index {n} out of range (card has {} items)", card.checklist.len());
         }
         let removed = card.checklist.remove(idx);
-        card.touch();
+        card.log(format!("Removed checklist item '{}'", removed.text));
         card_store::save_card(&board.id, &card)?;
         println!("Deleted checklist item '{}'.", removed.text);
     } else {
@@ -485,7 +509,7 @@ fn cmd_labels(args: &[String], by_id: bool) -> anyhow::Result<()> {
                 if let Ok(mut card) = card_store::load_card(&board.id, card_id) {
                     if card.label_ids.contains(&label.id) {
                         card.label_ids.retain(|id| id != &label.id);
-                        card.touch();
+                        card.log(format!("Removed label '{label_name}'"));
                         let _ = card_store::save_card(&board.id, &card);
                     }
                 }
@@ -501,7 +525,7 @@ fn cmd_labels(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         if !card.label_ids.contains(&label.id) {
             card.label_ids.push(label.id.clone());
-            card.touch();
+            card.log(format!("Added label '{}'", label.name));
             card_store::save_card(&board.id, &card)?;
             println!("Assigned label '{}' to card '{}'.", label.name, card.title);
         } else {
@@ -515,7 +539,7 @@ fn cmd_labels(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         if card.label_ids.contains(&label.id) {
             card.label_ids.retain(|id| id != &label.id);
-            card.touch();
+            card.log(format!("Removed label '{}'", label.name));
             card_store::save_card(&board.id, &card)?;
             println!("Removed label '{}' from card '{}'.", label.name, card.title);
         } else {

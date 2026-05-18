@@ -52,6 +52,7 @@ pub enum DialogKind {
     ArchivedLists,
     LabelPicker,
     LabelManager,
+    CardHistory,
 }
 
 pub struct LoadedBoard {
@@ -128,6 +129,7 @@ pub struct App {
     pub archived_boards: Vec<crate::model::board::BoardMeta>,
     pub archived_lists: Vec<CardList>,
     pub archived_selected: usize,
+    pub history_scroll: usize,
     pub last_reload: Instant,
     pub reload_interval: Duration,
 }
@@ -158,6 +160,7 @@ impl App {
             archived_boards: Vec::new(),
             archived_lists: Vec::new(),
             archived_selected: 0,
+            history_scroll: 0,
             last_reload: Instant::now(),
             reload_interval: Duration::from_secs(15),
         };
@@ -416,6 +419,7 @@ mod tests {
             archived_boards: vec![],
             archived_lists: vec![],
             archived_selected: 0,
+            history_scroll: 0,
             last_reload: Instant::now(),
             reload_interval: Duration::from_secs(15),
         }

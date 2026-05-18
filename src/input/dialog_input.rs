@@ -20,7 +20,38 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         DialogKind::ArchivedLists => handle_archived_lists(app, key),
         DialogKind::LabelPicker => handle_label_picker(app, key),
         DialogKind::LabelManager => handle_label_manager(app, key),
+        DialogKind::CardHistory => handle_card_history(app, key),
     }
+}
+
+fn handle_card_history(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+    match key.code {
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.history_scroll = app.history_scroll.saturating_add(1);
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.history_scroll = app.history_scroll.saturating_sub(1);
+        }
+        KeyCode::PageDown => {
+            app.history_scroll = app.history_scroll.saturating_add(10);
+        }
+        KeyCode::PageUp => {
+            app.history_scroll = app.history_scroll.saturating_sub(10);
+        }
+        KeyCode::Home | KeyCode::Char('g') => {
+            app.history_scroll = 0;
+        }
+        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('h') => {
+            app.history_scroll = 0;
+            if let Some(prev) = app.previous_mode.take() {
+                app.mode = prev;
+            } else {
+                app.mode = AppMode::Normal;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 fn handle_confirm_archive_list(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
@@ -210,7 +241,7 @@ fn handle_confirm_archive_card(app: &mut App, key: KeyEvent) -> anyhow::Result<(
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
                         card.archived = true;
-                        card.touch();
+                        card.log("Archived");
                         card_store::save_card(&board.meta.id, card)?;
                         if let Some(list) = board.lists.get_mut(board.selected_list) {
                             list.card_ids.retain(|id| id != &card_id);
@@ -262,7 +293,7 @@ fn handle_archived_cards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             if app.archived_selected < app.archived_cards.len() {
                 let mut card = app.archived_cards.remove(app.archived_selected);
                 card.archived = false;
-                card.touch();
+                card.log("Restored from archive");
                 let title = card.title.clone();
                 if let Some(board) = &mut app.board {
                     card_store::save_card(&board.meta.id, &card)?;
@@ -336,22 +367,25 @@ fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
         KeyCode::Enter | KeyCode::Char(' ') => {
-            // ... (existing code for setting label)
             if let Some(board) = &mut app.board {
-                let label_id = board
+                let label = board
                     .meta
                     .labels
                     .get(app.label_picker_idx)
-                    .map(|l| l.id.clone());
-                if let Some(lid) = label_id {
+                    .map(|l| (l.id.clone(), l.name.clone()));
+                if let Some((lid, lname)) = label {
                     if let Some(card_id) = board.current_card_id().cloned() {
                         if let Some(card) = board.cards.get_mut(&card_id) {
-                            if let Some(pos) = card.label_ids.iter().position(|id| *id == lid) {
+                            let action = if let Some(pos) =
+                                card.label_ids.iter().position(|id| *id == lid)
+                            {
                                 card.label_ids.remove(pos);
+                                format!("Removed label '{lname}'")
                             } else {
                                 card.label_ids.push(lid);
-                            }
-                            card.touch();
+                                format!("Added label '{lname}'")
+                            };
+                            card.log(action);
                             card_store::save_card(&board.meta.id, card)?;
                         }
                     }

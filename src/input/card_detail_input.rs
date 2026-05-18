@@ -47,9 +47,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     let ii = board.detail_item_idx;
                     if let Some(card) = board.cards.get_mut(&card_id) {
                         if ii + 1 < card.checklist.len() {
+                            let name = card.checklist[ii].text.clone();
                             card.checklist.swap(ii, ii + 1);
                             board.detail_item_idx += 1;
-                            card.touch();
+                            card.log(format!("Reordered checklist item '{name}'"));
                             crate::storage::card_store::save_card(&board.meta.id, card)?;
                         }
                     }
@@ -64,9 +65,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     let ii = board.detail_item_idx;
                     if let Some(card) = board.cards.get_mut(&card_id) {
                         if ii > 0 {
+                            let name = card.checklist[ii].text.clone();
                             card.checklist.swap(ii, ii - 1);
                             board.detail_item_idx -= 1;
-                            card.touch();
+                            card.log(format!("Reordered checklist item '{name}'"));
                             crate::storage::card_store::save_card(&board.meta.id, card)?;
                         }
                     }
@@ -82,7 +84,12 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     if let Some(card) = board.cards.get_mut(&card_id) {
                         if let Some(item) = card.checklist.get_mut(ii) {
                             item.completed = !item.completed;
-                            card.touch();
+                            let action = if item.completed {
+                                format!("Completed checklist item '{}'", item.text)
+                            } else {
+                                format!("Uncompleted checklist item '{}'", item.text)
+                            };
+                            card.log(action);
                             crate::storage::card_store::save_card(&board.meta.id, card)?;
                         }
                     }
@@ -102,11 +109,11 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     let ii = board.detail_item_idx;
                     if let Some(card) = board.cards.get_mut(&card_id) {
                         if ii < card.checklist.len() {
-                            card.checklist.remove(ii);
+                            let removed = card.checklist.remove(ii);
                             if board.detail_item_idx >= card.checklist.len() && !card.checklist.is_empty() {
                                 board.detail_item_idx = card.checklist.len() - 1;
                             }
-                            card.touch();
+                            card.log(format!("Removed checklist item '{}'", removed.text));
                             crate::storage::card_store::save_card(&board.meta.id, card)?;
                         }
                     }
@@ -203,11 +210,26 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
+                        let was_set = card.due_date.is_some();
                         card.due_date = None;
-                        card.touch();
+                        if was_set {
+                            card.log("Cleared due date");
+                        } else {
+                            card.touch();
+                        }
                         crate::storage::card_store::save_card(&board.meta.id, card)?;
                         app.set_status("Due date cleared".into());
                     }
+                }
+            }
+        }
+
+        (KeyCode::Char('h'), _) => {
+            if let Some(board) = &app.board {
+                if board.current_card_id().is_some() {
+                    app.previous_mode = Some(app.mode.clone());
+                    app.history_scroll = 0;
+                    app.mode = AppMode::Dialog(crate::app::DialogKind::CardHistory);
                 }
             }
         }

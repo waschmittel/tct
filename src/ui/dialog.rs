@@ -86,6 +86,78 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         DialogKind::LabelManager => {
             render_label_manager(frame, area, app);
         }
+        DialogKind::CardHistory => {
+            render_card_history(frame, area, app);
+        }
+    }
+}
+
+fn render_card_history(frame: &mut Frame, area: Rect, app: &App) {
+    let card = match app.board.as_ref().and_then(|b| b.current_card()) {
+        Some(c) => c,
+        None => return,
+    };
+
+    let local_fmt = |dt: chrono::DateTime<chrono::Utc>| {
+        dt.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string()
+    };
+
+    let mut entries: Vec<(String, String)> = Vec::new();
+    entries.push(("Created".into(), local_fmt(card.created_at)));
+    for entry in card.history.iter().rev() {
+        entries.push((entry.action.clone(), local_fmt(entry.at)));
+    }
+
+    let width = 70u16.min(area.width.saturating_sub(4)).max(40);
+    let height = ((entries.len() as u16).saturating_add(4))
+        .min(area.height.saturating_sub(4))
+        .max(8);
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = (area.height.saturating_sub(height)) / 2;
+    let popup = Rect::new(x, y, width, height);
+
+    frame.render_widget(Clear, popup);
+
+    let title = format!(" History — {} ", truncate_for_title(&card.title, 40));
+    let block = Block::default()
+        .title(title)
+        .title_bottom(Line::from(vec![
+            Span::styled(" Up/Dn", Style::default().fg(accent(app))),
+            Span::raw(":scroll  "),
+            Span::styled("Esc", Style::default().fg(Color::Yellow)),
+            Span::raw(":close "),
+        ]))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(accent(app)));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let visible_rows = inner.height as usize;
+    let max_scroll = entries.len().saturating_sub(visible_rows);
+    let scroll = app.history_scroll.min(max_scroll);
+
+    let stamp_width = 16usize;
+    let mut lines = Vec::with_capacity(visible_rows);
+    for (action, stamp) in entries.iter().skip(scroll).take(visible_rows) {
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{stamp:<stamp_width$}  "),
+                Style::default().fg(Color::DarkGray),
+            ),
+            Span::styled(action.clone(), Style::default().fg(Color::White)),
+        ]));
+    }
+
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn truncate_for_title(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        let mut out: String = s.chars().take(max.saturating_sub(1)).collect();
+        out.push('…');
+        out
     }
 }
 

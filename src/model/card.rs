@@ -17,6 +17,8 @@ pub struct Card {
     pub archived: bool,
     pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
+    #[serde(default)]
+    pub history: Vec<HistoryEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +26,14 @@ pub struct ChecklistItem {
     pub text: String,
     pub completed: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryEntry {
+    pub at: chrono::DateTime<Utc>,
+    pub action: String,
+}
+
+pub const HISTORY_LIMIT: usize = 50;
 
 impl Card {
     pub fn new(title: String) -> Self {
@@ -38,6 +48,7 @@ impl Card {
             archived: false,
             created_at: now,
             updated_at: now,
+            history: Vec::new(),
         }
     }
 
@@ -68,6 +79,18 @@ impl Card {
 
     pub fn touch(&mut self) {
         self.updated_at = Utc::now();
+    }
+
+    /// Record a change in history and bump `updated_at`. Caps history at
+    /// HISTORY_LIMIT entries (FIFO eviction).
+    pub fn log(&mut self, action: impl Into<String>) {
+        let now = Utc::now();
+        self.history.push(HistoryEntry { at: now, action: action.into() });
+        let len = self.history.len();
+        if len > HISTORY_LIMIT {
+            self.history.drain(..len - HISTORY_LIMIT);
+        }
+        self.updated_at = now;
     }
 
     /// Render the full checklist as GitHub-flavored markdown task list.
@@ -177,6 +200,32 @@ mod tests {
         assert_eq!(resolved[0].name, "alpha");
         assert_eq!(resolved[1].name, "beta");
         assert_eq!(resolved[2].name, "gamma");
+    }
+
+    #[test]
+    fn log_appends_entry_and_advances_updated_at() {
+        let mut card = Card::new("Task".into());
+        let original = card.updated_at;
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        card.log("Did something");
+        assert_eq!(card.history.len(), 1);
+        assert_eq!(card.history[0].action, "Did something");
+        assert!(card.updated_at > original);
+    }
+
+    #[test]
+    fn log_caps_at_history_limit() {
+        let mut card = Card::new("Task".into());
+        for i in 0..HISTORY_LIMIT + 10 {
+            card.log(format!("event {i}"));
+        }
+        assert_eq!(card.history.len(), HISTORY_LIMIT);
+        // Oldest entries dropped — first remaining entry must be "event 10".
+        assert_eq!(card.history.first().unwrap().action, "event 10");
+        assert_eq!(
+            card.history.last().unwrap().action,
+            format!("event {}", HISTORY_LIMIT + 9)
+        );
     }
 
     #[test]

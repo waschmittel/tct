@@ -45,6 +45,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Span::raw(":help  "),
             Span::styled("PgUp/PgDn", Style::default().fg(accent)),
             Span::raw(":scroll desc  "),
+            Span::styled("h", Style::default().fg(accent)),
+            Span::raw(":history  "),
             Span::styled("Esc", Style::default().fg(accent)),
             Span::raw(":close "),
         ]

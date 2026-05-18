@@ -302,8 +302,13 @@ fn confirm_due_date(app: &mut App) -> anyhow::Result<()> {
         if let Some(board) = &mut app.board {
             if let Some(card_id) = board.current_card_id().cloned() {
                 if let Some(card) = board.cards.get_mut(&card_id) {
+                    let was_set = card.due_date.is_some();
                     card.due_date = None;
-                    card.touch();
+                    if was_set {
+                        card.log("Cleared due date");
+                    } else {
+                        card.touch();
+                    }
                     card_store::save_card(&board.meta.id, card)?;
                 }
             }
@@ -323,8 +328,13 @@ fn confirm_due_date(app: &mut App) -> anyhow::Result<()> {
         if let Some(board) = &mut app.board {
             if let Some(card_id) = board.current_card_id().cloned() {
                 if let Some(card) = board.cards.get_mut(&card_id) {
+                    let prev = card.due_date;
                     card.due_date = Some(date);
-                    card.touch();
+                    if prev != Some(date) {
+                        card.log(format!("Set due date to {date}"));
+                    } else {
+                        card.touch();
+                    }
                     card_store::save_card(&board.meta.id, card)?;
                 }
             }
@@ -386,17 +396,22 @@ fn description_changed(app: &App) -> bool {
 
 fn confirm_description_save(app: &mut App) -> anyhow::Result<()> {
     let text = app.finish_description_edit().unwrap_or_default();
+    let original = app.description_original.take();
     if let Some(board) = &mut app.board {
         if let Some(card_id) = board.current_card_id().cloned() {
             if let Some(card) = board.cards.get_mut(&card_id) {
+                let changed = original.as_deref() != Some(text.as_str());
                 card.description = text;
-                card.touch();
+                if changed {
+                    card.log("Edited description");
+                } else {
+                    card.touch();
+                }
                 card_store::save_card(&board.meta.id, card)?;
                 app.set_status("Description saved".into());
             }
         }
     }
-    app.description_original = None;
     app.mode = app.previous_mode.take().unwrap_or(AppMode::CardDetail);
     Ok(())
 }
@@ -720,7 +735,8 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
         InsertTarget::NewCardTitle => {
             if let Some(board) = &mut app.board {
                 if let Some(list) = board.lists.get_mut(board.selected_list) {
-                    let card = Card::new(text.clone());
+                    let mut card = Card::new(text.clone());
+                    card.log("Created");
                     card_store::save_card(&board.meta.id, &card)?;
                     list.card_ids.push(card.id.clone());
                     list_store::save_list(&board.meta.id, list)?;
@@ -759,8 +775,13 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
+                        let changed = card.title != text;
                         card.title = text;
-                        card.touch();
+                        if changed {
+                            card.log("Edited title");
+                        } else {
+                            card.touch();
+                        }
                         card_store::save_card(&board.meta.id, card)?;
                     }
                 }
@@ -774,12 +795,13 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
+                        let action = format!("Added checklist item '{text}'");
                         card.checklist.push(crate::model::card::ChecklistItem {
                             text,
                             completed: false,
                         });
                         board.detail_item_idx = card.checklist.len() - 1;
-                        card.touch();
+                        card.log(action);
                         card_store::save_card(&board.meta.id, card)?;
                     }
                 }
@@ -791,8 +813,14 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
                         if let Some(item) = card.checklist.get_mut(board.detail_item_idx) {
-                            item.text = text;
-                            card.touch();
+                            let changed = item.text != text;
+                            let old = std::mem::replace(&mut item.text, text);
+                            let new = item.text.clone();
+                            if changed {
+                                card.log(format!("Renamed checklist item '{old}' → '{new}'"));
+                            } else {
+                                card.touch();
+                            }
                             card_store::save_card(&board.meta.id, card)?;
                         }
                     }
@@ -805,8 +833,13 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                 if let Some(board) = &mut app.board {
                     if let Some(card_id) = board.current_card_id().cloned() {
                         if let Some(card) = board.cards.get_mut(&card_id) {
+                            let was_set = card.due_date.is_some();
                             card.due_date = None;
-                            card.touch();
+                            if was_set {
+                                card.log("Cleared due date");
+                            } else {
+                                card.touch();
+                            }
                             card_store::save_card(&board.meta.id, card)?;
                         }
                     }
@@ -817,8 +850,13 @@ fn confirm_insert(app: &mut App) -> anyhow::Result<()> {
                 if let Some(board) = &mut app.board {
                     if let Some(card_id) = board.current_card_id().cloned() {
                         if let Some(card) = board.cards.get_mut(&card_id) {
+                            let prev = card.due_date;
                             card.due_date = Some(date);
-                            card.touch();
+                            if prev != Some(date) {
+                                card.log(format!("Set due date to {date}"));
+                            } else {
+                                card.touch();
+                            }
                             card_store::save_card(&board.meta.id, card)?;
                         }
                     }

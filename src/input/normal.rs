@@ -251,12 +251,26 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
+        (KeyCode::Char('h'), _) => {
+            if let Some(board) = &app.board {
+                if board.current_card_id().is_some() {
+                    app.previous_mode = Some(app.mode.clone());
+                    app.history_scroll = 0;
+                    app.mode = AppMode::Dialog(DialogKind::CardHistory);
+                }
+            }
+        }
         (KeyCode::Char('U'), _) => {
             if let Some(board) = &mut app.board {
                 if let Some(card_id) = board.current_card_id().cloned() {
                     if let Some(card) = board.cards.get_mut(&card_id) {
+                        let was_set = card.due_date.is_some();
                         card.due_date = None;
-                        card.touch();
+                        if was_set {
+                            card.log("Cleared due date");
+                        } else {
+                            card.touch();
+                        }
                         card_store::save_card(&board.meta.id, card)?;
                         app.set_status("Due date cleared".into());
                     }

@@ -112,6 +112,7 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | r | Rename list |
 | D | Archive list (confirm) |
 | a | Archive card (confirm) |
+| h | View card change history |
 | v | View/restore/delete archived cards |
 | V | View/restore/delete archived lists |
 | </>  | Reorder list left/right |
@@ -141,6 +142,7 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | L | Manage labels (create, rename, color, reorder, delete) |
 | u | Set due date (opens picker) |
 | U | Clear due date |
+| h | View card change history |
 | Esc | Close |
 
 In the due-date picker: arrow keys navigate the calendar (←→ ±day, ↑↓ ±week), PgUp/PgDn jump months (Shift = ±year), `t` jumps to today, typing digits/hyphens edits the text input, Enter saves, Esc cancels. Clearing the buffer (Ctrl+U) and pressing Enter removes the due date.
