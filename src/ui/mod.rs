@@ -172,7 +172,9 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 Line::raw("  Ctrl+K     Code (`text`)"),
                 Line::raw("  Ctrl+L     List item (- )"),
                 Line::raw("  Up/Down    Move by visual (wrapped) line"),
-                Line::raw("  Enter      Auto-continue lists"),
+                Line::raw("  Enter      Auto-continue lists (plain newline at start of doc)"),
+                Line::raw("  Tab        Nest list item (numbered restart at 1)"),
+                Line::raw("  Shift+Tab  Un-nest list item"),
                 Line::raw("  Esc        Cancel"),
             ]);
         }

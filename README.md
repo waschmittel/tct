@@ -154,7 +154,10 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | Ctrl+K | Inline code (\`text\`) |
 | Ctrl+L | Insert list item (- ) |
 | Up/Down | Move by visual (wrapped) line |
-| Enter | Auto-continue list items |
+| Enter | Auto-continue list items; numbered lists are renumbered (nested sublists are independent); plain newline at start of document |
+| Tab | Nest the current list item one level deeper (3 spaces); numbered items restart at 1 |
+| Shift+Tab | Un-nest the current list item one level (rejoins the parent list) |
+| Backspace/Delete | Numbered lists are renumbered when an edit changes the line count |
 | Esc | Cancel (confirms if changes exist) |
 
 On macOS, Cmd can be used instead of Ctrl in terminals that support it (kitty, Alacritty, WezTerm).

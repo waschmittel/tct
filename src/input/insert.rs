@@ -118,6 +118,16 @@ fn handle_description_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         (KeyCode::Enter, _) => {
             handle_enter_in_list(app);
         }
+        (KeyCode::Tab, m) if !m.contains(KeyModifiers::SHIFT) => {
+            if !handle_tab_nest(app) {
+                if let Some(textarea) = &mut app.description_editor {
+                    textarea.input(key);
+                }
+            }
+        }
+        (KeyCode::BackTab, _) | (KeyCode::Tab, _) => {
+            handle_shift_tab_unnest(app);
+        }
         (KeyCode::Up, _) => {
             move_cursor_visual(app, -1);
         }
@@ -126,7 +136,16 @@ fn handle_description_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
         _ => {
             if let Some(textarea) = &mut app.description_editor {
+                // Renumber when an edit changes the document's line count
+                // (Backspace joining lines, Delete merging, paste of multi-
+                // line text). Plain char-by-char edits leave the count
+                // unchanged and skip the renumber pass.
+                let before = textarea.lines().len();
                 textarea.input(key);
+                let after = textarea.lines().len();
+                if after != before {
+                    renumber_all(textarea);
+                }
             }
         }
     }
@@ -213,7 +232,18 @@ fn handle_enter_in_list(app: &mut App) {
     let Some(textarea) = &mut app.description_editor else {
         return;
     };
-    let ratatui_textarea::DataCursor(row, _col) = textarea.cursor();
+    let ratatui_textarea::DataCursor(row, col) = textarea.cursor();
+
+    // At the very start of the document: insert a blank line above without
+    // list continuation, so users can add content before a leading list item.
+    // Only special-cased for (0, 0) — for other positions, users can navigate
+    // to the previous line and continue normally.
+    if row == 0 && col == 0 {
+        textarea.insert_newline();
+        textarea.move_cursor(CursorMove::Up);
+        return;
+    }
+
     let current_line = textarea.lines().get(row).cloned().unwrap_or_default();
     let trimmed = current_line.trim_start();
 
@@ -244,17 +274,190 @@ fn handle_enter_in_list(app: &mut App) {
 
     if let Some(dot_pos) = trimmed.find(". ") {
         let num_part = &trimmed[..dot_pos];
-        if let Ok(num) = num_part.parse::<u64>() {
+        if num_part.parse::<u64>().is_ok() {
             let indent = current_line.len() - trimmed.len();
             let indent_str = " ".repeat(indent);
             textarea.move_cursor(CursorMove::End);
             textarea.insert_newline();
-            textarea.insert_str(&format!("{indent_str}{}. ", num + 1));
+            // Use a placeholder number (renumber_all rewrites it to the
+            // correct value, so the literal here doesn't matter beyond shape).
+            textarea.insert_str(&format!("{indent_str}1. "));
+            renumber_all(textarea);
+            // Park the cursor at the end of the new item, regardless of how
+            // many digits its prefix ended up with.
+            let new_row = row + 1;
+            let new_len = textarea
+                .lines()
+                .get(new_row)
+                .map(|l| l.chars().count())
+                .unwrap_or(0);
+            textarea.move_cursor(CursorMove::Jump(new_row as u16, new_len as u16));
             return;
         }
     }
 
     textarea.insert_newline();
+}
+
+const NEST_INDENT: usize = 3;
+
+/// Returns true if the cursor was on a list line and the nest was applied.
+/// On a numbered list the inserted item is forced to start at 1 so it
+/// becomes the start of a fresh nested list (renumber_all then joins it
+/// to any existing nested run at the new indent).
+fn handle_tab_nest(app: &mut App) -> bool {
+    let Some(textarea) = &mut app.description_editor else {
+        return false;
+    };
+    let ratatui_textarea::DataCursor(row, col) = textarea.cursor();
+    let line = match textarea.lines().get(row) {
+        Some(l) => l.clone(),
+        None => return false,
+    };
+    let trimmed = line.trim_start();
+    let indent = line.len() - trimmed.len();
+
+    let numbered_prefix = trimmed
+        .find(". ")
+        .and_then(|p| trimmed[..p].parse::<u64>().ok().map(|_| p));
+    let is_unordered = trimmed.starts_with("- ") || trimmed.starts_with("* ");
+
+    if numbered_prefix.is_none() && !is_unordered {
+        return false;
+    }
+
+    let pad = " ".repeat(NEST_INDENT);
+    textarea.move_cursor(CursorMove::Jump(row as u16, 0));
+    textarea.insert_str(&pad);
+
+    if let Some(dot_pos) = numbered_prefix {
+        let old_num_str = &trimmed[..dot_pos];
+        let new_indent = indent + NEST_INDENT;
+        textarea.move_cursor(CursorMove::Jump(row as u16, new_indent as u16));
+        textarea.delete_str(old_num_str.chars().count());
+        textarea.insert_str("1");
+    }
+
+    renumber_all(textarea);
+
+    let new_line_len = textarea
+        .lines()
+        .get(row)
+        .map(|l| l.chars().count())
+        .unwrap_or(0);
+    let target_col = (col + NEST_INDENT).min(new_line_len);
+    textarea.move_cursor(CursorMove::Jump(row as u16, target_col as u16));
+    true
+}
+
+/// Remove one indent level (`NEST_INDENT` leading spaces) if the cursor
+/// is on a list line that has enough leading spaces. After dedenting,
+/// renumber_all rejoins the line to the parent-level list.
+fn handle_shift_tab_unnest(app: &mut App) {
+    let Some(textarea) = &mut app.description_editor else {
+        return;
+    };
+    let ratatui_textarea::DataCursor(row, col) = textarea.cursor();
+    let line = match textarea.lines().get(row) {
+        Some(l) => l.clone(),
+        None => return,
+    };
+    let trimmed = line.trim_start();
+    let indent = line.len() - trimmed.len();
+    if indent < NEST_INDENT {
+        return;
+    }
+
+    let is_numbered = trimmed
+        .find(". ")
+        .and_then(|p| trimmed[..p].parse::<u64>().ok())
+        .is_some();
+    let is_unordered = trimmed.starts_with("- ") || trimmed.starts_with("* ");
+    if !is_numbered && !is_unordered {
+        return;
+    }
+
+    textarea.move_cursor(CursorMove::Jump(row as u16, 0));
+    textarea.delete_str(NEST_INDENT);
+
+    renumber_all(textarea);
+
+    let new_line_len = textarea
+        .lines()
+        .get(row)
+        .map(|l| l.chars().count())
+        .unwrap_or(0);
+    let target_col = col.saturating_sub(NEST_INDENT).min(new_line_len);
+    textarea.move_cursor(CursorMove::Jump(row as u16, target_col as u16));
+}
+
+/// Walk the entire document with a per-indent stack of "next expected
+/// number" counters and rewrite every numbered list item so each
+/// contiguous run is sequential. Each run's start number is preserved
+/// from the run's first item, so lists that intentionally start at a
+/// non-1 number keep their starting point. Blank lines reset all
+/// active runs; non-numbered lines end runs at indent >= their indent
+/// so unrelated lists stay independent. Cursor position is preserved.
+fn renumber_all(textarea: &mut ratatui_textarea::TextArea<'static>) {
+    let lines = textarea.lines().to_vec();
+    let saved = textarea.cursor();
+
+    let mut stack: Vec<(usize, u64)> = Vec::new();
+
+    for (r, line) in lines.iter().enumerate() {
+        if line.is_empty() {
+            stack.clear();
+            continue;
+        }
+        let trimmed = line.trim_start();
+        let indent = line.len() - trimmed.len();
+
+        let numbered = trimmed.find(". ").and_then(|p| {
+            let s = &trimmed[..p];
+            s.parse::<u64>().ok().map(|n| (s.to_string(), n))
+        });
+
+        if let Some((num_str, n)) = numbered {
+            while let Some(&(top_indent, _)) = stack.last() {
+                if top_indent > indent {
+                    stack.pop();
+                } else {
+                    break;
+                }
+            }
+
+            let expected = match stack.last() {
+                Some(&(top_indent, next)) if top_indent == indent => next,
+                _ => n,
+            };
+
+            match stack.last_mut() {
+                Some(top) if top.0 == indent => top.1 = expected + 1,
+                _ => stack.push((indent, expected + 1)),
+            }
+
+            if expected != n {
+                textarea.move_cursor(CursorMove::Jump(r as u16, indent as u16));
+                textarea.delete_str(num_str.chars().count());
+                textarea.insert_str(&expected.to_string());
+            }
+        } else {
+            // A non-blank, non-numbered line ends any run whose indent
+            // is >= this line's indent. Deeper-indented continuation
+            // lines (indent strictly greater than every active level)
+            // are left alone.
+            while let Some(&(top_indent, _)) = stack.last() {
+                if top_indent >= indent {
+                    stack.pop();
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    let ratatui_textarea::DataCursor(sr, sc) = saved;
+    textarea.move_cursor(CursorMove::Jump(sr as u16, sc as u16));
 }
 
 fn wrap_selection_or_insert(app: &mut App, prefix: &str, suffix: &str) {
@@ -538,5 +741,466 @@ mod tests {
         handle(&mut app, KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty())).unwrap();
         assert_eq!(app.input_buffer, "");
         assert_eq!(app.input_cursor, 0);
+    }
+
+    fn editor_lines(app: &App) -> Vec<String> {
+        app.description_editor
+            .as_ref()
+            .unwrap()
+            .lines()
+            .to_vec()
+    }
+
+    fn editor_cursor(app: &App) -> (usize, usize) {
+        let ratatui_textarea::DataCursor(r, c) = app.description_editor.as_ref().unwrap().cursor();
+        (r, c)
+    }
+
+    #[test]
+    fn enter_at_col0_of_first_list_line_inserts_blank_line_above() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("- first\n- second");
+        // Position cursor at (0, 0) — start of first list item
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::Head);
+        assert_eq!(editor_cursor(&app), (0, 0));
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        // Blank line inserted above; original list items preserved verbatim
+        assert_eq!(
+            editor_lines(&app),
+            vec!["".to_string(), "- first".to_string(), "- second".to_string()]
+        );
+        // Cursor on the new blank line so user can type immediately
+        assert_eq!(editor_cursor(&app), (0, 0));
+    }
+
+    #[test]
+    fn enter_at_col0_of_inner_list_line_still_continues_list() {
+        // Regression guard: the col-0 fix is scoped to (0, 0). Inner list lines
+        // keep the original auto-continuation behavior.
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("intro\n- first\n- second");
+        // Position cursor at (1, 0) — start of first list item
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::Down);
+        ta.move_cursor(ratatui_textarea::CursorMove::Head);
+        assert_eq!(editor_cursor(&app), (1, 0));
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        // Auto-continuation kicks in: new "- " line inserted after the list item
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "intro".to_string(),
+                "- first".to_string(),
+                "- ".to_string(),
+                "- second".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn enter_at_end_of_list_item_continues_list() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("- first");
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        // Continuation: new line gets "- " bullet prefix
+        assert_eq!(
+            editor_lines(&app),
+            vec!["- first".to_string(), "- ".to_string()]
+        );
+    }
+
+    #[test]
+    fn enter_at_end_of_numbered_item_continues_with_next_number() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. first");
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec!["1. first".to_string(), "2. ".to_string()]
+        );
+    }
+
+    #[test]
+    fn enter_in_numbered_list_renumbers_following_items() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. a\n2. b\n3. c");
+        // Cursor at end of "1. a"
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        // Following items renumbered to keep the list contiguous
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "1. a".to_string(),
+                "2. ".to_string(),
+                "3. b".to_string(),
+                "4. c".to_string(),
+            ]
+        );
+        // Cursor stays on the newly inserted item, after the "2. " prefix
+        assert_eq!(editor_cursor(&app), (1, 3));
+    }
+
+    #[test]
+    fn enter_at_last_numbered_item_does_not_renumber() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. a\n2. b");
+        let ta = app.description_editor.as_mut().unwrap();
+        // Move to end of "2. b"
+        ta.move_cursor(ratatui_textarea::CursorMove::Bottom);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec!["1. a".to_string(), "2. b".to_string(), "3. ".to_string()]
+        );
+    }
+
+    #[test]
+    fn enter_in_parent_numbered_list_skips_nested_children() {
+        let mut app =
+            App::new(None).unwrap();
+        app.start_description_edit("1. parent\n   1. child\n   2. child\n2. parent2");
+        // Cursor at end of "1. parent" (row 0)
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        // Parent "2. parent2" renumbered to 3, children untouched
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "1. parent".to_string(),
+                "2. ".to_string(),
+                "   1. child".to_string(),
+                "   2. child".to_string(),
+                "3. parent2".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn enter_in_nested_numbered_list_does_not_renumber_parents() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. parent\n   1. child\n   2. child2\n2. parent2");
+        // Cursor at end of "   1. child" (row 1)
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::Down);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        // Sibling child renumbered, parent line "2. parent2" left alone
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "1. parent".to_string(),
+                "   1. child".to_string(),
+                "   2. ".to_string(),
+                "   3. child2".to_string(),
+                "2. parent2".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn enter_renumbers_non_canonical_numbered_list_fully() {
+        // Existing numbers are [1, 5, 7]. Enter at end of "1. a" must
+        // renumber every item in the run sequentially, not just bump by 1.
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. a\n5. b\n7. c");
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "1. a".to_string(),
+                "2. ".to_string(),
+                "3. b".to_string(),
+                "4. c".to_string(),
+            ]
+        );
+        // Cursor parked at end of new item's prefix
+        assert_eq!(editor_cursor(&app), (1, 3));
+    }
+
+    #[test]
+    fn enter_preserves_lists_starting_at_nonzero_number() {
+        // List starts at 3 — first item's number is taken as the run's
+        // start; subsequent items renumber sequentially from there.
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("3. a\n4. b\n4. c");
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "3. a".to_string(),
+                "4. ".to_string(),
+                "5. b".to_string(),
+                "6. c".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn enter_in_middle_of_list_renumbers_items_above_and_below() {
+        // Original numbers are all "1." (legal markdown). Inserting in
+        // the middle must canonicalize the whole run.
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. a\n1. b\n1. c\n1. d");
+        let ta = app.description_editor.as_mut().unwrap();
+        // Cursor at end of "1. b" (row 1)
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::Down);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "1. a".to_string(),
+                "2. b".to_string(),
+                "3. ".to_string(),
+                "4. c".to_string(),
+                "5. d".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn enter_below_paragraph_renumbers_only_the_list_run() {
+        // The paragraph above the list is not a list item, so the run's
+        // upward walk must stop there. Without that guard, the renumber
+        // would never reach the inserted item and leave it as "1. ".
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("intro text\n1. foo\n2. bar");
+        let ta = app.description_editor.as_mut().unwrap();
+        // Cursor at end of "1. foo" (row 1)
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::Down);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "intro text".to_string(),
+                "1. foo".to_string(),
+                "2. ".to_string(),
+                "3. bar".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn enter_does_not_touch_earlier_unrelated_numbered_list() {
+        // Two separate numbered lists separated by a paragraph. Editing
+        // the second list must not touch the first.
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. orphan\nunrelated\n1. foo\n2. bar");
+        let ta = app.description_editor.as_mut().unwrap();
+        // Cursor at end of "1. foo" (row 2)
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::Down);
+        ta.move_cursor(ratatui_textarea::CursorMove::Down);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "1. orphan".to_string(),
+                "unrelated".to_string(),
+                "1. foo".to_string(),
+                "2. ".to_string(),
+                "3. bar".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn tab_nests_numbered_list_item_and_resets_to_one() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. parent\n2. child");
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Bottom);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Tab, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec!["1. parent".to_string(), "   1. child".to_string()]
+        );
+    }
+
+    #[test]
+    fn tab_nests_into_existing_nested_run() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. parent\n   1. existing-nested\n2. orphan");
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Bottom);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Tab, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec![
+                "1. parent".to_string(),
+                "   1. existing-nested".to_string(),
+                "   2. orphan".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn tab_nests_unordered_list_item() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("- a\n- b");
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Bottom);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Tab, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec!["- a".to_string(), "   - b".to_string()]
+        );
+    }
+
+    #[test]
+    fn shift_tab_unnests_nested_item_and_joins_parent_list() {
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. parent\n   1. child");
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Bottom);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::BackTab, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec!["1. parent".to_string(), "2. child".to_string()]
+        );
+    }
+
+    #[test]
+    fn shift_tab_on_top_level_list_item_is_noop() {
+        // Nothing to unnest at indent 0.
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. a\n2. b");
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Bottom);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        handle(&mut app, KeyEvent::new(KeyCode::BackTab, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec!["1. a".to_string(), "2. b".to_string()]
+        );
+    }
+
+    #[test]
+    fn deleting_blank_line_between_list_items_renumbers() {
+        // Two list runs separated by a blank line. Removing the blank line
+        // merges them into one run, which must be renumbered.
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. a\n\n5. b\n7. c");
+        let ta = app.description_editor.as_mut().unwrap();
+        // Cursor at start of the blank line (row 1)
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::Down);
+        ta.move_cursor(ratatui_textarea::CursorMove::Head);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec!["1. a".to_string(), "2. b".to_string(), "3. c".to_string()]
+        );
+    }
+
+    #[test]
+    fn deleting_numbered_item_via_line_merge_renumbers() {
+        // Cursor at start of "2. b"; Backspace joins it with the previous
+        // line's tail. After the merge the remaining numbered items have
+        // shifted positions and must be renumbered.
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. a\n2. b\n3. c");
+        let ta = app.description_editor.as_mut().unwrap();
+        // Cursor at start of "2. b" (row 1)
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::Down);
+        ta.move_cursor(ratatui_textarea::CursorMove::Head);
+
+        handle(&mut app, KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty())).unwrap();
+
+        // Backspace at start of "2. b" merges it into the previous line:
+        // line 0 becomes "1. a2. b" — still a "1." numbered prefix, so the
+        // run continues. The trailing "3. c" gets renumbered to "2. c"
+        // because the list run is now two items long.
+        assert_eq!(
+            editor_lines(&app),
+            vec!["1. a2. b".to_string(), "2. c".to_string()]
+        );
+    }
+
+    #[test]
+    fn typing_does_not_trigger_renumber() {
+        // Regression guard: renumbering must only happen on numbered-list
+        // continuation Enter, not on every keystroke.
+        let mut app = App::new(None).unwrap();
+        app.start_description_edit("1. a\n5. b");
+        // Cursor at end of "1. a"
+        let ta = app.description_editor.as_mut().unwrap();
+        ta.move_cursor(ratatui_textarea::CursorMove::Top);
+        ta.move_cursor(ratatui_textarea::CursorMove::End);
+
+        // Type a character — must not rewrite "5. b" to "2. b"
+        handle(&mut app, KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty())).unwrap();
+
+        assert_eq!(
+            editor_lines(&app),
+            vec!["1. ax".to_string(), "5. b".to_string()]
+        );
     }
 }
