@@ -146,6 +146,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             Line::raw("  t              Edit title"),
             Line::raw("  e              Edit description"),
             Line::raw("  y              Copy description"),
+            Line::raw("  Y              Copy checklist as markdown"),
             Line::raw("  Up/Down        Navigate checklist items"),
             Line::raw("  Shift+Up/Down  Reorder checklist item"),
             Line::raw("  Space          Toggle checklist item"),

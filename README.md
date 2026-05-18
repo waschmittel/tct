@@ -127,6 +127,8 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | --- | --- |
 | t | Edit title |
 | e | Edit description |
+| y | Copy description to clipboard |
+| Y | Copy entire checklist as markdown to clipboard |
 | Up/Down | Navigate checklist items |
 | Shift+Up/Down | Reorder selected checklist item |
 | Space | Toggle checklist item |

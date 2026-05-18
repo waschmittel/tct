@@ -149,6 +149,20 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
 
+        // Copy entire checklist as markdown
+        (KeyCode::Char('Y'), _) => {
+            if let Some(board) = &app.board {
+                if let Some(card) = board.current_card() {
+                    if card.checklist.is_empty() {
+                        app.set_status("Checklist is empty".into());
+                    } else {
+                        let md = card.checklist_as_markdown();
+                        app.copy_to_clipboard(md);
+                    }
+                }
+            }
+        }
+
         // Labels
         (KeyCode::Char('l'), _) => {
             if let Some(board) = &app.board {

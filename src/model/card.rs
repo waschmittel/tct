@@ -70,6 +70,19 @@ impl Card {
         self.updated_at = Utc::now();
     }
 
+    /// Render the full checklist as GitHub-flavored markdown task list.
+    /// Returns an empty string when the checklist is empty.
+    pub fn checklist_as_markdown(&self) -> String {
+        self.checklist
+            .iter()
+            .map(|item| {
+                let mark = if item.completed { "x" } else { " " };
+                format!("- [{mark}] {}", item.text)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     pub fn resolved_labels<'a>(&self, board_labels: &'a [Label]) -> Vec<&'a Label> {
         board_labels
             .iter()
@@ -193,6 +206,43 @@ mod tests {
             ChecklistItem { text: "B".into(), completed: false },
         ];
         assert_eq!(card.checklist_progress(), Some((0, 2)));
+    }
+
+    #[test]
+    fn checklist_as_markdown_mixed() {
+        let mut card = Card::new("Task".into());
+        card.checklist = vec![
+            ChecklistItem { text: "Reproduce".into(), completed: true },
+            ChecklistItem { text: "Fix".into(), completed: false },
+            ChecklistItem { text: "Test".into(), completed: true },
+        ];
+        let md = card.checklist_as_markdown();
+        assert_eq!(md, "- [x] Reproduce\n- [ ] Fix\n- [x] Test");
+    }
+
+    #[test]
+    fn checklist_as_markdown_empty() {
+        let card = Card::new("Task".into());
+        assert_eq!(card.checklist_as_markdown(), "");
+    }
+
+    #[test]
+    fn checklist_as_markdown_single_item() {
+        let mut card = Card::new("Task".into());
+        card.checklist = vec![ChecklistItem { text: "alone".into(), completed: false }];
+        assert_eq!(card.checklist_as_markdown(), "- [ ] alone");
+    }
+
+    #[test]
+    fn checklist_as_markdown_preserves_special_chars() {
+        let mut card = Card::new("Task".into());
+        card.checklist = vec![
+            ChecklistItem { text: "with **bold** and `code`".into(), completed: true },
+        ];
+        assert_eq!(
+            card.checklist_as_markdown(),
+            "- [x] with **bold** and `code`"
+        );
     }
 
     #[test]

@@ -51,6 +51,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Span::raw(":title  "),
             Span::styled("e", Style::default().fg(accent)),
             Span::raw(":desc  "),
+            Span::styled("y/Y", Style::default().fg(accent)),
+            Span::raw(":copy desc/list  "),
             Span::styled("u/U", Style::default().fg(accent)),
             Span::raw(":due/clear  "),
             Span::styled("l", Style::default().fg(accent)),
