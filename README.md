@@ -110,10 +110,10 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | n | New card |
 | N | New list |
 | r | Rename list |
-| d | Delete card (confirm) |
-| D | Delete list (confirm) |
+| D | Archive list (confirm) |
 | a | Archive card (confirm) |
 | v | View/restore/delete archived cards |
+| V | View/restore/delete archived lists |
 | </>  | Reorder list left/right |
 | / | Search |
 | L | Manage labels |
@@ -192,10 +192,13 @@ tct boards --archive a1b2c3d4 --by-id
 ### Lists
 
 ```
-tct lists <board>                         List all lists on a board
+tct lists <board>                         List all active lists on a board
+tct lists <board> --archived              List archived lists
 tct lists <board> --create <name>         Create a list
 tct lists <board> --rename <list> <name>  Rename a list
-tct lists <board> --delete <list>         Delete a list and all its cards
+tct lists <board> --archive <list>        Archive a list
+tct lists <board> --restore <list>        Restore an archived list
+tct lists <board> --delete <list>         Permanently delete an archived list and its cards
 ```
 
 ### Cards

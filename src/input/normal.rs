@@ -147,17 +147,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
             }
         }
-        (KeyCode::Char('d'), _) => {
-            if let Some(board) = &app.board {
-                if board.current_card_id().is_some() {
-                    app.mode = AppMode::Dialog(DialogKind::ConfirmDeleteCard);
-                }
-            }
-        }
         (KeyCode::Char('D'), _) => {
             if let Some(board) = &app.board {
                 if !board.lists.is_empty() {
-                    app.mode = AppMode::Dialog(DialogKind::ConfirmDeleteList);
+                    app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveList);
                 }
             }
         }
@@ -203,6 +196,18 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     app.archived_cards = archived;
                     app.archived_selected = 0;
                     app.mode = AppMode::Dialog(DialogKind::ArchivedCards);
+                }
+            }
+        }
+        (KeyCode::Char('V'), _) => {
+            if let Some(board) = &app.board {
+                let archived = list_store::list_archived_lists(&board.meta.id);
+                if archived.is_empty() {
+                    app.set_status("No archived lists".into());
+                } else {
+                    app.archived_lists = archived;
+                    app.archived_selected = 0;
+                    app.mode = AppMode::Dialog(DialogKind::ArchivedLists);
                 }
             }
         }
@@ -467,7 +472,7 @@ mod tests {
             cards.into_iter().map(|c| (c.id.clone(), c)).collect();
         LoadedBoard {
             meta: BoardMeta::new("X".into()),
-            lists: vec![CardList { id: "l".into(), name: "L".into(), card_ids }],
+            lists: vec![CardList { id: "l".into(), name: "L".into(), card_ids, archived: false }],
             cards: cards_map,
             selected_list: 0,
             selected_card: vec![0],

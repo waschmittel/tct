@@ -33,10 +33,13 @@ COMMANDS:
   boards --restore <name>             Restore an archived board
   boards --delete <name>              Permanently delete an archived board
 
-  lists <board>                       List all lists on a board
+  lists <board>                       List all active lists on a board
+  lists <board> --archived            List archived lists
   lists <board> --create <name>       Create a list
   lists <board> --rename <list> <name>  Rename a list
-  lists <board> --delete <list>       Delete a list and all its cards
+  lists <board> --archive <list>      Archive a list
+  lists <board> --restore <list>      Restore an archived list
+  lists <board> --delete <list>       Permanently delete an archived list and its cards
 
   cards <board>                       List active cards grouped by list
   cards <board> --archived            List archived cards
@@ -180,10 +183,17 @@ fn cmd_boards(args: &[String], by_id: bool) -> anyhow::Result<()> {
 fn cmd_lists(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args
         .first()
-        .ok_or_else(|| anyhow::anyhow!("Usage: tct lists <board> [--create|--rename|--delete ...]"))?
+        .ok_or_else(|| anyhow::anyhow!("Usage: tct lists <board> [--create|--rename|--archive|--restore|--delete|--archived ...]"))?
         .as_str();
 
-    if let Some(name) = flag_value(args, "--create") {
+    if has_flag(args, "--archived") {
+        let board = find_board(board_partial, by_id)?;
+        let archived = list_store::list_archived_lists(&board.id);
+        println!("Board: {} [{}]  (archived lists: {})", board.name, board.id, archived.len());
+        for (i, list) in archived.iter().enumerate() {
+            println!("  {}. [{}]  {}  ({} cards)", i + 1, list.id, list.name, list.card_ids.len());
+        }
+    } else if let Some(name) = flag_value(args, "--create") {
         let board = find_board(board_partial, by_id)?;
         let list = CardList::new(name.to_string());
         list_store::save_list(&board.id, &list)?;
@@ -199,21 +209,42 @@ fn cmd_lists(args: &[String], by_id: bool) -> anyhow::Result<()> {
         list.name = new_name.to_string();
         list_store::save_list(&board.id, &list)?;
         println!("Renamed list '{old_name}' to '{new_name}'.");
-    } else if let Some(list_partial) = flag_value(args, "--delete") {
+    } else if let Some(list_partial) = flag_value(args, "--archive") {
         let board = find_board(board_partial, by_id)?;
         let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-        let list = find_list(&lists, list_partial, by_id)?.clone();
+        let mut list = find_list(&lists, list_partial, by_id)?.clone();
+        let name = list.name.clone();
+        list.archived = true;
+        list_store::save_list(&board.id, &list)?;
+        let mut meta = board_store::load_board(&board.id)?;
+        meta.list_order.retain(|id| id != &list.id);
+        board_store::save_board(&meta)?;
+        println!("Archived list '{name}'.");
+    } else if let Some(list_partial) = flag_value(args, "--restore") {
+        let board = find_board(board_partial, by_id)?;
+        let archived = list_store::list_archived_lists(&board.id);
+        let mut list = find_list(&archived, list_partial, by_id)?.clone();
+        let name = list.name.clone();
+        list.archived = false;
+        list_store::save_list(&board.id, &list)?;
+        let mut meta = board_store::load_board(&board.id)?;
+        if !meta.list_order.contains(&list.id) {
+            meta.list_order.push(list.id.clone());
+        }
+        board_store::save_board(&meta)?;
+        println!("Restored list '{name}'.");
+    } else if let Some(list_partial) = flag_value(args, "--delete") {
+        let board = find_board(board_partial, by_id)?;
+        let archived = list_store::list_archived_lists(&board.id);
+        let list = find_list(&archived, list_partial, by_id)?.clone();
         let name = list.name.clone();
         for card_id in &list.card_ids {
             let _ = card_store::delete_card(&board.id, card_id);
         }
         list_store::delete_list_file(&board.id, &list.id)?;
-        let mut meta = board_store::load_board(&board.id)?;
-        meta.list_order.retain(|id| id != &list.id);
-        board_store::save_board(&meta)?;
-        println!("Deleted list '{name}' and all its cards.");
+        println!("Permanently deleted list '{name}' and its cards.");
     } else {
-        // Default: list all lists on board
+        // Default: list all active lists on board
         let board = find_board(board_partial, by_id)?;
         let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
         let all_cards = load_all_cards(&board.id, &lists);

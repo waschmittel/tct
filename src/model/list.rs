@@ -7,6 +7,8 @@ pub struct CardList {
     pub id: ShortId,
     pub name: String,
     pub card_ids: Vec<ShortId>,
+    #[serde(default)]
+    pub archived: bool,
 }
 
 impl CardList {
@@ -15,6 +17,7 @@ impl CardList {
             id: ids::new_id(),
             name,
             card_ids: Vec::new(),
+            archived: false,
         }
     }
 }

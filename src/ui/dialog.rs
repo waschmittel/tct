@@ -13,16 +13,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     };
 
     match kind {
-        DialogKind::ConfirmDeleteCard => {
-            let name = app
-                .board
-                .as_ref()
-                .and_then(|b| b.current_card())
-                .map(|c| c.title.as_str())
-                .unwrap_or("this card");
-            render_confirm(frame, area, "Delete Card", &format!("Delete '{name}'?"));
-        }
-        DialogKind::ConfirmDeleteList => {
+        DialogKind::ConfirmArchiveList => {
             let name = app
                 .board
                 .as_ref()
@@ -32,8 +23,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             render_confirm(
                 frame,
                 area,
-                "Delete List",
-                &format!("Delete list '{name}' and all its cards?"),
+                "Archive List",
+                &format!("Archive list '{name}'?"),
             );
         }
         DialogKind::ConfirmArchiveBoard => {
@@ -85,6 +76,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         }
         DialogKind::ArchivedBoards => {
             render_archived_boards(frame, area, app);
+        }
+        DialogKind::ArchivedLists => {
+            render_archived_lists(frame, area, app);
         }
         DialogKind::LabelPicker => {
             render_label_picker(frame, area, app);
@@ -370,6 +364,56 @@ fn render_archived_boards(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(board_color)
         };
         lines.push(Line::from(Span::styled(format!("{prefix}{}", board.name), style)));
+    }
+
+    frame.render_widget(Paragraph::new(lines), inner);
+}
+
+fn render_archived_lists(frame: &mut Frame, area: Rect, app: &App) {
+    let height = (app.archived_lists.len() as u16 + 5).min(area.height.saturating_sub(4)).max(6);
+    let width = 54u16.min(area.width.saturating_sub(4));
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = (area.height.saturating_sub(height)) / 2;
+    let popup = Rect::new(x, y, width, height);
+
+    frame.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .title(" Archived Lists ")
+        .title_bottom(Line::from(vec![
+            Span::styled(" Enter", Style::default().fg(Color::Green)),
+            Span::raw(":restore  "),
+            Span::styled("x", Style::default().fg(Color::Red)),
+            Span::raw(":delete  "),
+            Span::styled("Esc", Style::default().fg(Color::Yellow)),
+            Span::raw(":close "),
+        ]))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    if app.archived_lists.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Span::styled("No archived lists", Style::default().fg(Color::DarkGray))),
+            inner,
+        );
+        return;
+    }
+
+    let mut lines = Vec::new();
+    for (i, list) in app.archived_lists.iter().enumerate() {
+        let is_selected = i == app.archived_selected;
+        let prefix = if is_selected { "» " } else { "  " };
+        let style = if is_selected {
+            Style::default().fg(accent(app)).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+        };
+        lines.push(Line::from(Span::styled(
+            format!("{prefix}{} ({} cards)", list.name, list.card_ids.len()),
+            style,
+        )));
     }
 
     frame.render_widget(Paragraph::new(lines), inner);

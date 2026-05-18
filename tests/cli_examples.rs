@@ -125,11 +125,14 @@ fn lists_create_rename_delete() {
     assert!(out.contains("Backlog"), "{out}");
     assert!(!out.contains("To Do"), "{out}");
 
-    let out = ok(&tmp, &["lists", "Proj", "--delete", "Backlog"]);
-    assert!(out.contains("Deleted list 'Backlog' and all its cards"), "{out}");
+    let out = ok(&tmp, &["lists", "Proj", "--archive", "Backlog"]);
+    assert!(out.contains("Archived list 'Backlog'"), "{out}");
 
     let out = ok(&tmp, &["lists", "Proj"]);
     assert!(out.contains("(no lists)"), "{out}");
+
+    let out = ok(&tmp, &["lists", "Proj", "--delete", "Backlog"]);
+    assert!(out.contains("Permanently deleted list 'Backlog'"), "{out}");
 }
 
 // ── Card tests ────────────────────────────────────────────────────────────────
@@ -669,6 +672,7 @@ fn deleting_list_removes_its_cards() {
     ok(&tmp, &["boards", "--create", "Proj"]);
     ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
     ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Doomed"]);
+    ok(&tmp, &["lists", "Proj", "--archive", "Tasks"]);
     ok(&tmp, &["lists", "Proj", "--delete", "Tasks"]);
 
     // Card should no longer appear in archived either (it's deleted, not archived)

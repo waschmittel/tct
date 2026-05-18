@@ -10,32 +10,38 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     };
 
     match kind {
-        DialogKind::ConfirmDeleteCard => handle_confirm_delete_card(app, key),
-        DialogKind::ConfirmDeleteList => handle_confirm_delete_list(app, key),
         DialogKind::ConfirmArchiveBoard => handle_confirm_archive_board(app, key),
         DialogKind::ConfirmArchiveCard => handle_confirm_archive_card(app, key),
+        DialogKind::ConfirmArchiveList => handle_confirm_archive_list(app, key),
         DialogKind::ConfirmCancelEdit => handle_confirm_cancel_edit(app, key),
         DialogKind::ConfirmDeleteLabel => handle_confirm_delete_label(app, key),
         DialogKind::ArchivedCards => handle_archived_cards(app, key),
         DialogKind::ArchivedBoards => handle_archived_boards(app, key),
+        DialogKind::ArchivedLists => handle_archived_lists(app, key),
         DialogKind::LabelPicker => handle_label_picker(app, key),
         DialogKind::LabelManager => handle_label_manager(app, key),
     }
 }
 
-fn handle_confirm_delete_card(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+fn handle_confirm_archive_list(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
             if let Some(board) = &mut app.board {
-                if let Some(card_id) = board.current_card_id().cloned() {
-                    card_store::delete_card(&board.meta.id, &card_id)?;
-                    board.cards.remove(&card_id);
-                    if let Some(list) = board.lists.get_mut(board.selected_list) {
-                        list.card_ids.retain(|id| id != &card_id);
-                        list_store::save_list(&board.meta.id, list)?;
+                let li = board.selected_list;
+                if let Some(list) = board.lists.get_mut(li) {
+                    list.archived = true;
+                    let list_id = list.id.clone();
+                    let list_clone = list.clone();
+                    list_store::save_list(&board.meta.id, &list_clone)?;
+                    board.meta.list_order.retain(|id| id != &list_id);
+                    board.lists.remove(li);
+                    board.selected_card.remove(li);
+                    board.scroll_offset.remove(li);
+                    board_store::save_board(&board.meta)?;
+                    if board.selected_list > 0 && board.selected_list >= board.lists.len() {
+                        board.selected_list = board.lists.len().saturating_sub(1);
                     }
-                    board.clamp_selection();
-                    app.set_status("Card deleted".into());
+                    app.set_status("List archived".into());
                 }
             }
             app.mode = AppMode::Normal;
@@ -48,32 +54,68 @@ fn handle_confirm_delete_card(app: &mut App, key: KeyEvent) -> anyhow::Result<()
     Ok(())
 }
 
-fn handle_confirm_delete_list(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+fn handle_archived_lists(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     match key.code {
-        KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if let Some(board) = &mut app.board {
-                let li = board.selected_list;
-                if let Some(list) = board.lists.get(li) {
-                    for card_id in &list.card_ids {
-                        let _ = card_store::delete_card(&board.meta.id, card_id);
-                        board.cards.remove(card_id);
+        KeyCode::Down => {
+            if app.archived_selected < app.archived_lists.len().saturating_sub(1) {
+                app.archived_selected += 1;
+            }
+        }
+        KeyCode::Up => {
+            if app.archived_selected > 0 {
+                app.archived_selected -= 1;
+            }
+        }
+        KeyCode::Enter => {
+            if app.archived_selected < app.archived_lists.len() {
+                let mut list = app.archived_lists.remove(app.archived_selected);
+                list.archived = false;
+                let name = list.name.clone();
+                if let Some(board) = &mut app.board {
+                    list_store::save_list(&board.meta.id, &list)?;
+                    if !board.meta.list_order.contains(&list.id) {
+                        board.meta.list_order.push(list.id.clone());
                     }
-                    list_store::delete_list_file(&board.meta.id, &list.id)?;
-                    let list_id = list.id.clone();
-                    board.meta.list_order.retain(|id| id != &list_id);
-                    board.lists.remove(li);
-                    board.selected_card.remove(li);
-                    board.scroll_offset.remove(li);
                     board_store::save_board(&board.meta)?;
-                    if board.selected_list > 0 && board.selected_list >= board.lists.len() {
-                        board.selected_list = board.lists.len().saturating_sub(1);
+                    for card_id in &list.card_ids {
+                        if let Ok(card) = card_store::load_card(&board.meta.id, card_id) {
+                            board.cards.insert(card_id.clone(), card);
+                        }
                     }
-                    app.set_status("List deleted".into());
+                    board.lists.push(list);
+                    board.selected_card.push(0);
+                    board.scroll_offset.push(0);
+                }
+                app.set_status(format!("Restored list '{name}'"));
+                if app.archived_selected > 0 && app.archived_selected >= app.archived_lists.len() {
+                    app.archived_selected = app.archived_lists.len().saturating_sub(1);
+                }
+                if app.archived_lists.is_empty() {
+                    app.mode = AppMode::Normal;
                 }
             }
-            app.mode = AppMode::Normal;
         }
-        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+        KeyCode::Char('x') => {
+            if app.archived_selected < app.archived_lists.len() {
+                let list = app.archived_lists.remove(app.archived_selected);
+                let name = list.name.clone();
+                if let Some(board) = &app.board {
+                    for card_id in &list.card_ids {
+                        let _ = card_store::delete_card(&board.meta.id, card_id);
+                    }
+                    list_store::delete_list_file(&board.meta.id, &list.id)?;
+                }
+                app.set_status(format!("Deleted list '{name}'"));
+                if app.archived_selected > 0 && app.archived_selected >= app.archived_lists.len() {
+                    app.archived_selected = app.archived_lists.len().saturating_sub(1);
+                }
+                if app.archived_lists.is_empty() {
+                    app.mode = AppMode::Normal;
+                }
+            }
+        }
+        KeyCode::Esc => {
+            app.archived_lists.clear();
             app.mode = AppMode::Normal;
         }
         _ => {}
