@@ -6,6 +6,9 @@ mod model;
 mod storage;
 mod ui;
 
+#[cfg(test)]
+mod test_support;
+
 use std::time::Duration;
 
 use app::App;
@@ -63,17 +66,10 @@ mod tests {
     use crate::model::label::{Label, LabelColor};
     use crate::model::list::CardList;
     use crate::storage::{board_store, card_store, list_store};
-    use std::env;
     #[allow(unused_imports)]
     use regex::Regex;
 
-    fn with_temp_dir<F: FnOnce()>(f: F) {
-        let dir = tempfile::tempdir().unwrap();
-        unsafe { env::set_var("TCT_DATA_DIR", dir.path()) };
-        board_store::ensure_base_dirs().unwrap();
-        f();
-        unsafe { env::remove_var("TCT_DATA_DIR") };
-    }
+    use crate::test_support::with_temp_dir;
 
     #[test]
     fn board_roundtrip() {

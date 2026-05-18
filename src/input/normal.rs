@@ -414,16 +414,8 @@ mod tests {
     use crate::model::card::Card;
     use crate::model::list::CardList;
     use crate::storage::{board_store, card_store, list_store};
+    use crate::test_support::with_temp_dir;
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
-    use std::env;
-
-    fn with_temp_dir<F: FnOnce()>(f: F) {
-        let dir = tempfile::tempdir().unwrap();
-        unsafe { env::set_var("TCT_DATA_DIR", dir.path()) };
-        board_store::ensure_base_dirs().unwrap();
-        f();
-        unsafe { env::remove_var("TCT_DATA_DIR") };
-    }
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent {
@@ -441,6 +433,44 @@ mod tests {
             kind: KeyEventKind::Press,
             state: KeyEventState::NONE,
         }
+    }
+
+    /// Build an App with a single list of cards with the given titles.
+    fn single_list_fixture(titles: &[&str]) -> (App, BoardMeta) {
+        let mut meta = board_store::create_board("Board".into()).unwrap();
+        let mut list = CardList::new("L".into());
+        for t in titles {
+            let c = Card::new((*t).into());
+            card_store::save_card(&meta.id, &c).unwrap();
+            list.card_ids.push(c.id.clone());
+        }
+        list_store::save_list(&meta.id, &list).unwrap();
+        meta.list_order = vec![list.id.clone()];
+        board_store::save_board(&meta).unwrap();
+        (App::new(Some(meta.id.clone())).unwrap(), meta)
+    }
+
+    /// Build a `LoadedBoard` directly (no disk) with cards in one list.
+    fn loaded_board(cards: Vec<Card>) -> LoadedBoard {
+        let card_ids: Vec<_> = cards.iter().map(|c| c.id.clone()).collect();
+        let cards_map: std::collections::HashMap<_, _> =
+            cards.into_iter().map(|c| (c.id.clone(), c)).collect();
+        LoadedBoard {
+            meta: BoardMeta::new("X".into()),
+            lists: vec![CardList { id: "l".into(), name: "L".into(), card_ids }],
+            cards: cards_map,
+            selected_list: 0,
+            selected_card: vec![0],
+            scroll_offset: vec![0],
+            detail_item_idx: 0,
+            detail_scroll: 0,
+        }
+    }
+
+    fn fixed_card(id: &str, title: &str) -> Card {
+        let mut c = Card::new(title.into());
+        c.id = id.into();
+        c
     }
 
     /// Build an App with a board having two lists; list 0 has 3 cards, list 1 has 1.
@@ -711,21 +741,7 @@ mod tests {
     #[test]
     fn search_nav_skips_non_matching_cards() {
         with_temp_dir(|| {
-            // Manually craft a board where only middle card matches
-            let mut meta = board_store::create_board("Board".into()).unwrap();
-            let mut list = CardList::new("L".into());
-            let c1 = Card::new("alpha".into());
-            let c2 = Card::new("BINGO match".into());
-            let c3 = Card::new("gamma".into());
-            for c in [&c1, &c2, &c3] {
-                card_store::save_card(&meta.id, c).unwrap();
-                list.card_ids.push(c.id.clone());
-            }
-            list_store::save_list(&meta.id, &list).unwrap();
-            meta.list_order = vec![list.id.clone()];
-            board_store::save_board(&meta).unwrap();
-
-            let mut app = App::new(Some(meta.id.clone())).unwrap();
+            let (mut app, _) = single_list_fixture(&["alpha", "BINGO match", "gamma"]);
             app.search_active = true;
             app.search_query = "BINGO".into();
             // From index 0, next match is index 1
@@ -740,20 +756,7 @@ mod tests {
     #[test]
     fn search_nav_up_finds_previous_match() {
         with_temp_dir(|| {
-            let mut meta = board_store::create_board("Board".into()).unwrap();
-            let mut list = CardList::new("L".into());
-            let c1 = Card::new("BINGO one".into());
-            let c2 = Card::new("nope".into());
-            let c3 = Card::new("BINGO three".into());
-            for c in [&c1, &c2, &c3] {
-                card_store::save_card(&meta.id, c).unwrap();
-                list.card_ids.push(c.id.clone());
-            }
-            list_store::save_list(&meta.id, &list).unwrap();
-            meta.list_order = vec![list.id.clone()];
-            board_store::save_board(&meta).unwrap();
-
-            let mut app = App::new(Some(meta.id.clone())).unwrap();
+            let (mut app, _) = single_list_fixture(&["BINGO one", "nope", "BINGO three"]);
             app.search_active = true;
             app.search_query = "BINGO".into();
             app.board.as_mut().unwrap().selected_card[0] = 2;
@@ -789,53 +792,15 @@ mod tests {
 
     #[test]
     fn next_matching_card_helper_returns_none_for_no_match() {
-        let board = LoadedBoard {
-            meta: BoardMeta::new("X".into()),
-            lists: vec![CardList { id: "l1".into(), name: "L".into(), card_ids: vec!["c1".into()] }],
-            cards: {
-                let mut m = std::collections::HashMap::new();
-                let mut c = Card::new("alpha".into());
-                c.id = "c1".into();
-                m.insert("c1".to_string(), c);
-                m
-            },
-            selected_list: 0,
-            selected_card: vec![0],
-            scroll_offset: vec![0],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        };
+        let board = loaded_board(vec![fixed_card("c1", "alpha")]);
         assert!(next_matching_card(&board, 0, 0, "zzz").is_none());
     }
 
     #[test]
     fn visible_card_ids_skips_archived() {
-        let mut c1 = Card::new("a".into());
-        let mut c2 = Card::new("b".into());
-        c1.id = "id1".into();
-        c2.id = "id2".into();
-        c2.archived = true;
-
-        let board = LoadedBoard {
-            meta: BoardMeta::new("X".into()),
-            lists: vec![CardList {
-                id: "l".into(),
-                name: "L".into(),
-                card_ids: vec!["id1".into(), "id2".into()],
-            }],
-            cards: {
-                let mut m = std::collections::HashMap::new();
-                m.insert("id1".to_string(), c1);
-                m.insert("id2".to_string(), c2);
-                m
-            },
-            selected_list: 0,
-            selected_card: vec![0],
-            scroll_offset: vec![0],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        };
-        let visible = visible_card_ids(&board, 0);
-        assert_eq!(visible, vec![0]);
+        let mut cards = vec![fixed_card("id1", "a"), fixed_card("id2", "b")];
+        cards[1].archived = true;
+        let board = loaded_board(cards);
+        assert_eq!(visible_card_ids(&board, 0), vec![0]);
     }
 }

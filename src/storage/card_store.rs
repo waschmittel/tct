@@ -79,15 +79,7 @@ mod tests {
     use super::*;
     use crate::model::board::BoardMeta;
     use crate::storage::board_store;
-    use std::env;
-
-    fn with_temp_dir<F: FnOnce()>(f: F) {
-        let dir = tempfile::tempdir().unwrap();
-        unsafe { env::set_var("TCT_DATA_DIR", dir.path()) };
-        board_store::ensure_base_dirs().unwrap();
-        f();
-        unsafe { env::remove_var("TCT_DATA_DIR") };
-    }
+    use crate::test_support::with_temp_dir;
 
     fn make_board() -> BoardMeta {
         board_store::create_board("Board".into()).unwrap()

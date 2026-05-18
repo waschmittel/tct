@@ -41,15 +41,7 @@ pub fn load_all_lists(board_id: &str, list_order: &[ShortId]) -> Result<Vec<Card
 mod tests {
     use super::*;
     use crate::storage::board_store;
-    use std::env;
-
-    fn with_temp_dir<F: FnOnce()>(f: F) {
-        let dir = tempfile::tempdir().unwrap();
-        unsafe { env::set_var("TCT_DATA_DIR", dir.path()) };
-        board_store::ensure_base_dirs().unwrap();
-        f();
-        unsafe { env::remove_var("TCT_DATA_DIR") };
-    }
+    use crate::test_support::with_temp_dir;
 
     #[test]
     fn save_load_roundtrip() {

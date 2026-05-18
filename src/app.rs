@@ -345,201 +345,38 @@ mod tests {
     use crate::model::card::Card;
     use crate::model::label::LabelColor;
     use crate::model::list::CardList;
-    use std::env;
+    use crate::test_support::with_temp_dir;
 
-    fn with_temp_dir<F: FnOnce()>(f: F) {
-        let dir = tempfile::tempdir().unwrap();
-        unsafe { env::set_var("TCT_DATA_DIR", dir.path()) };
-        board_store::ensure_base_dirs().unwrap();
-        f();
-        unsafe { env::remove_var("TCT_DATA_DIR") };
+    /// Build a `Card` with a fixed `id` for stable test assertions.
+    fn fixed_card(id: &str, title: &str) -> Card {
+        let mut c = Card::new(title.into());
+        c.id = id.into();
+        c
     }
 
-    fn make_board_with_cards() -> (BoardMeta, CardList, Vec<Card>) {
-        let mut meta = board_store::create_board("Board".into()).unwrap();
-        let mut list = CardList::new("To Do".into());
-        let cards: Vec<Card> = (0..3).map(|i| Card::new(format!("Card {i}"))).collect();
-        for c in &cards {
-            card_store::save_card(&meta.id, c).unwrap();
-            list.card_ids.push(c.id.clone());
+    /// Build a `LoadedBoard` with a single list containing the given cards.
+    fn single_list_board(cards: Vec<Card>) -> LoadedBoard {
+        let card_ids: Vec<_> = cards.iter().map(|c| c.id.clone()).collect();
+        let cards_map: HashMap<_, _> = cards.into_iter().map(|c| (c.id.clone(), c)).collect();
+        LoadedBoard {
+            meta: BoardMeta::new("X".into()),
+            lists: vec![CardList {
+                id: "l1".into(),
+                name: "L".into(),
+                card_ids,
+            }],
+            cards: cards_map,
+            selected_list: 0,
+            selected_card: vec![0],
+            scroll_offset: vec![0],
+            detail_item_idx: 0,
+            detail_scroll: 0,
         }
-        list_store::save_list(&meta.id, &list).unwrap();
-        meta.list_order = vec![list.id.clone()];
-        board_store::save_board(&meta).unwrap();
-        (meta, list, cards)
     }
 
-    #[test]
-    fn clamp_selection_within_bounds_unchanged() {
-        with_temp_dir(|| {
-            let (_, _, cards) = make_board_with_cards();
-            let mut board = LoadedBoard {
-                meta: BoardMeta::new("X".into()),
-                lists: vec![CardList { id: "l1".into(), name: "L".into(), card_ids: cards.iter().map(|c| c.id.clone()).collect() }],
-                cards: cards.iter().map(|c| (c.id.clone(), c.clone())).collect(),
-                selected_list: 0,
-                selected_card: vec![1],
-                scroll_offset: vec![0],
-                detail_item_idx: 0,
-                detail_scroll: 0,
-            };
-            board.clamp_selection();
-            assert_eq!(board.selected_card[0], 1);
-        });
-    }
-
-    #[test]
-    fn clamp_selection_caps_to_last_visible() {
-        let mut c1 = Card::new("A".into());
-        let mut c2 = Card::new("B".into());
-        c1.id = "aaaaaaaa".into();
-        c2.id = "bbbbbbbb".into();
-        let list = CardList {
-            id: "l1".into(),
-            name: "L".into(),
-            card_ids: vec![c1.id.clone(), c2.id.clone()],
-        };
-        let mut cards = std::collections::HashMap::new();
-        cards.insert(c1.id.clone(), c1);
-        cards.insert(c2.id.clone(), c2);
-
-        let mut board = LoadedBoard {
-            meta: BoardMeta::new("X".into()),
-            lists: vec![list],
-            cards,
-            selected_list: 0,
-            selected_card: vec![5], // out of bounds
-            scroll_offset: vec![0],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        };
-        board.clamp_selection();
-        assert_eq!(board.selected_card[0], 1); // last visible
-    }
-
-    #[test]
-    fn clamp_selection_zeros_when_no_visible_cards() {
-        let mut board = LoadedBoard {
-            meta: BoardMeta::new("X".into()),
-            lists: vec![CardList { id: "l1".into(), name: "L".into(), card_ids: vec![] }],
-            cards: Default::default(),
-            selected_list: 0,
-            selected_card: vec![3],
-            scroll_offset: vec![0],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        };
-        board.clamp_selection();
-        assert_eq!(board.selected_card[0], 0);
-    }
-
-    #[test]
-    fn clamp_selection_skips_archived() {
-        let mut c1 = Card::new("A".into());
-        let mut c2 = Card::new("B".into());
-        c1.id = "aaaaaaaa".into();
-        c2.id = "bbbbbbbb".into();
-        c2.archived = true; // only c1 visible
-        let list = CardList {
-            id: "l1".into(),
-            name: "L".into(),
-            card_ids: vec![c1.id.clone(), c2.id.clone()],
-        };
-        let mut cards = std::collections::HashMap::new();
-        cards.insert(c1.id.clone(), c1);
-        cards.insert(c2.id.clone(), c2);
-
-        let mut board = LoadedBoard {
-            meta: BoardMeta::new("X".into()),
-            lists: vec![list],
-            cards,
-            selected_list: 0,
-            selected_card: vec![1], // points to archived
-            scroll_offset: vec![0],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        };
-        board.clamp_selection();
-        // visible count = 1, so selection capped to 0
-        assert_eq!(board.selected_card[0], 0);
-    }
-
-    #[test]
-    fn visible_card_count_excludes_archived_and_missing() {
-        let mut c1 = Card::new("A".into());
-        let mut c2 = Card::new("B".into());
-        c1.id = "aaaaaaaa".into();
-        c2.id = "bbbbbbbb".into();
-        c2.archived = true;
-        let list = CardList {
-            id: "l1".into(),
-            name: "L".into(),
-            // Includes a card_id with no matching card (orphan)
-            card_ids: vec![c1.id.clone(), c2.id.clone(), "orphanid".into()],
-        };
-        let mut cards = std::collections::HashMap::new();
-        cards.insert(c1.id.clone(), c1);
-        cards.insert(c2.id.clone(), c2);
-
-        let board = LoadedBoard {
-            meta: BoardMeta::new("X".into()),
-            lists: vec![list],
-            cards,
-            selected_list: 0,
-            selected_card: vec![0],
-            scroll_offset: vec![0],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        };
-        assert_eq!(board.visible_card_count(0), 1);
-    }
-
-    #[test]
-    fn current_card_returns_selected() {
-        let c1 = Card { id: "aaaaaaaa".into(), title: "A".into(), ..Card::new("A".into()) };
-        let c2 = Card { id: "bbbbbbbb".into(), title: "B".into(), ..Card::new("B".into()) };
-        let list = CardList {
-            id: "l1".into(),
-            name: "L".into(),
-            card_ids: vec![c1.id.clone(), c2.id.clone()],
-        };
-        let mut cards = std::collections::HashMap::new();
-        cards.insert(c1.id.clone(), c1);
-        cards.insert(c2.id.clone(), c2);
-
-        let board = LoadedBoard {
-            meta: BoardMeta::new("X".into()),
-            lists: vec![list],
-            cards,
-            selected_list: 0,
-            selected_card: vec![1],
-            scroll_offset: vec![0],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        };
-        assert_eq!(board.current_card_id().unwrap(), "bbbbbbbb");
-        assert_eq!(board.current_card().unwrap().title, "B");
-    }
-
-    #[test]
-    fn current_card_none_on_empty_list() {
-        let board = LoadedBoard {
-            meta: BoardMeta::new("X".into()),
-            lists: vec![CardList { id: "l1".into(), name: "L".into(), card_ids: vec![] }],
-            cards: Default::default(),
-            selected_list: 0,
-            selected_card: vec![0],
-            scroll_offset: vec![0],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        };
-        assert!(board.current_card_id().is_none());
-        assert!(board.current_card().is_none());
-    }
-
-    #[test]
-    fn accent_color_defaults_to_cyan() {
-        let app = App {
+    /// Build a bare `App` (no disk, no board). Caller can override fields.
+    fn bare_app() -> App {
+        App {
             mode: AppMode::BoardSelector,
             previous_mode: None,
             should_quit: false,
@@ -561,105 +398,119 @@ mod tests {
             archived_selected: 0,
             last_reload: Instant::now(),
             reload_interval: Duration::from_secs(15),
-        };
-        assert_eq!(app.accent_color(), Color::Cyan);
+        }
+    }
+
+    fn make_board_with_cards() -> (BoardMeta, CardList, Vec<Card>) {
+        let mut meta = board_store::create_board("Board".into()).unwrap();
+        let mut list = CardList::new("To Do".into());
+        let cards: Vec<Card> = (0..3).map(|i| Card::new(format!("Card {i}"))).collect();
+        for c in &cards {
+            card_store::save_card(&meta.id, c).unwrap();
+            list.card_ids.push(c.id.clone());
+        }
+        list_store::save_list(&meta.id, &list).unwrap();
+        meta.list_order = vec![list.id.clone()];
+        board_store::save_board(&meta).unwrap();
+        (meta, list, cards)
+    }
+
+    #[test]
+    fn clamp_selection_within_bounds_unchanged() {
+        let cards = vec![
+            fixed_card("aaaaaaaa", "A"),
+            fixed_card("bbbbbbbb", "B"),
+            fixed_card("cccccccc", "C"),
+        ];
+        let mut board = single_list_board(cards);
+        board.selected_card[0] = 1;
+        board.clamp_selection();
+        assert_eq!(board.selected_card[0], 1);
+    }
+
+    #[test]
+    fn clamp_selection_caps_to_last_visible() {
+        let cards = vec![fixed_card("aaaaaaaa", "A"), fixed_card("bbbbbbbb", "B")];
+        let mut board = single_list_board(cards);
+        board.selected_card[0] = 5; // out of bounds
+        board.clamp_selection();
+        assert_eq!(board.selected_card[0], 1);
+    }
+
+    #[test]
+    fn clamp_selection_zeros_when_no_visible_cards() {
+        let mut board = single_list_board(vec![]);
+        board.selected_card[0] = 3;
+        board.clamp_selection();
+        assert_eq!(board.selected_card[0], 0);
+    }
+
+    #[test]
+    fn clamp_selection_skips_archived() {
+        let mut cards = vec![fixed_card("aaaaaaaa", "A"), fixed_card("bbbbbbbb", "B")];
+        cards[1].archived = true; // only first visible
+        let mut board = single_list_board(cards);
+        board.selected_card[0] = 1; // points to archived
+        board.clamp_selection();
+        assert_eq!(board.selected_card[0], 0);
+    }
+
+    #[test]
+    fn visible_card_count_excludes_archived_and_missing() {
+        let mut cards = vec![fixed_card("aaaaaaaa", "A"), fixed_card("bbbbbbbb", "B")];
+        cards[1].archived = true;
+        let mut board = single_list_board(cards);
+        // Inject orphan card_id with no matching card
+        board.lists[0].card_ids.push("orphanid".into());
+        assert_eq!(board.visible_card_count(0), 1);
+    }
+
+    #[test]
+    fn current_card_returns_selected() {
+        let cards = vec![fixed_card("aaaaaaaa", "A"), fixed_card("bbbbbbbb", "B")];
+        let mut board = single_list_board(cards);
+        board.selected_card[0] = 1;
+        assert_eq!(board.current_card_id().unwrap(), "bbbbbbbb");
+        assert_eq!(board.current_card().unwrap().title, "B");
+    }
+
+    #[test]
+    fn current_card_none_on_empty_list() {
+        let board = single_list_board(vec![]);
+        assert!(board.current_card_id().is_none());
+        assert!(board.current_card().is_none());
+    }
+
+    #[test]
+    fn accent_color_defaults_to_cyan() {
+        assert_eq!(bare_app().accent_color(), Color::Cyan);
     }
 
     #[test]
     fn accent_color_uses_board_meta() {
-        let mut meta = BoardMeta::new("X".into());
-        meta.accent_color = LabelColor::Purple;
-        let board = LoadedBoard {
-            meta,
-            lists: vec![],
-            cards: Default::default(),
-            selected_list: 0,
-            selected_card: vec![],
-            scroll_offset: vec![],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        };
-        let app = App {
-            mode: AppMode::Normal,
-            previous_mode: None,
-            should_quit: false,
-            status_message: None,
-            boards: vec![],
-            selected_board_idx: 0,
-            board: Some(board),
-            search_query: String::new(),
-            search_active: false,
-            label_filter: None,
-            input_buffer: String::new(),
-            input_cursor: 0,
-            label_picker_idx: 0,
-            description_editor: None,
-            description_original: None,
-            editor_scroll: 0,
-            archived_cards: vec![],
-            archived_boards: vec![],
-            archived_selected: 0,
-            last_reload: Instant::now(),
-            reload_interval: Duration::from_secs(15),
-        };
+        let mut board = single_list_board(vec![]);
+        board.meta.accent_color = LabelColor::Purple;
+        let mut app = bare_app();
+        app.mode = AppMode::Normal;
+        app.board = Some(board);
         let (r, g, b) = LabelColor::Purple.to_rgb();
         assert_eq!(app.accent_color(), Color::Rgb(r, g, b));
     }
 
     #[test]
     fn on_tick_clears_old_status_message() {
-        let mut app = App {
-            mode: AppMode::Normal,
-            previous_mode: None,
-            should_quit: false,
-            status_message: Some(("hi".into(), Instant::now() - Duration::from_secs(10))),
-            boards: vec![],
-            selected_board_idx: 0,
-            board: None,
-            search_query: String::new(),
-            search_active: false,
-            label_filter: None,
-            input_buffer: String::new(),
-            input_cursor: 0,
-            label_picker_idx: 0,
-            description_editor: None,
-            description_original: None,
-            editor_scroll: 0,
-            archived_cards: vec![],
-            archived_boards: vec![],
-            archived_selected: 0,
-            last_reload: Instant::now(),
-            reload_interval: Duration::from_secs(15),
-        };
+        let mut app = bare_app();
+        app.mode = AppMode::Normal;
+        app.status_message = Some(("hi".into(), Instant::now() - Duration::from_secs(10)));
         app.on_tick();
         assert!(app.status_message.is_none());
     }
 
     #[test]
     fn on_tick_keeps_fresh_status_message() {
-        let mut app = App {
-            mode: AppMode::Normal,
-            previous_mode: None,
-            should_quit: false,
-            status_message: Some(("hi".into(), Instant::now())),
-            boards: vec![],
-            selected_board_idx: 0,
-            board: None,
-            search_query: String::new(),
-            search_active: false,
-            label_filter: None,
-            input_buffer: String::new(),
-            input_cursor: 0,
-            label_picker_idx: 0,
-            description_editor: None,
-            description_original: None,
-            editor_scroll: 0,
-            archived_cards: vec![],
-            archived_boards: vec![],
-            archived_selected: 0,
-            last_reload: Instant::now(),
-            reload_interval: Duration::from_secs(15),
-        };
+        let mut app = bare_app();
+        app.mode = AppMode::Normal;
+        app.status_message = Some(("hi".into(), Instant::now()));
         app.on_tick();
         assert!(app.status_message.is_some());
     }
