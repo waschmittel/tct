@@ -193,7 +193,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                         .due_date
                         .map(|d| d.format("%Y-%m-%d").to_string())
                         .unwrap_or_default();
-                    app.start_insert_with(InsertTarget::EditDueDate, &date_str);
+                    app.start_due_date_picker(&date_str);
                 }
             }
         }

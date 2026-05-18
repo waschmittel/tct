@@ -90,13 +90,13 @@ pub fn render(
                 Color::Green
             };
             let label = if days < 0 {
-                format!("Due:{} (-{}d)", due.format("%m/%d"), -days)
+                format!("{} (-{}d)", due.format("%m-%d"), -days)
             } else if days == 0 {
-                format!("Due:{} (today)", due.format("%m/%d"))
+                format!("{} (today)", due.format("%m-%d"))
             } else if days <= 3 {
-                format!("Due:{} ({}d)", due.format("%m/%d"), days)
+                format!("{} ({}d)", due.format("%m-%d"), days)
             } else {
-                format!("Due:{}", due.format("%m/%d"))
+                due.format("%m-%d").to_string()
             };
             info.push(Span::styled(label, Style::default().fg(color)));
         }

@@ -139,9 +139,11 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | x | Delete selected checklist item |
 | l | Assign/remove labels (label picker) |
 | L | Manage labels (create, rename, color, reorder, delete) |
-| u | Set due date |
+| u | Set due date (opens picker) |
 | U | Clear due date |
 | Esc | Close |
+
+In the due-date picker: arrow keys navigate the calendar (←→ ±day, ↑↓ ±week), PgUp/PgDn jump months (Shift = ±year), `t` jumps to today, typing digits/hyphens edits the text input, Enter saves, Esc cancels. Clearing the buffer (Ctrl+U) and pressing Enter removes the due date.
 
 ### Description Editor
 

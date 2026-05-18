@@ -19,6 +19,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         return handle_description_edit(app, key);
     }
 
+    if matches!(app.mode, AppMode::Insert(InsertTarget::EditDueDate)) {
+        return handle_due_date_picker(app, key);
+    }
+
     match key.code {
         KeyCode::Esc => {
             cancel_insert(app);
@@ -163,6 +167,175 @@ fn update_editor_scroll(app: &mut App) {
             app.editor_scroll = cursor_row - visible_height + 1;
         }
     }
+}
+
+fn handle_due_date_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+    use chrono::Datelike;
+
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+
+    match key.code {
+        KeyCode::Esc => {
+            app.picker_date = None;
+            cancel_insert(app);
+            return Ok(());
+        }
+        KeyCode::Enter => {
+            return confirm_due_date(app);
+        }
+
+        // Grid navigation
+        KeyCode::Left => {
+            shift_picker(app, -1);
+        }
+        KeyCode::Right => {
+            shift_picker(app, 1);
+        }
+        KeyCode::Up => {
+            shift_picker(app, -7);
+        }
+        KeyCode::Down => {
+            shift_picker(app, 7);
+        }
+        KeyCode::PageUp => {
+            shift_picker_months(app, if shift { -12 } else { -1 });
+        }
+        KeyCode::PageDown => {
+            shift_picker_months(app, if shift { 12 } else { 1 });
+        }
+        KeyCode::Char('t') | KeyCode::Char('T') => {
+            let today = chrono::Local::now().date_naive();
+            set_picker_date(app, today);
+        }
+        KeyCode::Home => {
+            // Jump to first day of month
+            if let Some(d) = app.picker_date {
+                if let Some(first) = chrono::NaiveDate::from_ymd_opt(d.year(), d.month(), 1) {
+                    set_picker_date(app, first);
+                }
+            }
+        }
+        KeyCode::End => {
+            // Jump to last day of month
+            if let Some(d) = app.picker_date {
+                let next_month = if d.month() == 12 {
+                    chrono::NaiveDate::from_ymd_opt(d.year() + 1, 1, 1)
+                } else {
+                    chrono::NaiveDate::from_ymd_opt(d.year(), d.month() + 1, 1)
+                };
+                if let Some(nm) = next_month {
+                    set_picker_date(app, nm.pred_opt().unwrap_or(d));
+                }
+            }
+        }
+
+        // Text editing
+        KeyCode::Backspace => {
+            if !app.input_buffer.is_empty() {
+                app.input_buffer.pop();
+                app.input_cursor = app.input_buffer.len();
+                sync_picker_from_buffer(app);
+            }
+        }
+        KeyCode::Char('u') if has_ctrl_or_cmd(key.modifiers) => {
+            app.input_buffer.clear();
+            app.input_cursor = 0;
+            app.picker_date = None;
+        }
+        KeyCode::Char(c) if c.is_ascii_digit() || c == '-' => {
+            app.input_buffer.push(c);
+            app.input_cursor = app.input_buffer.len();
+            sync_picker_from_buffer(app);
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn shift_picker(app: &mut App, days: i64) {
+    let base = app
+        .picker_date
+        .unwrap_or_else(|| chrono::Local::now().date_naive());
+    let new = base + chrono::Duration::days(days);
+    set_picker_date(app, new);
+}
+
+fn shift_picker_months(app: &mut App, delta_months: i32) {
+    use chrono::Datelike;
+    let base = app
+        .picker_date
+        .unwrap_or_else(|| chrono::Local::now().date_naive());
+    let total = base.year() * 12 + base.month() as i32 - 1 + delta_months;
+    let new_year = total.div_euclid(12);
+    let new_month = (total.rem_euclid(12) + 1) as u32;
+    let max_day = days_in_month(new_year, new_month);
+    let day = base.day().min(max_day);
+    if let Some(new_date) = chrono::NaiveDate::from_ymd_opt(new_year, new_month, day) {
+        set_picker_date(app, new_date);
+    }
+}
+
+fn days_in_month(year: i32, month: u32) -> u32 {
+    let (ny, nm) = if month == 12 { (year + 1, 1) } else { (year, month + 1) };
+    let first_next = chrono::NaiveDate::from_ymd_opt(ny, nm, 1).unwrap();
+    let last = first_next.pred_opt().unwrap();
+    chrono::Datelike::day(&last)
+}
+
+fn set_picker_date(app: &mut App, date: chrono::NaiveDate) {
+    app.picker_date = Some(date);
+    app.input_buffer = date.format("%Y-%m-%d").to_string();
+    app.input_cursor = app.input_buffer.len();
+}
+
+fn sync_picker_from_buffer(app: &mut App) {
+    if let Ok(d) = chrono::NaiveDate::parse_from_str(&app.input_buffer, "%Y-%m-%d") {
+        app.picker_date = Some(d);
+    }
+}
+
+fn confirm_due_date(app: &mut App) -> anyhow::Result<()> {
+    let trimmed = app.input_buffer.trim().to_string();
+
+    // Empty or "none" clears the due date.
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("none") {
+        if let Some(board) = &mut app.board {
+            if let Some(card_id) = board.current_card_id().cloned() {
+                if let Some(card) = board.cards.get_mut(&card_id) {
+                    card.due_date = None;
+                    card.touch();
+                    card_store::save_card(&board.meta.id, card)?;
+                }
+            }
+        }
+        app.set_status("Cleared due date".into());
+        app.picker_date = None;
+        cancel_insert(app);
+        return Ok(());
+    }
+
+    // Prefer the picker's parsed date; fall back to parsing the buffer.
+    let parsed = app
+        .picker_date
+        .or_else(|| chrono::NaiveDate::parse_from_str(&trimmed, "%Y-%m-%d").ok());
+
+    if let Some(date) = parsed {
+        if let Some(board) = &mut app.board {
+            if let Some(card_id) = board.current_card_id().cloned() {
+                if let Some(card) = board.cards.get_mut(&card_id) {
+                    card.due_date = Some(date);
+                    card.touch();
+                    card_store::save_card(&board.meta.id, card)?;
+                }
+            }
+        }
+        app.set_status(format!("Due date set to {date}"));
+        app.picker_date = None;
+        cancel_insert(app);
+    } else {
+        app.set_status("Invalid date format. Use YYYY-MM-DD".into());
+    }
+    Ok(())
 }
 
 fn move_cursor_visual(app: &mut App, direction: i32) {

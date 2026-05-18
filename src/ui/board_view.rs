@@ -117,12 +117,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             );
         }
         AppMode::Insert(InsertTarget::EditDueDate) => {
-            render_input_overlay(
+            super::widgets::date_picker::render(
                 frame,
                 area,
-                "Due Date (YYYY-MM-DD)",
                 &app.input_buffer,
                 app.input_cursor,
+                app.picker_date,
                 accent,
             );
         }

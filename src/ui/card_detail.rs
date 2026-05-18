@@ -369,12 +369,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             render_input_dialog(frame, popup, "Edit Item", &app.input_buffer, app.input_cursor);
         }
         AppMode::Insert(InsertTarget::EditDueDate) => {
-            render_input_dialog(
+            super::widgets::date_picker::render(
                 frame,
                 popup,
-                "Due Date (YYYY-MM-DD)",
                 &app.input_buffer,
                 app.input_cursor,
+                app.picker_date,
+                accent,
             );
         }
         _ => {}

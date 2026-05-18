@@ -123,6 +123,7 @@ pub struct App {
     pub description_editor: Option<TextArea<'static>>,
     pub description_original: Option<String>,
     pub editor_scroll: usize,
+    pub picker_date: Option<chrono::NaiveDate>,
     pub archived_cards: Vec<Card>,
     pub archived_boards: Vec<crate::model::board::BoardMeta>,
     pub archived_lists: Vec<CardList>,
@@ -152,6 +153,7 @@ impl App {
             description_editor: None,
             description_original: None,
             editor_scroll: 0,
+            picker_date: None,
             archived_cards: Vec::new(),
             archived_boards: Vec::new(),
             archived_lists: Vec::new(),
@@ -309,6 +311,18 @@ impl App {
         self.mode = AppMode::Insert(target);
     }
 
+    pub fn start_due_date_picker(&mut self, prefill: &str) {
+        let initial = chrono::NaiveDate::parse_from_str(prefill, "%Y-%m-%d")
+            .ok()
+            .unwrap_or_else(|| chrono::Local::now().date_naive());
+        let buf = initial.format("%Y-%m-%d").to_string();
+        self.picker_date = Some(initial);
+        self.input_buffer = buf.clone();
+        self.input_cursor = buf.len();
+        self.previous_mode = Some(self.mode.clone());
+        self.mode = AppMode::Insert(InsertTarget::EditDueDate);
+    }
+
     pub fn start_description_edit(&mut self, initial: &str) {
         let lines: Vec<String> = initial.split('\n').map(|s| s.to_string()).collect();
         let mut textarea = TextArea::new(lines);
@@ -397,6 +411,7 @@ mod tests {
             description_editor: None,
             description_original: None,
             editor_scroll: 0,
+            picker_date: None,
             archived_cards: vec![],
             archived_boards: vec![],
             archived_lists: vec![],
