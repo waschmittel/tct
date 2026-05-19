@@ -4,6 +4,10 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 
 tct stores everything as **plain JSON files** — one file per card, list, and board. Put them in a git repo, Dropbox, or any synced folder and every team member sees the same boards. tct watches the filesystem and picks up changes automatically, making it a natural fit for **background file sync** workflows.
 
+![screenshot](docs/tct.png)
+
+[Demo Video on Youtube](https://youtu.be/Bm32HljTmlY)
+
 ## Why tct?
 
 - **Files are the API** — every entity is a standalone JSON file. Human-readable, git-friendly, scriptable.
