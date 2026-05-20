@@ -96,7 +96,7 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | n | New board |
 | r | Rename board |
 | c | Cycle board accent color |
-| d | Archive board |
+| a | Archive board |
 | v | View/restore archived boards |
 | ? | Help |
 | q | Quit |
@@ -117,7 +117,7 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | n | New card |
 | N | New list |
 | r | Rename list |
-| D | Archive list (confirm) |
+| A | Archive list (confirm) |
 | a | Archive card (confirm) |
 | h | View card change history |
 | v | View/restore/delete archived cards |

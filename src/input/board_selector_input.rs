@@ -48,7 +48,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 app.set_status("Board color changed".into());
             }
         }
-        (KeyCode::Char('d'), _)
+        (KeyCode::Char('a'), _)
             if !app.boards.is_empty() => {
                 app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveBoard);
             }
@@ -191,11 +191,11 @@ mod tests {
     }
 
     #[test]
-    fn d_opens_archive_confirmation_when_boards_exist() {
+    fn a_opens_archive_confirmation_when_boards_exist() {
         with_temp_dir(|| {
             seed_boards(&["A"]);
             let mut app = App::new(None).unwrap();
-            press(&mut app, KeyCode::Char('d'));
+            press(&mut app, KeyCode::Char('a'));
             assert!(matches!(
                 app.mode,
                 AppMode::Dialog(DialogKind::ConfirmArchiveBoard)
@@ -204,11 +204,11 @@ mod tests {
     }
 
     #[test]
-    fn d_is_noop_when_no_boards() {
+    fn a_is_noop_when_no_boards() {
         with_temp_dir(|| {
             let mut app = App::new(None).unwrap();
             assert!(app.boards.is_empty());
-            press(&mut app, KeyCode::Char('d'));
+            press(&mut app, KeyCode::Char('a'));
             // Stay in BoardSelector — no dialog opens.
             assert!(matches!(app.mode, AppMode::BoardSelector));
         });

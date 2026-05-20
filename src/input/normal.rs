@@ -140,7 +140,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     app.start_insert_with(InsertTarget::RenameList, &name);
                 }
         }
-        (KeyCode::Char('D'), _) => {
+        (KeyCode::Char('A'), _) => {
             if let Some(board) = &app.board
                 && !board.lists.is_empty() {
                     app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveList);

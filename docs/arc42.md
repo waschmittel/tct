@@ -356,7 +356,7 @@ stateDiagram-v2
 
     BoardSelector --> Normal: Enter (open board)
     BoardSelector --> Insert_NewBoardName: n (new board)
-    BoardSelector --> Dialog_ConfirmArchiveBoard: d (archive)
+    BoardSelector --> Dialog_ConfirmArchiveBoard: a (archive board)
     BoardSelector --> Dialog_ArchivedBoards: v (view archived)
 
     Insert_NewBoardName --> BoardSelector: Enter/Esc
@@ -366,8 +366,7 @@ stateDiagram-v2
     Normal --> Insert_EditCardTitleInline: e (quick edit)
     Normal --> Insert_NewListName: N (new list)
     Normal --> Insert_RenameList: r (rename list)
-    Normal --> Dialog_ConfirmDeleteCard: d (delete card)
-    Normal --> Dialog_ConfirmDeleteList: D (delete list)
+    Normal --> Dialog_ConfirmArchiveList: A (archive list)
     Normal --> Dialog_ConfirmArchiveCard: a (archive card)
     Normal --> Dialog_ArchivedCards: v (view archived)
     Normal --> Dialog_LabelManager: L (manage labels)
@@ -388,8 +387,7 @@ stateDiagram-v2
 
     Help --> Normal: Esc/q
 
-    Dialog_ConfirmDeleteCard --> Normal: y/n
-    Dialog_ConfirmDeleteList --> Normal: y/n
+    Dialog_ConfirmArchiveList --> Normal: y/n
     Dialog_ConfirmArchiveCard --> Normal: y/n
     Dialog_ConfirmArchiveBoard --> BoardSelector: y/n
     Dialog_ArchivedCards --> Normal: Esc
