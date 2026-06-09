@@ -39,6 +39,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 crate::command::Command::RenameList { name, .. } => {
                     Some(format!("Renamed list to '{name}'"))
                 }
+                crate::command::Command::EditCardTitle { .. } => {
+                    Some("Title saved".into())
+                }
                 crate::command::Command::SetDueDate { date, .. } => {
                     Some(format!("Due date set to {date}"))
                 }
@@ -47,6 +50,12 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 }
                 crate::command::Command::EditCardDescription { .. } => {
                     Some("Description saved".into())
+                }
+                crate::command::Command::AddChecklistItem { .. } => {
+                    Some("Item added".into())
+                }
+                crate::command::Command::EditChecklistItem { .. } => {
+                    Some("Item saved".into())
                 }
                 _ => None,
             };

@@ -395,7 +395,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 accent,
             );
         } else if let (Some(buf), Some(cursor)) = (handler.line_buffer(), handler.line_cursor()) {
-            render_input_dialog(frame, popup, handler.title(), buf, cursor);
+            render_input_dialog(frame, popup, handler.title(), buf, cursor, accent);
         }
     }
 }
@@ -432,8 +432,19 @@ fn render_description_editor(
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow))
-        .title(" Edit Description ");
+        .border_style(Style::default().fg(accent))
+        .title(Line::from(Span::styled(
+            " Edit Description ",
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        )))
+        .title_bottom(Line::from(vec![
+            Span::styled(" Ctrl+S", Style::default().fg(accent)),
+            Span::raw(":save  "),
+            Span::styled("Esc", Style::default().fg(accent)),
+            Span::raw(":cancel  "),
+            Span::styled("Tab", Style::default().fg(accent)),
+            Span::raw(":nest "),
+        ]));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -492,7 +503,14 @@ fn render_description_editor(
     }
 }
 
-fn render_input_dialog(frame: &mut Frame, area: Rect, title: &str, input: &str, cursor: usize) {
+fn render_input_dialog(
+    frame: &mut Frame,
+    area: Rect,
+    title: &str,
+    input: &str,
+    cursor: usize,
+    accent: Color,
+) {
     let width = 50u16.min(area.width.saturating_sub(2));
     let height = 5u16;
     let x = area.x + (area.width.saturating_sub(width)) / 2;
@@ -504,7 +522,7 @@ fn render_input_dialog(frame: &mut Frame, area: Rect, title: &str, input: &str, 
     let block = Block::default()
         .title(format!(" {title} "))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(accent));
     let inner = block.inner(dialog);
     frame.render_widget(block, dialog);
 

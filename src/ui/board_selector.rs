@@ -82,21 +82,33 @@ fn render_input_dialog(frame: &mut Frame, area: Rect, title: &str, input: &str, 
     let inner = block.inner(dialog_area);
     frame.render_widget(block, dialog_area);
 
-    let visible_w = inner.width as usize;
+    let layout = ratatui::layout::Layout::vertical([
+        ratatui::layout::Constraint::Length(1),
+        ratatui::layout::Constraint::Length(1),
+    ])
+    .split(inner);
+
+    let visible_w = layout[0].width as usize;
     let cursor_char_idx = input[..cursor].chars().count();
     let scroll = if cursor_char_idx >= visible_w {
         cursor_char_idx - visible_w + 1
     } else {
         0
     };
-    
+
     let visible: String = input.chars().skip(scroll).take(visible_w).collect();
     let text = Paragraph::new(Line::from(Span::raw(visible)));
-    frame.render_widget(text, inner);
+    frame.render_widget(text, layout[0]);
 
-    let cx = inner.x + (cursor_char_idx - scroll) as u16;
-    let cy = inner.y;
-    if cx < inner.x + inner.width {
+    let hints = Paragraph::new(Line::from(Span::styled(
+        "Enter: confirm  Esc: cancel",
+        Style::default().fg(Color::DarkGray),
+    )));
+    frame.render_widget(hints, layout[1]);
+
+    let cx = layout[0].x + (cursor_char_idx - scroll) as u16;
+    let cy = layout[0].y;
+    if cx < layout[0].x + layout[0].width {
         frame.set_cursor_position((cx, cy));
     }
 }
