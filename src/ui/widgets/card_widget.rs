@@ -20,10 +20,14 @@ pub fn render(
         return;
     }
 
+    let selection_bg = Color::Rgb(40, 40, 55);
     let base_style = if dimmed {
         Style::default().fg(Color::DarkGray)
     } else if selected {
-        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::White)
+            .bg(selection_bg)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
@@ -36,7 +40,7 @@ pub fn render(
         Style::default().fg(Color::Gray)
     };
 
-    let block = Block::default()
+    let mut block = Block::default()
         .borders(Borders::ALL)
         .border_style(border_style)
         .border_type(if selected {
@@ -44,6 +48,9 @@ pub fn render(
         } else {
             BorderType::Plain
         });
+    if selected && !dimmed {
+        block = block.style(Style::default().bg(selection_bg));
+    }
     let inner = block.inner(area);
     frame.render_widget(block, area);
 

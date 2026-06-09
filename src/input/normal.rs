@@ -1,7 +1,16 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{App, AppMode, DialogKind, InsertTarget};
-use crate::storage::{board_store, card_store, list_store};
+use crate::app::{App, AppMode};
+use crate::command::{Command, MoveDir};
+use crate::dialog::{
+    archived_cards::ArchivedCards, archived_lists::ArchivedLists, card_history::CardHistory,
+    confirm_archive_card::ConfirmArchiveCard, confirm_archive_list::ConfirmArchiveList,
+    label_manager::LabelManager, label_picker::LabelPicker,
+};
+use crate::insert::{
+    date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor, InsertSurface,
+};
+use crate::storage::{card_store, list_store};
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
@@ -112,7 +121,8 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             if let Some(board) = &app.board
                 && let Some(card) = board.current_card() {
                     let desc = card.description.clone();
-                    app.start_description_edit(&desc);
+                    let card_id = card.id.clone();
+                    app.start_insert(Box::new(MarkdownEditor::new(card_id, &desc)));
                 }
         }
 
@@ -121,59 +131,57 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             if let Some(board) = &app.board
                 && let Some(card) = board.current_card() {
                     let title = card.title.clone();
-                    app.start_insert_with(InsertTarget::EditCardTitleInline, &title);
+                    let card_id = card.id.clone();
+                    app.start_insert(Box::new(line_editor::EditCardTitle::new(
+                        card_id, &title, true,
+                    )));
                 }
         }
 
         (KeyCode::Char('n'), _)
             if app.board.is_some() => {
-                app.start_insert(InsertTarget::NewCardTitle);
+                app.start_insert(Box::new(line_editor::NewCardTitle::new()));
             }
         (KeyCode::Char('N'), _)
             if app.board.is_some() => {
-                app.start_insert(InsertTarget::NewListName);
+                app.start_insert(Box::new(line_editor::NewListName::new()));
             }
         (KeyCode::Char('r'), _) => {
             if let Some(board) = &app.board
                 && let Some(list) = board.lists.get(board.selected_list) {
                     let name = list.name.clone();
-                    app.start_insert_with(InsertTarget::RenameList, &name);
+                    let list_id = list.id.clone();
+                    app.start_insert(Box::new(line_editor::RenameList::new(list_id, &name)));
                 }
         }
         (KeyCode::Char('A'), _) => {
             if let Some(board) = &app.board
                 && !board.lists.is_empty() {
-                    app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveList);
+                    app.open_dialog(Box::new(ConfirmArchiveList));
                 }
         }
         (KeyCode::Char('<'), _) => {
-            if let Some(board) = &mut app.board
-                && board.selected_list > 0 {
-                    let i = board.selected_list;
-                    board.lists.swap(i, i - 1);
-                    board.meta.list_order.swap(i, i - 1);
-                    board.selected_card.swap(i, i - 1);
-                    board.scroll_offset.swap(i, i - 1);
-                    board.selected_list -= 1;
-                    board_store::save_board(&board.meta)?;
-                }
+            let list_id = app
+                .board
+                .as_ref()
+                .and_then(|b| b.lists.get(b.selected_list).map(|l| l.id.clone()));
+            if let Some(list_id) = list_id {
+                app.apply(Command::MoveList { list_id, direction: MoveDir::Left })?;
+            }
         }
         (KeyCode::Char('>'), _) => {
-            if let Some(board) = &mut app.board
-                && board.selected_list < board.lists.len().saturating_sub(1) {
-                    let i = board.selected_list;
-                    board.lists.swap(i, i + 1);
-                    board.meta.list_order.swap(i, i + 1);
-                    board.selected_card.swap(i, i + 1);
-                    board.scroll_offset.swap(i, i + 1);
-                    board.selected_list += 1;
-                    board_store::save_board(&board.meta)?;
-                }
+            let list_id = app
+                .board
+                .as_ref()
+                .and_then(|b| b.lists.get(b.selected_list).map(|l| l.id.clone()));
+            if let Some(list_id) = list_id {
+                app.apply(Command::MoveList { list_id, direction: MoveDir::Right })?;
+            }
         }
         (KeyCode::Char('a'), _) => {
             if let Some(board) = &app.board
                 && board.current_card_id().is_some() {
-                    app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveCard);
+                    app.open_dialog(Box::new(ConfirmArchiveCard));
                 }
         }
         (KeyCode::Char('v'), _) => {
@@ -182,9 +190,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 if archived.is_empty() {
                     app.set_status("No archived cards".into());
                 } else {
-                    app.archived_cards = archived;
-                    app.archived_selected = 0;
-                    app.mode = AppMode::Dialog(DialogKind::ArchivedCards);
+                    app.open_dialog(Box::new(ArchivedCards {
+                        cards: archived,
+                        selected: 0,
+                    }));
                 }
             }
         }
@@ -194,9 +203,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 if archived.is_empty() {
                     app.set_status("No archived lists".into());
                 } else {
-                    app.archived_lists = archived;
-                    app.archived_selected = 0;
-                    app.mode = AppMode::Dialog(DialogKind::ArchivedLists);
+                    app.open_dialog(Box::new(ArchivedLists {
+                        lists: archived,
+                        selected: 0,
+                    }));
                 }
             }
         }
@@ -205,8 +215,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             app.mode = AppMode::Command;
         }
         (KeyCode::Char('f'), _) => {
-            app.label_picker_idx = 0;
-            app.mode = AppMode::Dialog(DialogKind::LabelPicker);
+            app.open_dialog(Box::new(LabelPicker { selected_idx: 0 }));
         }
         (KeyCode::Char('F'), _) => {
             app.search_active = false;
@@ -217,14 +226,11 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         (KeyCode::Char('l'), _) => {
             if let Some(board) = &app.board
                 && board.current_card_id().is_some() {
-                    app.previous_mode = Some(app.mode.clone());
-                    app.label_picker_idx = 0;
-                    app.mode = AppMode::Dialog(DialogKind::LabelPicker);
+                    app.open_dialog(Box::new(LabelPicker { selected_idx: 0 }));
                 }
         }
         (KeyCode::Char('L'), _) => {
-            app.label_picker_idx = 0;
-            app.mode = AppMode::Dialog(DialogKind::LabelManager);
+            app.open_dialog(Box::new(LabelManager { selected_idx: 0 }));
         }
         (KeyCode::Char('u'), _) => {
             if let Some(board) = &app.board
@@ -233,127 +239,55 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                         .due_date
                         .map(|d| d.format("%Y-%m-%d").to_string())
                         .unwrap_or_default();
-                    app.start_due_date_picker(&date_str);
+                    let card_id = card.id.clone();
+                    app.start_insert(Box::new(DatePicker::new(card_id, &date_str, InsertSurface::BoardView)));
                 }
         }
         (KeyCode::Char('h'), _) => {
             if let Some(board) = &app.board
                 && board.current_card_id().is_some() {
-                    app.previous_mode = Some(app.mode.clone());
-                    app.history_scroll = 0;
-                    app.mode = AppMode::Dialog(DialogKind::CardHistory);
+                    app.open_dialog(Box::new(CardHistory { scroll: 0 }));
                 }
         }
         (KeyCode::Char('U'), _) => {
-            if let Some(board) = &mut app.board
-                && let Some(card_id) = board.current_card_id().cloned()
-                    && let Some(card) = board.cards.get_mut(&card_id) {
-                        let was_set = card.due_date.is_some();
-                        card.due_date = None;
-                        if was_set {
-                            card.log("Cleared due date");
-                        } else {
-                            card.touch();
-                        }
-                        card_store::save_card(&board.meta.id, card)?;
-                        app.set_status("Due date cleared".into());
-                    }
+            if let Some(board) = &app.board
+                && let Some(card_id) = board.current_card_id().cloned() {
+                    app.apply(Command::ClearDueDate { card_id })?;
+                    app.set_status("Due date cleared".into());
+                }
         }
         _ => {}
     }
     Ok(())
 }
 
-fn move_card_down(app: &mut App) -> anyhow::Result<()> {
-    let board = match &mut app.board {
-        Some(b) => b,
+fn move_card_in_direction(app: &mut App, direction: MoveDir) -> anyhow::Result<()> {
+    let card_id = match app
+        .board
+        .as_ref()
+        .and_then(|b| b.current_card_id().cloned())
+    {
+        Some(id) => id,
         None => return Ok(()),
     };
-    let li = board.selected_list;
-    let ci = board.selected_card.get(li).copied().unwrap_or(0);
-    if let Some(list) = board.lists.get_mut(li)
-        && ci < list.card_ids.len().saturating_sub(1) {
-            list.card_ids.swap(ci, ci + 1);
-            board.selected_card[li] = ci + 1;
-            list_store::save_list(&board.meta.id, list)?;
-        }
+    app.apply(Command::MoveCard { card_id, direction })?;
     Ok(())
+}
+
+fn move_card_down(app: &mut App) -> anyhow::Result<()> {
+    move_card_in_direction(app, MoveDir::Down)
 }
 
 fn move_card_up(app: &mut App) -> anyhow::Result<()> {
-    let board = match &mut app.board {
-        Some(b) => b,
-        None => return Ok(()),
-    };
-    let li = board.selected_list;
-    let ci = board.selected_card.get(li).copied().unwrap_or(0);
-    if ci > 0
-        && let Some(list) = board.lists.get_mut(li) {
-            list.card_ids.swap(ci, ci - 1);
-            board.selected_card[li] = ci - 1;
-            list_store::save_list(&board.meta.id, list)?;
-        }
-    Ok(())
+    move_card_in_direction(app, MoveDir::Up)
 }
 
 fn move_card_left(app: &mut App) -> anyhow::Result<()> {
-    let board = match &mut app.board {
-        Some(b) => b,
-        None => return Ok(()),
-    };
-    let src = board.selected_list;
-    if src == 0 {
-        return Ok(());
-    }
-    let dst = src - 1;
-    let ci = board.selected_card.get(src).copied().unwrap_or(0);
-
-    let card_id = match board.lists.get(src).and_then(|l| l.card_ids.get(ci)) {
-        Some(id) => id.clone(),
-        None => return Ok(()),
-    };
-
-    board.lists[src].card_ids.remove(ci);
-    list_store::save_list(&board.meta.id, &board.lists[src])?;
-
-    let insert_at = ci.min(board.lists[dst].card_ids.len());
-    board.lists[dst].card_ids.insert(insert_at, card_id);
-    list_store::save_list(&board.meta.id, &board.lists[dst])?;
-
-    board.clamp_selection();
-    board.selected_list = dst;
-    board.selected_card[dst] = insert_at;
-    Ok(())
+    move_card_in_direction(app, MoveDir::Left)
 }
 
 fn move_card_right(app: &mut App) -> anyhow::Result<()> {
-    let board = match &mut app.board {
-        Some(b) => b,
-        None => return Ok(()),
-    };
-    let src = board.selected_list;
-    if src >= board.lists.len().saturating_sub(1) {
-        return Ok(());
-    }
-    let dst = src + 1;
-    let ci = board.selected_card.get(src).copied().unwrap_or(0);
-
-    let card_id = match board.lists.get(src).and_then(|l| l.card_ids.get(ci)) {
-        Some(id) => id.clone(),
-        None => return Ok(()),
-    };
-
-    board.lists[src].card_ids.remove(ci);
-    list_store::save_list(&board.meta.id, &board.lists[src])?;
-
-    let insert_at = ci.min(board.lists[dst].card_ids.len());
-    board.lists[dst].card_ids.insert(insert_at, card_id);
-    list_store::save_list(&board.meta.id, &board.lists[dst])?;
-
-    board.clamp_selection();
-    board.selected_list = dst;
-    board.selected_card[dst] = insert_at;
-    Ok(())
+    move_card_in_direction(app, MoveDir::Right)
 }
 
 fn visible_card_ids(board: &crate::app::LoadedBoard, list_idx: usize) -> Vec<usize> {
@@ -810,12 +744,10 @@ mod tests {
         with_temp_dir(|| {
             let (mut app, _, a_cards, _) = fixture();
             handle(&mut app, key(KeyCode::Char('t'))).unwrap();
-            assert!(matches!(
-                app.mode,
-                AppMode::Insert(InsertTarget::EditCardTitleInline)
-            ));
-            // Title pre-filled
-            assert_eq!(app.input_buffer, a_cards[0].title);
+            assert!(matches!(app.mode, AppMode::Insert));
+            // Title pre-filled in the handler's buffer
+            let h = app.insert.as_ref().unwrap();
+            assert_eq!(h.line_buffer(), Some(a_cards[0].title.as_str()));
             // Return path: previous_mode set to Normal
             assert_eq!(app.previous_mode, Some(AppMode::Normal));
         });
@@ -834,14 +766,15 @@ mod tests {
                 card_store::save_card(&meta.id, card).unwrap();
             }
             handle(&mut app, key(KeyCode::Char('e'))).unwrap();
-            assert!(matches!(
-                app.mode,
-                AppMode::Insert(InsertTarget::EditCardDescription)
-            ));
-            // Description editor active with initial content
-            let editor = app.description_editor.as_ref().expect("editor active");
-            assert_eq!(editor.lines().join("\n"), "hello desc");
-            // Return path: previous_mode set to Normal
+            assert!(matches!(app.mode, AppMode::Insert));
+            let editor = app
+                .insert
+                .as_ref()
+                .unwrap()
+                .as_any()
+                .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
+                .expect("description editor active");
+            assert_eq!(editor.input.current_text(), "hello desc");
             assert_eq!(app.previous_mode, Some(AppMode::Normal));
         });
     }

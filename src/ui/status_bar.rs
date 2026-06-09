@@ -11,19 +11,40 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         AppMode::BoardSelector => "BOARDS",
         AppMode::Normal => "NORMAL",
         AppMode::CardDetail => "DETAIL",
-        AppMode::Insert(_) => "INSERT",
+        AppMode::Insert => "INSERT",
         AppMode::Command => "SEARCH",
-        AppMode::Dialog(_) => "DIALOG",
+        AppMode::Dialog => "DIALOG",
         AppMode::Help => "HELP",
     };
 
-    let hints = match &app.mode {
+    let insert_hint = if matches!(app.mode, AppMode::Insert) {
+        app.insert.as_ref().map(|h| {
+            let title = h.title();
+            if h.as_any()
+                .downcast_ref::<crate::insert::date_picker::DatePicker>()
+                .is_some()
+            {
+                format!("{title}  ←→↑↓:navigate  t:today  Enter:save  Esc:cancel")
+            } else if h.as_any()
+                .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
+                .is_some()
+            {
+                format!("{title}  Ctrl+S:save  Esc:cancel  Tab:nest")
+            } else {
+                format!("{title}  Enter:confirm  Esc:cancel")
+            }
+        })
+    } else {
+        None
+    };
+
+    let hints: &str = match &app.mode {
         AppMode::BoardSelector => "?:help  q:quit",
         AppMode::Normal => "?:help  q:quit",
         AppMode::CardDetail => "?:help  Esc:close",
-        AppMode::Insert(_) => "Enter:confirm  Esc:cancel",
+        AppMode::Insert => insert_hint.as_deref().unwrap_or("Enter:confirm  Esc:cancel"),
         AppMode::Command => "Enter:search  Esc:cancel",
-        AppMode::Dialog(_) => "y:confirm  n:cancel",
+        AppMode::Dialog => "y:confirm  n:cancel",
         AppMode::Help => "Esc:close",
     };
 

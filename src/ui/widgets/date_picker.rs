@@ -22,9 +22,12 @@ pub fn render(
     frame.render_widget(Clear, dialog);
 
     let block = Block::default()
-        .title(" Due Date (YYYY-MM-DD) ")
+        .title(Line::from(Span::styled(
+            " Due Date (YYYY-MM-DD) ",
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        )))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(accent));
     let inner = block.inner(dialog);
     frame.render_widget(block, dialog);
 

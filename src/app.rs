@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use arboard::Clipboard;
-use ratatui::style::{Color, Style};
-use ratatui_textarea::TextArea;
+use ratatui::style::Color;
 
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
@@ -17,42 +16,12 @@ pub enum AppMode {
     BoardSelector,
     Normal,
     CardDetail,
-    Insert(InsertTarget),
+    /// Insert mode. The active **Insert Handler** lives on `App.insert`.
+    Insert,
     Command,
-    Dialog(DialogKind),
+    /// Modal dialog mode. The active dialog itself lives on `App.dialog`.
+    Dialog,
     Help,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum InsertTarget {
-    NewCardTitle,
-    EditCardTitle,
-    EditCardTitleInline,
-    EditCardDescription,
-    NewListName,
-    RenameList,
-    NewChecklistItem,
-    EditChecklistItem,
-    NewBoardName,
-    RenameBoard,
-    EditDueDate,
-    NewLabelName,
-    EditLabelName,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DialogKind {
-    ConfirmArchiveBoard,
-    ConfirmArchiveCard,
-    ConfirmArchiveList,
-    ConfirmCancelEdit,
-    ConfirmDeleteLabel,
-    ArchivedCards,
-    ArchivedBoards,
-    ArchivedLists,
-    LabelPicker,
-    LabelManager,
-    CardHistory,
 }
 
 pub struct LoadedBoard {
@@ -118,20 +87,12 @@ pub struct App {
     pub search_query: String,
     pub search_active: bool,
     pub label_filter: Option<LabelColor>,
-    pub input_buffer: String,
-    pub input_cursor: usize,
-    pub label_picker_idx: usize,
-    pub description_editor: Option<TextArea<'static>>,
-    pub description_original: Option<String>,
-    pub editor_scroll: usize,
-    pub picker_date: Option<chrono::NaiveDate>,
-    pub archived_cards: Vec<Card>,
-    pub archived_boards: Vec<crate::model::board::BoardMeta>,
-    pub archived_lists: Vec<CardList>,
-    pub archived_selected: usize,
-    pub history_scroll: usize,
     pub last_reload: Instant,
     pub reload_interval: Duration,
+    /// Active modal **Dialog Kind** — present iff `mode == AppMode::Dialog`.
+    pub dialog: Option<Box<dyn crate::dialog::Dialog>>,
+    /// Active **Insert Handler** — present iff `mode == AppMode::Insert`.
+    pub insert: Option<Box<dyn crate::insert::InsertHandler>>,
 }
 
 impl App {
@@ -149,20 +110,10 @@ impl App {
             search_query: String::new(),
             search_active: false,
             label_filter: None,
-            input_buffer: String::new(),
-            input_cursor: 0,
-            label_picker_idx: 0,
-            description_editor: None,
-            description_original: None,
-            editor_scroll: 0,
-            picker_date: None,
-            archived_cards: Vec::new(),
-            archived_boards: Vec::new(),
-            archived_lists: Vec::new(),
-            archived_selected: 0,
-            history_scroll: 0,
             last_reload: Instant::now(),
             reload_interval: Duration::from_secs(15),
+            dialog: None,
+            insert: None,
         };
         if let Some(board_id) = open_board_id {
             app.load_board(&board_id)?;
@@ -185,7 +136,7 @@ impl App {
     fn should_reload(&self) -> bool {
         self.board.is_some()
             && matches!(self.mode, AppMode::Normal | AppMode::Help | AppMode::CardDetail)
-            && self.description_editor.is_none()
+            && self.insert.is_none()
     }
 
     fn try_reload_board(&mut self) {
@@ -299,52 +250,51 @@ impl App {
         Ok(())
     }
 
-    pub fn start_insert(&mut self, target: InsertTarget) {
-        self.input_buffer.clear();
-        self.input_cursor = 0;
-        self.previous_mode = Some(self.mode.clone());
-        self.mode = AppMode::Insert(target);
+    /// Open a modal **Dialog**, remembering the current mode so the
+    /// dispatcher can restore it on `Close`.
+    pub fn open_dialog(&mut self, dialog: Box<dyn crate::dialog::Dialog>) {
+        if !matches!(self.mode, AppMode::Dialog) {
+            self.previous_mode = Some(self.mode.clone());
+        }
+        self.dialog = Some(dialog);
+        self.mode = AppMode::Dialog;
     }
 
-    pub fn start_insert_with(&mut self, target: InsertTarget, initial: &str) {
-        self.input_buffer = initial.to_string();
-        self.input_cursor = initial.len();
-        self.previous_mode = Some(self.mode.clone());
-        self.mode = AppMode::Insert(target);
+    /// Close the active dialog, restoring `previous_mode` if set, else
+    /// falling back to `Normal` (or `BoardSelector` when no board loaded).
+    pub fn close_dialog(&mut self) {
+        self.dialog = None;
+        let fallback = if self.board.is_some() {
+            AppMode::Normal
+        } else {
+            AppMode::BoardSelector
+        };
+        self.mode = self.previous_mode.take().unwrap_or(fallback);
     }
 
-    pub fn start_due_date_picker(&mut self, prefill: &str) {
-        let initial = chrono::NaiveDate::parse_from_str(prefill, "%Y-%m-%d")
-            .ok()
-            .unwrap_or_else(|| chrono::Local::now().date_naive());
-        let buf = initial.format("%Y-%m-%d").to_string();
-        self.picker_date = Some(initial);
-        self.input_buffer = buf.clone();
-        self.input_cursor = buf.len();
-        self.previous_mode = Some(self.mode.clone());
-        self.mode = AppMode::Insert(InsertTarget::EditDueDate);
+    /// Close the active dialog to an explicit target mode (does not
+    /// consume `previous_mode`).
+    pub fn close_dialog_to(&mut self, target: AppMode) {
+        self.dialog = None;
+        self.mode = target;
     }
 
-    pub fn start_description_edit(&mut self, initial: &str) {
-        let lines: Vec<String> = initial.split('\n').map(|s| s.to_string()).collect();
-        let mut textarea = TextArea::new(lines);
-        textarea.set_cursor_line_style(Style::default());
-        textarea.set_style(Style::default().fg(Color::White));
-        textarea.set_block(
-            ratatui::widgets::Block::default()
-                .borders(ratatui::widgets::Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow))
-                .title(" Edit Description "),
-        );
-        self.description_original = Some(initial.to_string());
-        self.description_editor = Some(textarea);
-        self.editor_scroll = 0;
-        self.previous_mode = Some(self.mode.clone());
-        self.mode = AppMode::Insert(InsertTarget::EditCardDescription);
+    /// Enter **Insert** mode with the given handler, remembering the
+    /// current mode for cancel-return.
+    pub fn start_insert(&mut self, handler: Box<dyn crate::insert::InsertHandler>) {
+        if !matches!(self.mode, AppMode::Insert) {
+            self.previous_mode = Some(self.mode.clone());
+        }
+        self.insert = Some(handler);
+        self.mode = AppMode::Insert;
     }
 
-    pub fn finish_description_edit(&mut self) -> Option<String> {
-        self.description_editor.take().map(|ta| ta.into_lines().join("\n"))
+    /// Cancel insert and restore `previous_mode`.
+    pub fn cancel_insert(&mut self) {
+        self.insert = None;
+        self.mode = self.previous_mode.take().unwrap_or_else(|| {
+            if self.board.is_some() { AppMode::Normal } else { AppMode::BoardSelector }
+        });
     }
 }
 
@@ -356,6 +306,21 @@ impl App {
             .unwrap_or(Color::Cyan)
     }
 
+    /// Route a Command through the Board Editor while keeping the
+    /// take-replace shim until `App.board` is renamed to `editor` (later
+    /// phase). The result is the id of a card created by `AddCard`, if any.
+    pub fn apply(&mut self, cmd: crate::command::Command) -> anyhow::Result<Option<crate::model::ids::ShortId>> {
+        let board = self
+            .board
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("no board loaded"))?;
+        let mut editor = crate::board_editor::BoardEditor::from_loaded(board);
+        let result = editor.apply(cmd);
+        let new_id = editor.last_added_card_id().cloned();
+        self.board = Some(editor.into_loaded());
+        result.map_err(anyhow::Error::from)?;
+        Ok(new_id)
+    }
 }
 
 #[cfg(test)]
@@ -407,20 +372,10 @@ mod tests {
             search_query: String::new(),
             search_active: false,
             label_filter: None,
-            input_buffer: String::new(),
-            input_cursor: 0,
-            label_picker_idx: 0,
-            description_editor: None,
-            description_original: None,
-            editor_scroll: 0,
-            picker_date: None,
-            archived_cards: vec![],
-            archived_boards: vec![],
-            archived_lists: vec![],
-            archived_selected: 0,
-            history_scroll: 0,
             last_reload: Instant::now(),
             reload_interval: Duration::from_secs(15),
+            dialog: None,
+            insert: None,
         }
     }
 
@@ -631,7 +586,7 @@ mod tests {
         with_temp_dir(|| {
             let (meta, mut list, _) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
-            app.mode = AppMode::Insert(InsertTarget::NewCardTitle);
+            app.start_insert(Box::new(crate::insert::line_editor::NewCardTitle::new()));
 
             // Add a card on disk
             let new_card = Card::new("Should not appear".into());
@@ -655,7 +610,10 @@ mod tests {
             let mut app = App::new(Some(meta.id.clone())).unwrap();
             app.mode = AppMode::CardDetail;
             // Simulate active description edit
-            app.start_description_edit("initial");
+            let card_id = app.board.as_ref().unwrap().current_card_id().cloned().unwrap();
+            app.start_insert(Box::new(
+                crate::insert::markdown_editor::MarkdownEditor::new(card_id, "initial"),
+            ));
 
             let new_card = Card::new("Disk".into());
             card_store::save_card(&meta.id, &new_card).unwrap();
@@ -675,21 +633,15 @@ mod tests {
     fn start_insert_with_prefill() {
         with_temp_dir(|| {
             let mut app = App::new(None).unwrap();
-            app.start_insert_with(InsertTarget::EditCardTitleInline, "hello");
-            assert_eq!(app.input_buffer, "hello");
-            assert_eq!(app.input_cursor, 5);
-            assert!(matches!(app.mode, AppMode::Insert(InsertTarget::EditCardTitleInline)));
-        });
-    }
-
-    #[test]
-    fn finish_description_edit_returns_joined_lines() {
-        with_temp_dir(|| {
-            let mut app = App::new(None).unwrap();
-            app.start_description_edit("line1\nline2");
-            let out = app.finish_description_edit().unwrap();
-            assert_eq!(out, "line1\nline2");
-            assert!(app.description_editor.is_none());
+            app.start_insert(Box::new(crate::insert::line_editor::EditCardTitle::new(
+                "abc".into(),
+                "hello",
+                true,
+            )));
+            let h = app.insert.as_ref().unwrap();
+            assert_eq!(h.line_buffer(), Some("hello"));
+            assert_eq!(h.line_cursor(), Some(5));
+            assert!(matches!(app.mode, AppMode::Insert));
         });
     }
 }

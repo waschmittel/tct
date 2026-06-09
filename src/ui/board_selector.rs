@@ -4,7 +4,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use ratatui::Frame;
 
-use crate::app::{App, AppMode, InsertTarget};
+use crate::app::{App, AppMode};
+use crate::insert::InsertSurface;
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::vertical([
@@ -54,11 +55,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         frame.render_stateful_widget(list, chunks[1], &mut state);
     }
 
-    if let AppMode::Insert(InsertTarget::NewBoardName) = &app.mode {
-        render_input_dialog(frame, area, "New Board", &app.input_buffer, app.input_cursor);
-    }
-    if let AppMode::Insert(InsertTarget::RenameBoard) = &app.mode {
-        render_input_dialog(frame, area, "Rename Board", &app.input_buffer, app.input_cursor);
+    if matches!(&app.mode, AppMode::Insert)
+        && let Some(handler) = app.insert.as_ref()
+        && handler.surface() == InsertSurface::BoardSelector
+        && let (Some(buf), Some(cursor)) = (handler.line_buffer(), handler.line_cursor())
+    {
+        render_input_dialog(frame, area, handler.title(), buf, cursor);
     }
 
     super::status_bar::render(frame, chunks[2], app);
@@ -80,21 +82,33 @@ fn render_input_dialog(frame: &mut Frame, area: Rect, title: &str, input: &str, 
     let inner = block.inner(dialog_area);
     frame.render_widget(block, dialog_area);
 
-    let visible_w = inner.width as usize;
+    let layout = ratatui::layout::Layout::vertical([
+        ratatui::layout::Constraint::Length(1),
+        ratatui::layout::Constraint::Length(1),
+    ])
+    .split(inner);
+
+    let visible_w = layout[0].width as usize;
     let cursor_char_idx = input[..cursor].chars().count();
     let scroll = if cursor_char_idx >= visible_w {
         cursor_char_idx - visible_w + 1
     } else {
         0
     };
-    
+
     let visible: String = input.chars().skip(scroll).take(visible_w).collect();
     let text = Paragraph::new(Line::from(Span::raw(visible)));
-    frame.render_widget(text, inner);
+    frame.render_widget(text, layout[0]);
 
-    let cx = inner.x + (cursor_char_idx - scroll) as u16;
-    let cy = inner.y;
-    if cx < inner.x + inner.width {
+    let hints = Paragraph::new(Line::from(Span::styled(
+        "Enter: confirm  Esc: cancel",
+        Style::default().fg(Color::DarkGray),
+    )));
+    frame.render_widget(hints, layout[1]);
+
+    let cx = layout[0].x + (cursor_char_idx - scroll) as u16;
+    let cy = layout[0].y;
+    if cx < layout[0].x + layout[0].width {
         frame.set_cursor_position((cx, cy));
     }
 }

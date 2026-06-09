@@ -4,8 +4,9 @@ use anyhow::{bail, Context};
 
 use super::lookup::{find_board, find_card_in_lists};
 use super::util::{flag_value, fmt_progress, load_all_cards};
-use crate::model::card::ChecklistItem;
-use crate::storage::{card_store, list_store};
+use crate::board_editor::BoardEditor;
+use crate::command::Command;
+use crate::storage::list_store;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args
@@ -26,43 +27,42 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let all_cards = load_all_cards(&board.id, &lists);
 
     if let Some(text) = flag_value(args, "--add") {
-        let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
-        card.checklist.push(ChecklistItem {
-            text: text.to_string(),
-            completed: false,
-        });
-        card.log(format!("Added checklist item '{text}'"));
-        card_store::save_card(&board.id, &card)?;
-        println!("Added checklist item '{}' to card '{}'.", text, card.title);
+        let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
+        let card_id = card.id.clone();
+        let card_title = card.title.clone();
+        let mut editor = BoardEditor::load(&board.id)?;
+        editor.apply(Command::AddChecklistItem { card_id, text: text.to_string() })?;
+        println!("Added checklist item '{}' to card '{}'.", text, card_title);
     } else if let Some(n_str) = flag_value(args, "--toggle") {
         let n: usize = n_str
             .parse()
             .context("Item index must be a positive integer")?;
-        let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
+        let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         let idx = n
             .checked_sub(1)
             .ok_or_else(|| anyhow::anyhow!("Index must be >= 1"))?;
         let total = card.checklist.len();
-        let item = card
-            .checklist
-            .get_mut(idx)
-            .ok_or_else(|| anyhow::anyhow!("Index {n} out of range (card has {total} items)"))?;
-        item.completed = !item.completed;
-        let state = if item.completed { "done" } else { "undone" };
-        let text = item.text.clone();
-        let action = if item.completed {
-            format!("Completed checklist item '{text}'")
-        } else {
-            format!("Uncompleted checklist item '{text}'")
-        };
-        card.log(action);
-        card_store::save_card(&board.id, &card)?;
-        println!("Toggled item {n} ('{text}') → {state}.");
+        if idx >= total {
+            bail!("Index {n} out of range (card has {total} items)");
+        }
+        let item_text = card.checklist[idx].text.clone();
+        let card_id = card.id.clone();
+        let mut editor = BoardEditor::load(&board.id)?;
+        editor.apply(Command::ToggleChecklistItem { card_id: card_id.clone(), item_idx: idx })?;
+        let new_state = editor
+            .board()
+            .cards
+            .get(&card_id)
+            .and_then(|c| c.checklist.get(idx))
+            .map(|i| i.completed)
+            .unwrap_or(false);
+        let state = if new_state { "done" } else { "undone" };
+        println!("Toggled item {n} ('{item_text}') → {state}.");
     } else if let Some(n_str) = flag_value(args, "--delete") {
         let n: usize = n_str
             .parse()
             .context("Item index must be a positive integer")?;
-        let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
+        let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         let idx = n
             .checked_sub(1)
             .ok_or_else(|| anyhow::anyhow!("Index must be >= 1"))?;
@@ -72,10 +72,11 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
                 card.checklist.len()
             );
         }
-        let removed = card.checklist.remove(idx);
-        card.log(format!("Removed checklist item '{}'", removed.text));
-        card_store::save_card(&board.id, &card)?;
-        println!("Deleted checklist item '{}'.", removed.text);
+        let removed_text = card.checklist[idx].text.clone();
+        let card_id = card.id.clone();
+        let mut editor = BoardEditor::load(&board.id)?;
+        editor.apply(Command::RemoveChecklistItem { card_id, item_idx: idx })?;
+        println!("Deleted checklist item '{removed_text}'.");
     } else {
         // Default: show checklist
         let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;

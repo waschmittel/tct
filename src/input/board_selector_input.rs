@@ -1,6 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{App, AppMode, DialogKind, InsertTarget};
+use crate::app::{App, AppMode};
+use crate::board_editor::BoardEditor;
+use crate::command::Command;
+use crate::dialog::{archived_boards::ArchivedBoards, confirm_archive_board::ConfirmArchiveBoard};
+use crate::insert::line_editor;
 use crate::storage::board_store;
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
@@ -29,12 +33,12 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             }
         }
         (KeyCode::Char('n'), _) => {
-            app.start_insert(InsertTarget::NewBoardName);
+            app.start_insert(Box::new(line_editor::NewBoardName::new()));
         }
         (KeyCode::Char('r'), _) => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let name = board.name.clone();
-                app.start_insert_with(InsertTarget::RenameBoard, &name);
+                app.start_insert(Box::new(line_editor::RenameBoard::new(&name)));
             }
         }
         (KeyCode::Char('?'), _) => {
@@ -42,21 +46,32 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             app.mode = AppMode::Help;
         }
         (KeyCode::Char('c'), _) => {
-            if let Some(board) = app.boards.get_mut(app.selected_board_idx) {
-                board.accent_color = board.accent_color.next();
-                board_store::save_board(board)?;
+            if let Some(board) = app.boards.get(app.selected_board_idx) {
+                let id = board.id.clone();
+                let next = board.accent_color.next();
+                let mut editor = BoardEditor::load(&id)?;
+                editor.apply(Command::SetAccentColor { color: next })?;
+                if let Some(b) = app.boards.get_mut(app.selected_board_idx) {
+                    b.accent_color = next;
+                }
                 app.set_status("Board color changed".into());
             }
         }
         (KeyCode::Char('a'), _)
             if !app.boards.is_empty() => {
-                app.mode = AppMode::Dialog(DialogKind::ConfirmArchiveBoard);
+                let board_name = app
+                    .boards
+                    .get(app.selected_board_idx)
+                    .map(|b| b.name.clone())
+                    .unwrap_or_default();
+                app.open_dialog(Box::new(ConfirmArchiveBoard { board_name }));
             }
         (KeyCode::Char('v'), _) => {
             let archived = board_store::list_archived_boards()?;
-            app.archived_boards = archived;
-            app.archived_selected = 0;
-            app.mode = AppMode::Dialog(DialogKind::ArchivedBoards);
+            app.open_dialog(Box::new(ArchivedBoards {
+                boards: archived,
+                selected: 0,
+            }));
         }
         _ => {}
     }
@@ -153,11 +168,9 @@ mod tests {
         with_temp_dir(|| {
             let mut app = App::new(None).unwrap();
             press(&mut app, KeyCode::Char('n'));
-            assert!(matches!(
-                app.mode,
-                AppMode::Insert(InsertTarget::NewBoardName)
-            ));
-            assert!(app.input_buffer.is_empty());
+            assert!(matches!(app.mode, AppMode::Insert));
+            let h = app.insert.as_ref().unwrap();
+            assert_eq!(h.line_buffer(), Some(""));
         });
     }
 
@@ -167,11 +180,9 @@ mod tests {
             seed_boards(&["My Board"]);
             let mut app = App::new(None).unwrap();
             press(&mut app, KeyCode::Char('r'));
-            assert!(matches!(
-                app.mode,
-                AppMode::Insert(InsertTarget::RenameBoard)
-            ));
-            assert_eq!(app.input_buffer, "My Board");
+            assert!(matches!(app.mode, AppMode::Insert));
+            let h = app.insert.as_ref().unwrap();
+            assert_eq!(h.line_buffer(), Some("My Board"));
         });
     }
 
@@ -196,10 +207,8 @@ mod tests {
             seed_boards(&["A"]);
             let mut app = App::new(None).unwrap();
             press(&mut app, KeyCode::Char('a'));
-            assert!(matches!(
-                app.mode,
-                AppMode::Dialog(DialogKind::ConfirmArchiveBoard)
-            ));
+            assert!(matches!(app.mode, AppMode::Dialog));
+            assert!(app.dialog.is_some());
         });
     }
 
@@ -219,10 +228,8 @@ mod tests {
         with_temp_dir(|| {
             let mut app = App::new(None).unwrap();
             press(&mut app, KeyCode::Char('v'));
-            assert!(matches!(
-                app.mode,
-                AppMode::Dialog(DialogKind::ArchivedBoards)
-            ));
+            assert!(matches!(app.mode, AppMode::Dialog));
+            assert!(app.dialog.is_some());
         });
     }
 

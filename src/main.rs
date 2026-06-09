@@ -1,7 +1,11 @@
 mod app;
+mod board_editor;
 mod cli;
+mod command;
+mod dialog;
 mod event;
 mod input;
+mod insert;
 mod model;
 mod storage;
 mod ui;

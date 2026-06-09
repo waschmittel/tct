@@ -4,7 +4,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
-use crate::app::{App, AppMode, InsertTarget};
+use crate::app::{App, AppMode};
+use crate::insert::InsertSurface;
 
 use super::markdown;
 
@@ -30,7 +31,16 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     let title_display = format!(" {} ", card.title);
 
-    let is_editing_desc = matches!(app.mode, AppMode::Insert(InsertTarget::EditCardDescription));
+    // Detect "editing description" via the active insert handler.
+    let editing_desc_handler = if matches!(app.mode, AppMode::Insert) {
+        app.insert.as_ref().and_then(|h| {
+            h.as_any()
+                .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
+        })
+    } else {
+        None
+    };
+    let is_editing_desc = editing_desc_handler.is_some();
 
     let bottom_hints = if is_editing_desc {
         vec![
@@ -64,11 +74,15 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    // If editing description, render the editor instead
-    if is_editing_desc {
-        if let Some(textarea) = &app.description_editor {
-            render_description_editor(frame, inner, textarea, app.editor_scroll, accent);
-        }
+    // If editing description, render the editor instead.
+    if let Some(handler) = editing_desc_handler {
+        render_description_editor(
+            frame,
+            inner,
+            &handler.input.textarea,
+            handler.input.scroll,
+            accent,
+        );
         return;
     }
 
@@ -85,7 +99,10 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     } else if desc_wrap_width == 0 {
         Vec::new()
     } else {
-        markdown::highlight_lines_with_width(&card.description, accent, desc_wrap_width)
+        markdown::MarkdownRenderer::new(&card.description, desc_wrap_width, accent)
+            .render()
+            .lines()
+            .to_vec()
     };
 
     let checklist_lines: Vec<Line<'static>> = if card.checklist.is_empty() {
@@ -359,28 +376,27 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         frame.render_widget(Paragraph::new(due_lines), due_area);
     }
 
-    // Input dialogs rendered on top
-    match &app.mode {
-        AppMode::Insert(InsertTarget::EditCardTitle) => {
-            render_input_dialog(frame, popup, "Edit Card Title", &app.input_buffer, app.input_cursor);
-        }
-        AppMode::Insert(InsertTarget::NewChecklistItem) => {
-            render_input_dialog(frame, popup, "New Item", &app.input_buffer, app.input_cursor);
-        }
-        AppMode::Insert(InsertTarget::EditChecklistItem) => {
-            render_input_dialog(frame, popup, "Edit Item", &app.input_buffer, app.input_cursor);
-        }
-        AppMode::Insert(InsertTarget::EditDueDate) => {
+    // Input dialogs rendered on top — driven by the active insert handler
+    // when its surface is `CardDetail`.
+    if matches!(&app.mode, AppMode::Insert)
+        && let Some(handler) = app.insert.as_ref()
+        && handler.surface() == InsertSurface::CardDetail
+    {
+        if let Some(dp) = handler
+            .as_any()
+            .downcast_ref::<crate::insert::date_picker::DatePicker>()
+        {
             super::widgets::date_picker::render(
                 frame,
                 popup,
-                &app.input_buffer,
-                app.input_cursor,
-                app.picker_date,
+                &dp.buffer,
+                dp.cursor,
+                dp.picker_date,
                 accent,
             );
+        } else if let (Some(buf), Some(cursor)) = (handler.line_buffer(), handler.line_cursor()) {
+            render_input_dialog(frame, popup, handler.title(), buf, cursor, accent);
         }
-        _ => {}
     }
 }
 
@@ -416,8 +432,19 @@ fn render_description_editor(
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow))
-        .title(" Edit Description ");
+        .border_style(Style::default().fg(accent))
+        .title(Line::from(Span::styled(
+            " Edit Description ",
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        )))
+        .title_bottom(Line::from(vec![
+            Span::styled(" Ctrl+S", Style::default().fg(accent)),
+            Span::raw(":save  "),
+            Span::styled("Esc", Style::default().fg(accent)),
+            Span::raw(":cancel  "),
+            Span::styled("Tab", Style::default().fg(accent)),
+            Span::raw(":nest "),
+        ]));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -426,42 +453,16 @@ fn render_description_editor(
     }
 
     let visible_height = inner.height as usize;
-    let lines = textarea.lines();
+    let lines: Vec<String> = textarea.lines().iter().map(|s| s.to_string()).collect();
     let ratatui_textarea::DataCursor(cursor_row, cursor_col) = textarea.cursor();
 
     let wrap_width = markdown::WRAP_WIDTH.min(inner.width as usize);
 
-    // Build visual lines for rendering
-    let mut visual_lines: Vec<(usize, Line<'static>)> = Vec::new();
-    for (li, line_text) in lines.iter().enumerate() {
-        let trimmed = line_text.trim_start();
-        let base_indent = line_text.len() - trimmed.len();
-        let mut list_indent = 0;
-
-        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-            list_indent = base_indent + 2;
-        } else if let Some(dot_pos) = trimmed.find(". ") {
-            let num_part = &trimmed[..dot_pos];
-            if num_part.parse::<u64>().is_ok() {
-                list_indent = base_indent + dot_pos + 2;
-            }
-        }
-
-        let highlighted = markdown::highlight_line(line_text, accent);
-        let wrapped = if list_indent > 0 {
-            markdown::wrap_spans_with_indent(highlighted, wrap_width, list_indent)
-        } else {
-            markdown::wrap_spans(highlighted, wrap_width)
-        };
-        for wl in wrapped {
-            visual_lines.push((li, wl));
-        }
-    }
-
-    let lines_owned: Vec<String> = lines.iter().map(|s| s.to_string()).collect();
-    let visual_map = markdown::build_visual_map(&lines_owned, accent, wrap_width);
-    let (cursor_visual_row, cursor_visual_col) =
-        markdown::source_to_visual(&visual_map, cursor_row, cursor_col);
+    let rendered = markdown::MarkdownRenderer::from_lines(&lines, wrap_width, accent).render();
+    let visual_lines = rendered.lines();
+    let (cursor_visual_row_u16, cursor_visual_col_u16) = rendered.cursor_at(cursor_row, cursor_col);
+    let cursor_visual_row = cursor_visual_row_u16 as usize;
+    let cursor_visual_col = cursor_visual_col_u16 as usize;
 
     // Adjust scroll to keep cursor visible
     let scroll = if cursor_visual_row < editor_scroll {
@@ -476,7 +477,8 @@ fn render_description_editor(
     let start = scroll.min(end);
 
     for (vi, idx) in (start..end).enumerate() {
-        let (src_li, ref vline) = visual_lines[idx];
+        let vline = &visual_lines[idx];
+        let src_li = rendered.src_row_for(idx).unwrap_or(0);
 
         let y = inner.y + vi as u16;
         let line_area = Rect::new(inner.x, y, inner.width, 1);
@@ -501,7 +503,14 @@ fn render_description_editor(
     }
 }
 
-fn render_input_dialog(frame: &mut Frame, area: Rect, title: &str, input: &str, cursor: usize) {
+fn render_input_dialog(
+    frame: &mut Frame,
+    area: Rect,
+    title: &str,
+    input: &str,
+    cursor: usize,
+    accent: Color,
+) {
     let width = 50u16.min(area.width.saturating_sub(2));
     let height = 5u16;
     let x = area.x + (area.width.saturating_sub(width)) / 2;
@@ -513,7 +522,7 @@ fn render_input_dialog(frame: &mut Frame, area: Rect, title: &str, input: &str, 
     let block = Block::default()
         .title(format!(" {title} "))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
+        .border_style(Style::default().fg(accent));
     let inner = block.inner(dialog);
     frame.render_widget(block, dialog);
 

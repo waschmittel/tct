@@ -18,9 +18,9 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         AppMode::BoardSelector => board_selector_input::handle(app, key),
         AppMode::Normal => normal::handle(app, key),
         AppMode::CardDetail => card_detail_input::handle(app, key),
-        AppMode::Insert(_) => insert::handle(app, key),
+        AppMode::Insert => insert::handle(app, key),
         AppMode::Command => command::handle(app, key),
-        AppMode::Dialog(_) => dialog_input::handle(app, key),
+        AppMode::Dialog => dialog_input::handle(app, key),
         AppMode::Help => {
             if matches!(key.code, crossterm::event::KeyCode::Esc | crossterm::event::KeyCode::Char('q')) {
                 if let Some(prev) = app.previous_mode.take() {

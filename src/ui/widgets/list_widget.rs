@@ -259,24 +259,32 @@ pub fn render(
         }
     }
 
-    // Scroll indicators
-    if scroll > 0 {
+    // Scroll indicators (accent-colored so users notice hidden cards)
+    let scroll_above = scroll;
+    if scroll_above > 0 {
+        let label = format!("▲ +{scroll_above}");
+        let w = label.chars().count() as u16 + 1;
         let indicator = ratatui::widgets::Paragraph::new(
-            ratatui::text::Span::styled("▲ more", Style::default().fg(Color::DarkGray)),
+            ratatui::text::Span::styled(
+                label,
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+            ),
         );
-        let ind_area = Rect::new(inner.x + inner.width.saturating_sub(7), inner.y, 7, 1);
+        let ind_area = Rect::new(inner.x + inner.width.saturating_sub(w), inner.y, w, 1);
         frame.render_widget(indicator, ind_area);
     }
     if scroll + rendered_count < visible_cards.len() {
         let remaining = visible_cards.len() - scroll - rendered_count;
+        let label = format!("▼ +{remaining}");
+        let w = label.chars().count() as u16 + 1;
         let indicator = ratatui::widgets::Paragraph::new(
             ratatui::text::Span::styled(
-                format!("▼ +{remaining}"),
-                Style::default().fg(Color::DarkGray),
+                label,
+                Style::default().fg(accent).add_modifier(Modifier::BOLD),
             ),
         );
         let y_pos = inner.y + inner.height.saturating_sub(1);
-        let ind_area = Rect::new(inner.x + inner.width.saturating_sub(7), y_pos, 7, 1);
+        let ind_area = Rect::new(inner.x + inner.width.saturating_sub(w), y_pos, w, 1);
         frame.render_widget(indicator, ind_area);
     }
 
