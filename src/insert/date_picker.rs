@@ -14,10 +14,11 @@ pub struct DatePicker {
     pub buffer: String,
     pub cursor: usize,
     pub picker_date: Option<NaiveDate>,
+    pub surface: InsertSurface,
 }
 
 impl DatePicker {
-    pub fn new(card_id: ShortId, prefill: &str) -> Self {
+    pub fn new(card_id: ShortId, prefill: &str, surface: InsertSurface) -> Self {
         let initial = NaiveDate::parse_from_str(prefill, "%Y-%m-%d")
             .ok()
             .unwrap_or_else(|| chrono::Local::now().date_naive());
@@ -27,6 +28,7 @@ impl DatePicker {
             cursor: buf.len(),
             buffer: buf,
             picker_date: Some(initial),
+            surface,
         }
     }
 }
@@ -110,7 +112,7 @@ impl InsertHandler for DatePicker {
         }
     }
 
-    fn surface(&self) -> InsertSurface { InsertSurface::CardDetail }
+    fn surface(&self) -> InsertSurface { self.surface }
     fn as_any(&self) -> &dyn std::any::Any { self }
 }
 
@@ -189,7 +191,7 @@ mod tests {
     use super::*;
 
     fn make_picker() -> DatePicker {
-        DatePicker::new("card1".into(), "2026-05-18")
+        DatePicker::new("card1".into(), "2026-05-18", InsertSurface::CardDetail)
     }
 
     #[test]

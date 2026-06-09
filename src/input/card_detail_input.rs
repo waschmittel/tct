@@ -6,7 +6,7 @@ use crate::dialog::{
     card_history::CardHistory, label_manager::LabelManager, label_picker::LabelPicker,
 };
 use crate::insert::{
-    date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor,
+    date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor, InsertSurface,
 };
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
@@ -199,7 +199,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                         .map(|d| d.format("%Y-%m-%d").to_string())
                         .unwrap_or_default();
                     let card_id = card.id.clone();
-                    app.start_insert(Box::new(DatePicker::new(card_id, &date_str)));
+                    app.start_insert(Box::new(DatePicker::new(card_id, &date_str, InsertSurface::CardDetail)));
                 }
         }
 
