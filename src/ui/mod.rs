@@ -10,7 +10,13 @@ pub mod widgets;
 
 use ratatui::Frame;
 
-use crate::app::{App, AppMode, InsertTarget};
+use crate::app::{App, AppMode};
+use crate::insert::InsertSurface;
+
+/// Resolve the surface of the currently active `InsertHandler`, if any.
+fn insert_surface(app: &App) -> Option<InsertSurface> {
+    app.insert.as_ref().map(|h| h.surface())
+}
 
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
@@ -22,14 +28,20 @@ pub fn render(frame: &mut Frame, app: &App) {
         &app.mode
     };
 
-    let is_board_selector_base = app.board.is_none() || matches!(
-        effective_mode,
-        AppMode::BoardSelector
-            | AppMode::Insert(InsertTarget::NewBoardName)
-            | AppMode::Insert(InsertTarget::RenameBoard)
-            | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
-            | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
-    );
+    let dialog_over_selector = matches!(&app.mode, AppMode::Dialog)
+        && app
+            .dialog
+            .as_ref()
+            .map(|d| matches!(d.background(), crate::dialog::DialogBackground::BoardSelector))
+            .unwrap_or(false);
+
+    let insert_over_selector = matches!(&app.mode, AppMode::Insert)
+        && matches!(insert_surface(app), Some(InsertSurface::BoardSelector));
+
+    let is_board_selector_base = app.board.is_none()
+        || matches!(effective_mode, AppMode::BoardSelector)
+        || dialog_over_selector
+        || insert_over_selector;
 
     if is_board_selector_base {
         board_selector::render(frame, area, app);
@@ -45,41 +57,31 @@ pub fn render(frame: &mut Frame, app: &App) {
         AppMode::Command => {
             search_bar::render(frame, area, app);
         }
-        AppMode::CardDetail
-        | AppMode::Insert(
-            InsertTarget::EditCardTitle
-            | InsertTarget::EditCardDescription
-            | InsertTarget::NewChecklistItem
-            | InsertTarget::EditChecklistItem
-        ) => {
+        AppMode::CardDetail => {
             card_detail::render(frame, area, app);
         }
-        AppMode::Insert(InsertTarget::EditDueDate) => {
-            if effective_mode == &AppMode::CardDetail {
+        AppMode::Insert => {
+            // Card-detail inserts render the popup themselves (the
+            // handler's render is invoked inside card_detail::render).
+            if matches!(insert_surface(app), Some(InsertSurface::CardDetail)) {
                 card_detail::render(frame, area, app);
             }
+            // BoardView/BoardSelector inserts are drawn by the
+            // respective background views via consulting `app.insert`.
         }
-        AppMode::Dialog(_kind) => {
-            // Some dialogs are specific to BoardSelector and already rendered background above.
-            // Some are specific to BoardView. dialog::render handles the specific popup content.
+        AppMode::Dialog => {
             dialog::render(frame, area, app);
         }
         _ => {
-            // If we are in Help, we might still need to render CardDetail as an intermediate layer
-            if let AppMode::Help = app.mode
-                && matches!(
-                    effective_mode,
-                    AppMode::CardDetail
-                        | AppMode::Insert(
-                            InsertTarget::EditCardTitle
-                            | InsertTarget::EditCardDescription
-                            | InsertTarget::NewChecklistItem
-                            | InsertTarget::EditChecklistItem
-                            | InsertTarget::EditDueDate
-                        )
-                ) {
+            // Help may need card-detail as an intermediate layer.
+            if let AppMode::Help = app.mode {
+                let prev_card_detail = matches!(effective_mode, AppMode::CardDetail);
+                let prev_insert_card_detail = matches!(effective_mode, AppMode::Insert)
+                    && matches!(insert_surface(app), Some(InsertSurface::CardDetail));
+                if prev_card_detail || prev_insert_card_detail {
                     card_detail::render(frame, area, app);
                 }
+            }
         }
     }
 }
@@ -102,31 +104,24 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
 
     let effective_mode = app.previous_mode.as_ref().unwrap_or(&app.mode);
 
-    let is_board_selector_base = app.board.is_none() || matches!(
-        effective_mode,
-        AppMode::BoardSelector
-            | AppMode::Insert(InsertTarget::NewBoardName)
-            | AppMode::Insert(InsertTarget::RenameBoard)
-            | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
-            | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
-    );
+    let insert_surface_v = insert_surface(app);
+    let is_board_selector_base = app.board.is_none()
+        || matches!(effective_mode, AppMode::BoardSelector)
+        || matches!(effective_mode, AppMode::Insert)
+            && matches!(insert_surface_v, Some(InsertSurface::BoardSelector));
 
-    let is_card_detail = matches!(
-        effective_mode,
-        AppMode::CardDetail
-            | AppMode::Insert(
-                InsertTarget::EditCardTitle
-                    | InsertTarget::EditCardDescription
-                    | InsertTarget::NewChecklistItem
-                    | InsertTarget::EditChecklistItem
-                    | InsertTarget::EditDueDate
-            )
-    );
+    let is_card_detail = matches!(effective_mode, AppMode::CardDetail)
+        || (matches!(effective_mode, AppMode::Insert)
+            && matches!(insert_surface_v, Some(InsertSurface::CardDetail)));
 
-    let is_editing_desc = matches!(
-        effective_mode,
-        AppMode::Insert(InsertTarget::EditCardDescription)
-    );
+    // Description editor: previous mode is `Insert` and handler is the
+    // MarkdownEditor (titled "Edit Description").
+    let is_editing_desc = matches!(effective_mode, AppMode::Insert)
+        && app
+            .insert
+            .as_ref()
+            .map(|h| h.title() == "Edit Description")
+            .unwrap_or(false);
 
     let title = if is_editing_desc {
         " Help — Description Editor "
@@ -310,46 +305,19 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
 
 #[cfg(test)]
 mod tests {
-    use crate::app::{App, InsertTarget, AppMode};
+    use crate::app::{App, AppMode};
+    use crate::insert::InsertSurface;
 
+    /// Smoke test: BoardSelector base when no board loaded.
     #[test]
     fn test_render_completeness() {
         let mut app = App::new(None).unwrap();
-        
-        let all_targets = vec![
-            InsertTarget::NewCardTitle,
-            InsertTarget::EditCardTitle,
-            InsertTarget::EditCardTitleInline,
-            InsertTarget::EditCardDescription,
-            InsertTarget::NewListName,
-            InsertTarget::RenameList,
-            InsertTarget::NewChecklistItem,
-            InsertTarget::EditChecklistItem,
-            InsertTarget::NewBoardName,
-            InsertTarget::RenameBoard,
-            InsertTarget::EditDueDate,
-            InsertTarget::NewLabelName,
-            InsertTarget::EditLabelName,
-        ];
+        app.mode = AppMode::Insert;
+        // No board loaded → always BoardSelector base.
+        assert!(app.board.is_none());
 
-        // Case 1: No board loaded (BoardSelector background for ALL)
-        for target in &all_targets {
-            app.mode = AppMode::Insert(target.clone());
-            
-            let is_selector = app.board.is_none() || matches!(
-                app.mode,
-                AppMode::BoardSelector
-                    | AppMode::Insert(InsertTarget::NewBoardName)
-                    | AppMode::Insert(InsertTarget::RenameBoard)
-                    | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
-                    | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
-            );
-
-            assert!(is_selector, "When no board is loaded, base should be BoardSelector for target {:?}", target);
-        }
-
-        // Case 2: Board IS loaded (BoardView background for card-related targets)
-        // Simulate a loaded board
+        // With board loaded, only board-name insert handlers force the
+        // selector background; other handlers use the BoardView.
         let board_meta = crate::model::board::BoardMeta::new("Test".into());
         app.board = Some(crate::app::LoadedBoard {
             meta: board_meta,
@@ -362,23 +330,18 @@ mod tests {
             detail_scroll: 0,
         });
 
-        for target in all_targets {
-            app.mode = AppMode::Insert(target.clone());
-            
-            let is_selector = app.board.is_none() || matches!(
-                app.mode,
-                AppMode::BoardSelector
-                    | AppMode::Insert(InsertTarget::NewBoardName)
-                    | AppMode::Insert(InsertTarget::RenameBoard)
-                    | AppMode::Dialog(crate::app::DialogKind::ConfirmArchiveBoard)
-                    | AppMode::Dialog(crate::app::DialogKind::ArchivedBoards)
-            );
+        // NewBoardName → BoardSelector surface
+        app.insert = Some(Box::new(crate::insert::line_editor::NewBoardName::new()));
+        assert_eq!(
+            app.insert.as_ref().unwrap().surface(),
+            InsertSurface::BoardSelector
+        );
 
-            if target == InsertTarget::NewBoardName || target == InsertTarget::RenameBoard {
-                assert!(is_selector, "Target {:?} should always use BoardSelector background", target);
-            } else {
-                assert!(!is_selector, "Target {:?} should use BoardView background when board is loaded", target);
-            }
-        }
+        // NewCardTitle → BoardView surface
+        app.insert = Some(Box::new(crate::insert::line_editor::NewCardTitle::new()));
+        assert_eq!(
+            app.insert.as_ref().unwrap().surface(),
+            InsertSurface::BoardView
+        );
     }
 }

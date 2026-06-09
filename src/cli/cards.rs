@@ -7,8 +7,9 @@ use super::lookup::{find_archived_card, find_board, find_card_in_lists, find_lis
 use super::util::{
     flag_value, flag_values2, has_flag, load_all_cards, print_card_detail, print_card_line,
 };
-use crate::model::card::Card;
-use crate::storage::{board_store, card_store, list_store};
+use crate::board_editor::BoardEditor;
+use crate::command::Command;
+use crate::storage::{card_store, list_store};
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args
@@ -70,15 +71,24 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     } else if let Some((list_partial, title)) = flag_values2(args, "--create") {
         let board = find_board(board_partial, by_id)?;
         let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-        let mut list = find_list(&lists, list_partial, by_id)?.clone();
-        let mut card = Card::new(title.to_string());
-        card.log("Created");
-        card_store::save_card(&board.id, &card)?;
-        list.card_ids.push(card.id.clone());
-        list_store::save_list(&board.id, &list)?;
+        let list = find_list(&lists, list_partial, by_id)?.clone();
+        let list_name = list.name.clone();
+        let list_id = list.id.clone();
+        let mut editor = BoardEditor::load(&board.id)?;
+        editor.apply(Command::AddCard { list_id, title: title.to_string() })?;
+        let new_id = editor
+            .last_added_card_id()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("AddCard did not produce a new card id"))?;
+        let card_title = editor
+            .board()
+            .cards
+            .get(&new_id)
+            .map(|c| c.title.clone())
+            .unwrap_or_else(|| title.to_string());
         println!(
             "Created card '{}' in list '{}' on board '{}'.",
-            card.title, list.name, board.name
+            card_title, list_name, board.name
         );
     } else if let Some(card_partial) = flag_value(args, "--edit") {
         edit(args, board_partial, card_partial, by_id)?;
@@ -86,29 +96,22 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let board = find_board(board_partial, by_id)?;
         let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
         let all_cards = load_all_cards(&board.id, &lists);
-        let (mut list, mut card) =
-            find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
+        let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         let title = card.title.clone();
-        card.archived = true;
-        card.log("Archived");
-        card_store::save_card(&board.id, &card)?;
-        list.card_ids.retain(|id| id != &card.id);
-        list_store::save_list(&board.id, &list)?;
+        let card_id = card.id.clone();
+        let mut editor = BoardEditor::load(&board.id)?;
+        editor.apply(Command::ArchiveCard { card_id })?;
         println!("Archived card '{title}'.");
     } else if let Some(card_partial) = flag_value(args, "--restore") {
         let board = find_board(board_partial, by_id)?;
-        let mut card = find_archived_card(&board.id, card_partial, by_id)?;
+        let card = find_archived_card(&board.id, card_partial, by_id)?;
         let title = card.title.clone();
-        card.archived = false;
-        card.log("Restored from archive");
-        card_store::save_card(&board.id, &card)?;
-        let meta = board_store::load_board(&board.id)?;
-        if let Some(first_list_id) = meta.list_order.first()
-            && let Ok(mut list) = list_store::load_list(&board.id, first_list_id)
-        {
-            list.card_ids.push(card.id.clone());
-            list_store::save_list(&board.id, &list)?;
-        }
+        let card_id = card.id.clone();
+        let mut editor = BoardEditor::load(&board.id)?;
+        // Insert the archived card into the loaded board so RestoreCard
+        // can find it; the editor will reattach it to a list.
+        editor.with_extra_card(card);
+        editor.apply(Command::RestoreCard { card_id })?;
         println!("Restored card '{title}'.");
     } else if let Some(card_partial) = flag_value(args, "--delete") {
         let board = find_board(board_partial, by_id)?;
@@ -147,7 +150,8 @@ fn edit(args: &[String], board_partial: &str, card_partial: &str, by_id: bool) -
     let board = find_board(board_partial, by_id)?;
     let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
     let all_cards = load_all_cards(&board.id, &lists);
-    let (_, mut card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
+    let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
+    let card_id = card.id.clone();
 
     let new_title = flag_value(args, "--title");
     let new_desc = flag_value(args, "--description");
@@ -156,42 +160,42 @@ fn edit(args: &[String], board_partial: &str, card_partial: &str, by_id: bool) -
     if new_title.is_none() && new_desc.is_none() && new_due.is_none() {
         bail!("cards --edit requires at least one of: --title, --description, --due");
     }
-    let mut actions: Vec<String> = Vec::new();
-    if let Some(t) = new_title {
-        if card.title != t {
-            actions.push("Edited title".into());
-        }
-        card.title = t.to_string();
-    }
-    if let Some(d) = new_desc {
-        if card.description != d {
-            actions.push("Edited description".into());
-        }
-        card.description = d.to_string();
-    }
-    if let Some(due_str) = new_due {
-        if due_str == "none" {
-            if card.due_date.is_some() {
-                actions.push("Cleared due date".into());
-            }
-            card.due_date = None;
-        } else {
+
+    // Validate the due date before any mutation.
+    let due_change: Option<Option<NaiveDate>> = match new_due {
+        None => None,
+        Some("none") => Some(None),
+        Some(due_str) => {
             let d = NaiveDate::parse_from_str(due_str, "%Y-%m-%d")
                 .context("Invalid date format. Use YYYY-MM-DD or 'none'.")?;
-            if card.due_date != Some(d) {
-                actions.push(format!("Set due date to {d}"));
-            }
-            card.due_date = Some(d);
+            Some(Some(d))
         }
+    };
+
+    let mut editor = BoardEditor::load(&board.id)?;
+    if let Some(t) = new_title {
+        editor.apply(Command::EditCardTitle {
+            card_id: card_id.clone(),
+            title: t.to_string(),
+        })?;
     }
-    if actions.is_empty() {
-        card.touch();
-    } else {
-        for a in actions {
-            card.log(a);
-        }
+    if let Some(d) = new_desc {
+        editor.apply(Command::EditCardDescription {
+            card_id: card_id.clone(),
+            body: d.to_string(),
+        })?;
     }
-    card_store::save_card(&board.id, &card)?;
-    println!("Updated card '{}'.", card.title);
+    match due_change {
+        Some(Some(d)) => editor.apply(Command::SetDueDate { card_id: card_id.clone(), date: d })?,
+        Some(None) => editor.apply(Command::ClearDueDate { card_id: card_id.clone() })?,
+        None => {}
+    }
+    let title = editor
+        .board()
+        .cards
+        .get(&card_id)
+        .map(|c| c.title.clone())
+        .unwrap_or_default();
+    println!("Updated card '{title}'.");
     Ok(())
 }

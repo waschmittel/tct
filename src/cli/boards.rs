@@ -2,6 +2,8 @@
 
 use super::lookup::{find_archived_board, find_board};
 use super::util::{board_summary_counts, flag_value, has_flag};
+use crate::board_editor::BoardEditor;
+use crate::command::Command;
 use crate::model::board::BoardMeta;
 use crate::model::label::LabelColor;
 use crate::storage::board_store;
@@ -18,6 +20,8 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
             }
         }
     } else if let Some(name) = flag_value(args, "--create") {
+        // Brand-new board: no Command applies because there's no loaded
+        // board yet. Create the meta and persist directly.
         let existing_boards = board_store::list_boards()?;
         let existing_colors: Vec<_> = existing_boards.iter().map(|b| b.accent_color).collect();
         let mut meta = BoardMeta::new(name.to_string());
@@ -26,18 +30,20 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         board_store::append_to_order(&meta.id)?;
         println!("Created board '{}'.", meta.name);
     } else if let Some(partial) = flag_value(args, "--archive") {
-        let mut board = find_board(partial, by_id)?;
+        let board = find_board(partial, by_id)?;
         let name = board.name.clone();
-        board.archived = true;
-        board_store::save_board(&board)?;
-        board_store::remove_from_order(&board.id)?;
+        let id = board.id.clone();
+        let mut editor = BoardEditor::load(&id)?;
+        editor.apply(Command::ArchiveBoard { board_id: id.clone() })?;
+        board_store::remove_from_order(&id)?;
         println!("Archived board '{name}'.");
     } else if let Some(partial) = flag_value(args, "--restore") {
-        let mut board = find_archived_board(partial, by_id)?;
+        let board = find_archived_board(partial, by_id)?;
         let name = board.name.clone();
-        board.archived = false;
-        board_store::save_board(&board)?;
-        board_store::append_to_order(&board.id)?;
+        let id = board.id.clone();
+        let mut editor = BoardEditor::load(&id)?;
+        editor.apply(Command::RestoreBoard { board_id: id.clone() })?;
+        board_store::append_to_order(&id)?;
         println!("Restored board '{name}'.");
     } else if let Some(partial) = flag_value(args, "--delete") {
         let board = find_archived_board(partial, by_id)?;

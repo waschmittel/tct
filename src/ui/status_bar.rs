@@ -11,9 +11,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         AppMode::BoardSelector => "BOARDS",
         AppMode::Normal => "NORMAL",
         AppMode::CardDetail => "DETAIL",
-        AppMode::Insert(_) => "INSERT",
+        AppMode::Insert => "INSERT",
         AppMode::Command => "SEARCH",
-        AppMode::Dialog(_) => "DIALOG",
+        AppMode::Dialog => "DIALOG",
         AppMode::Help => "HELP",
     };
 
@@ -21,9 +21,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         AppMode::BoardSelector => "?:help  q:quit",
         AppMode::Normal => "?:help  q:quit",
         AppMode::CardDetail => "?:help  Esc:close",
-        AppMode::Insert(_) => "Enter:confirm  Esc:cancel",
+        AppMode::Insert => "Enter:confirm  Esc:cancel",
         AppMode::Command => "Enter:search  Esc:cancel",
-        AppMode::Dialog(_) => "y:confirm  n:cancel",
+        AppMode::Dialog => "y:confirm  n:cancel",
         AppMode::Help => "Esc:close",
     };
 

@@ -4,7 +4,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use ratatui::Frame;
 
-use crate::app::{App, AppMode, InsertTarget};
+use crate::app::{App, AppMode};
+use crate::insert::InsertSurface;
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::vertical([
@@ -54,11 +55,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         frame.render_stateful_widget(list, chunks[1], &mut state);
     }
 
-    if let AppMode::Insert(InsertTarget::NewBoardName) = &app.mode {
-        render_input_dialog(frame, area, "New Board", &app.input_buffer, app.input_cursor);
-    }
-    if let AppMode::Insert(InsertTarget::RenameBoard) = &app.mode {
-        render_input_dialog(frame, area, "Rename Board", &app.input_buffer, app.input_cursor);
+    if matches!(&app.mode, AppMode::Insert)
+        && let Some(handler) = app.insert.as_ref()
+        && handler.surface() == InsertSurface::BoardSelector
+        && let (Some(buf), Some(cursor)) = (handler.line_buffer(), handler.line_cursor())
+    {
+        render_input_dialog(frame, area, handler.title(), buf, cursor);
     }
 
     super::status_bar::render(frame, chunks[2], app);

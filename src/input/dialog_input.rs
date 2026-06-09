@@ -1,484 +1,143 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+//! Dialog mode key dispatcher.
+//!
+//! Routes the event to the active `Box<dyn Dialog>` on `App` and
+//! interprets its [`DialogOutcome`] — applies commands, side effects,
+//! status messages, and follow-up navigation.
 
-use crate::app::{App, AppMode, DialogKind, InsertTarget};
+use crossterm::event::KeyEvent;
+
+use crate::app::{App, AppMode};
+use crate::dialog::{DialogSideEffect, Follow};
+use crate::insert::line_editor;
 use crate::storage::{board_store, card_store, list_store};
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    let kind = match &app.mode {
-        AppMode::Dialog(k) => k.clone(),
-        _ => return Ok(()),
+    // Temporarily move the dialog out so we can pass a borrow of `board`
+    // alongside a mutable borrow of the dialog itself.
+    let mut dialog = match app.dialog.take() {
+        Some(d) => d,
+        None => return Ok(()),
     };
+    let outcome = dialog.handle_key(key, app.board.as_ref());
+    // Put the dialog back so subsequent ops (apply, side effects) can
+    // see consistent state. Follow may replace or remove it below.
+    app.dialog = Some(dialog);
 
-    match kind {
-        DialogKind::ConfirmArchiveBoard => handle_confirm_archive_board(app, key),
-        DialogKind::ConfirmArchiveCard => handle_confirm_archive_card(app, key),
-        DialogKind::ConfirmArchiveList => handle_confirm_archive_list(app, key),
-        DialogKind::ConfirmCancelEdit => handle_confirm_cancel_edit(app, key),
-        DialogKind::ConfirmDeleteLabel => handle_confirm_delete_label(app, key),
-        DialogKind::ArchivedCards => handle_archived_cards(app, key),
-        DialogKind::ArchivedBoards => handle_archived_boards(app, key),
-        DialogKind::ArchivedLists => handle_archived_lists(app, key),
-        DialogKind::LabelPicker => handle_label_picker(app, key),
-        DialogKind::LabelManager => handle_label_manager(app, key),
-        DialogKind::CardHistory => handle_card_history(app, key),
+    if let Some(cmd) = outcome.apply {
+        app.apply(cmd)?;
     }
-}
-
-fn handle_card_history(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Down | KeyCode::Char('j') => {
-            app.history_scroll = app.history_scroll.saturating_add(1);
+    if let Some(eff) = outcome.side_effect {
+        apply_side_effect(app, eff)?;
+    }
+    if let Some(status) = outcome.status {
+        app.set_status(status);
+    }
+    match outcome.follow {
+        Follow::Stay => {}
+        Follow::Close => {
+            app.close_dialog();
         }
-        KeyCode::Up | KeyCode::Char('k') => {
-            app.history_scroll = app.history_scroll.saturating_sub(1);
+        Follow::CloseTo(target) => {
+            app.close_dialog_to(target);
         }
-        KeyCode::PageDown => {
-            app.history_scroll = app.history_scroll.saturating_add(10);
+        Follow::Open(next) => {
+            app.dialog = Some(next);
+            // Mode stays AppMode::Dialog.
         }
-        KeyCode::PageUp => {
-            app.history_scroll = app.history_scroll.saturating_sub(10);
-        }
-        KeyCode::Home | KeyCode::Char('g') => {
-            app.history_scroll = 0;
-        }
-        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('h') => {
-            app.history_scroll = 0;
-            if let Some(prev) = app.previous_mode.take() {
-                app.mode = prev;
-            } else {
-                app.mode = AppMode::Normal;
-            }
-        }
-        _ => {}
     }
     Ok(())
 }
 
-fn handle_confirm_archive_list(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if let Some(board) = &mut app.board {
-                let li = board.selected_list;
-                if let Some(list) = board.lists.get_mut(li) {
-                    list.archived = true;
-                    let list_id = list.id.clone();
-                    let list_clone = list.clone();
-                    list_store::save_list(&board.meta.id, &list_clone)?;
-                    board.meta.list_order.retain(|id| id != &list_id);
-                    board.lists.remove(li);
-                    board.selected_card.remove(li);
-                    board.scroll_offset.remove(li);
-                    board_store::save_board(&board.meta)?;
-                    if board.selected_list > 0 && board.selected_list >= board.lists.len() {
-                        board.selected_list = board.lists.len().saturating_sub(1);
-                    }
-                    app.set_status("List archived".into());
-                }
-            }
-            app.mode = AppMode::Normal;
+fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()> {
+    match eff {
+        DialogSideEffect::DeleteArchivedBoard { board_id } => {
+            board_store::delete_board(&board_id)?;
         }
-        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            app.mode = AppMode::Normal;
+        DialogSideEffect::DeleteArchivedList { list_id, card_ids } => {
+            if let Some(board) = &app.board {
+                for cid in &card_ids {
+                    let _ = card_store::delete_card(&board.meta.id, cid);
+                }
+                list_store::delete_list_file(&board.meta.id, &list_id)?;
+            }
         }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn handle_archived_lists(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Down
-            if app.archived_selected < app.archived_lists.len().saturating_sub(1) => {
-                app.archived_selected += 1;
+        DialogSideEffect::DeleteArchivedCard { card_id } => {
+            if let Some(board) = &app.board {
+                card_store::delete_card(&board.meta.id, &card_id)?;
             }
-        KeyCode::Up
-            if app.archived_selected > 0 => {
-                app.archived_selected -= 1;
-            }
-        KeyCode::Enter
-            if app.archived_selected < app.archived_lists.len() => {
-                let mut list = app.archived_lists.remove(app.archived_selected);
-                list.archived = false;
-                let name = list.name.clone();
-                if let Some(board) = &mut app.board {
-                    list_store::save_list(&board.meta.id, &list)?;
-                    if !board.meta.list_order.contains(&list.id) {
-                        board.meta.list_order.push(list.id.clone());
-                    }
-                    board_store::save_board(&board.meta)?;
-                    for card_id in &list.card_ids {
-                        if let Ok(card) = card_store::load_card(&board.meta.id, card_id) {
-                            board.cards.insert(card_id.clone(), card);
-                        }
-                    }
-                    board.lists.push(list);
-                    board.selected_card.push(0);
-                    board.scroll_offset.push(0);
-                }
-                app.set_status(format!("Restored list '{name}'"));
-                if app.archived_selected > 0 && app.archived_selected >= app.archived_lists.len() {
-                    app.archived_selected = app.archived_lists.len().saturating_sub(1);
-                }
-                if app.archived_lists.is_empty() {
-                    app.mode = AppMode::Normal;
-                }
-            }
-        KeyCode::Char('x')
-            if app.archived_selected < app.archived_lists.len() => {
-                let list = app.archived_lists.remove(app.archived_selected);
-                let name = list.name.clone();
-                if let Some(board) = &app.board {
-                    for card_id in &list.card_ids {
-                        let _ = card_store::delete_card(&board.meta.id, card_id);
-                    }
-                    list_store::delete_list_file(&board.meta.id, &list.id)?;
-                }
-                app.set_status(format!("Deleted list '{name}'"));
-                if app.archived_selected > 0 && app.archived_selected >= app.archived_lists.len() {
-                    app.archived_selected = app.archived_lists.len().saturating_sub(1);
-                }
-                if app.archived_lists.is_empty() {
-                    app.mode = AppMode::Normal;
-                }
-            }
-        KeyCode::Esc => {
-            app.archived_lists.clear();
-            app.mode = AppMode::Normal;
         }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn handle_confirm_archive_board(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Char('y') | KeyCode::Char('Y') => {
+        DialogSideEffect::RestoreArchivedBoard { board_id } => {
+            let mut editor = crate::board_editor::BoardEditor::load(&board_id)?;
+            editor.apply(crate::command::Command::RestoreBoard {
+                board_id: board_id.clone(),
+            })?;
+            board_store::append_to_order(&board_id)?;
+            app.reload_boards()?;
+        }
+        DialogSideEffect::ArchiveSelectedBoard => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let id = board.id.clone();
-                let mut meta = board_store::load_board(&id)?;
-                meta.archived = true;
-                board_store::save_board(&meta)?;
+                let mut editor = crate::board_editor::BoardEditor::load(&id)?;
+                editor.apply(crate::command::Command::ArchiveBoard {
+                    board_id: id.clone(),
+                })?;
                 board_store::remove_from_order(&id)?;
                 app.reload_boards()?;
                 if app.selected_board_idx > 0 && app.selected_board_idx >= app.boards.len() {
                     app.selected_board_idx = app.boards.len().saturating_sub(1);
                 }
-                app.set_status("Board archived".into());
             }
-            app.mode = AppMode::BoardSelector;
         }
-        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            app.mode = AppMode::BoardSelector;
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn handle_archived_boards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Down
-            if app.archived_selected < app.archived_boards.len().saturating_sub(1) => {
-                app.archived_selected += 1;
+        DialogSideEffect::StageAndRestoreCard { card } => {
+            let card_id = card.id.clone();
+            if let Some(board) = &mut app.board {
+                board.cards.insert(card_id.clone(), card);
             }
-        KeyCode::Up
-            if app.archived_selected > 0 => {
-                app.archived_selected -= 1;
-            }
-        KeyCode::Enter
-            if app.archived_selected < app.archived_boards.len() => {
-                let id = app.archived_boards[app.archived_selected].id.clone();
-                let name = app.archived_boards[app.archived_selected].name.clone();
-                let mut meta = board_store::load_board(&id)?;
-                meta.archived = false;
-                board_store::save_board(&meta)?;
-                board_store::append_to_order(&id)?;
-                app.archived_boards.remove(app.archived_selected);
-                if app.archived_selected > 0 && app.archived_selected >= app.archived_boards.len() {
-                    app.archived_selected = app.archived_boards.len().saturating_sub(1);
-                }
-                app.reload_boards()?;
-                app.set_status(format!("Restored board '{name}'"));
-                if app.archived_boards.is_empty() {
-                    app.mode = AppMode::BoardSelector;
-                }
-            }
-        KeyCode::Char('x')
-            if app.archived_selected < app.archived_boards.len() => {
-                let id = app.archived_boards[app.archived_selected].id.clone();
-                let name = app.archived_boards[app.archived_selected].name.clone();
-                board_store::delete_board(&id)?;
-                app.archived_boards.remove(app.archived_selected);
-                if app.archived_selected > 0 && app.archived_selected >= app.archived_boards.len() {
-                    app.archived_selected = app.archived_boards.len().saturating_sub(1);
-                }
-                app.set_status(format!("Deleted board '{name}'"));
-                if app.archived_boards.is_empty() {
-                    app.mode = AppMode::BoardSelector;
-                }
-            }
-        KeyCode::Esc => {
-            app.archived_boards.clear();
-            app.mode = AppMode::BoardSelector;
+            app.apply(crate::command::Command::RestoreCard { card_id })?;
         }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn handle_confirm_archive_card(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if let Some(board) = &mut app.board
-                && let Some(card_id) = board.current_card_id().cloned()
-                    && let Some(card) = board.cards.get_mut(&card_id) {
-                        card.archived = true;
-                        card.log("Archived");
-                        card_store::save_card(&board.meta.id, card)?;
-                        if let Some(list) = board.lists.get_mut(board.selected_list) {
-                            list.card_ids.retain(|id| id != &card_id);
-                            list_store::save_list(&board.meta.id, list)?;
-                        }
-                        board.clamp_selection();
-                        app.set_status("Card archived".into());
-                    }
-            app.mode = AppMode::Normal;
-        }
-        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            app.mode = AppMode::Normal;
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn handle_confirm_cancel_edit(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Char('y') | KeyCode::Char('Y') => {
-            app.description_editor = None;
-            app.description_original = None;
+        DialogSideEffect::DiscardDescriptionEdit => {
+            app.insert = None;
+            app.dialog = None;
             app.mode = app.previous_mode.take().unwrap_or(AppMode::CardDetail);
         }
-        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            app.mode = AppMode::Insert(InsertTarget::EditCardDescription);
+        DialogSideEffect::ResumeDescriptionEdit => {
+            // The MarkdownEditor handler is still on `app.insert` — just
+            // switch back to Insert mode.
+            app.dialog = None;
+            app.mode = AppMode::Insert;
         }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn handle_archived_cards(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Down
-            if app.archived_selected < app.archived_cards.len().saturating_sub(1) => {
-                app.archived_selected += 1;
-            }
-        KeyCode::Up
-            if app.archived_selected > 0 => {
-                app.archived_selected -= 1;
-            }
-        KeyCode::Enter
-            if app.archived_selected < app.archived_cards.len() => {
-                let mut card = app.archived_cards.remove(app.archived_selected);
-                card.archived = false;
-                card.log("Restored from archive");
-                let title = card.title.clone();
-                if let Some(board) = &mut app.board {
-                    card_store::save_card(&board.meta.id, &card)?;
-                    if let Some(list) = board.lists.get_mut(board.selected_list) {
-                        list.card_ids.push(card.id.clone());
-                        list_store::save_list(&board.meta.id, list)?;
-                    }
-                    board.cards.insert(card.id.clone(), card);
-                }
-                app.set_status(format!("Restored '{title}'"));
-                if app.archived_selected > 0 && app.archived_selected >= app.archived_cards.len() {
-                    app.archived_selected = app.archived_cards.len().saturating_sub(1);
-                }
-                if app.archived_cards.is_empty() {
-                    app.mode = AppMode::Normal;
-                }
-            }
-        KeyCode::Char('x')
-            if app.archived_selected < app.archived_cards.len() => {
-                let card = app.archived_cards.remove(app.archived_selected);
-                let title = card.title.clone();
-                if let Some(board) = &app.board {
-                    card_store::delete_card(&board.meta.id, &card.id)?;
-                }
-                app.set_status(format!("Deleted '{title}'"));
-                if app.archived_selected > 0 && app.archived_selected >= app.archived_cards.len() {
-                    app.archived_selected = app.archived_cards.len().saturating_sub(1);
-                }
-                if app.archived_cards.is_empty() {
-                    app.mode = AppMode::Normal;
-                }
-            }
-        KeyCode::Esc => {
-            app.archived_cards.clear();
-            app.mode = AppMode::Normal;
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn handle_label_picker(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    let label_count = app
-        .board
-        .as_ref()
-        .map(|b| b.meta.labels.len())
-        .unwrap_or(0);
-
-    if label_count == 0 {
-        if matches!(key.code, KeyCode::Esc) {
-            if let Some(prev) = app.previous_mode.take() {
-                app.mode = prev;
-            } else {
-                app.mode = AppMode::CardDetail;
-            }
-        }
-        return Ok(());
-    }
-
-    match key.code {
-        KeyCode::Down
-            if app.label_picker_idx < label_count - 1 => {
-                app.label_picker_idx += 1;
-            }
-        KeyCode::Up
-            if app.label_picker_idx > 0 => {
-                app.label_picker_idx -= 1;
-            }
-        KeyCode::Enter | KeyCode::Char(' ') => {
-            if let Some(board) = &mut app.board {
-                let label = board
-                    .meta
-                    .labels
-                    .get(app.label_picker_idx)
-                    .map(|l| (l.id.clone(), l.name.clone()));
-                if let Some((lid, lname)) = label
-                    && let Some(card_id) = board.current_card_id().cloned()
-                        && let Some(card) = board.cards.get_mut(&card_id) {
-                            let action = if let Some(pos) =
-                                card.label_ids.iter().position(|id| *id == lid)
-                            {
-                                card.label_ids.remove(pos);
-                                format!("Removed label '{lname}'")
-                            } else {
-                                card.label_ids.push(lid);
-                                format!("Added label '{lname}'")
-                            };
-                            card.log(action);
-                            card_store::save_card(&board.meta.id, card)?;
-                        }
-            }
-        }
-        KeyCode::Esc => {
-            if let Some(prev) = app.previous_mode.take() {
-                app.mode = prev;
-            } else {
-                app.mode = AppMode::CardDetail;
-            }
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn handle_label_manager(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    let label_count = app
-        .board
-        .as_ref()
-        .map(|b| b.meta.labels.len())
-        .unwrap_or(0);
-    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
-
-    match (key.code, shift) {
-        (KeyCode::Down, false)
-            if label_count > 0 && app.label_picker_idx < label_count - 1 => {
-                app.label_picker_idx += 1;
-            }
-        (KeyCode::Up, false)
-            if app.label_picker_idx > 0 => {
-                app.label_picker_idx -= 1;
-            }
-        (KeyCode::Down, true) => {
-            if let Some(board) = &mut app.board {
-                let ii = app.label_picker_idx;
-                if ii + 1 < board.meta.labels.len() {
-                    board.meta.labels.swap(ii, ii + 1);
-                    app.label_picker_idx += 1;
-                    board_store::save_board(&board.meta)?;
-                }
-            }
-        }
-        (KeyCode::Up, true) => {
-            if let Some(board) = &mut app.board {
-                let ii = app.label_picker_idx;
-                if ii > 0 {
-                    board.meta.labels.swap(ii, ii - 1);
-                    app.label_picker_idx -= 1;
-                    board_store::save_board(&board.meta)?;
-                }
-            }
-        }
-        (KeyCode::Char('n'), _) => {
-            app.start_insert(InsertTarget::NewLabelName);
-        }
-        (KeyCode::Char('e'), _) => {
-            if label_count > 0
-                && let Some(board) = &app.board
-                    && let Some(label) = board.meta.labels.get(app.label_picker_idx) {
-                        let name = label.name.clone();
-                        app.start_insert_with(InsertTarget::EditLabelName, &name);
-                    }
-        }
-        (KeyCode::Char('c'), _) => {
-            if label_count > 0
-                && let Some(board) = &mut app.board
-                    && let Some(label) = board.meta.labels.get_mut(app.label_picker_idx) {
-                        label.color = label.color.next();
-                        board_store::save_board(&board.meta)?;
-                    }
-        }
-        (KeyCode::Char('x'), _)
-            if label_count > 0 => {
-                app.mode = AppMode::Dialog(DialogKind::ConfirmDeleteLabel);
-            }
-        (KeyCode::Esc, _) => {
-            app.mode = AppMode::Normal;
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn handle_confirm_delete_label(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
-    match key.code {
-        KeyCode::Char('y') | KeyCode::Char('Y') => {
+        DialogSideEffect::ReorderLabels { from, to } => {
             if let Some(board) = &mut app.board
-                && app.label_picker_idx < board.meta.labels.len() {
-                    let removed_id = board.meta.labels[app.label_picker_idx].id.clone();
-                    let label_name = board.meta.labels[app.label_picker_idx].name.clone();
-                    board.meta.labels.remove(app.label_picker_idx);
-                    for card in board.cards.values_mut() {
-                        card.label_ids.retain(|id| *id != removed_id);
-                    }
-                    board_store::save_board(&board.meta)?;
-                    if app.label_picker_idx >= board.meta.labels.len()
-                        && !board.meta.labels.is_empty()
-                    {
-                        app.label_picker_idx = board.meta.labels.len() - 1;
-                    }
-                    app.set_status(format!("Label '{label_name}' deleted"));
-                }
-            app.mode = AppMode::Dialog(DialogKind::LabelManager);
+                && from < board.meta.labels.len()
+                && to < board.meta.labels.len()
+            {
+                board.meta.labels.swap(from, to);
+                board_store::save_board(&board.meta)?;
+            }
         }
-        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-            app.mode = AppMode::Dialog(DialogKind::LabelManager);
+        DialogSideEffect::StartNewLabelInsert => {
+            // Close the LabelManager and start NewLabelName insert. The
+            // confirm handler reopens LabelManager.
+            app.dialog = None;
+            app.start_insert(Box::new(line_editor::NewLabelName::new()));
         }
-        _ => {}
+        DialogSideEffect::StartRenameLabelInsert {
+            label_idx,
+            current_name,
+        } => {
+            let label_id = app
+                .board
+                .as_ref()
+                .and_then(|b| b.meta.labels.get(label_idx).map(|l| l.id.clone()));
+            if let Some(label_id) = label_id {
+                app.dialog = None;
+                app.start_insert(Box::new(line_editor::EditLabelName::new(
+                    label_id,
+                    label_idx,
+                    &current_name,
+                )));
+            }
+        }
     }
     Ok(())
 }

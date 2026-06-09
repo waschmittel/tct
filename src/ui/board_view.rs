@@ -4,7 +4,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
-use crate::app::{App, AppMode, InsertTarget};
+use crate::app::{App, AppMode};
+use crate::insert::InsertSurface;
 
 use super::widgets::list_widget;
 
@@ -76,57 +77,29 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     // Inline title editing overlay (for new card / new list / rename)
-    match &app.mode {
-        AppMode::Insert(InsertTarget::NewCardTitle) => {
-            render_input_overlay(frame, area, "New Card", &app.input_buffer, app.input_cursor, accent);
-        }
-        AppMode::Insert(InsertTarget::NewListName) => {
-            render_input_overlay(frame, area, "New List", &app.input_buffer, app.input_cursor, accent);
-        }
-        AppMode::Insert(InsertTarget::EditCardTitleInline) => {
-            render_input_overlay(
-                frame,
-                area,
-                "Edit Card Title",
-                &app.input_buffer,
-                app.input_cursor,
-                accent,
-            );
-        }
-        AppMode::Insert(InsertTarget::RenameList) => {
-            render_input_overlay(
-                frame,
-                area,
-                "Rename List",
-                &app.input_buffer,
-                app.input_cursor,
-                accent,
-            );
-        }
-        AppMode::Insert(InsertTarget::NewLabelName) => {
-            render_input_overlay(frame, area, "New Label", &app.input_buffer, app.input_cursor, accent);
-        }
-        AppMode::Insert(InsertTarget::EditLabelName) => {
-            render_input_overlay(
-                frame,
-                area,
-                "Rename Label",
-                &app.input_buffer,
-                app.input_cursor,
-                accent,
-            );
-        }
-        AppMode::Insert(InsertTarget::EditDueDate) => {
+    if matches!(&app.mode, AppMode::Insert)
+        && let Some(handler) = app.insert.as_ref()
+        && handler.surface() == InsertSurface::BoardView
+    {
+        // Date picker for editing due date from list view is one of the
+        // BoardView handlers; everything else is a line editor.
+        if let Some(dp) = handler
+            .as_any()
+            .downcast_ref::<crate::insert::date_picker::DatePicker>()
+        {
             super::widgets::date_picker::render(
                 frame,
                 area,
-                &app.input_buffer,
-                app.input_cursor,
-                app.picker_date,
+                &dp.buffer,
+                dp.cursor,
+                dp.picker_date,
                 accent,
             );
+        } else if let (Some(buf), Some(cursor)) =
+            (handler.line_buffer(), handler.line_cursor())
+        {
+            render_input_overlay(frame, area, handler.title(), buf, cursor, accent);
         }
-        _ => {}
     }
 
     // Status bar

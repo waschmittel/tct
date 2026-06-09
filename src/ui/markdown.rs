@@ -3,66 +3,208 @@ use ratatui::text::{Line, Span};
 
 pub const WRAP_WIDTH: usize = 80;
 
-pub fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
-    highlight_lines_with_width(text, accent, WRAP_WIDTH)
+/// Renders markdown text into styled, word-wrapped visual lines.
+///
+/// `MarkdownRenderer` is the single public entry point for turning raw
+/// markdown source into ratatui `Line<'static>` values plus the cursor
+/// mapping used by the description editor. List indentation is detected
+/// automatically per source line; callers don't pass it in.
+pub struct MarkdownRenderer<'a> {
+    source: Source<'a>,
+    width: usize,
+    accent: Color,
 }
 
-pub fn highlight_lines_with_width(
-    text: &str,
-    accent: Color,
-    wrap_width: usize,
-) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-    let mut in_code_block = false;
+/// How the source markdown is provided to the renderer. The two shapes
+/// correspond to the two callers: a raw string (`card.description`) where
+/// trailing blank lines aren't meaningful, and pre-split textarea lines
+/// where they are.
+enum Source<'a> {
+    Text(&'a str),
+    Lines(&'a [String]),
+}
 
-    for line in text.lines() {
-        if line.starts_with("```") {
-            in_code_block = !in_code_block;
-            lines.push(Line::from(vec![Span::styled(
-                line.to_string(),
-                Style::default().fg(Color::DarkGray),
-            )]));
-            continue;
-        }
+/// Result of rendering markdown: the visual lines, plus a private mapping
+/// from source `(row, col)` positions to visual `(row, col)` positions.
+pub struct Rendered {
+    pub lines: Vec<Line<'static>>,
+    /// Per-visual-line entry: `(source_row, source_col_offset, visual_line_len, visual_indent)`.
+    map: Vec<(usize, usize, usize, usize)>,
+}
 
-        if in_code_block {
-            lines.push(Line::from(vec![Span::styled(
-                format!("  {line}"),
-                Style::default().fg(Color::Green),
-            )]));
-            continue;
-        }
+impl<'a> MarkdownRenderer<'a> {
+    /// Build a renderer over raw markdown text. Source lines are split with
+    /// `str::lines()`, which drops a trailing empty entry for a trailing '\n'
+    /// — matching the existing description-text behavior.
+    pub fn new(text: &'a str, width: usize, accent: Color) -> Self {
+        Self { source: Source::Text(text), width, accent }
+    }
 
-        let trimmed = line.trim_start();
-        let base_indent = line.len() - trimmed.len();
-        let mut list_indent = 0;
+    /// Build a renderer over pre-split source lines (e.g. textarea contents).
+    /// Trailing blank lines are preserved.
+    pub fn from_lines(lines: &'a [String], width: usize, accent: Color) -> Self {
+        Self { source: Source::Lines(lines), width, accent }
+    }
 
-        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-            list_indent = base_indent + 2;
-        } else if let Some(dot_pos) = trimmed.find(". ") {
-            let num_part = &trimmed[..dot_pos];
-            if num_part.parse::<u64>().is_ok() {
-                list_indent = base_indent + dot_pos + 2;
+    pub fn render(&self) -> Rendered {
+        match self.source {
+            Source::Text(text) => {
+                let refs: Vec<&str> = text.lines().collect();
+                render_source_lines(&refs, self.width, self.accent)
+            }
+            Source::Lines(lines) => {
+                let refs: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
+                render_source_lines(&refs, self.width, self.accent)
             }
         }
+    }
+}
 
-        let highlighted = highlight_line(line, accent);
+fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Rendered {
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    let mut map: Vec<(usize, usize, usize, usize)> = Vec::new();
+    let mut in_code_block = false;
+
+    for (li, &line_text) in source_lines.iter().enumerate() {
+        // Code fence / code block lines: no inline highlighting, no wrapping.
+        if line_text.starts_with("```") {
+            in_code_block = !in_code_block;
+            let span = Span::styled(
+                line_text.to_string(),
+                Style::default().fg(Color::DarkGray),
+            );
+            let vlen = line_text.chars().count();
+            lines.push(Line::from(vec![span]));
+            map.push((li, 0, vlen, 0));
+            continue;
+        }
+        if in_code_block {
+            let rendered = format!("  {line_text}");
+            let vlen = rendered.chars().count();
+            lines.push(Line::from(vec![Span::styled(
+                rendered,
+                Style::default().fg(Color::Green),
+            )]));
+            map.push((li, 0, vlen, 0));
+            continue;
+        }
+
+        let list_indent = detect_list_indent(line_text);
+        let highlighted = highlight_line(line_text, accent);
         let wrapped = if list_indent > 0 {
-            wrap_spans_with_indent(highlighted, wrap_width, list_indent)
+            wrap_spans_with_indent(highlighted, width, list_indent)
         } else {
-            wrap_spans(highlighted, wrap_width)
+            wrap_spans(highlighted, width)
         };
+
+        // Build the visual map for this source line in lock-step with `wrapped`.
+        let line_chars: Vec<char> = line_text.chars().collect();
+        let mut source_char_offset = 0;
+        for (wi, wl) in wrapped.iter().enumerate() {
+            let display_v_char_len: usize =
+                wl.spans.iter().map(|s| s.content.chars().count()).sum();
+
+            let mut actual_source_len = display_v_char_len;
+            let mut current_v_indent = 0;
+            if wi > 0 && list_indent > 0 {
+                actual_source_len = display_v_char_len.saturating_sub(list_indent);
+                current_v_indent = list_indent;
+            }
+
+            map.push((li, source_char_offset, display_v_char_len, current_v_indent));
+
+            let gap = if source_char_offset + actual_source_len < line_chars.len()
+                && line_chars[source_char_offset + actual_source_len] == ' '
+            {
+                1
+            } else {
+                0
+            };
+            source_char_offset += actual_source_len + gap;
+        }
+
         lines.extend(wrapped);
     }
 
-    lines
+    Rendered { lines, map }
 }
 
-pub fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'static>> {
+impl Rendered {
+    pub fn lines(&self) -> &[Line<'static>] {
+        &self.lines
+    }
+
+    /// Map a source `(row, col)` cursor position to the corresponding visual
+    /// `(row, col)` position, accounting for wrapping and list indentation.
+    pub fn cursor_at(&self, src_row: usize, src_col: usize) -> (u16, u16) {
+        let (vrow, vcol) = source_to_visual(&self.map, src_row, src_col);
+        (vrow as u16, vcol as u16)
+    }
+
+    /// Returns the source row index that produced visual line `visual_idx`,
+    /// or `None` if out of bounds. Used by the description editor to confirm
+    /// the cursor's visual row actually corresponds to its source row before
+    /// painting the current-line highlight.
+    pub fn src_row_for(&self, visual_idx: usize) -> Option<usize> {
+        self.map.get(visual_idx).map(|&(src_row, _, _, _)| src_row)
+    }
+}
+
+/// Detect leading list-marker indent (bullet or numbered) so wrapped
+/// continuation lines line up under the first character of the item text.
+fn detect_list_indent(line: &str) -> usize {
+    let trimmed = line.trim_start();
+    let base_indent = line.len() - trimmed.len();
+    if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+        return base_indent + 2;
+    }
+    if let Some(dot_pos) = trimmed.find(". ") {
+        let num_part = &trimmed[..dot_pos];
+        if num_part.parse::<u64>().is_ok() {
+            return base_indent + dot_pos + 2;
+        }
+    }
+    0
+}
+
+pub(crate) fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
+    MarkdownRenderer::new(text, WRAP_WIDTH, accent).render().lines
+}
+
+pub(crate) fn build_visual_map(
+    lines: &[String],
+    accent: Color,
+    wrap_width: usize,
+) -> Vec<(usize, usize, usize, usize)> {
+    MarkdownRenderer::from_lines(lines, wrap_width, accent).render().map
+}
+
+pub(crate) fn source_to_visual(
+    visual_map: &[(usize, usize, usize, usize)],
+    cursor_row: usize,
+    cursor_col: usize,
+) -> (usize, usize) {
+    for (vi, &(src_row, src_offset, vlen, vindent)) in visual_map.iter().enumerate() {
+        if src_row == cursor_row {
+            let actual_src_len = vlen.saturating_sub(vindent);
+            let col_in_segment = cursor_col.saturating_sub(src_offset);
+
+            if col_in_segment <= actual_src_len
+                || vi + 1 >= visual_map.len()
+                || visual_map[vi + 1].0 != cursor_row
+            {
+                return (vi, col_in_segment.min(actual_src_len) + vindent);
+            }
+        }
+    }
+    (0, cursor_col)
+}
+
+fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'static>> {
     wrap_spans_with_indent(spans, max_width, 0)
 }
 
-pub fn wrap_spans_with_indent(
+fn wrap_spans_with_indent(
     spans: Vec<Span<'static>>,
     max_width: usize,
     indent: usize,
@@ -164,82 +306,7 @@ pub fn wrap_spans_with_indent(
     result
 }
 
-/// Visual line map entry: (source_row, source_col_offset, visual_line_len, visual_indent).
-pub fn build_visual_map(lines: &[String], accent: Color, wrap_width: usize) -> Vec<(usize, usize, usize, usize)> {
-    let mut map = Vec::new();
-    for (li, line_text) in lines.iter().enumerate() {
-        let trimmed = line_text.trim_start();
-        let base_indent = line_text.len() - trimmed.len();
-        let mut list_indent = 0;
-
-        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-            list_indent = base_indent + 2;
-        } else if let Some(dot_pos) = trimmed.find(". ") {
-            let num_part = &trimmed[..dot_pos];
-            if num_part.parse::<u64>().is_ok() {
-                list_indent = base_indent + dot_pos + 2;
-            }
-        }
-
-        let highlighted = highlight_line(line_text, accent);
-        let wrapped = if list_indent > 0 {
-            wrap_spans_with_indent(highlighted, wrap_width, list_indent)
-        } else {
-            wrap_spans(highlighted, wrap_width)
-        };
-        
-        let line_chars: Vec<char> = line_text.chars().collect();
-        let mut source_char_offset = 0;
-        
-        for (wi, wl) in wrapped.iter().enumerate() {
-            let display_v_char_len: usize = wl.spans.iter().map(|s| s.content.chars().count()).sum();
-            
-            let mut actual_source_len = display_v_char_len;
-            let mut current_v_indent = 0;
-            
-            if wi > 0 && list_indent > 0 {
-                actual_source_len = display_v_char_len.saturating_sub(list_indent);
-                current_v_indent = list_indent;
-            }
-
-            map.push((li, source_char_offset, display_v_char_len, current_v_indent));
-            
-            let gap = if source_char_offset + actual_source_len < line_chars.len()
-                && line_chars[source_char_offset + actual_source_len] == ' '
-            {
-                1
-            } else {
-                0
-            };
-            source_char_offset += actual_source_len + gap;
-        }
-    }
-    map
-}
-
-/// Find visual row and column for a source cursor position.
-pub fn source_to_visual(
-    visual_map: &[(usize, usize, usize, usize)],
-    cursor_row: usize,
-    cursor_col: usize,
-) -> (usize, usize) {
-    for (vi, &(src_row, src_offset, vlen, vindent)) in visual_map.iter().enumerate() {
-        if src_row == cursor_row {
-            let actual_src_len = vlen.saturating_sub(vindent);
-            let col_in_segment = cursor_col.saturating_sub(src_offset);
-            
-            if col_in_segment <= actual_src_len
-                || vi + 1 >= visual_map.len()
-                || visual_map[vi + 1].0 != cursor_row
-            {
-                return (vi, col_in_segment.min(actual_src_len) + vindent);
-            }
-        }
-    }
-    (0, cursor_col)
-}
-
-pub fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
+fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
     let mut spans = Vec::new();
     let owned = line.to_string();
 
@@ -401,16 +468,20 @@ fn find_closing_single(chars: &[char], start: usize, ch: char) -> Option<usize> 
 mod tests {
     use super::*;
 
+    fn render(text: &str, accent: Color, width: usize) -> Rendered {
+        MarkdownRenderer::new(text, width, accent).render()
+    }
+
     #[test]
     fn test_highlight_lines_code_block() {
-        let lines = highlight_lines("```\nfn main() {}\n```", Color::Cyan);
-        assert_eq!(lines.len(), 3);
+        let r = render("```\nfn main() {}\n```", Color::Cyan, WRAP_WIDTH);
+        assert_eq!(r.lines().len(), 3);
     }
 
     #[test]
     fn test_highlight_lines_heading() {
-        let lines = highlight_lines("# Hello", Color::Cyan);
-        assert!(!lines.is_empty());
+        let r = render("# Hello", Color::Cyan, WRAP_WIDTH);
+        assert!(!r.lines().is_empty());
     }
 
     #[test]
@@ -462,8 +533,8 @@ mod tests {
     #[test]
     fn test_highlight_lines_wraps_long_paragraph() {
         let text = "word ".repeat(30); // 150 chars paragraph
-        let lines = highlight_lines(&text, Color::Cyan);
-        assert!(lines.len() >= 2);
+        let r = render(&text, Color::Cyan, WRAP_WIDTH);
+        assert!(r.lines().len() >= 2);
     }
 
     #[test]
@@ -554,8 +625,8 @@ mod tests {
 
     #[test]
     fn test_highlight_lines_empty_input() {
-        let lines = highlight_lines("", Color::Cyan);
-        assert!(lines.is_empty());
+        let r = render("", Color::Cyan, WRAP_WIDTH);
+        assert!(r.lines().is_empty());
     }
 
     #[test]
@@ -625,14 +696,15 @@ mod tests {
     #[test]
     fn test_highlight_lines_nested_backtick_in_text() {
         // ` inside text, not a fence — should not crash
-        let lines = highlight_lines("inline `code` and **bold**", Color::Cyan);
-        assert!(!lines.is_empty());
+        let r = render("inline `code` and **bold**", Color::Cyan, WRAP_WIDTH);
+        assert!(!r.lines().is_empty());
     }
 
     #[test]
     fn test_highlight_lines_code_block_with_inline_markers() {
         // Inside a code block, ** should not be interpreted as bold
-        let lines = highlight_lines("```\n**not bold**\n```", Color::Cyan);
+        let r = render("```\n**not bold**\n```", Color::Cyan, WRAP_WIDTH);
+        let lines = r.lines();
         assert_eq!(lines.len(), 3);
         // Middle line should be styled as code (green)
         let middle_style = lines[1].spans[0].style;
@@ -642,8 +714,8 @@ mod tests {
     #[test]
     fn test_highlight_lines_unterminated_code_block() {
         // Opening ``` with no close — all subsequent lines styled as code
-        let lines = highlight_lines("```\ncode line\nstill code", Color::Cyan);
-        assert_eq!(lines.len(), 3);
+        let r = render("```\ncode line\nstill code", Color::Cyan, WRAP_WIDTH);
+        assert_eq!(r.lines().len(), 3);
     }
 
     #[test]
@@ -668,11 +740,11 @@ mod tests {
     fn test_list_indentation_wrapping() {
         let text = "- This is a very long list item that should be wrapped and indented correctly.";
         let accent = Color::Cyan;
-        
+
         // Test unsorted list
         let highlighted = highlight_line(text, accent);
         let wrapped = wrap_spans_with_indent(highlighted, 20, 2);
-        
+
         assert!(wrapped.len() > 1);
         // Second line should start with 2 spaces
         assert!(wrapped[1].spans[0].content.starts_with("  "));
@@ -683,5 +755,17 @@ mod tests {
         let wrapped2 = wrap_spans_with_indent(highlighted2, 10, 5);
         assert!(wrapped2.len() > 1);
         assert!(wrapped2[1].spans[0].content.starts_with("     "));
+    }
+
+    #[test]
+    fn test_renderer_cursor_at_no_wrap() {
+        let r = render("hello world", Color::Cyan, 80);
+        assert_eq!(r.cursor_at(0, 5), (0, 5));
+    }
+
+    #[test]
+    fn test_renderer_cursor_at_after_wrap() {
+        let r = render("aaaa bbbb cccc dddd", Color::Cyan, 10);
+        assert_eq!(r.cursor_at(0, 10), (1, 0));
     }
 }
