@@ -1,0 +1,33 @@
+---
+source: src/ui/snapshot_tests.rs
+expression: render_to_string(&app)
+---
+ Demo (2 lists)
+┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
+│┏━━━┌ Help — Board View ─────────────────────────────────────────────────────────────────────┐───┐│
+│┃Fix│Navigation                                   Lists                                      │   ││
+│┃[bu│  Left / Right    Switch lists                 N               New list                 │───┘│
+│┃[1/│  Up / Down       Navigate cards               r               Rename list              │    │
+│┗━━━│  g / G           First / last card            A               Archive list             │    │
+│┌───│  Enter           Open card detail             V               View archived lists      │    │
+││Red│                                               < / >           Reorder list             │    │
+│└───│Card                                                                                    │    │
+│    │  t               Quick-edit title           Search & Filter                            │    │
+│    │  e               Edit description             /               Search                   │    │
+│    │  y               Copy title                   f               Filter by label          │    │
+│    │  n               New card                     F               Clear filters            │    │
+│    │  a               Archive card                                                          │    │
+│    │  v               View archived cards        Labels & Due                               │    │
+│    │  h               View change history          l               Assign / remove labels   │    │
+│    │                                               L               Manage labels            │    │
+│    │Move                                           u               Set due date             │    │
+│    │  Shift+Left/RightMove to adjacent list        U               Clear due date           │    │
+│    │  Shift+Up/Down   Move within list                                                      │    │
+│    │                                             App                                        │    │
+│    │                                               b               Back to selector         │    │
+│    │                                               ?               Help                     │    │
+│    │                                               q               Quit                     │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+└────└ Esc:close ─────────────────────────────────────────────────────────────────────────────┘────┘
+ HELP  Esc:close

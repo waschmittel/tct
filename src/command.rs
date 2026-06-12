@@ -50,4 +50,5 @@ pub enum Command {
     RenameLabel { label_id: ShortId, name: String },
     SetLabelColor { label_id: ShortId, color: LabelColor },
     DeleteLabel { label_id: ShortId },
+    ReorderLabels { from: usize, to: usize },
 }

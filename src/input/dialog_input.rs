@@ -9,7 +9,6 @@ use crossterm::event::KeyEvent;
 use crate::app::{App, AppMode};
 use crate::dialog::{DialogSideEffect, Follow};
 use crate::insert::line_editor;
-use crate::storage::{board_store, card_store, list_store};
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     // Temporarily move the dialog out so we can pass a borrow of `board`
@@ -18,7 +17,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         Some(d) => d,
         None => return Ok(()),
     };
-    let outcome = dialog.handle_key(key, app.board.as_ref());
+    let outcome = dialog.handle_key(key, app.board());
     // Put the dialog back so subsequent ops (apply, side effects) can
     // see consistent state. Follow may replace or remove it below.
     app.dialog = Some(dialog);
@@ -51,37 +50,26 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()> {
     match eff {
         DialogSideEffect::DeleteArchivedBoard { board_id } => {
-            board_store::delete_board(&board_id)?;
+            crate::board_directory::delete(&board_id)?;
         }
         DialogSideEffect::DeleteArchivedList { list_id, card_ids } => {
-            if let Some(board) = &app.board {
-                for cid in &card_ids {
-                    let _ = card_store::delete_card(&board.meta.id, cid);
-                }
-                list_store::delete_list_file(&board.meta.id, &list_id)?;
+            if let Some(editor) = &mut app.editor {
+                editor.delete_archived_list(&list_id, &card_ids)?;
             }
         }
         DialogSideEffect::DeleteArchivedCard { card_id } => {
-            if let Some(board) = &app.board {
-                card_store::delete_card(&board.meta.id, &card_id)?;
+            if let Some(editor) = &mut app.editor {
+                editor.delete_archived_card(&card_id)?;
             }
         }
         DialogSideEffect::RestoreArchivedBoard { board_id } => {
-            let mut editor = crate::board_editor::BoardEditor::load(&board_id)?;
-            editor.apply(crate::command::Command::RestoreBoard {
-                board_id: board_id.clone(),
-            })?;
-            board_store::append_to_order(&board_id)?;
+            crate::board_directory::restore(&board_id)?;
             app.reload_boards()?;
         }
         DialogSideEffect::ArchiveSelectedBoard => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let id = board.id.clone();
-                let mut editor = crate::board_editor::BoardEditor::load(&id)?;
-                editor.apply(crate::command::Command::ArchiveBoard {
-                    board_id: id.clone(),
-                })?;
-                board_store::remove_from_order(&id)?;
+                crate::board_directory::archive(&id)?;
                 app.reload_boards()?;
                 if app.selected_board_idx > 0 && app.selected_board_idx >= app.boards.len() {
                     app.selected_board_idx = app.boards.len().saturating_sub(1);
@@ -90,8 +78,8 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
         }
         DialogSideEffect::StageAndRestoreCard { card } => {
             let card_id = card.id.clone();
-            if let Some(board) = &mut app.board {
-                board.cards.insert(card_id.clone(), card);
+            if let Some(editor) = &mut app.editor {
+                editor.with_extra_card(card);
             }
             app.apply(crate::command::Command::RestoreCard { card_id })?;
         }
@@ -107,13 +95,7 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
             app.mode = AppMode::Insert;
         }
         DialogSideEffect::ReorderLabels { from, to } => {
-            if let Some(board) = &mut app.board
-                && from < board.meta.labels.len()
-                && to < board.meta.labels.len()
-            {
-                board.meta.labels.swap(from, to);
-                board_store::save_board(&board.meta)?;
-            }
+            app.apply(crate::command::Command::ReorderLabels { from, to })?;
         }
         DialogSideEffect::StartNewLabelInsert => {
             // Close the LabelManager and start NewLabelName insert. The
@@ -126,8 +108,7 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
             current_name,
         } => {
             let label_id = app
-                .board
-                .as_ref()
+                .board()
                 .and_then(|b| b.meta.labels.get(label_idx).map(|l| l.id.clone()));
             if let Some(label_id) = label_id {
                 app.dialog = None;

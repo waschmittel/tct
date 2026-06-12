@@ -9,6 +9,6 @@ use crate::app::App;
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if let Some(dialog) = &app.dialog {
-        dialog.render(frame, area, app.board.as_ref(), app.accent_color());
+        dialog.render(frame, area, app.board(), app.accent_color());
     }
 }

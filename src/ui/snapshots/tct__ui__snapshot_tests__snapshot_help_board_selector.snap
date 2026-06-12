@@ -1,0 +1,33 @@
+---
+source: src/ui/snapshot_tests.rs
+expression: render_to_string(&app)
+---
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ TCT - Terminal Card Tracker                                                                      │
+└────┌ Help — Board Selector ─────────────────────────────────────────────────────────────────┐────┘
+┌ Boa│Navigation                                   Actions                                    │────┐
+│> Al│  Up / Down       Navigate boards              n               New board                │    │
+│  Be│  Shift+Up/Down   Reorder board                r               Rename board             │    │
+│    │  Enter           Open board                   c               Cycle accent color       │    │
+│    │                                               a               Archive board            │    │
+│    │                                               v               View archived            │    │
+│    │                                                                                        │    │
+│    │                                             App                                        │    │
+│    │                                               ?               Help                     │    │
+│    │                                               q               Quit                     │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+└────└ Esc:close ─────────────────────────────────────────────────────────────────────────────┘────┘
+ HELP  Esc:close

@@ -19,4 +19,5 @@ regex = "1"
 arboard = "3.4"
 
 [dev-dependencies]
+insta = "1.48.0"
 tempfile = "3.27.0"

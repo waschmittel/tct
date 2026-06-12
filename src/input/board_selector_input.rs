@@ -1,64 +1,106 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, AppMode};
-use crate::board_editor::BoardEditor;
-use crate::command::Command;
+use crate::board_directory;
 use crate::dialog::{archived_boards::ArchivedBoards, confirm_archive_board::ConfirmArchiveBoard};
 use crate::insert::line_editor;
-use crate::storage::board_store;
+
+use super::keymap::{self, Binding};
+
+#[derive(Clone, Copy)]
+pub enum Action {
+    SelectUp,
+    SelectDown,
+    MoveBoardUp,
+    MoveBoardDown,
+    OpenBoard,
+    NewBoard,
+    RenameBoard,
+    CycleAccentColor,
+    ArchiveBoard,
+    ViewArchived,
+    Help,
+    Quit,
+}
+
+/// Board-selector keymap. Single definition of key → action → help text;
+/// the help overlay renders from this table.
+pub static KEYMAP: &[Binding<Action>] = &[
+    // Navigation
+    Binding { code: KeyCode::Up, shift: Some(false), action: Action::SelectUp, keys: "Up / Down", help: "Navigate boards", section: "Navigation" },
+    Binding { code: KeyCode::Down, shift: Some(false), action: Action::SelectDown, keys: "Up / Down", help: "Navigate boards", section: "Navigation" },
+    Binding { code: KeyCode::Up, shift: Some(true), action: Action::MoveBoardUp, keys: "Shift+Up/Down", help: "Reorder board", section: "Navigation" },
+    Binding { code: KeyCode::Down, shift: Some(true), action: Action::MoveBoardDown, keys: "Shift+Up/Down", help: "Reorder board", section: "Navigation" },
+    Binding { code: KeyCode::Enter, shift: None, action: Action::OpenBoard, keys: "Enter", help: "Open board", section: "Navigation" },
+    // Actions
+    Binding { code: KeyCode::Char('n'), shift: None, action: Action::NewBoard, keys: "n", help: "New board", section: "Actions" },
+    Binding { code: KeyCode::Char('r'), shift: None, action: Action::RenameBoard, keys: "r", help: "Rename board", section: "Actions" },
+    Binding { code: KeyCode::Char('c'), shift: None, action: Action::CycleAccentColor, keys: "c", help: "Cycle accent color", section: "Actions" },
+    Binding { code: KeyCode::Char('a'), shift: None, action: Action::ArchiveBoard, keys: "a", help: "Archive board", section: "Actions" },
+    Binding { code: KeyCode::Char('v'), shift: None, action: Action::ViewArchived, keys: "v", help: "View archived", section: "Actions" },
+    // App
+    Binding { code: KeyCode::Char('?'), shift: None, action: Action::Help, keys: "?", help: "Help", section: "App" },
+    Binding { code: KeyCode::Char('q'), shift: None, action: Action::Quit, keys: "q", help: "Quit", section: "App" },
+];
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+    let Some(action) = keymap::lookup(KEYMAP, key.code, shift) else {
+        return Ok(());
+    };
+    run(app, action)
+}
 
-    match (key.code, shift) {
-        (KeyCode::Char('q'), _) => app.should_quit = true,
-        (KeyCode::Down, false)
-            if !app.boards.is_empty() && app.selected_board_idx < app.boards.len() - 1 => {
+fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
+    match action {
+        Action::Quit => app.should_quit = true,
+        Action::SelectDown => {
+            if !app.boards.is_empty() && app.selected_board_idx < app.boards.len() - 1 {
                 app.selected_board_idx += 1;
             }
-        (KeyCode::Up, false)
-            if app.selected_board_idx > 0 => {
+        }
+        Action::SelectUp => {
+            if app.selected_board_idx > 0 {
                 app.selected_board_idx -= 1;
             }
-        (KeyCode::Down, true) => {
+        }
+        Action::MoveBoardDown => {
             move_board(app, 1)?;
         }
-        (KeyCode::Up, true) => {
+        Action::MoveBoardUp => {
             move_board(app, -1)?;
         }
-        (KeyCode::Enter, _) => {
+        Action::OpenBoard => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let id = board.id.clone();
                 app.load_board(&id)?;
             }
         }
-        (KeyCode::Char('n'), _) => {
+        Action::NewBoard => {
             app.start_insert(Box::new(line_editor::NewBoardName::new()));
         }
-        (KeyCode::Char('r'), _) => {
+        Action::RenameBoard => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let name = board.name.clone();
                 app.start_insert(Box::new(line_editor::RenameBoard::new(&name)));
             }
         }
-        (KeyCode::Char('?'), _) => {
+        Action::Help => {
             app.previous_mode = Some(app.mode.clone());
             app.mode = AppMode::Help;
         }
-        (KeyCode::Char('c'), _) => {
+        Action::CycleAccentColor => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let id = board.id.clone();
-                let next = board.accent_color.next();
-                let mut editor = BoardEditor::load(&id)?;
-                editor.apply(Command::SetAccentColor { color: next })?;
+                let next = board_directory::cycle_accent(&id)?;
                 if let Some(b) = app.boards.get_mut(app.selected_board_idx) {
                     b.accent_color = next;
                 }
                 app.set_status("Board color changed".into());
             }
         }
-        (KeyCode::Char('a'), _)
-            if !app.boards.is_empty() => {
+        Action::ArchiveBoard => {
+            if !app.boards.is_empty() {
                 let board_name = app
                     .boards
                     .get(app.selected_board_idx)
@@ -66,14 +108,14 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     .unwrap_or_default();
                 app.open_dialog(Box::new(ConfirmArchiveBoard { board_name }));
             }
-        (KeyCode::Char('v'), _) => {
-            let archived = board_store::list_archived_boards()?;
+        }
+        Action::ViewArchived => {
+            let archived = board_directory::list_archived()?;
             app.open_dialog(Box::new(ArchivedBoards {
                 boards: archived,
                 selected: 0,
             }));
         }
-        _ => {}
     }
     Ok(())
 }
@@ -267,32 +309,12 @@ fn move_board(app: &mut App, direction: i32) -> anyhow::Result<()> {
     }
     let new_idx = new_idx as usize;
 
-    let mut order = board_store::load_board_order().unwrap_or_default();
-
-    // Ensure both boards are in the order list
     let a_id = app.boards[idx].id.clone();
     let b_id = app.boards[new_idx].id.clone();
-
-    // Build order from current display if order is missing entries
-    if !order.contains(&a_id) || !order.contains(&b_id) {
-        let all_ids: Vec<_> = app.boards.iter().map(|b| b.id.clone()).collect();
-        for id in &all_ids {
-            if !order.contains(id) {
-                order.push(id.clone());
-            }
-        }
-    }
-
-    // Swap positions in the order vec
-    if let (Some(pos_a), Some(pos_b)) = (
-        order.iter().position(|id| id == &a_id),
-        order.iter().position(|id| id == &b_id),
-    ) {
-        order.swap(pos_a, pos_b);
-        board_store::save_board_order(&order)?;
-        app.boards.swap(idx, new_idx);
-        app.selected_board_idx = new_idx;
-    }
+    let displayed: Vec<_> = app.boards.iter().map(|b| b.id.clone()).collect();
+    board_directory::swap_order(&a_id, &b_id, &displayed)?;
+    app.boards.swap(idx, new_idx);
+    app.selected_board_idx = new_idx;
 
     Ok(())
 }

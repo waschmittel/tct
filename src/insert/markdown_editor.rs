@@ -331,29 +331,25 @@ fn move_cursor_visual(textarea: &mut ratatui_textarea::TextArea<'static>, direct
     let ratatui_textarea::DataCursor(cursor_row, cursor_col) = textarea.cursor();
     let lines: Vec<String> = textarea.lines().to_vec();
 
-    let visual_map = markdown::build_visual_map(&lines, accent, markdown::WRAP_WIDTH);
-    let (current_vrow, visual_col) =
-        markdown::source_to_visual(&visual_map, cursor_row, cursor_col);
+    let rendered =
+        markdown::MarkdownRenderer::from_lines(&lines, markdown::WRAP_WIDTH, accent).render();
+    let (current_vrow, visual_col) = rendered.cursor_at(cursor_row, cursor_col);
+    let (current_vrow, visual_col) = (current_vrow as usize, visual_col as usize);
 
     let target_vrow = if direction < 0 {
         current_vrow.checked_sub(1)
     } else {
         let next = current_vrow + 1;
-        if next < visual_map.len() {
-            Some(next)
-        } else {
-            None
-        }
+        (next < rendered.visual_line_count()).then_some(next)
     };
 
     let Some(target_vrow) = target_vrow else {
         return;
     };
-
-    let (target_src_row, target_src_offset, target_vlen, target_vindent) = visual_map[target_vrow];
-    let actual_target_vlen = target_vlen.saturating_sub(target_vindent);
-    let target_col =
-        target_src_offset + (visual_col.saturating_sub(target_vindent)).min(actual_target_vlen);
+    let Some((target_src_row, target_col)) = rendered.source_pos_at(target_vrow, visual_col)
+    else {
+        return;
+    };
 
     textarea.move_cursor(CursorMove::Jump(target_src_row as u16, target_col as u16));
 }

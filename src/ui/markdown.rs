@@ -148,6 +148,20 @@ impl Rendered {
     pub fn src_row_for(&self, visual_idx: usize) -> Option<usize> {
         self.map.get(visual_idx).map(|&(src_row, _, _, _)| src_row)
     }
+
+    pub fn visual_line_count(&self) -> usize {
+        self.map.len()
+    }
+
+    /// Map a visual `(row, col)` position back to the source `(row, col)`,
+    /// clamping the column into the visual line's segment. Inverse of
+    /// `cursor_at`; used for visual-line cursor movement in the editor.
+    pub fn source_pos_at(&self, visual_row: usize, visual_col: usize) -> Option<(usize, usize)> {
+        let &(src_row, src_offset, vlen, vindent) = self.map.get(visual_row)?;
+        let actual_len = vlen.saturating_sub(vindent);
+        let col = src_offset + visual_col.saturating_sub(vindent).min(actual_len);
+        Some((src_row, col))
+    }
 }
 
 /// Detect leading list-marker indent (bullet or numbered) so wrapped
@@ -171,7 +185,8 @@ pub(crate) fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
     MarkdownRenderer::new(text, WRAP_WIDTH, accent).render().lines
 }
 
-pub(crate) fn build_visual_map(
+#[cfg(test)]
+fn build_visual_map(
     lines: &[String],
     accent: Color,
     wrap_width: usize,
@@ -179,7 +194,7 @@ pub(crate) fn build_visual_map(
     MarkdownRenderer::from_lines(lines, wrap_width, accent).render().map
 }
 
-pub(crate) fn source_to_visual(
+fn source_to_visual(
     visual_map: &[(usize, usize, usize, usize)],
     cursor_row: usize,
     cursor_col: usize,
@@ -676,6 +691,24 @@ mod tests {
         // Cursor at col 4 (end of first word, before space) — should land on row 0 col 4
         let (vrow, _vcol) = source_to_visual(&map, 0, 4);
         assert!(vrow <= 1);
+    }
+
+    #[test]
+    fn test_source_pos_at_inverts_cursor_at() {
+        // Wrapped list item: cursor positions must roundtrip through the
+        // visual mapping (modulo clamping into the segment).
+        let lines = vec!["- aaaa bbbb cccc dddd".to_string(), "next".to_string()];
+        let rendered = MarkdownRenderer::from_lines(&lines, 10, Color::Cyan).render();
+        for (src_row, line) in lines.iter().enumerate() {
+            for src_col in 0..=line.chars().count() {
+                let (vrow, vcol) = rendered.cursor_at(src_row, src_col);
+                let (back_row, back_col) = rendered
+                    .source_pos_at(vrow as usize, vcol as usize)
+                    .unwrap();
+                assert_eq!(back_row, src_row);
+                assert!(back_col <= line.chars().count());
+            }
+        }
     }
 
     #[test]
