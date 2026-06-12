@@ -14,6 +14,7 @@ trap 'rm -rf "$tmp"' EXIT
 cp docs/vhs/golden/demo.txt "$tmp/expected.txt"
 
 vhs docs/vhs/demo.tape -q
+rm -f ./tct
 
 if diff -u "$tmp/expected.txt" docs/vhs/golden/demo.txt; then
     echo "vhs golden matches"
