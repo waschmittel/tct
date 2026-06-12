@@ -6,8 +6,6 @@ tct stores everything as **plain JSON files** — one file per card, list, and b
 
 ![demo](docs/vhs/demo.gif)
 
-The demo is recorded with [vhs](https://github.com/charmbracelet/vhs) from [`docs/vhs/demo.tape`](docs/vhs/demo.tape) against data seeded by [`docs/vhs/seed.sh`](docs/vhs/seed.sh) — regenerate with `vhs docs/vhs/demo.tape`.
-
 ## Why tct?
 
 - **Files are the API** — every entity is a standalone JSON file. Human-readable, git-friendly, scriptable.
