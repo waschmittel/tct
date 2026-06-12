@@ -1,0 +1,33 @@
+---
+source: src/ui/snapshot_tests.rs
+expression: render_to_string(&app)
+---
+ Empty (0 lists)
+  No lists. Press N to create one.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ NORMAL  ?:help  q:quit

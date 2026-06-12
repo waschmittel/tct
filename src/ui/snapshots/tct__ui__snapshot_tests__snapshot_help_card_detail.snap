@@ -1,0 +1,33 @@
+---
+source: src/ui/snapshot_tests.rs
+expression: render_to_string(&app)
+---
+ Demo (2 lists)
+┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
+│┏━━━┌ Help — Card Detail ────────────────────────────────────────────────────────────────────┐───┐│
+│┃Fix│Card                                         Labels & Due                               │   ││
+│┃[bu│  t               Edit title                   l               Assign / remove labels   │───┘│
+│┃[1/│  e               Edit description             L               Manage labels            │    │
+│┗━━━│  PgUp / PgDn     Scroll description           u               Set due date             │    │
+│┌───│  y               Copy description             U               Clear due date           │    │
+││Red│  Y               Copy checklist (md)                                                   │    │
+│└───│  h               View change history        App                                        │    │
+│    │                                               Esc             Close                    │    │
+│    │Checklist                                      ?               Help                     │    │
+│    │  Up / Down       Navigate items               q               Quit                     │    │
+│    │  Shift+Up/Down   Reorder item                                                          │    │
+│    │  Space           Toggle item                                                           │    │
+│    │  a               Add item                                                              │    │
+│    │  Enter           Edit item                                                             │    │
+│    │  x               Delete item                                                           │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+│    │                                                                                        │    │
+└────└ Esc:close ─────────────────────────────────────────────────────────────────────────────┘────┘
+ HELP  Esc:close

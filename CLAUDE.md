@@ -7,6 +7,9 @@ cargo build          # Must compile with zero errors and zero warnings
 cargo test -- --test-threads=1   # Tests use shared filesystem state
 ```
 
+- **Golden-screen tests**: `src/ui/snapshot_tests.rs` renders the full UI into a ratatui `TestBackend` and snapshots the text with `insta` (goldens in `src/ui/snapshots/`). After intentional UI changes: `INSTA_UPDATE=always cargo test snapshot_ -- --test-threads=1`, inspect the `.snap` diff, commit. Fixture rule: no due dates / history timestamps (rendered relative to now → churn).
+- **vhs demo + visual regression**: `docs/vhs/demo.tape` drives the real binary (seeded by `docs/vhs/seed.sh`) and produces `docs/vhs/demo.gif` + a frame-text golden. `./docs/vhs/check.sh` re-records and diffs (requires `brew install vhs`; goldens are platform/font dependent — regenerate locally, don't compare cross-platform).
+
 ## Architecture
 
 - **Modal input**: `AppMode` enum in `app.rs` drives which handler in `input/` runs. Modes: BoardSelector, Normal, CardDetail, Insert, Command, Dialog, Help. `Insert` and `Dialog` are parameterless — the active handler is `Box<dyn>` on `App.insert` / `App.dialog`. BoardSelector/Normal/CardDetail dispatch via per-mode `KEYMAP` tables (see "New keybinding").

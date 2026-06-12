@@ -4,6 +4,8 @@ pub mod card_detail;
 pub mod dialog;
 pub mod markdown;
 pub mod search_bar;
+#[cfg(test)]
+mod snapshot_tests;
 pub mod status_bar;
 pub mod theme;
 pub mod widgets;
