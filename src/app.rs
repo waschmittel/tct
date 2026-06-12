@@ -4,12 +4,13 @@ use std::time::{Duration, Instant};
 use arboard::Clipboard;
 use ratatui::style::Color;
 
+use crate::board_editor::BoardEditor;
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
 use crate::model::ids::ShortId;
 use crate::model::label::LabelColor;
 use crate::model::list::CardList;
-use crate::storage::{board_store, card_store, list_store};
+use crate::storage::board_store;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppMode {
@@ -47,21 +48,34 @@ impl LoadedBoard {
         self.cards.get(id)
     }
 
-    pub fn visible_card_count(&self, list_idx: usize) -> usize {
-        self.lists
-            .get(list_idx)
-            .map(|l| {
-                l.card_ids
-                    .iter()
-                    .filter(|id| {
-                        self.cards
-                            .get(*id)
-                            .map(|c| !c.archived)
-                            .unwrap_or(false)
+    /// Indices (into `list.card_ids`) of the visible Cards of a List.
+    /// Archived Cards are always hidden; with an active search, non-matching
+    /// Cards are hidden too. This is the single source of truth for
+    /// visibility — navigation, clamping, and rendering all consume it.
+    pub fn visible_cards(&self, list_idx: usize, search: Option<&str>) -> Vec<usize> {
+        let Some(list) = self.lists.get(list_idx) else {
+            return vec![];
+        };
+        list.card_ids
+            .iter()
+            .enumerate()
+            .filter(|(_, id)| {
+                self.cards
+                    .get(*id)
+                    .map(|c| {
+                        !c.archived
+                            && search
+                                .map(|q| c.matches_search(q, &self.meta.labels))
+                                .unwrap_or(true)
                     })
-                    .count()
+                    .unwrap_or(false)
             })
-            .unwrap_or(0)
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    pub fn visible_card_count(&self, list_idx: usize) -> usize {
+        self.visible_cards(list_idx, None).len()
     }
 
     pub fn clamp_selection(&mut self) {
@@ -83,7 +97,9 @@ pub struct App {
     pub status_message: Option<(String, Instant)>,
     pub boards: Vec<BoardMeta>,
     pub selected_board_idx: usize,
-    pub board: Option<LoadedBoard>,
+    /// Board Editor for the currently open board (ADR-0001). Reads go via
+    /// `App::board()`; mutations via `App::apply` or editor selection verbs.
+    pub editor: Option<BoardEditor>,
     pub search_query: String,
     pub search_active: bool,
     pub label_filter: Option<LabelColor>,
@@ -106,7 +122,7 @@ impl App {
             status_message: None,
             boards,
             selected_board_idx: 0,
-            board: None,
+            editor: None,
             search_query: String::new(),
             search_active: false,
             label_filter: None,
@@ -119,6 +135,22 @@ impl App {
             app.load_board(&board_id)?;
         }
         Ok(app)
+    }
+
+    /// Read-only view of the currently loaded board, if any.
+    pub fn board(&self) -> Option<&LoadedBoard> {
+        self.editor.as_ref().map(|e| e.board())
+    }
+
+    /// The active search query, if search is on.
+    pub fn search(&self) -> Option<&str> {
+        self.search_active.then_some(self.search_query.as_str())
+    }
+
+    /// Test-only mutable access to the Loaded Board.
+    #[cfg(test)]
+    pub fn board_mut(&mut self) -> Option<&mut LoadedBoard> {
+        self.editor.as_mut().map(|e| e.board_mut())
     }
 
     pub fn on_tick(&mut self) {
@@ -134,66 +166,21 @@ impl App {
     }
 
     fn should_reload(&self) -> bool {
-        self.board.is_some()
+        self.editor.is_some()
             && matches!(self.mode, AppMode::Normal | AppMode::Help | AppMode::CardDetail)
             && self.insert.is_none()
     }
 
     fn try_reload_board(&mut self) {
-        let board_id = match &self.board {
-            Some(b) => b.meta.id.clone(),
-            None => return,
+        let Some(editor) = self.editor.as_mut() else {
+            return;
         };
-
-        let old = self.board.as_ref().unwrap();
-        let old_selected_list = old.selected_list;
-        let old_selected_card = old.selected_card.clone();
-        let old_scroll_offset = old.scroll_offset.clone();
-        let old_detail_item_idx = old.detail_item_idx;
-        let old_detail_scroll = old.detail_scroll;
-
-        let meta = match board_store::load_board(&board_id) {
-            Ok(m) => m,
-            Err(_) => {
-                self.board = None;
-                let _ = self.reload_boards();
-                self.mode = AppMode::BoardSelector;
-                return;
-            }
-        };
-        let lists = match list_store::load_all_lists(&board_id, &meta.list_order) {
-            Ok(l) => l,
-            Err(_) => return,
-        };
-        let mut cards = HashMap::new();
-        for list in &lists {
-            for card_id in &list.card_ids {
-                if let Ok(card) = card_store::load_card(&board_id, card_id) {
-                    cards.insert(card_id.clone(), card);
-                }
-            }
+        if editor.reload().is_err() {
+            // Board file gone — drop the editor and return to the selector.
+            self.editor = None;
+            let _ = self.reload_boards();
+            self.mode = AppMode::BoardSelector;
         }
-
-        let num_lists = lists.len();
-        let board = self.board.as_mut().unwrap();
-        board.meta = meta;
-        board.lists = lists;
-        board.cards = cards;
-
-        board.selected_card.resize(num_lists, 0);
-        board.scroll_offset.resize(num_lists, 0);
-        board.selected_list = old_selected_list.min(num_lists.saturating_sub(1));
-        for i in 0..num_lists {
-            if i < old_selected_card.len() {
-                board.selected_card[i] = old_selected_card[i];
-            }
-            if i < old_scroll_offset.len() {
-                board.scroll_offset[i] = old_scroll_offset[i];
-            }
-        }
-        board.detail_item_idx = old_detail_item_idx;
-        board.detail_scroll = old_detail_scroll;
-        board.clamp_selection();
     }
 
     pub fn set_status(&mut self, msg: String) {
@@ -216,29 +203,16 @@ impl App {
     }
 
     pub fn load_board(&mut self, board_id: &str) -> anyhow::Result<()> {
-        let meta = board_store::load_board(board_id)?;
-        let lists = list_store::load_all_lists(board_id, &meta.list_order)?;
-        let mut cards = HashMap::new();
-        for list in &lists {
-            for card_id in &list.card_ids {
-                if let Ok(card) = card_store::load_card(board_id, card_id) {
-                    cards.insert(card_id.clone(), card);
-                }
-            }
-        }
-
-        let num_lists = lists.len();
-        self.board = Some(LoadedBoard {
-            meta,
-            lists,
-            cards,
-            selected_list: 0,
-            selected_card: vec![0; num_lists],
-            scroll_offset: vec![0; num_lists],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-        });
+        self.editor = Some(BoardEditor::load(board_id)?);
         self.mode = AppMode::Normal;
+        Ok(())
+    }
+
+    /// Close the open board and return to the Board Selector.
+    pub fn close_board(&mut self) -> anyhow::Result<()> {
+        self.editor = None;
+        self.reload_boards()?;
+        self.mode = AppMode::BoardSelector;
         Ok(())
     }
 
@@ -264,7 +238,7 @@ impl App {
     /// falling back to `Normal` (or `BoardSelector` when no board loaded).
     pub fn close_dialog(&mut self) {
         self.dialog = None;
-        let fallback = if self.board.is_some() {
+        let fallback = if self.editor.is_some() {
             AppMode::Normal
         } else {
             AppMode::BoardSelector
@@ -293,33 +267,27 @@ impl App {
     pub fn cancel_insert(&mut self) {
         self.insert = None;
         self.mode = self.previous_mode.take().unwrap_or_else(|| {
-            if self.board.is_some() { AppMode::Normal } else { AppMode::BoardSelector }
+            if self.editor.is_some() { AppMode::Normal } else { AppMode::BoardSelector }
         });
     }
 }
 
 impl App {
     pub fn accent_color(&self) -> Color {
-        self.board
-            .as_ref()
+        self.board()
             .map(|b| b.meta.accent_color.to_ratatui_color())
             .unwrap_or(Color::Cyan)
     }
 
-    /// Route a Command through the Board Editor while keeping the
-    /// take-replace shim until `App.board` is renamed to `editor` (later
-    /// phase). The result is the id of a card created by `AddCard`, if any.
-    pub fn apply(&mut self, cmd: crate::command::Command) -> anyhow::Result<Option<crate::model::ids::ShortId>> {
-        let board = self
-            .board
-            .take()
+    /// Route a Command through the Board Editor. The result is the id of a
+    /// card created by `AddCard`, if any.
+    pub fn apply(&mut self, cmd: crate::command::Command) -> anyhow::Result<Option<ShortId>> {
+        let editor = self
+            .editor
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("no board loaded"))?;
-        let mut editor = crate::board_editor::BoardEditor::from_loaded(board);
-        let result = editor.apply(cmd);
-        let new_id = editor.last_added_card_id().cloned();
-        self.board = Some(editor.into_loaded());
-        result.map_err(anyhow::Error::from)?;
-        Ok(new_id)
+        editor.apply(cmd)?;
+        Ok(editor.last_added_card_id().cloned())
     }
 }
 
@@ -329,6 +297,7 @@ mod tests {
     use crate::model::card::Card;
     use crate::model::label::LabelColor;
     use crate::model::list::CardList;
+    use crate::storage::{card_store, list_store};
     use crate::test_support::with_temp_dir;
 
     /// Build a `Card` with a fixed `id` for stable test assertions.
@@ -368,7 +337,7 @@ mod tests {
             status_message: None,
             boards: vec![],
             selected_board_idx: 0,
-            board: None,
+            editor: None,
             search_query: String::new(),
             search_active: false,
             label_filter: None,
@@ -470,7 +439,7 @@ mod tests {
         board.meta.accent_color = LabelColor::Purple;
         let mut app = bare_app();
         app.mode = AppMode::Normal;
-        app.board = Some(board);
+        app.editor = Some(BoardEditor::from_loaded(board));
         let (r, g, b) = LabelColor::Purple.to_rgb();
         assert_eq!(app.accent_color(), Color::Rgb(r, g, b));
     }
@@ -498,7 +467,7 @@ mod tests {
         with_temp_dir(|| {
             let (meta, mut list, _cards) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
-            assert_eq!(app.board.as_ref().unwrap().lists[0].card_ids.len(), 3);
+            assert_eq!(app.board().unwrap().lists[0].card_ids.len(), 3);
 
             // Add a new card on disk
             let new_card = Card::new("Disk-added".into());
@@ -511,7 +480,7 @@ mod tests {
             app.last_reload = Instant::now() - Duration::from_secs(1);
             app.on_tick();
 
-            let board = app.board.as_ref().unwrap();
+            let board = app.board().unwrap();
             assert_eq!(board.lists[0].card_ids.len(), 4);
             assert!(board.cards.contains_key(&new_card.id));
         });
@@ -523,15 +492,15 @@ mod tests {
             let (meta, _, _) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
             // Move selection to card index 2
-            app.board.as_mut().unwrap().selected_card[0] = 2;
-            app.board.as_mut().unwrap().detail_item_idx = 5;
-            app.board.as_mut().unwrap().detail_scroll = 7;
+            app.board_mut().unwrap().selected_card[0] = 2;
+            app.board_mut().unwrap().detail_item_idx = 5;
+            app.board_mut().unwrap().detail_scroll = 7;
 
             app.reload_interval = Duration::from_millis(0);
             app.last_reload = Instant::now() - Duration::from_secs(1);
             app.on_tick();
 
-            let board = app.board.as_ref().unwrap();
+            let board = app.board().unwrap();
             assert_eq!(board.selected_card[0], 2);
             assert_eq!(board.detail_item_idx, 5);
             assert_eq!(board.detail_scroll, 7);
@@ -543,7 +512,7 @@ mod tests {
         with_temp_dir(|| {
             let (meta, mut list, cards) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
-            app.board.as_mut().unwrap().selected_card[0] = 2; // points at last
+            app.board_mut().unwrap().selected_card[0] = 2; // points at last
 
             // Remove last card from disk
             list.card_ids.retain(|id| id != &cards[2].id);
@@ -554,7 +523,7 @@ mod tests {
             app.last_reload = Instant::now() - Duration::from_secs(1);
             app.on_tick();
 
-            let board = app.board.as_ref().unwrap();
+            let board = app.board().unwrap();
             assert_eq!(board.lists[0].card_ids.len(), 2);
             // Selection clamped to new last index
             assert_eq!(board.selected_card[0], 1);
@@ -566,7 +535,7 @@ mod tests {
         with_temp_dir(|| {
             let (meta, _, _) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
-            assert!(app.board.is_some());
+            assert!(app.editor.is_some());
 
             // Delete board from disk
             board_store::delete_board(&meta.id).unwrap();
@@ -576,7 +545,7 @@ mod tests {
             app.on_tick();
 
             // App should drop the board and switch to selector
-            assert!(app.board.is_none());
+            assert!(app.editor.is_none());
             assert_eq!(app.mode, AppMode::BoardSelector);
         });
     }
@@ -599,7 +568,7 @@ mod tests {
             app.on_tick();
 
             // Should NOT have reloaded
-            assert_eq!(app.board.as_ref().unwrap().lists[0].card_ids.len(), 3);
+            assert_eq!(app.board().unwrap().lists[0].card_ids.len(), 3);
         });
     }
 
@@ -610,7 +579,7 @@ mod tests {
             let mut app = App::new(Some(meta.id.clone())).unwrap();
             app.mode = AppMode::CardDetail;
             // Simulate active description edit
-            let card_id = app.board.as_ref().unwrap().current_card_id().cloned().unwrap();
+            let card_id = app.board().unwrap().current_card_id().cloned().unwrap();
             app.start_insert(Box::new(
                 crate::insert::markdown_editor::MarkdownEditor::new(card_id, "initial"),
             ));
@@ -625,7 +594,7 @@ mod tests {
             app.on_tick();
 
             // Editor active → skip reload
-            assert_eq!(app.board.as_ref().unwrap().lists[0].card_ids.len(), 3);
+            assert_eq!(app.board().unwrap().lists[0].card_ids.len(), 3);
         });
     }
 

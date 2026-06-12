@@ -38,7 +38,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     let insert_over_selector = matches!(&app.mode, AppMode::Insert)
         && matches!(insert_surface(app), Some(InsertSurface::BoardSelector));
 
-    let is_board_selector_base = app.board.is_none()
+    let is_board_selector_base = app.editor.is_none()
         || matches!(effective_mode, AppMode::BoardSelector)
         || dialog_over_selector
         || insert_over_selector;
@@ -105,7 +105,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     let effective_mode = app.previous_mode.as_ref().unwrap_or(&app.mode);
 
     let insert_surface_v = insert_surface(app);
-    let is_board_selector_base = app.board.is_none()
+    let is_board_selector_base = app.editor.is_none()
         || matches!(effective_mode, AppMode::BoardSelector)
         || matches!(effective_mode, AppMode::Insert)
             && matches!(insert_surface_v, Some(InsertSurface::BoardSelector));
@@ -168,7 +168,29 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         ])
     };
 
+    // One column of help lines from a keymap: section headers + their rows.
+    fn keymap_column<A: Copy>(
+        map: &[crate::input::keymap::Binding<A>],
+        sections: &[&str],
+        header: &dyn Fn(&str) -> Line<'static>,
+        row: &dyn Fn(&str, &str) -> Line<'static>,
+    ) -> Vec<Line<'static>> {
+        let mut lines = Vec::new();
+        for (i, section) in sections.iter().enumerate() {
+            if i > 0 {
+                lines.push(Line::raw(""));
+            }
+            lines.push(header(section));
+            for (keys, help) in crate::input::keymap::help_rows(map, section) {
+                lines.push(row(keys, help));
+            }
+        }
+        lines
+    }
+
     let (left, right): (Vec<Line>, Vec<Line>) = if is_editing_desc {
+        // Description-editor keys live on the MarkdownEditor handler, not a
+        // mode keymap — documented here directly.
         (
             vec![
                 header("File"),
@@ -193,103 +215,27 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             ],
         )
     } else if is_card_detail {
+        let map = crate::input::card_detail_input::KEYMAP;
         (
-            vec![
-                header("Card"),
-                row("t", "Edit title"),
-                row("e", "Edit description"),
-                row("PgUp / PgDn", "Scroll description"),
-                row("y", "Copy description"),
-                row("Y", "Copy checklist (md)"),
-                row("h", "View change history"),
-                Line::raw(""),
-                header("Checklist"),
-                row("Up / Down", "Navigate items"),
-                row("Shift+Up/Down", "Reorder item"),
-                row("Space", "Toggle item"),
-                row("a", "Add item"),
-                row("Enter", "Edit item"),
-                row("x", "Delete item"),
-            ],
-            vec![
-                header("Labels & Due"),
-                row("l", "Assign / remove labels"),
-                row("L", "Manage labels"),
-                row("u", "Set due date"),
-                row("U", "Clear due date"),
-                Line::raw(""),
-                header("App"),
-                row("Esc", "Close"),
-                row("q", "Quit"),
-            ],
+            keymap_column(map, &["Card", "Checklist"], &header, &row),
+            keymap_column(map, &["Labels & Due", "App"], &header, &row),
         )
     } else if is_board_selector_base {
+        let map = crate::input::board_selector_input::KEYMAP;
         (
-            vec![
-                header("Navigation"),
-                row("Up / Down", "Navigate boards"),
-                row("Shift+Up/Down", "Reorder board"),
-                row("Enter", "Open board"),
-            ],
-            vec![
-                header("Actions"),
-                row("n", "New board"),
-                row("r", "Rename board"),
-                row("c", "Cycle accent color"),
-                row("a", "Archive board"),
-                row("v", "View archived"),
-                Line::raw(""),
-                header("App"),
-                row("?", "Help"),
-                row("q", "Quit"),
-            ],
+            keymap_column(map, &["Navigation"], &header, &row),
+            keymap_column(map, &["Actions", "App"], &header, &row),
         )
     } else {
+        let map = crate::input::normal::KEYMAP;
         (
-            vec![
-                header("Navigation"),
-                row("Left / Right", "Switch lists"),
-                row("Up / Down", "Navigate cards"),
-                row("g / G", "First / last card"),
-                row("Enter", "Open card detail"),
-                Line::raw(""),
-                header("Card"),
-                row("t", "Quick-edit title"),
-                row("e", "Edit description"),
-                row("y", "Copy title"),
-                row("n", "New card"),
-                row("a", "Archive card"),
-                row("v", "View archived cards"),
-                row("h", "View change history"),
-                Line::raw(""),
-                header("Move"),
-                row("Shift+Left/Right", "Move to adjacent list"),
-                row("Shift+Up/Down", "Move within list"),
-            ],
-            vec![
-                header("Lists"),
-                row("N", "New list"),
-                row("r", "Rename list"),
-                row("A", "Archive list"),
-                row("V", "View archived lists"),
-                row("< / >", "Reorder list"),
-                Line::raw(""),
-                header("Search & Filter"),
-                row("/", "Search"),
-                row("f", "Filter by label"),
-                row("F", "Clear filters"),
-                Line::raw(""),
-                header("Labels & Due"),
-                row("l", "Assign / remove labels"),
-                row("L", "Manage labels"),
-                row("u", "Set due date"),
-                row("U", "Clear due date"),
-                Line::raw(""),
-                header("App"),
-                row("b", "Back to selector"),
-                row("?", "Help"),
-                row("q", "Quit"),
-            ],
+            keymap_column(map, &["Navigation", "Card", "Move"], &header, &row),
+            keymap_column(
+                map,
+                &["Lists", "Search & Filter", "Labels & Due", "App"],
+                &header,
+                &row,
+            ),
         )
     };
 
@@ -308,18 +254,57 @@ mod tests {
     use crate::app::{App, AppMode};
     use crate::insert::InsertSurface;
 
+    /// Every section used by a keymap must be listed in the help layout in
+    /// `render_help`, otherwise its bindings silently vanish from the
+    /// overlay. Keep these lists in sync with `render_help`.
+    #[test]
+    fn help_layout_covers_all_keymap_sections() {
+        fn sections<A: Copy>(map: &[crate::input::keymap::Binding<A>]) -> Vec<&'static str> {
+            let mut secs: Vec<&'static str> = Vec::new();
+            for b in map {
+                if !secs.contains(&b.section) {
+                    secs.push(b.section);
+                }
+            }
+            secs
+        }
+
+        let layouts: &[(&[&str], Vec<&'static str>)] = &[
+            (
+                &["Navigation", "Card", "Move", "Lists", "Search & Filter", "Labels & Due", "App"],
+                sections(crate::input::normal::KEYMAP),
+            ),
+            (
+                &["Card", "Checklist", "Labels & Due", "App"],
+                sections(crate::input::card_detail_input::KEYMAP),
+            ),
+            (
+                &["Navigation", "Actions", "App"],
+                sections(crate::input::board_selector_input::KEYMAP),
+            ),
+        ];
+        for (layout, used) in layouts {
+            for sec in used {
+                assert!(
+                    layout.contains(sec),
+                    "keymap section '{sec}' missing from help layout"
+                );
+            }
+        }
+    }
+
     /// Smoke test: BoardSelector base when no board loaded.
     #[test]
     fn test_render_completeness() {
         let mut app = App::new(None).unwrap();
         app.mode = AppMode::Insert;
         // No board loaded → always BoardSelector base.
-        assert!(app.board.is_none());
+        assert!(app.editor.is_none());
 
         // With board loaded, only board-name insert handlers force the
         // selector background; other handlers use the BoardView.
         let board_meta = crate::model::board::BoardMeta::new("Test".into());
-        app.board = Some(crate::app::LoadedBoard {
+        app.editor = Some(crate::board_editor::BoardEditor::from_loaded(crate::app::LoadedBoard {
             meta: board_meta,
             lists: vec![],
             cards: std::collections::HashMap::new(),
@@ -328,7 +313,7 @@ mod tests {
             scroll_offset: vec![],
             detail_item_idx: 0,
             detail_scroll: 0,
-        });
+        }));
 
         // NewBoardName → BoardSelector surface
         app.insert = Some(Box::new(crate::insert::line_editor::NewBoardName::new()));

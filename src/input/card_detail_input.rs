@@ -9,44 +9,95 @@ use crate::insert::{
     date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor, InsertSurface,
 };
 
+use super::keymap::{self, Binding};
+
+#[derive(Clone, Copy)]
+pub enum Action {
+    Close,
+    ItemUp,
+    ItemDown,
+    ScrollDown,
+    ScrollUp,
+    ReorderItemDown,
+    ReorderItemUp,
+    ToggleItem,
+    AddItem,
+    DeleteItem,
+    EditItem,
+    EditDescription,
+    EditTitle,
+    CopyDescription,
+    CopyChecklist,
+    AssignLabels,
+    ManageLabels,
+    SetDueDate,
+    ClearDueDate,
+    HistoryDialog,
+    Help,
+    Quit,
+}
+
+/// Card-detail keymap. Single definition of key → action → help text; the
+/// help overlay renders from this table.
+pub static KEYMAP: &[Binding<Action>] = &[
+    // Card
+    Binding { code: KeyCode::Char('t'), shift: None, action: Action::EditTitle, keys: "t", help: "Edit title", section: "Card" },
+    Binding { code: KeyCode::Char('e'), shift: None, action: Action::EditDescription, keys: "e", help: "Edit description", section: "Card" },
+    Binding { code: KeyCode::PageUp, shift: None, action: Action::ScrollUp, keys: "PgUp / PgDn", help: "Scroll description", section: "Card" },
+    Binding { code: KeyCode::PageDown, shift: None, action: Action::ScrollDown, keys: "PgUp / PgDn", help: "Scroll description", section: "Card" },
+    Binding { code: KeyCode::Char('y'), shift: None, action: Action::CopyDescription, keys: "y", help: "Copy description", section: "Card" },
+    Binding { code: KeyCode::Char('Y'), shift: None, action: Action::CopyChecklist, keys: "Y", help: "Copy checklist (md)", section: "Card" },
+    Binding { code: KeyCode::Char('h'), shift: None, action: Action::HistoryDialog, keys: "h", help: "View change history", section: "Card" },
+    // Checklist
+    Binding { code: KeyCode::Up, shift: Some(false), action: Action::ItemUp, keys: "Up / Down", help: "Navigate items", section: "Checklist" },
+    Binding { code: KeyCode::Down, shift: Some(false), action: Action::ItemDown, keys: "Up / Down", help: "Navigate items", section: "Checklist" },
+    Binding { code: KeyCode::Up, shift: Some(true), action: Action::ReorderItemUp, keys: "Shift+Up/Down", help: "Reorder item", section: "Checklist" },
+    Binding { code: KeyCode::Down, shift: Some(true), action: Action::ReorderItemDown, keys: "Shift+Up/Down", help: "Reorder item", section: "Checklist" },
+    Binding { code: KeyCode::Char(' '), shift: None, action: Action::ToggleItem, keys: "Space", help: "Toggle item", section: "Checklist" },
+    Binding { code: KeyCode::Char('a'), shift: None, action: Action::AddItem, keys: "a", help: "Add item", section: "Checklist" },
+    Binding { code: KeyCode::Enter, shift: None, action: Action::EditItem, keys: "Enter", help: "Edit item", section: "Checklist" },
+    Binding { code: KeyCode::Char('x'), shift: None, action: Action::DeleteItem, keys: "x", help: "Delete item", section: "Checklist" },
+    // Labels & Due
+    Binding { code: KeyCode::Char('l'), shift: None, action: Action::AssignLabels, keys: "l", help: "Assign / remove labels", section: "Labels & Due" },
+    Binding { code: KeyCode::Char('L'), shift: None, action: Action::ManageLabels, keys: "L", help: "Manage labels", section: "Labels & Due" },
+    Binding { code: KeyCode::Char('u'), shift: None, action: Action::SetDueDate, keys: "u", help: "Set due date", section: "Labels & Due" },
+    Binding { code: KeyCode::Char('U'), shift: None, action: Action::ClearDueDate, keys: "U", help: "Clear due date", section: "Labels & Due" },
+    // App
+    Binding { code: KeyCode::Esc, shift: None, action: Action::Close, keys: "Esc", help: "Close", section: "App" },
+    Binding { code: KeyCode::Char('?'), shift: None, action: Action::Help, keys: "?", help: "Help", section: "App" },
+    Binding { code: KeyCode::Char('q'), shift: None, action: Action::Quit, keys: "q", help: "Quit", section: "App" },
+];
+
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+    let Some(action) = keymap::lookup(KEYMAP, key.code, shift) else {
+        return Ok(());
+    };
+    run(app, action)
+}
 
-    match (key.code, shift) {
-        (KeyCode::Esc, _) => {
-            if let Some(board) = &mut app.board {
-                board.detail_item_idx = 0;
-                board.detail_scroll = 0;
+fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
+    match action {
+        Action::Close => {
+            if let Some(editor) = &mut app.editor {
+                editor.reset_detail_cursor();
             }
             app.mode = AppMode::Normal;
         }
-
-        // Checklist item navigation
-        (KeyCode::Down, false) => {
-            if let Some(board) = &mut app.board
-                && let Some(card) = board.current_card()
-                    && board.detail_item_idx < card.checklist.len().saturating_sub(1) {
-                        board.detail_item_idx += 1;
-                    }
+        Action::ItemDown => {
+            if let Some(editor) = &mut app.editor {
+                editor.detail_item_down();
+            }
         }
-        (KeyCode::Up, false) => {
-            if let Some(board) = &mut app.board
-                && board.detail_item_idx > 0 {
-                    board.detail_item_idx -= 1;
-                }
+        Action::ItemUp => {
+            if let Some(editor) = &mut app.editor {
+                editor.detail_item_up();
+            }
         }
-
-        // Description scrolling
-        (KeyCode::PageDown, _) => {
-            scroll_description(app, 5, true);
-        }
-        (KeyCode::PageUp, _) => {
-            scroll_description(app, 5, false);
-        }
-
-        // Reorder checklist item down
-        (KeyCode::Down, true) => {
-            if let Some(board) = &app.board
+        Action::ScrollDown => scroll_description(app, 5, true),
+        Action::ScrollUp => scroll_description(app, 5, false),
+        Action::ReorderItemDown => {
+            if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned()
                 && let Some(card) = board.cards.get(&card_id) {
                     let ii = board.detail_item_idx;
@@ -56,16 +107,11 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                             from: ii,
                             to: ii + 1,
                         })?;
-                        if let Some(b) = &mut app.board {
-                            b.detail_item_idx = ii + 1;
-                        }
                     }
                 }
         }
-
-        // Reorder checklist item up
-        (KeyCode::Up, true) => {
-            if let Some(board) = &app.board
+        Action::ReorderItemUp => {
+            if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned() {
                     let ii = board.detail_item_idx;
                     if ii > 0 {
@@ -74,16 +120,11 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                             from: ii,
                             to: ii - 1,
                         })?;
-                        if let Some(b) = &mut app.board {
-                            b.detail_item_idx = ii - 1;
-                        }
                     }
                 }
         }
-
-        // Toggle checklist item
-        (KeyCode::Char(' '), _) => {
-            if let Some(board) = &app.board
+        Action::ToggleItem => {
+            if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned()
                 && let Some(card) = board.cards.get(&card_id) {
                     let ii = board.detail_item_idx;
@@ -92,37 +133,25 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     }
                 }
         }
-
-        // Add checklist item
-        (KeyCode::Char('a'), _) => {
+        Action::AddItem => {
             if let Some(card_id) =
-                app.board.as_ref().and_then(|b| b.current_card_id().cloned())
+                app.board().and_then(|b| b.current_card_id().cloned())
             {
                 app.start_insert(Box::new(line_editor::NewChecklistItem::new(card_id)));
             }
         }
-
-        // Delete checklist item
-        (KeyCode::Char('x'), _) => {
-            if let Some(board) = &app.board
+        Action::DeleteItem => {
+            if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned()
                 && let Some(card) = board.cards.get(&card_id) {
                     let ii = board.detail_item_idx;
                     if ii < card.checklist.len() {
-                        app.apply(Command::RemoveChecklistItem { card_id: card_id.clone(), item_idx: ii })?;
-                        if let Some(b) = &mut app.board
-                            && let Some(c) = b.cards.get(&card_id) {
-                                if b.detail_item_idx >= c.checklist.len() && !c.checklist.is_empty() {
-                                    b.detail_item_idx = c.checklist.len() - 1;
-                                }
-                            }
+                        app.apply(Command::RemoveChecklistItem { card_id, item_idx: ii })?;
                     }
                 }
         }
-
-        // Edit checklist item text
-        (KeyCode::Enter, _) => {
-            if let Some(board) = &app.board
+        Action::EditItem => {
+            if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned()
                 && let Some(card) = board.cards.get(&card_id) {
                     let ii = board.detail_item_idx;
@@ -134,20 +163,16 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     }
                 }
         }
-
-        // Edit description
-        (KeyCode::Char('e'), _) => {
-            if let Some(board) = &app.board
+        Action::EditDescription => {
+            if let Some(board) = app.board()
                 && let Some(card) = board.current_card() {
                     let desc = card.description.clone();
                     let card_id = card.id.clone();
                     app.start_insert(Box::new(MarkdownEditor::new(card_id, &desc)));
                 }
         }
-
-        // Edit title
-        (KeyCode::Char('t'), _) => {
-            if let Some(board) = &app.board
+        Action::EditTitle => {
+            if let Some(board) = app.board()
                 && let Some(card) = board.current_card() {
                     let title = card.title.clone();
                     let card_id = card.id.clone();
@@ -156,19 +181,15 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     )));
                 }
         }
-
-        // Copy description
-        (KeyCode::Char('y'), _) => {
-            if let Some(board) = &app.board
+        Action::CopyDescription => {
+            if let Some(board) = app.board()
                 && let Some(card) = board.current_card() {
                     let desc = card.description.clone();
                     app.copy_to_clipboard(desc);
                 }
         }
-
-        // Copy entire checklist as markdown
-        (KeyCode::Char('Y'), _) => {
-            if let Some(board) = &app.board
+        Action::CopyChecklist => {
+            if let Some(board) = app.board()
                 && let Some(card) = board.current_card() {
                     if card.checklist.is_empty() {
                         app.set_status("Checklist is empty".into());
@@ -178,21 +199,17 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     }
                 }
         }
-
-        // Labels
-        (KeyCode::Char('l'), _) => {
-            if let Some(board) = &app.board
+        Action::AssignLabels => {
+            if let Some(board) = app.board()
                 && board.current_card_id().is_some() {
                     app.open_dialog(Box::new(LabelPicker { selected_idx: 0 }));
                 }
         }
-        (KeyCode::Char('L'), _) => {
+        Action::ManageLabels => {
             app.open_dialog(Box::new(LabelManager { selected_idx: 0 }));
         }
-
-        // Due date
-        (KeyCode::Char('u'), _) => {
-            if let Some(board) = &app.board
+        Action::SetDueDate => {
+            if let Some(board) = app.board()
                 && let Some(card) = board.current_card() {
                     let date_str = card
                         .due_date
@@ -202,32 +219,26 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                     app.start_insert(Box::new(DatePicker::new(card_id, &date_str, InsertSurface::CardDetail)));
                 }
         }
-
-        // Clear due date
-        (KeyCode::Char('U'), _) => {
-            if let Some(board) = &app.board
+        Action::ClearDueDate => {
+            if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned() {
                     app.apply(Command::ClearDueDate { card_id })?;
                     app.set_status("Due date cleared".into());
                 }
         }
-
-        (KeyCode::Char('h'), _) => {
-            if let Some(board) = &app.board
+        Action::HistoryDialog => {
+            if let Some(board) = app.board()
                 && board.current_card_id().is_some() {
                     app.open_dialog(Box::new(CardHistory { scroll: 0 }));
                 }
         }
-
-        (KeyCode::Char('?'), _) => {
+        Action::Help => {
             app.previous_mode = Some(app.mode.clone());
             app.mode = AppMode::Help;
         }
-        (KeyCode::Char('q'), _) => {
+        Action::Quit => {
             app.should_quit = true;
         }
-
-        _ => {}
     }
     Ok(())
 }
@@ -274,13 +285,13 @@ mod tests {
     fn esc_returns_to_normal_mode_and_resets_scroll() {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
-            app.board.as_mut().unwrap().detail_scroll = 5;
-            app.board.as_mut().unwrap().detail_item_idx = 2;
+            app.board_mut().unwrap().detail_scroll = 5;
+            app.board_mut().unwrap().detail_item_idx = 2;
 
             press(&mut app, KeyCode::Esc);
 
             assert!(matches!(app.mode, AppMode::Normal));
-            let board = app.board.as_ref().unwrap();
+            let board = app.board().unwrap();
             assert_eq!(board.detail_scroll, 0);
             assert_eq!(board.detail_item_idx, 0);
         });
@@ -291,12 +302,12 @@ mod tests {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
             press(&mut app, KeyCode::Down);
-            assert_eq!(app.board.as_ref().unwrap().detail_item_idx, 1);
+            assert_eq!(app.board().unwrap().detail_item_idx, 1);
             press(&mut app, KeyCode::Down);
-            assert_eq!(app.board.as_ref().unwrap().detail_item_idx, 2);
+            assert_eq!(app.board().unwrap().detail_item_idx, 2);
             // Already at last item — clamp
             press(&mut app, KeyCode::Down);
-            assert_eq!(app.board.as_ref().unwrap().detail_item_idx, 2);
+            assert_eq!(app.board().unwrap().detail_item_idx, 2);
         });
     }
 
@@ -304,11 +315,11 @@ mod tests {
     fn up_arrow_stops_at_zero() {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
-            app.board.as_mut().unwrap().detail_item_idx = 1;
+            app.board_mut().unwrap().detail_item_idx = 1;
             press(&mut app, KeyCode::Up);
-            assert_eq!(app.board.as_ref().unwrap().detail_item_idx, 0);
+            assert_eq!(app.board().unwrap().detail_item_idx, 0);
             press(&mut app, KeyCode::Up);
-            assert_eq!(app.board.as_ref().unwrap().detail_item_idx, 0);
+            assert_eq!(app.board().unwrap().detail_item_idx, 0);
         });
     }
 
@@ -317,10 +328,10 @@ mod tests {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
             press(&mut app, KeyCode::Char(' '));
-            let card = app.board.as_ref().unwrap().current_card().unwrap();
+            let card = app.board().unwrap().current_card().unwrap();
             assert!(card.checklist[0].completed);
             press(&mut app, KeyCode::Char(' '));
-            let card = app.board.as_ref().unwrap().current_card().unwrap();
+            let card = app.board().unwrap().current_card().unwrap();
             assert!(!card.checklist[0].completed);
         });
     }
@@ -329,9 +340,9 @@ mod tests {
     fn x_deletes_current_checklist_item_and_clamps_selection() {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
-            app.board.as_mut().unwrap().detail_item_idx = 2; // last
+            app.board_mut().unwrap().detail_item_idx = 2; // last
             press(&mut app, KeyCode::Char('x'));
-            let board = app.board.as_ref().unwrap();
+            let board = app.board().unwrap();
             assert_eq!(board.current_card().unwrap().checklist.len(), 2);
             // selection moved back to new last
             assert_eq!(board.detail_item_idx, 1);
@@ -343,7 +354,7 @@ mod tests {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
             press_shift(&mut app, KeyCode::Down);
-            let board = app.board.as_ref().unwrap();
+            let board = app.board().unwrap();
             assert_eq!(board.detail_item_idx, 1);
             let cl = &board.current_card().unwrap().checklist;
             assert_eq!(cl[0].text, "b");
@@ -357,7 +368,7 @@ mod tests {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
             press_shift(&mut app, KeyCode::Char('U'));
-            let card = app.board.as_ref().unwrap().current_card().unwrap();
+            let card = app.board().unwrap().current_card().unwrap();
             assert!(card.due_date.is_none());
             // Card history should include "Cleared due date"
             assert!(card.history.iter().any(|h| h.action.contains("Cleared")));
@@ -441,7 +452,7 @@ mod tests {
     fn enter_on_existing_item_starts_edit_with_prefill() {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
-            app.board.as_mut().unwrap().detail_item_idx = 1; // "b"
+            app.board_mut().unwrap().detail_item_idx = 1; // "b"
             press(&mut app, KeyCode::Enter);
             assert!(matches!(app.mode, AppMode::Insert));
             let h = app.insert.as_ref().unwrap();
@@ -454,14 +465,14 @@ mod tests {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
             // Set a multi-line description so scroll is bounded by content.
-            let board = app.board.as_mut().unwrap();
+            let board = app.board_mut().unwrap();
             let card_id = board.current_card_id().cloned().unwrap();
             let card = board.cards.get_mut(&card_id).unwrap();
             card.description = (0..30).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
             press(&mut app, KeyCode::PageDown);
-            assert!(app.board.as_ref().unwrap().detail_scroll > 0);
+            assert!(app.board().unwrap().detail_scroll > 0);
             press(&mut app, KeyCode::PageUp);
-            assert_eq!(app.board.as_ref().unwrap().detail_scroll, 0);
+            assert_eq!(app.board().unwrap().detail_scroll, 0);
         });
     }
 
@@ -469,7 +480,7 @@ mod tests {
 
 fn scroll_description(app: &mut App, step: usize, down: bool) {
     let accent = app.accent_color();
-    let visual_count = if let Some(board) = &app.board {
+    let visual_count = if let Some(board) = app.board() {
         if let Some(card) = board.current_card() {
             if card.description.is_empty() {
                 1
@@ -483,11 +494,7 @@ fn scroll_description(app: &mut App, step: usize, down: bool) {
         0
     };
     let max_scroll = visual_count.saturating_sub(1);
-    if let Some(board) = &mut app.board {
-        if down {
-            board.detail_scroll = (board.detail_scroll + step).min(max_scroll);
-        } else {
-            board.detail_scroll = board.detail_scroll.saturating_sub(step);
-        }
+    if let Some(editor) = &mut app.editor {
+        editor.scroll_detail(step, down, max_scroll);
     }
 }

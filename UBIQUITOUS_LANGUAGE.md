@@ -23,7 +23,9 @@
 | **Archived**    | Soft-deleted state on **Board**/**List**/**Card** (`archived: bool`); hidden but recoverable  | Deleted, trashed, removed       |
 | **Loaded Board**| In-memory aggregate of one **Board**'s meta, **Lists**, **Cards** owned by a **Board Editor** | Active board, current board     |
 | **Board Editor**| Aggregate root owning a **Loaded Board** + **Selection State**; exposes domain verbs (`add_card_to_list`, `archive_card`, `move_card`, …) and atomic stage-and-commit persistence | Service, manager, repository |
+| **Board Directory** | Module owning the collection of **Boards**: create, archive/restore, rename, display order, listing (`src/board_directory.rs`). Everything that spans multiple boards or runs before a board is loaded | Board manager, board service |
 | **Selection State** | Navigation invariants for a **Loaded Board** — selected list/card indices, scroll offsets, search query, label filter; mutated only via verbs that maintain clamp/shift invariants | Cursor, focus               |
+| **Visible**     | A **Card** shown given its **Archived** flag and the active search (`LoadedBoard::visible_cards` is the single source of truth; navigation, clamping, and rendering all consume it) | Filtered, shown, matching |
 | **Touch**       | Bump a **Card**'s `updated_at` timestamp without other change                                 | Update, mark dirty              |
 | **Log**         | Append a **History Entry** to a **Card** and touch it                                         | Record, track                   |
 

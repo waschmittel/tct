@@ -2,8 +2,8 @@
 //!
 //! See `docs/adr/0001-board-editor-aggregate.md`. Owns the in-memory board
 //! state; mutations enter via `apply(Command)` which mutates, appends the
-//! History Entry, and stages writes for `commit_pending`. Selection
-//! extraction (ADR-0001) lands in Phase 2.
+//! History Entry, and stages writes for `commit_pending`. Selection State
+//! is mutated only through the selection verbs below (ADR-0002).
 
 use std::collections::HashMap;
 
@@ -64,23 +64,207 @@ impl BoardEditor {
         })
     }
 
+    /// Test-only constructor for in-memory fixtures (no disk).
+    #[cfg(test)]
     pub fn from_loaded(board: LoadedBoard) -> Self {
         Self { board, last_added_card_id: None }
-    }
-
-    pub fn into_loaded(self) -> LoadedBoard {
-        self.board
     }
 
     pub fn board(&self) -> &LoadedBoard {
         &self.board
     }
 
+    /// Test-only escape hatch for fixtures that need to pre-arrange state.
+    #[cfg(test)]
+    pub fn board_mut(&mut self) -> &mut LoadedBoard {
+        &mut self.board
+    }
+
+    /// Re-read the board from disk, preserving Selection State.
+    /// `Err(NotFound)`-style storage errors on the board file mean the board
+    /// is gone; list-load failures keep the in-memory state untouched.
+    pub fn reload(&mut self) -> Result<(), BoardEditorError> {
+        let meta = board_store::load_board(&self.board.meta.id)?;
+        let lists = match list_store::load_all_lists(&self.board.meta.id, &meta.list_order) {
+            Ok(l) => l,
+            Err(_) => return Ok(()),
+        };
+        let mut cards = HashMap::new();
+        for list in &lists {
+            for card_id in &list.card_ids {
+                if let Ok(card) = card_store::load_card(&self.board.meta.id, card_id) {
+                    cards.insert(card_id.clone(), card);
+                }
+            }
+        }
+
+        let num_lists = lists.len();
+        let old_selected_list = self.board.selected_list;
+        let old_selected_card = std::mem::take(&mut self.board.selected_card);
+        let old_scroll_offset = std::mem::take(&mut self.board.scroll_offset);
+
+        self.board.meta = meta;
+        self.board.lists = lists;
+        self.board.cards = cards;
+        self.board.selected_card = vec![0; num_lists];
+        self.board.scroll_offset = vec![0; num_lists];
+        self.board.selected_list = old_selected_list.min(num_lists.saturating_sub(1));
+        for i in 0..num_lists {
+            if i < old_selected_card.len() {
+                self.board.selected_card[i] = old_selected_card[i];
+            }
+            if i < old_scroll_offset.len() {
+                self.board.scroll_offset[i] = old_scroll_offset[i];
+            }
+        }
+        self.board.clamp_selection();
+        Ok(())
+    }
+
+    // ── Selection verbs (ADR-0002: direct methods, not Commands) ──────────
+
+    pub fn select_list_left(&mut self) {
+        if self.board.selected_list > 0 {
+            self.board.selected_list -= 1;
+        }
+    }
+
+    pub fn select_list_right(&mut self) {
+        if self.board.selected_list < self.board.lists.len().saturating_sub(1) {
+            self.board.selected_list += 1;
+        }
+    }
+
+    /// Move selection down to the next visible Card (next match when a
+    /// search is active).
+    pub fn select_card_down(&mut self, search: Option<&str>) {
+        let li = self.board.selected_list;
+        let current = self.board.selected_card.get(li).copied().unwrap_or(0);
+        let next = self
+            .board
+            .visible_cards(li, search)
+            .into_iter()
+            .find(|&i| i > current);
+        if let Some(next) = next {
+            self.board.selected_card[li] = next;
+        }
+    }
+
+    /// Move selection up to the previous visible Card (previous match when
+    /// a search is active).
+    pub fn select_card_up(&mut self, search: Option<&str>) {
+        let li = self.board.selected_list;
+        let current = self.board.selected_card.get(li).copied().unwrap_or(0);
+        let prev = self
+            .board
+            .visible_cards(li, search)
+            .into_iter()
+            .rev()
+            .find(|&i| i < current);
+        if let Some(prev) = prev {
+            self.board.selected_card[li] = prev;
+        }
+    }
+
+    pub fn select_first_card(&mut self) {
+        let li = self.board.selected_list;
+        if let Some(slot) = self.board.selected_card.get_mut(li) {
+            *slot = 0;
+        }
+    }
+
+    pub fn select_last_card(&mut self) {
+        let li = self.board.selected_list;
+        let max = self.board.visible_card_count(li).saturating_sub(1);
+        if let Some(slot) = self.board.selected_card.get_mut(li) {
+            *slot = max;
+        }
+    }
+
+    /// Jump to the first Card matching `query` anywhere on the board.
+    pub fn select_first_match(&mut self, query: &str) {
+        for li in 0..self.board.lists.len() {
+            if let Some(&ci) = self.board.visible_cards(li, Some(query)).first() {
+                self.board.selected_list = li;
+                self.board.selected_card[li] = ci;
+                return;
+            }
+        }
+    }
+
+    // ── Card Detail cursor verbs ───────────────────────────────────────────
+
+    pub fn reset_detail_cursor(&mut self) {
+        self.board.detail_item_idx = 0;
+        self.board.detail_scroll = 0;
+    }
+
+    pub fn detail_item_up(&mut self) {
+        if self.board.detail_item_idx > 0 {
+            self.board.detail_item_idx -= 1;
+        }
+    }
+
+    /// Move the detail cursor down, clamped to the current Card's checklist.
+    pub fn detail_item_down(&mut self) {
+        let len = self
+            .board
+            .current_card()
+            .map(|c| c.checklist.len())
+            .unwrap_or(0);
+        if self.board.detail_item_idx < len.saturating_sub(1) {
+            self.board.detail_item_idx += 1;
+        }
+    }
+
+    /// Scroll the description pane by `step`, clamped to `max_scroll`
+    /// (computed by the renderer from the wrapped line count).
+    pub fn scroll_detail(&mut self, step: usize, down: bool, max_scroll: usize) {
+        if down {
+            self.board.detail_scroll = (self.board.detail_scroll + step).min(max_scroll);
+        } else {
+            self.board.detail_scroll = self.board.detail_scroll.saturating_sub(step);
+        }
+    }
+
+
     /// Stage a card into the in-memory model without staging a write. Used
     /// when callers need to bring an archived card into scope before
     /// applying a command that touches it (e.g. `RestoreCard`).
     pub fn with_extra_card(&mut self, card: Card) {
         self.board.cards.insert(card.id.clone(), card);
+    }
+
+    /// Archived Cards of this board, read from disk.
+    pub fn archived_cards(&self) -> Vec<Card> {
+        card_store::list_archived_cards(&self.board.meta.id)
+    }
+
+    /// Archived Lists of this board, read from disk.
+    pub fn archived_lists(&self) -> Vec<CardList> {
+        list_store::list_archived_lists(&self.board.meta.id)
+    }
+
+    /// Permanently delete an archived Card's file. The only hard delete on
+    /// Cards — everything else is Archive.
+    pub fn delete_archived_card(&mut self, card_id: &ShortId) -> Result<(), BoardEditorError> {
+        card_store::delete_card(&self.board.meta.id, card_id)?;
+        self.board.cards.remove(card_id);
+        Ok(())
+    }
+
+    /// Permanently delete an archived List's file along with its Cards.
+    pub fn delete_archived_list(
+        &mut self,
+        list_id: &ShortId,
+        card_ids: &[ShortId],
+    ) -> Result<(), BoardEditorError> {
+        for cid in card_ids {
+            let _ = card_store::delete_card(&self.board.meta.id, cid);
+            self.board.cards.remove(cid);
+        }
+        list_store::delete_list_file(&self.board.meta.id, list_id)?;
+        Ok(())
     }
 
     /// Most recently added card id, set by `Command::AddCard`. Cleared at the
@@ -176,7 +360,10 @@ impl BoardEditor {
                 let action = format!("Added checklist item '{text}'");
                 card.checklist.push(ChecklistItem { text, completed: false });
                 card.log(action);
+                let last = card.checklist.len() - 1;
                 pending.push(PendingWrite::Card(card.clone()));
+                // Detail cursor follows the new item.
+                self.board.detail_item_idx = last;
             }
             Command::EditChecklistItem { card_id, item_idx, text } => {
                 let card = self.card_mut(&card_id)?;
@@ -218,7 +405,12 @@ impl BoardEditor {
                 }
                 let removed = card.checklist.remove(item_idx);
                 card.log(format!("Removed checklist item '{}'", removed.text));
+                let len = card.checklist.len();
                 pending.push(PendingWrite::Card(card.clone()));
+                // Clamp detail cursor to the shrunk checklist.
+                if self.board.detail_item_idx >= len && len > 0 {
+                    self.board.detail_item_idx = len - 1;
+                }
             }
             Command::ReorderChecklistItem { card_id, from, to } => {
                 let card = self.card_mut(&card_id)?;
@@ -237,6 +429,8 @@ impl BoardEditor {
                     card.touch();
                 }
                 pending.push(PendingWrite::Card(card.clone()));
+                // Detail cursor follows the moved item.
+                self.board.detail_item_idx = to;
             }
             Command::ToggleLabel { card_id, label_id } => {
                 let label_name = self
@@ -262,23 +456,30 @@ impl BoardEditor {
                 pending.push(PendingWrite::Card(card.clone()));
             }
             Command::AddCard { list_id, title } => {
-                let list = self
+                let li = self
                     .board
                     .lists
-                    .iter_mut()
-                    .find(|l| l.id == list_id)
+                    .iter()
+                    .position(|l| l.id == list_id)
                     .ok_or_else(|| BoardEditorError::NotFound {
                         kind: "list",
                         id: list_id.clone(),
                     })?;
+                let list = &mut self.board.lists[li];
                 let mut card = Card::new(title);
                 card.log("Created");
                 list.card_ids.push(card.id.clone());
                 let new_id = card.id.clone();
+                let new_idx = list.card_ids.len() - 1;
                 pending.push(PendingWrite::List(list.clone()));
                 self.board.cards.insert(card.id.clone(), card.clone());
                 pending.push(PendingWrite::Card(card));
                 self.last_added_card_id = Some(new_id);
+                // Selection follows the new card.
+                self.board.selected_list = li;
+                if let Some(slot) = self.board.selected_card.get_mut(li) {
+                    *slot = new_idx;
+                }
             }
             Command::MoveCard { card_id, direction } => {
                 self.move_card(&card_id, direction, &mut pending)?;
@@ -290,6 +491,8 @@ impl BoardEditor {
                 self.board.lists.push(list.clone());
                 self.board.selected_card.push(0);
                 self.board.scroll_offset.push(0);
+                // Selection follows the new list.
+                self.board.selected_list = self.board.lists.len() - 1;
                 pending.push(PendingWrite::List(list));
                 pending.push(PendingWrite::Board);
             }
@@ -434,6 +637,16 @@ impl BoardEditor {
                     }
                 }
                 pending.push(PendingWrite::Board);
+            }
+            Command::ReorderLabels { from, to } => {
+                let len = self.board.meta.labels.len();
+                if from >= len || to >= len {
+                    return Err(BoardEditorError::Invariant("label index out of range"));
+                }
+                if from != to {
+                    self.board.meta.labels.swap(from, to);
+                    pending.push(PendingWrite::Board);
+                }
             }
         }
         self.commit_pending(pending)?;
@@ -632,6 +845,67 @@ mod tests {
             assert!(actions.contains(&"Archived"));
             assert!(actions.contains(&"Restored from archive"));
         });
+    }
+
+    fn fixed_card(id: &str, title: &str) -> Card {
+        let mut c = Card::new(title.into());
+        c.id = id.into();
+        c
+    }
+
+    fn loaded_board(cards: Vec<Card>) -> LoadedBoard {
+        let card_ids: Vec<_> = cards.iter().map(|c| c.id.clone()).collect();
+        let cards_map: HashMap<_, _> = cards.into_iter().map(|c| (c.id.clone(), c)).collect();
+        LoadedBoard {
+            meta: BoardMeta::new("X".into()),
+            lists: vec![CardList { id: "l".into(), name: "L".into(), card_ids, archived: false }],
+            cards: cards_map,
+            selected_list: 0,
+            selected_card: vec![0],
+            scroll_offset: vec![0],
+            detail_item_idx: 0,
+            detail_scroll: 0,
+        }
+    }
+
+    #[test]
+    fn visible_cards_empty_for_no_search_match() {
+        let board = loaded_board(vec![fixed_card("c1", "alpha")]);
+        assert!(board.visible_cards(0, Some("zzz")).is_empty());
+    }
+
+    #[test]
+    fn visible_cards_skips_archived() {
+        let mut cards = vec![fixed_card("id1", "a"), fixed_card("id2", "b")];
+        cards[1].archived = true;
+        let board = loaded_board(cards);
+        assert_eq!(board.visible_cards(0, None), vec![0]);
+    }
+
+    #[test]
+    fn visible_cards_search_hides_non_matching() {
+        let cards = vec![
+            fixed_card("c1", "alpha"),
+            fixed_card("c2", "BINGO"),
+            fixed_card("c3", "gamma"),
+        ];
+        let board = loaded_board(cards);
+        assert_eq!(board.visible_cards(0, Some("bingo")), vec![1]);
+        assert_eq!(board.visible_cards(0, None), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn select_card_down_skips_to_next_search_match() {
+        let cards = vec![
+            fixed_card("c1", "alpha"),
+            fixed_card("c2", "BINGO match"),
+            fixed_card("c3", "gamma"),
+        ];
+        let mut editor = BoardEditor::from_loaded(loaded_board(cards));
+        editor.select_card_down(Some("BINGO"));
+        assert_eq!(editor.board().selected_card[0], 1);
+        editor.select_card_down(Some("BINGO"));
+        assert_eq!(editor.board().selected_card[0], 1);
     }
 
     #[test]

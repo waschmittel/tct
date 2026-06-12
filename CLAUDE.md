@@ -9,12 +9,15 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 
 ## Architecture
 
-- **Modal input**: `AppMode` enum in `app.rs` drives which handler in `input/` runs. Modes: BoardSelector, Normal, CardDetail, Insert, Command, Dialog, Help. `Insert` and `Dialog` are parameterless — the active handler is `Box<dyn>` on `App.insert` / `App.dialog`.
+- **Modal input**: `AppMode` enum in `app.rs` drives which handler in `input/` runs. Modes: BoardSelector, Normal, CardDetail, Insert, Command, Dialog, Help. `Insert` and `Dialog` are parameterless — the active handler is `Box<dyn>` on `App.insert` / `App.dialog`. BoardSelector/Normal/CardDetail dispatch via per-mode `KEYMAP` tables (see "New keybinding").
+- **Board Editor** (`src/board_editor.rs`, ADR-0001/0002): aggregate root for the open board. `App.editor: Option<BoardEditor>`; reads via `app.board() -> Option<&LoadedBoard>`; domain mutations via `app.apply(Command)`; selection moves via editor verbs (`select_card_down`, `detail_item_up`, `reset_detail_cursor`, …). Input/UI code never mutates `LoadedBoard` fields directly.
+- **Board Directory** (`src/board_directory.rs`): owns the board collection — create/archive/restore/rename/cycle accent/display order/listing. Used by the board selector, insert/dialog side effects, and `tct boards`. Stores are internals of the two aggregates.
+- **Visibility**: `LoadedBoard::visible_cards(list_idx, search)` is the single source of truth for which Cards show (archived always hidden; search hides non-matching). Navigation, clamping, and rendering all consume it.
 - **Dialog trait** (`src/dialog/`): One struct per dialog kind implementing `Dialog { render, handle_key, background }`. Each holds its own payload + cursor/scroll state. Returns `DialogOutcome { apply: Option<Command>, side_effect, status, follow }`. The dispatcher in `input/dialog_input.rs` interprets the outcome. See `docs/adr/0003-dialog-and-insert-as-traits.md`.
 - **InsertHandler trait** (`src/insert/`): One struct per insert target. Handlers are grouped by widget kind: `line_editor.rs` (11 line inputs sharing `LineInput`), `markdown_editor.rs` (description editor over `TextAreaInput`), `date_picker.rs` (due-date picker). Returns `InsertOutcome::{Stay, Cancel, Confirm(Command), ConfirmAndOpenDialog, OpenDialog, CancelWithStatus, ConfirmSideEffect}`. Dispatcher in `input/insert.rs`.
 - **Storage**: JSON files under `~/.tct/boards/`. All writes use `atomic_write` (write `.tmp`, then rename). Override path with `TCT_DATA_DIR` env var.
 - **Description editing**: Lives on the `MarkdownEditor` insert handler (`src/insert/markdown_editor.rs`). Wraps `ratatui-textarea::TextArea` via `TextAreaInput` shared base. List autocontinue + renumbering + nest/unnest also live there. Renderer in `card_detail.rs::render_description_editor()` reads from the handler.
-- **Markdown rendering**: `MarkdownRenderer` in `ui/markdown.rs` (refactored separately). Word-wrap at `WRAP_WIDTH` (80 chars). The description editor's cursor visual mapping uses the legacy `build_visual_map` / `source_to_visual` helpers in the same module.
+- **Markdown rendering**: `MarkdownRenderer` in `ui/markdown.rs`. Word-wrap at `WRAP_WIDTH` (80 chars). `render()` returns a `Rendered` that owns the source↔visual cursor mapping: `cursor_at` (source→visual), `source_pos_at` (visual→source), `visual_line_count`, `src_row_for`. One wrap implementation for rendering and cursor movement.
 - **Label colors**: `LabelColor` enum with named pastel variants + `Custom { r, g, b }`. New labels get auto-generated pastel colors via `LabelColor::generate_pastel()` which picks maximally distant hue from existing labels.
 - **Board accent color**: Each board has an `accent_color: LabelColor` field in `BoardMeta`. All UI highlight/accent colors use `app.accent_color()` instead of hardcoded `Color::Cyan`. New boards auto-get a differentiated pastel color. Users cycle with 'c' in board selector. Help overlay keeps structural Cyan.
 - **Search**: When active, non-matching cards are hidden (not just dimmed). Navigation skips hidden cards. First match auto-selected on search confirm.
@@ -22,22 +25,11 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 
 ## How to Add Things
 
-### New keybinding in board selector
-1. Add match arm in `input/board_selector_input.rs`
-2. Update status bar hints in `ui/status_bar.rs`
-3. Update help text in `ui/mod.rs::render_help()`
-4. Update README.md keybindings table
-
-### New keybinding in board view
-1. Add match arm in `input/normal.rs`
-2. Update status bar hints in `ui/status_bar.rs`
-3. Update help text in `ui/mod.rs::render_help()`
-4. Update README.md keybindings table
-
-### New keybinding in card detail
-1. Add match arm in `input/card_detail_input.rs`
-2. Update bottom hints in `ui/card_detail.rs` (the `bottom_hints` vec)
-3. Update help text in `ui/mod.rs::render_help()`
+### New keybinding (board selector / board view / card detail)
+Keybindings live in a **keymap table** per mode (`KEYMAP` in `input/board_selector_input.rs`, `input/normal.rs`, `input/card_detail_input.rs`). Dispatch and the help overlay both read the table.
+1. Add an `Action` enum variant and a `Binding` row to the mode's `KEYMAP` (key, action, help text, section)
+2. Add the action's match arm in the same file's `run()`
+3. The help overlay (`ui/mod.rs::render_help()`) generates rows from the table — only touch it if you introduce a new *section* (and extend the section list + the `help_layout_covers_all_keymap_sections` test)
 4. Update README.md keybindings table
 
 ### New dialog
@@ -69,9 +61,9 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 
 ## Keep in Sync
 
-When changing keybindings or features, update ALL of:
-- `src/ui/mod.rs` — help overlay text
-- `src/ui/status_bar.rs` — mode hint strings
+When changing keybindings or features, update:
+- The mode's `KEYMAP` table (help overlay generates from it)
+- `src/ui/status_bar.rs` — mode hint strings (mode-level, rarely changes)
 - `src/ui/card_detail.rs` — bottom hint spans (for card detail modes)
 - `README.md` — keybindings tables
 - This file if architectural patterns change

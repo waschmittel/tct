@@ -10,7 +10,7 @@ use crate::insert::InsertSurface;
 use super::markdown;
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
-    let board = match &app.board {
+    let board = match app.board() {
         Some(b) => b,
         None => return,
     };

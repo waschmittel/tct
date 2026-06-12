@@ -65,7 +65,7 @@ pub fn render(
     is_selected: bool,
     app: &App,
 ) {
-    let board = match &app.board {
+    let board = match app.board() {
         Some(b) => b,
         None => return,
     };
@@ -84,32 +84,10 @@ pub fn render(
         Style::default().fg(Color::White)
     };
 
-    let active_count = list
-        .card_ids
-        .iter()
-        .filter(|id| {
-            board
-                .cards
-                .get(*id)
-                .map(|c| !c.archived)
-                .unwrap_or(false)
-        })
-        .count();
-
-    let filtered_count = if app.search_active {
-        list.card_ids
-            .iter()
-            .filter(|id| {
-                board.cards.get(*id).map(|c| {
-                    !c.archived && c.matches_search(&app.search_query, &board.meta.labels)
-                }).unwrap_or(false)
-            })
-            .count()
-    } else {
-        active_count
-    };
+    let active_count = board.visible_cards(list_index, None).len();
 
     let count_label = if app.search_active {
+        let filtered_count = board.visible_cards(list_index, app.search()).len();
         format!("{filtered_count}/{active_count}")
     } else {
         format!("{active_count}")
@@ -132,36 +110,16 @@ pub fn render(
 
     let selected_card_idx = board.selected_card.get(list_index).copied().unwrap_or(0);
 
-    let all_visible: Vec<&str> = list
-        .card_ids
-        .iter()
-        .filter(|id| {
-            board
-                .cards
-                .get(*id)
-                .map(|c| !c.archived)
-                .unwrap_or(false)
-        })
-        .map(|id| id.as_str())
+    let selected_card_id = board
+        .visible_cards(list_index, None)
+        .get(selected_card_idx)
+        .map(|&i| list.card_ids[i].as_str());
+
+    let visible_cards: Vec<&str> = board
+        .visible_cards(list_index, app.search())
+        .into_iter()
+        .map(|i| list.card_ids[i].as_str())
         .collect();
-
-    let selected_card_id = all_visible.get(selected_card_idx).copied();
-
-    let visible_cards: Vec<&str> = if app.search_active {
-        all_visible
-            .iter()
-            .filter(|id| {
-                board
-                    .cards
-                    .get(**id)
-                    .map(|c| c.matches_search(&app.search_query, &board.meta.labels))
-                    .unwrap_or(false)
-            })
-            .copied()
-            .collect()
-    } else {
-        all_visible
-    };
 
     if visible_cards.is_empty() {
         let empty = ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(

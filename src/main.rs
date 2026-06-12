@@ -1,4 +1,5 @@
 mod app;
+mod board_directory;
 mod board_editor;
 mod cli;
 mod command;

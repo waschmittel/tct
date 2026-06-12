@@ -1,9 +1,10 @@
-mod board_selector_input;
-mod card_detail_input;
+pub mod board_selector_input;
+pub mod card_detail_input;
 mod command;
 mod dialog_input;
 mod insert;
-mod normal;
+pub mod keymap;
+pub mod normal;
 
 use crossterm::event::{KeyEvent, KeyEventKind};
 
@@ -25,7 +26,7 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             if matches!(key.code, crossterm::event::KeyCode::Esc | crossterm::event::KeyCode::Char('q')) {
                 if let Some(prev) = app.previous_mode.take() {
                     app.mode = prev;
-                } else if app.board.is_some() {
+                } else if app.editor.is_some() {
                     app.mode = AppMode::Normal;
                 } else {
                     app.mode = AppMode::BoardSelector;
