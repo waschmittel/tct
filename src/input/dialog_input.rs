@@ -76,6 +76,15 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
                 }
             }
         }
+        DialogSideEffect::SetSelectedBoardAccent { color } => {
+            if let Some(board) = app.boards.get(app.selected_board_idx) {
+                let id = board.id.clone();
+                crate::board_directory::set_accent(&id, color)?;
+                if let Some(b) = app.boards.get_mut(app.selected_board_idx) {
+                    b.accent_color = color;
+                }
+            }
+        }
         DialogSideEffect::StageAndRestoreCard { card } => {
             let card_id = card.id.clone();
             if let Some(editor) = &mut app.editor {

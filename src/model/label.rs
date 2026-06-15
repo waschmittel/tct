@@ -125,7 +125,7 @@ impl LabelColor {
     }
 }
 
-fn hsl_to_rgb(h: f64, s: f64, l: f64) -> (u8, u8, u8) {
+pub(crate) fn hsl_to_rgb(h: f64, s: f64, l: f64) -> (u8, u8, u8) {
     let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
     let h2 = h / 60.0;
     let x = c * (1.0 - (h2 % 2.0 - 1.0).abs());
@@ -150,7 +150,7 @@ fn hsl_to_rgb(h: f64, s: f64, l: f64) -> (u8, u8, u8) {
     )
 }
 
-fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (f64, f64, f64) {
+pub(crate) fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (f64, f64, f64) {
     let r = r as f64 / 255.0;
     let g = g as f64 / 255.0;
     let b = b as f64 / 255.0;

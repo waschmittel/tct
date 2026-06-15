@@ -9,13 +9,13 @@ expression: render_to_string(&app)
 │> Al│  Up / Down       Navigate boards              n               New board                │    │
 │  Be│  Shift+Up/Down   Reorder board                r               Rename board             │    │
 │    │  Enter           Open board                   c               Cycle accent color       │    │
+│    │                                               C               Pick accent color        │    │
 │    │                                               a               Archive board            │    │
 │    │                                               v               View archived            │    │
 │    │                                                                                        │    │
 │    │                                             App                                        │    │
 │    │                                               ?               Help                     │    │
 │    │                                               q               Quit                     │    │
-│    │                                                                                        │    │
 │    │                                                                                        │    │
 │    │                                                                                        │    │
 │    │                                                                                        │    │

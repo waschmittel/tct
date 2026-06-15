@@ -18,6 +18,7 @@ pub mod archived_boards;
 pub mod archived_cards;
 pub mod archived_lists;
 pub mod card_history;
+pub mod color_picker;
 pub(crate) mod common;
 pub mod confirm_archive_board;
 pub mod confirm_archive_card;
@@ -152,6 +153,10 @@ pub enum DialogSideEffect {
     /// Archive the currently-selected board (in Board Selector context):
     /// load editor for that board, apply ArchiveBoard, remove from order.
     ArchiveSelectedBoard,
+    /// Set the accent color of the currently-selected board (Board Selector
+    /// context, no board loaded): load editor for that board, apply
+    /// SetAccentColor, sync `app.boards`.
+    SetSelectedBoardAccent { color: crate::model::label::LabelColor },
     /// Stage an archived card into the loaded board's cache before
     /// applying RestoreCard. Used by the archived-cards dialog.
     StageAndRestoreCard { card: crate::model::card::Card },

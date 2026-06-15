@@ -31,7 +31,7 @@ tct stores everything as **plain JSON files** — one file per card, list, and b
 - Undo/redo in description editor
 - macOS Cmd key support (in supported terminals)
 - Auto-continuing lists in editor
-- Per-board configurable accent color (pastel palette, cycle with 'c')
+- Per-board configurable accent color (pastel palette cycle with 'c', or free HSL color picker with 'C')
 - Periodic filesystem reload (every 15s) for background sync support
 - Full CLI interface for scripting and AI agent use (`tct --help`)
 
@@ -94,6 +94,7 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | n | New board |
 | r | Rename board |
 | c | Cycle board accent color |
+| C | Pick board accent color (HSL color picker) |
 | a | Archive board |
 | v | View/restore archived boards |
 | ? | Help |

@@ -61,6 +61,13 @@ pub fn cycle_accent(board_id: &ShortId) -> anyhow::Result<LabelColor> {
     Ok(next)
 }
 
+/// Set the Board's Accent Color to an explicit value and persist.
+pub fn set_accent(board_id: &ShortId, color: LabelColor) -> anyhow::Result<()> {
+    let mut editor = BoardEditor::load(board_id)?;
+    editor.apply(Command::SetAccentColor { color })?;
+    Ok(())
+}
+
 /// Permanently delete an archived Board's directory from disk.
 pub fn delete(board_id: &str) -> anyhow::Result<()> {
     Ok(board_store::delete_board(board_id)?)

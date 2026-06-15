@@ -2,7 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{App, AppMode};
 use crate::board_directory;
-use crate::dialog::{archived_boards::ArchivedBoards, confirm_archive_board::ConfirmArchiveBoard};
+use crate::dialog::{
+    archived_boards::ArchivedBoards, color_picker::ColorPicker,
+    confirm_archive_board::ConfirmArchiveBoard,
+};
 use crate::insert::line_editor;
 
 use super::keymap::{self, Binding};
@@ -17,6 +20,7 @@ pub enum Action {
     NewBoard,
     RenameBoard,
     CycleAccentColor,
+    PickAccentColor,
     ArchiveBoard,
     ViewArchived,
     Help,
@@ -36,6 +40,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Char('n'), shift: None, action: Action::NewBoard, keys: "n", help: "New board", section: "Actions" },
     Binding { code: KeyCode::Char('r'), shift: None, action: Action::RenameBoard, keys: "r", help: "Rename board", section: "Actions" },
     Binding { code: KeyCode::Char('c'), shift: None, action: Action::CycleAccentColor, keys: "c", help: "Cycle accent color", section: "Actions" },
+    Binding { code: KeyCode::Char('C'), shift: None, action: Action::PickAccentColor, keys: "C", help: "Pick accent color", section: "Actions" },
     Binding { code: KeyCode::Char('a'), shift: None, action: Action::ArchiveBoard, keys: "a", help: "Archive board", section: "Actions" },
     Binding { code: KeyCode::Char('v'), shift: None, action: Action::ViewArchived, keys: "v", help: "View archived", section: "Actions" },
     // App
@@ -97,6 +102,12 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                     b.accent_color = next;
                 }
                 app.set_status("Board color changed".into());
+            }
+        }
+        Action::PickAccentColor => {
+            if let Some(board) = app.boards.get(app.selected_board_idx) {
+                let color = board.accent_color;
+                app.open_dialog(Box::new(ColorPicker::from_color(color)));
             }
         }
         Action::ArchiveBoard => {
@@ -240,6 +251,17 @@ mod tests {
             // Reload from disk and verify persistence.
             let reloaded = board_store::load_board(&app.boards[0].id).unwrap();
             assert_eq!(reloaded.accent_color, after);
+        });
+    }
+
+    #[test]
+    fn shift_c_opens_color_picker_dialog() {
+        with_temp_dir(|| {
+            seed_boards(&["A"]);
+            let mut app = App::new(None).unwrap();
+            press(&mut app, KeyCode::Char('C'));
+            assert!(matches!(app.mode, AppMode::Dialog));
+            assert!(app.dialog.is_some());
         });
     }
 
