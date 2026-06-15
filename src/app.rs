@@ -234,6 +234,16 @@ impl App {
         self.mode = AppMode::Dialog;
     }
 
+    /// Open a modal **Dialog** while the **Insert** handler stays alive on
+    /// `self.insert`. Unlike [`open_dialog`], this does *not* overwrite
+    /// `previous_mode` (which still points at the mode the editor was
+    /// opened from), so the dialog can either resume editing (back to
+    /// Insert) or discard and return to the originating mode.
+    pub fn open_dialog_over_insert(&mut self, dialog: Box<dyn crate::dialog::Dialog>) {
+        self.dialog = Some(dialog);
+        self.mode = AppMode::Dialog;
+    }
+
     /// Close the active dialog, restoring `previous_mode` if set, else
     /// falling back to `Normal` (or `BoardSelector` when no board loaded).
     pub fn close_dialog(&mut self) {

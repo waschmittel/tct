@@ -46,6 +46,11 @@ pub enum InsertOutcome {
     ConfirmAndOpenDialog(Command, Box<dyn crate::dialog::Dialog>),
     /// Close insert (no command) then open a dialog.
     OpenDialog(Box<dyn crate::dialog::Dialog>),
+    /// Open a dialog *over* the still-active insert handler, keeping it
+    /// alive (and the pre-insert `previous_mode` intact) so the dialog can
+    /// resume editing or return to the originating mode. Used by the
+    /// description editor's discard-changes prompt.
+    OpenDialogOverInsert(Box<dyn crate::dialog::Dialog>),
     /// Close insert with a status message but no command.
     CancelWithStatus(String),
     /// Confirm via a generic side effect (e.g. board create — not

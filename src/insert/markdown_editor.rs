@@ -52,7 +52,7 @@ impl MarkdownEditor {
             }
             (KeyCode::Esc, _) => {
                 if self.input.is_modified() {
-                    InsertOutcome::OpenDialog(Box::new(ConfirmCancelEdit))
+                    InsertOutcome::OpenDialogOverInsert(Box::new(ConfirmCancelEdit))
                 } else {
                     InsertOutcome::Cancel
                 }
