@@ -63,8 +63,10 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Down, shift: Some(false), action: Action::SelectCardDown, keys: "Up / Down", help: "Navigate cards", section: "Navigation" },
     Binding { code: KeyCode::Char('g'), shift: None, action: Action::JumpFirstCard, keys: "g / G", help: "First / last card", section: "Navigation" },
     Binding { code: KeyCode::Char('G'), shift: None, action: Action::JumpLastCard, keys: "g / G", help: "First / last card", section: "Navigation" },
-    Binding { code: KeyCode::Char('j'), shift: None, action: Action::SwitchBoardPrev, keys: "j / k", help: "Prev / next board", section: "Navigation" },
-    Binding { code: KeyCode::Char('k'), shift: None, action: Action::SwitchBoardNext, keys: "j / k", help: "Prev / next board", section: "Navigation" },
+    Binding { code: KeyCode::Char('j'), shift: None, action: Action::SwitchBoardPrev, keys: "j/k or ,/.", help: "Prev / next board", section: "Navigation" },
+    Binding { code: KeyCode::Char('k'), shift: None, action: Action::SwitchBoardNext, keys: "j/k or ,/.", help: "Prev / next board", section: "Navigation" },
+    Binding { code: KeyCode::Char(','), shift: None, action: Action::SwitchBoardPrev, keys: "j/k or ,/.", help: "Prev / next board", section: "Navigation" },
+    Binding { code: KeyCode::Char('.'), shift: None, action: Action::SwitchBoardNext, keys: "j/k or ,/.", help: "Prev / next board", section: "Navigation" },
     Binding { code: KeyCode::Enter, shift: None, action: Action::OpenCardDetail, keys: "Enter", help: "Open card detail", section: "Navigation" },
     // Card
     Binding { code: KeyCode::Char('t'), shift: None, action: Action::EditTitle, keys: "t", help: "Quick-edit title", section: "Card" },
@@ -793,6 +795,22 @@ mod tests {
             handle(&mut app, key(KeyCode::Char('k'))).unwrap();
             assert_eq!(open_board_id(&app), metas[0].id);
             assert_eq!(app.selected_board_idx, 0);
+        });
+    }
+
+    #[test]
+    fn comma_and_dot_mirror_j_and_k() {
+        with_temp_dir(|| {
+            let (mut app, metas) = three_boards_first_open();
+            // '.' = next
+            handle(&mut app, key(KeyCode::Char('.'))).unwrap();
+            assert_eq!(open_board_id(&app), metas[1].id);
+            // ',' = previous
+            handle(&mut app, key(KeyCode::Char(','))).unwrap();
+            assert_eq!(open_board_id(&app), metas[0].id);
+            // ',' wraps to last
+            handle(&mut app, key(KeyCode::Char(','))).unwrap();
+            assert_eq!(open_board_id(&app), metas[2].id);
         });
     }
 

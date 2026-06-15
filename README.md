@@ -108,7 +108,7 @@ For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs
 | Up/Down | Navigate cards |
 | Shift+Left/Right | Move card to adjacent list |
 | Shift+Up/Down | Move card up/down within list |
-| j/k | Switch to previous/next board |
+| j/k or ,/. | Switch to previous/next board |
 | g/G | First/last card |
 | Enter | Open card detail |
 | t | Quick-edit card title |

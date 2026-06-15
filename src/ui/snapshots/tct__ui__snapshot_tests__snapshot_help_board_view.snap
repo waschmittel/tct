@@ -9,7 +9,7 @@ expression: render_to_string(&app)
 │┃[bu│  Left / Right    Switch lists                 N               New list                 │───┘│
 │┃[1/│  Up / Down       Navigate cards               r               Rename list              │    │
 │┗━━━│  g / G           First / last card            A               Archive list             │    │
-│┌───│  j / k           Prev / next board            V               View archived lists      │    │
+│┌───│  j/k or ,/.      Prev / next board            V               View archived lists      │    │
 ││Red│  Enter           Open card detail             < / >           Reorder list             │    │
 │└───│                                                                                        │    │
 │    │Card                                         Search & Filter                            │    │
