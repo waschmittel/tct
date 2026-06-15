@@ -30,6 +30,7 @@ USAGE:
     tct                              Open the TUI board selector
     tct --board <name>               Open TUI directly on a board (partial, case-insensitive)
     tct --help, -h                   Show this help message
+    tct --version, -V                Print the version and exit
     tct <COMMAND> [ARGS] [FLAGS]     Run a CLI command (no TUI)
 
 FLAGS (apply to any command):

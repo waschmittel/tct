@@ -18,6 +18,9 @@ ratatui-textarea = "0.9"
 regex = "1"
 arboard = "3.4"
 
+[build-dependencies]
+chrono = "0.4"
+
 [dev-dependencies]
 insta = "1.48.0"
 tempfile = "3.27.0"

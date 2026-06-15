@@ -109,6 +109,9 @@ pub struct App {
     pub dialog: Option<Box<dyn crate::dialog::Dialog>>,
     /// Active **Insert Handler** — present iff `mode == AppMode::Insert`.
     pub insert: Option<Box<dyn crate::insert::InsertHandler>>,
+    /// Build-stamped version string, shown in the help overlay. Defaults to
+    /// the compile-time [`crate::VERSION`]; tests pin it for stable goldens.
+    pub version: &'static str,
 }
 
 impl App {
@@ -130,6 +133,7 @@ impl App {
             reload_interval: Duration::from_secs(15),
             dialog: None,
             insert: None,
+            version: crate::VERSION,
         };
         if let Some(board_id) = open_board_id {
             app.load_board(&board_id)?;
@@ -355,6 +359,7 @@ mod tests {
             reload_interval: Duration::from_secs(15),
             dialog: None,
             insert: None,
+            version: crate::VERSION,
         }
     }
 

@@ -19,8 +19,18 @@ use std::time::Duration;
 use app::App;
 use event::{AppEvent, EventHandler};
 
+/// Build-stamped version: a release tag (set by `build.rs`) or a
+/// `snap-<date>` for untagged builds.
+pub const VERSION: &str = env!("TCT_VERSION");
+
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // Version flag (check before anything else so it always works)
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("tct {VERSION}");
+        return Ok(());
+    }
 
     // Help flag (check before anything else so it always works)
     if args.iter().any(|a| a == "--help" || a == "-h") || args.first().map(|a| a.as_str()) == Some("help") {
@@ -75,6 +85,12 @@ mod tests {
     use regex::Regex;
 
     use crate::test_support::with_temp_dir;
+
+    #[test]
+    fn version_is_stamped() {
+        // build.rs always sets a non-empty TCT_VERSION (tag or snap-…).
+        assert!(!crate::VERSION.is_empty());
+    }
 
     #[test]
     fn board_roundtrip() {

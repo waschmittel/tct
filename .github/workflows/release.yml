@@ -20,18 +20,24 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact_name: tct
-            asset_name: tct-macos-aarch64
+            label: macos-aarch64
+            ext: ""
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             artifact_name: tct.exe
-            asset_name: tct-windows-amd64.exe
+            label: windows-amd64
+            ext: ".exe"
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             artifact_name: tct
-            asset_name: tct-linux-amd64
+            label: linux-amd64
+            ext: ""
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # Need tags so build.rs can stamp the version via git describe.
+          fetch-depth: 0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1, stable
@@ -39,18 +45,29 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
+      - name: Compute version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            v="${GITHUB_REF#refs/tags/}"; v="${v#v}"
+          else
+            v="snap-$(date -u +%Y-%m-%d)"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Rename binary
         shell: bash
-        run: cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "${{ matrix.asset_name }}"
+        run: cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "tct-${{ steps.ver.outputs.version }}-${{ matrix.label }}${{ matrix.ext }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ matrix.asset_name }}
-          path: ${{ matrix.asset_name }}
+          name: tct-${{ steps.ver.outputs.version }}-${{ matrix.label }}${{ matrix.ext }}
+          path: tct-${{ steps.ver.outputs.version }}-${{ matrix.label }}${{ matrix.ext }}
 
   release:
     name: Create Release

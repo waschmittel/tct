@@ -186,6 +186,7 @@ tct can be used as a CLI tool without opening the TUI — useful for scripting o
 
 ```
 tct --help                              Show all commands and options
+tct --version                           Print the version and exit
 tct --board <name>                      Open TUI directly on a matching board
 ```
 

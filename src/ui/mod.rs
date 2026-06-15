@@ -141,6 +141,13 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             " Esc:close ",
             Style::default().fg(Color::DarkGray),
         )))
+        .title_bottom(
+            Line::from(Span::styled(
+                format!(" {} ", app.version),
+                Style::default().fg(Color::DarkGray),
+            ))
+            .right_aligned(),
+        )
         .borders(Borders::ALL)
         .border_style(Style::default().fg(accent));
     let inner = block.inner(popup);

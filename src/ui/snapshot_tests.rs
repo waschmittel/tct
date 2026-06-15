@@ -136,6 +136,7 @@ fn snapshot_help_board_selector() {
     with_temp_dir(|| {
         seed_selector_boards();
         let mut app = App::new(None).unwrap();
+        app.version = "vTEST";
         press(&mut app, KeyCode::Char('?'));
         insta::assert_snapshot!(render_to_string(&app));
     });
@@ -146,6 +147,7 @@ fn snapshot_help_board_view() {
     with_temp_dir(|| {
         let id = seed_demo_board();
         let mut app = App::new(Some(id)).unwrap();
+        app.version = "vTEST";
         press(&mut app, KeyCode::Char('?'));
         insta::assert_snapshot!(render_to_string(&app));
     });
@@ -156,6 +158,7 @@ fn snapshot_help_card_detail() {
     with_temp_dir(|| {
         let id = seed_demo_board();
         let mut app = App::new(Some(id)).unwrap();
+        app.version = "vTEST";
         press(&mut app, KeyCode::Enter);
         press(&mut app, KeyCode::Char('?'));
         insta::assert_snapshot!(render_to_string(&app));
