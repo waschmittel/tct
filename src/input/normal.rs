@@ -28,6 +28,8 @@ pub enum Action {
     MoveCardDown,
     JumpFirstCard,
     JumpLastCard,
+    SwitchBoardPrev,
+    SwitchBoardNext,
     OpenCardDetail,
     CopyTitle,
     EditDescription,
@@ -61,6 +63,8 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Down, shift: Some(false), action: Action::SelectCardDown, keys: "Up / Down", help: "Navigate cards", section: "Navigation" },
     Binding { code: KeyCode::Char('g'), shift: None, action: Action::JumpFirstCard, keys: "g / G", help: "First / last card", section: "Navigation" },
     Binding { code: KeyCode::Char('G'), shift: None, action: Action::JumpLastCard, keys: "g / G", help: "First / last card", section: "Navigation" },
+    Binding { code: KeyCode::Char('j'), shift: None, action: Action::SwitchBoardPrev, keys: "j / k", help: "Prev / next board", section: "Navigation" },
+    Binding { code: KeyCode::Char('k'), shift: None, action: Action::SwitchBoardNext, keys: "j / k", help: "Prev / next board", section: "Navigation" },
     Binding { code: KeyCode::Enter, shift: None, action: Action::OpenCardDetail, keys: "Enter", help: "Open card detail", section: "Navigation" },
     // Card
     Binding { code: KeyCode::Char('t'), shift: None, action: Action::EditTitle, keys: "t", help: "Quick-edit title", section: "Card" },
@@ -103,6 +107,30 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         return Ok(());
     };
     run(app, action)
+}
+
+/// Switch the open board to its neighbor in display order, wrapping around.
+/// No-op with fewer than two boards.
+fn cycle_open_board(app: &mut App, delta: i32) -> anyhow::Result<()> {
+    let len = app.boards.len();
+    if len < 2 {
+        return Ok(());
+    }
+    let Some(current_id) = app.board().map(|b| b.meta.id.clone()) else {
+        return Ok(());
+    };
+    let Some(idx) = app.boards.iter().position(|b| b.id == current_id) else {
+        return Ok(());
+    };
+    let new_idx = (idx as i32 + delta).rem_euclid(len as i32) as usize;
+    if new_idx == idx {
+        return Ok(());
+    }
+    let new_id = app.boards[new_idx].id.clone();
+    app.load_board(&new_id)?;
+    app.selected_board_idx = new_idx;
+    app.set_status(format!("Switched to '{}'", app.boards[new_idx].name));
+    Ok(())
 }
 
 fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
@@ -151,6 +179,8 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                 editor.select_last_card();
             }
         }
+        Action::SwitchBoardPrev => cycle_open_board(app, -1)?,
+        Action::SwitchBoardNext => cycle_open_board(app, 1)?,
         Action::OpenCardDetail => {
             if let Some(editor) = &mut app.editor
                 && editor.board().current_card_id().is_some() {
@@ -340,6 +370,24 @@ mod tests {
             kind: KeyEventKind::Press,
             state: KeyEventState::NONE,
         }
+    }
+
+    /// Three boards in display order, with the first one open.
+    fn three_boards_first_open() -> (App, Vec<BoardMeta>) {
+        let metas: Vec<BoardMeta> = ["A", "B", "C"]
+            .iter()
+            .map(|n| {
+                let m = board_store::create_board((*n).into()).unwrap();
+                board_store::append_to_order(&m.id).unwrap();
+                m
+            })
+            .collect();
+        let app = App::new(Some(metas[0].id.clone())).unwrap();
+        (app, metas)
+    }
+
+    fn open_board_id(app: &App) -> crate::model::ids::ShortId {
+        app.board().unwrap().meta.id.clone()
     }
 
     /// Build an App with a single list of cards with the given titles.
@@ -714,4 +762,50 @@ mod tests {
         });
     }
 
+    #[test]
+    fn k_switches_to_next_board() {
+        with_temp_dir(|| {
+            let (mut app, metas) = three_boards_first_open();
+            assert_eq!(open_board_id(&app), metas[0].id);
+            handle(&mut app, key(KeyCode::Char('k'))).unwrap();
+            assert_eq!(open_board_id(&app), metas[1].id);
+            assert_eq!(app.selected_board_idx, 1);
+            assert_eq!(app.mode, AppMode::Normal);
+        });
+    }
+
+    #[test]
+    fn j_wraps_to_last_board() {
+        with_temp_dir(|| {
+            let (mut app, metas) = three_boards_first_open();
+            handle(&mut app, key(KeyCode::Char('j'))).unwrap();
+            assert_eq!(open_board_id(&app), metas[2].id);
+            assert_eq!(app.selected_board_idx, 2);
+        });
+    }
+
+    #[test]
+    fn k_wraps_from_last_to_first() {
+        with_temp_dir(|| {
+            let (mut app, metas) = three_boards_first_open();
+            app.load_board(&metas[2].id).unwrap();
+            app.selected_board_idx = 2;
+            handle(&mut app, key(KeyCode::Char('k'))).unwrap();
+            assert_eq!(open_board_id(&app), metas[0].id);
+            assert_eq!(app.selected_board_idx, 0);
+        });
+    }
+
+    #[test]
+    fn j_k_are_noop_with_single_board() {
+        with_temp_dir(|| {
+            let m = board_store::create_board("Solo".into()).unwrap();
+            board_store::append_to_order(&m.id).unwrap();
+            let mut app = App::new(Some(m.id.clone())).unwrap();
+            handle(&mut app, key(KeyCode::Char('j'))).unwrap();
+            assert_eq!(open_board_id(&app), m.id);
+            handle(&mut app, key(KeyCode::Char('k'))).unwrap();
+            assert_eq!(open_board_id(&app), m.id);
+        });
+    }
 }
