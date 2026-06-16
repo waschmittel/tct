@@ -764,9 +764,21 @@ impl BoardEditor {
             + 1.0
     }
 
-    /// Position of the Card at `idx` in `card_ids`, or None if out of range.
-    fn position_at(&self, card_ids: &[ShortId], idx: usize) -> Option<f64> {
-        card_ids.get(idx).and_then(|id| self.board.cards.get(id)).map(|c| c.position)
+    /// `position` of the Card at raw `card_ids` index `idx` in list `list_idx`.
+    fn pos_of_raw(&self, list_idx: usize, idx: usize) -> Option<f64> {
+        self.board.lists[list_idx]
+            .card_ids
+            .get(idx)
+            .and_then(|id| self.board.cards.get(id))
+            .map(|c| c.position)
+    }
+
+    /// Re-derive a list's in-memory `card_ids` from the current Card positions,
+    /// so the live view matches what a reload would produce.
+    fn rebuild_list(&mut self, list_idx: usize) {
+        let lid = self.board.lists[list_idx].id.clone();
+        self.board.lists[list_idx].card_ids =
+            crate::model::list::ordered_card_ids(&lid, &self.board.cards);
     }
 
     fn card_mut(&mut self, card_id: &ShortId) -> Result<&mut Card, BoardEditorError> {
@@ -797,30 +809,49 @@ impl BoardEditor {
                 id: card_id.clone(),
             })?;
 
-        // Within-list reorder swaps card_ids and re-ranks only the moved card;
-        // cross-list moves also rewrite the card's list_id. Either way exactly
-        // one Card file is written.
+        // Moves operate over the *visible* sequence (archived Cards are hidden,
+        // see ADR-0006 / `visible_cards`), so a move past an interleaved archived
+        // Card still shifts the Card one slot in the user-visible order. Only the
+        // moved Card's `position` (and, cross-list, `list_id`) changes; affected
+        // lists' derived `card_ids` are rebuilt from positions. One Card written.
         match direction {
-            MoveDir::Up => {
-                if ci > 0 {
-                    self.board.lists[src_idx].card_ids.swap(ci, ci - 1);
-                    let moved = self.reposition(src_idx, ci - 1);
-                    if let Some(slot) = self.board.selected_card.get_mut(src_idx) {
-                        *slot = ci - 1;
+            MoveDir::Up | MoveDir::Down => {
+                let vis = self.board.visible_cards(src_idx, None);
+                let Some(vp) = vis.iter().position(|&i| i == ci) else {
+                    return Ok(());
+                };
+                let new_pos = match direction {
+                    MoveDir::Up => {
+                        if vp == 0 {
+                            return Ok(());
+                        }
+                        let prev = (vp >= 2).then(|| self.pos_of_raw(src_idx, vis[vp - 2])).flatten();
+                        let next = self.pos_of_raw(src_idx, vis[vp - 1]);
+                        crate::model::list::fractional_between(prev, next)
                     }
-                    pending.push(PendingWrite::Card(self.board.cards[&moved].clone()));
-                }
-            }
-            MoveDir::Down => {
-                let len = self.board.lists[src_idx].card_ids.len();
-                if ci + 1 < len {
-                    self.board.lists[src_idx].card_ids.swap(ci, ci + 1);
-                    let moved = self.reposition(src_idx, ci + 1);
-                    if let Some(slot) = self.board.selected_card.get_mut(src_idx) {
-                        *slot = ci + 1;
+                    MoveDir::Down => {
+                        if vp + 1 >= vis.len() {
+                            return Ok(());
+                        }
+                        let prev = self.pos_of_raw(src_idx, vis[vp + 1]);
+                        let next = vis.get(vp + 2).and_then(|&r| self.pos_of_raw(src_idx, r));
+                        crate::model::list::fractional_between(prev, next)
                     }
-                    pending.push(PendingWrite::Card(self.board.cards[&moved].clone()));
+                    _ => unreachable!(),
+                };
+                if let Some(card) = self.board.cards.get_mut(card_id) {
+                    card.position = new_pos;
                 }
+                self.rebuild_list(src_idx);
+                let new_ci = self.board.lists[src_idx]
+                    .card_ids
+                    .iter()
+                    .position(|id| id == card_id)
+                    .unwrap_or(ci);
+                if let Some(slot) = self.board.selected_card.get_mut(src_idx) {
+                    *slot = new_ci;
+                }
+                pending.push(PendingWrite::Card(self.board.cards[card_id].clone()));
             }
             MoveDir::Left | MoveDir::Right => {
                 let dst = match direction {
@@ -828,36 +859,41 @@ impl BoardEditor {
                     MoveDir::Right if src_idx + 1 < self.board.lists.len() => src_idx + 1,
                     _ => return Ok(()),
                 };
-                let cid = self.board.lists[src_idx].card_ids.remove(ci);
-                let insert_at = ci.min(self.board.lists[dst].card_ids.len());
-                self.board.lists[dst].card_ids.insert(insert_at, cid.clone());
+                // Land at the same visible slot in the destination (clamped to
+                // its visible length), between that slot's visible neighbors.
+                let vp = self
+                    .board
+                    .visible_cards(src_idx, None)
+                    .iter()
+                    .position(|&i| i == ci)
+                    .unwrap_or(0);
+                let vis_dst = self.board.visible_cards(dst, None);
+                let insert_vp = vp.min(vis_dst.len());
+                let prev = (insert_vp > 0)
+                    .then(|| self.pos_of_raw(dst, vis_dst[insert_vp - 1]))
+                    .flatten();
+                let next = vis_dst.get(insert_vp).and_then(|&r| self.pos_of_raw(dst, r));
+                let new_pos = crate::model::list::fractional_between(prev, next);
                 let dst_list_id = self.board.lists[dst].id.clone();
-                if let Some(card) = self.board.cards.get_mut(&cid) {
+                if let Some(card) = self.board.cards.get_mut(card_id) {
                     card.list_id = dst_list_id;
+                    card.position = new_pos;
                 }
-                self.reposition(dst, insert_at);
+                self.rebuild_list(src_idx);
+                self.rebuild_list(dst);
                 self.board.selected_list = dst;
+                let new_ci = self.board.lists[dst]
+                    .card_ids
+                    .iter()
+                    .position(|id| id == card_id)
+                    .unwrap_or(0);
                 if let Some(slot) = self.board.selected_card.get_mut(dst) {
-                    *slot = insert_at;
+                    *slot = new_ci;
                 }
-                pending.push(PendingWrite::Card(self.board.cards[&cid].clone()));
+                pending.push(PendingWrite::Card(self.board.cards[card_id].clone()));
             }
         }
         Ok(())
-    }
-
-    /// Re-rank the Card at `idx` in list `list_idx` to sit strictly between its
-    /// new neighbors' positions. Returns the moved Card's id.
-    fn reposition(&mut self, list_idx: usize, idx: usize) -> ShortId {
-        let card_ids = self.board.lists[list_idx].card_ids.clone();
-        let prev = if idx > 0 { self.position_at(&card_ids, idx - 1) } else { None };
-        let next = self.position_at(&card_ids, idx + 1);
-        let new_pos = crate::model::list::fractional_between(prev, next);
-        let id = card_ids[idx].clone();
-        if let Some(card) = self.board.cards.get_mut(&id) {
-            card.position = new_pos;
-        }
-        id
     }
 
     fn move_list(
@@ -1026,6 +1062,325 @@ mod tests {
             let actions: Vec<&str> = card.history.iter().map(|h| h.action.as_str()).collect();
             assert!(actions.contains(&"Archived"));
             assert!(actions.contains(&"Restored from archive"));
+        });
+    }
+
+    /// Regression: a visible Card with archived (hidden) Cards interleaved
+    /// between it and its visible neighbor must still move one visible slot.
+    /// Before the fix, the move swapped raw `card_ids` slots and merely traded
+    /// places with a hidden Card — no visible change.
+    #[test]
+    fn move_up_skips_interleaved_archived_card() {
+        with_temp_dir(|| {
+            let mut meta = BoardMeta::new("Test".into());
+            let lid = ids::new_id();
+            meta.lists.push(ListMeta { id: lid.clone(), name: "TODO".into(), archived: false });
+            board_store::save_board(&meta).unwrap();
+
+            // Visible "top" (pos -1), archived (0, 1), visible "bottom" (pos 2).
+            let mk = |title: &str, pos: f64, archived: bool| {
+                let mut c = Card::new(title.into());
+                c.list_id = lid.clone();
+                c.position = pos;
+                c.archived = archived;
+                card_store::save_card(&meta.id, &c).unwrap();
+                c.id
+            };
+            let top = mk("top", -1.0, false);
+            let _a1 = mk("arch1", 0.0, true);
+            let _a2 = mk("arch2", 1.0, true);
+            let bottom = mk("bottom", 2.0, false);
+
+            let mut editor = BoardEditor::load(&meta.id).unwrap();
+            // Visible order is [top, bottom]; bottom sits at raw index 3.
+            let vis = editor.board().visible_cards(0, None);
+            assert_eq!(vis.len(), 2);
+
+            editor.apply(Command::MoveCard { card_id: bottom.clone(), direction: MoveDir::Up }).unwrap();
+
+            let visible_order = |ed: &BoardEditor| -> Vec<ShortId> {
+                ed.board()
+                    .visible_cards(0, None)
+                    .into_iter()
+                    .map(|i| ed.board().lists[0].card_ids[i].clone())
+                    .collect()
+            };
+            assert_eq!(visible_order(&editor), vec![bottom.clone(), top.clone()], "bottom moved above top");
+            // Selection follows the moved card.
+            assert_eq!(editor.board().lists[0].card_ids[editor.board().selected_card[0]], bottom);
+
+            editor.reload().unwrap();
+            assert_eq!(visible_order(&editor), vec![bottom.clone(), top.clone()], "survives reload");
+        });
+    }
+
+    #[test]
+    fn move_card_all_directions_persist_across_reload() {
+        with_temp_dir(|| {
+            let mut meta = BoardMeta::new("Test".into());
+            let la = ids::new_id();
+            let lb = ids::new_id();
+            meta.lists.push(ListMeta { id: la.clone(), name: "A".into(), archived: false });
+            meta.lists.push(ListMeta { id: lb.clone(), name: "B".into(), archived: false });
+            board_store::save_board(&meta).unwrap();
+            let mut a = Vec::new();
+            for (i, t) in ["a0", "a1", "a2"].iter().enumerate() {
+                let mut c = Card::new((*t).into());
+                c.list_id = la.clone();
+                c.position = (i + 1) as f64;
+                card_store::save_card(&meta.id, &c).unwrap();
+                a.push(c.id);
+            }
+            let mut editor = BoardEditor::load(&meta.id).unwrap();
+            assert_eq!(editor.board().lists[0].card_ids, a);
+
+            // Down, then reload.
+            editor.apply(Command::MoveCard { card_id: a[0].clone(), direction: MoveDir::Down }).unwrap();
+            let mem = editor.board().lists[0].card_ids.clone();
+            assert_eq!(mem, vec![a[1].clone(), a[0].clone(), a[2].clone()]);
+            editor.reload().unwrap();
+            assert_eq!(editor.board().lists[0].card_ids, mem, "down survives reload");
+
+            // Up brings it back.
+            editor.apply(Command::MoveCard { card_id: a[0].clone(), direction: MoveDir::Up }).unwrap();
+            editor.reload().unwrap();
+            assert_eq!(editor.board().lists[0].card_ids, a, "up survives reload");
+
+            // Right: a0 -> list B.
+            editor.apply(Command::MoveCard { card_id: a[0].clone(), direction: MoveDir::Right }).unwrap();
+            editor.reload().unwrap();
+            assert_eq!(editor.board().lists[0].card_ids, vec![a[1].clone(), a[2].clone()], "src after right");
+            assert_eq!(editor.board().lists[1].card_ids, vec![a[0].clone()], "dst after right");
+            assert_eq!(editor.board().cards[&a[0]].list_id, lb);
+
+            // Left: a0 back to list A.
+            editor.apply(Command::MoveCard { card_id: a[0].clone(), direction: MoveDir::Left }).unwrap();
+            editor.reload().unwrap();
+            assert!(editor.board().lists[1].card_ids.is_empty(), "dst empty after left");
+            assert!(editor.board().lists[0].card_ids.contains(&a[0]));
+        });
+    }
+
+    // ── Persistence roundtrips: apply(Command) → reload() → assert on disk ──
+    //
+    // These guard the full mutate→persist→re-derive path (the gap that let the
+    // archived-interleave move bug ship). Each loads a fresh editor, applies a
+    // command, reloads from disk, and asserts the effect survived.
+
+    use crate::model::label::LabelColor;
+
+    /// Seed a board with one list and the given card titles (ascending
+    /// positions), returning the editor plus the card ids in order.
+    fn editor_with_cards(titles: &[&str]) -> (BoardEditor, ShortId, Vec<ShortId>) {
+        let mut meta = BoardMeta::new("Test".into());
+        let lid = ids::new_id();
+        meta.lists.push(ListMeta { id: lid.clone(), name: "L".into(), archived: false });
+        board_store::save_board(&meta).unwrap();
+        let ids_v = titles
+            .iter()
+            .enumerate()
+            .map(|(i, t)| {
+                let mut c = Card::new((*t).into());
+                c.list_id = lid.clone();
+                c.position = (i + 1) as f64;
+                card_store::save_card(&meta.id, &c).unwrap();
+                c.id
+            })
+            .collect();
+        (BoardEditor::load(&meta.id).unwrap(), lid, ids_v)
+    }
+
+    #[test]
+    fn add_card_persists_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, lid, _) = editor_with_cards(&["existing"]);
+            ed.apply(Command::AddCard { list_id: lid.clone(), title: "fresh".into() }).unwrap();
+            let new_id = ed.last_added_card_id().cloned().unwrap();
+            ed.reload().unwrap();
+            assert_eq!(ed.board().cards[&new_id].title, "fresh");
+            assert_eq!(ed.board().cards[&new_id].list_id, lid);
+            // Ordered after the existing card.
+            assert_eq!(ed.board().lists[0].card_ids.last(), Some(&new_id));
+        });
+    }
+
+    #[test]
+    fn edit_title_and_description_persist_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, _, c) = editor_with_cards(&["orig"]);
+            let id = c[0].clone();
+            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "renamed".into() }).unwrap();
+            ed.apply(Command::EditCardDescription { card_id: id.clone(), body: "body text".into() }).unwrap();
+            ed.reload().unwrap();
+            assert_eq!(ed.board().cards[&id].title, "renamed");
+            assert_eq!(ed.board().cards[&id].description, "body text");
+        });
+    }
+
+    #[test]
+    fn due_date_set_then_clear_persists_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, _, c) = editor_with_cards(&["task"]);
+            let id = c[0].clone();
+            let date = chrono::NaiveDate::from_ymd_opt(2026, 7, 1).unwrap();
+            ed.apply(Command::SetDueDate { card_id: id.clone(), date }).unwrap();
+            ed.reload().unwrap();
+            assert_eq!(ed.board().cards[&id].due_date, Some(date));
+            ed.apply(Command::ClearDueDate { card_id: id.clone() }).unwrap();
+            ed.reload().unwrap();
+            assert_eq!(ed.board().cards[&id].due_date, None);
+        });
+    }
+
+    #[test]
+    fn archive_then_restore_card_persists_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, lid, c) = editor_with_cards(&["task"]);
+            let id = c[0].clone();
+            ed.apply(Command::ArchiveCard { card_id: id.clone() }).unwrap();
+            ed.reload().unwrap();
+            assert!(ed.board().cards[&id].archived);
+            ed.apply(Command::RestoreCard { card_id: id.clone() }).unwrap();
+            ed.reload().unwrap();
+            assert!(!ed.board().cards[&id].archived);
+            // Still a member of its original list, hence visible again.
+            assert_eq!(ed.board().cards[&id].list_id, lid);
+            assert!(ed.board().lists[0].card_ids.contains(&id));
+        });
+    }
+
+    #[test]
+    fn checklist_lifecycle_persists_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, _, c) = editor_with_cards(&["task"]);
+            let id = c[0].clone();
+            ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: "one".into() }).unwrap();
+            ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: "two".into() }).unwrap();
+            ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: "three".into() }).unwrap();
+            ed.apply(Command::ToggleChecklistItem { card_id: id.clone(), item_idx: 0 }).unwrap();
+            ed.apply(Command::EditChecklistItem { card_id: id.clone(), item_idx: 1, text: "TWO".into() }).unwrap();
+            ed.apply(Command::ReorderChecklistItem { card_id: id.clone(), from: 2, to: 0 }).unwrap();
+            ed.reload().unwrap();
+            let cl = &ed.board().cards[&id].checklist;
+            let names: Vec<&str> = cl.iter().map(|i| i.text.as_str()).collect();
+            assert_eq!(names, vec!["three", "one", "TWO"], "order after reorder");
+            // "one" was completed; it is now at index 1 after the reorder.
+            assert!(cl[1].completed);
+            ed.apply(Command::RemoveChecklistItem { card_id: id.clone(), item_idx: 0 }).unwrap();
+            ed.reload().unwrap();
+            let names: Vec<&str> =
+                ed.board().cards[&id].checklist.iter().map(|i| i.text.as_str()).collect();
+            assert_eq!(names, vec!["one", "TWO"]);
+        });
+    }
+
+    #[test]
+    fn toggle_label_assignment_persists_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, _, c) = editor_with_cards(&["task"]);
+            let id = c[0].clone();
+            ed.apply(Command::DefineLabel { name: "urgent".into(), color: LabelColor::Red }).unwrap();
+            let lbl = ed.board().meta.labels[0].id.clone();
+            ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id: lbl.clone() }).unwrap();
+            ed.reload().unwrap();
+            assert_eq!(ed.board().cards[&id].label_ids, vec![lbl.clone()]);
+            ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id: lbl.clone() }).unwrap();
+            ed.reload().unwrap();
+            assert!(ed.board().cards[&id].label_ids.is_empty());
+        });
+    }
+
+    #[test]
+    fn delete_label_prunes_from_card_on_next_save() {
+        with_temp_dir(|| {
+            let (mut ed, _, c) = editor_with_cards(&["task"]);
+            let id = c[0].clone();
+            ed.apply(Command::DefineLabel { name: "temp".into(), color: LabelColor::Green }).unwrap();
+            let lbl = ed.board().meta.labels[0].id.clone();
+            ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id: lbl.clone() }).unwrap();
+            ed.apply(Command::DeleteLabel { label_id: lbl.clone() }).unwrap();
+            // Lazy prune: the dead id is shed on the card's next save.
+            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "touched".into() }).unwrap();
+            ed.reload().unwrap();
+            assert!(ed.board().meta.labels.is_empty());
+            assert!(ed.board().cards[&id].label_ids.is_empty(), "dead label id pruned on save");
+        });
+    }
+
+    #[test]
+    fn label_meta_commands_persist_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, _, _) = editor_with_cards(&["task"]);
+            ed.apply(Command::DefineLabel { name: "a".into(), color: LabelColor::Red }).unwrap();
+            ed.apply(Command::DefineLabel { name: "b".into(), color: LabelColor::Green }).unwrap();
+            let a = ed.board().meta.labels[0].id.clone();
+            ed.apply(Command::RenameLabel { label_id: a.clone(), name: "alpha".into() }).unwrap();
+            ed.apply(Command::SetLabelColor { label_id: a.clone(), color: LabelColor::Blue }).unwrap();
+            ed.apply(Command::ReorderLabels { from: 0, to: 1 }).unwrap();
+            ed.reload().unwrap();
+            // After reorder, "alpha" (the renamed/recolored one) is last.
+            let labels = &ed.board().meta.labels;
+            assert_eq!(labels.len(), 2);
+            assert_eq!(labels[1].name, "alpha");
+            assert_eq!(labels[1].color, LabelColor::Blue);
+            assert_eq!(labels[0].name, "b");
+        });
+    }
+
+    #[test]
+    fn list_commands_persist_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, lid, _) = editor_with_cards(&["task"]);
+            ed.apply(Command::AddList { name: "Second".into() }).unwrap();
+            ed.apply(Command::RenameList { list_id: lid.clone(), name: "First".into() }).unwrap();
+            ed.reload().unwrap();
+            assert_eq!(ed.board().lists.len(), 2);
+            assert_eq!(ed.board().lists[0].name, "First");
+            assert_eq!(ed.board().lists[1].name, "Second");
+
+            // Reorder: move "First" right (down the meta order).
+            ed.apply(Command::MoveList { list_id: lid.clone(), direction: MoveDir::Right }).unwrap();
+            ed.reload().unwrap();
+            assert_eq!(ed.board().lists[0].name, "Second");
+            assert_eq!(ed.board().lists[1].name, "First");
+        });
+    }
+
+    #[test]
+    fn archive_then_restore_list_persists_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, lid, _) = editor_with_cards(&["task"]);
+            ed.apply(Command::AddList { name: "Keep".into() }).unwrap();
+            ed.apply(Command::ArchiveList { list_id: lid.clone() }).unwrap();
+            ed.reload().unwrap();
+            // Active view excludes the archived list.
+            assert_eq!(ed.board().lists.len(), 1);
+            assert_eq!(ed.board().lists[0].name, "Keep");
+
+            ed.apply(Command::RestoreList { list_id: lid.clone() }).unwrap();
+            ed.reload().unwrap();
+            assert_eq!(ed.board().lists.len(), 2);
+            assert!(ed.board().lists.iter().any(|l| l.id == lid));
+        });
+    }
+
+    #[test]
+    fn board_commands_persist_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, _, _) = editor_with_cards(&["task"]);
+            let bid = ed.board().meta.id.clone();
+            ed.apply(Command::RenameBoard { name: "Renamed Board".into() }).unwrap();
+            ed.apply(Command::SetAccentColor { color: LabelColor::Blue }).unwrap();
+            ed.reload().unwrap();
+            assert_eq!(ed.board().meta.name, "Renamed Board");
+            assert_eq!(ed.board().meta.accent_color, LabelColor::Blue);
+
+            ed.apply(Command::ArchiveBoard { board_id: bid.clone() }).unwrap();
+            ed.reload().unwrap();
+            assert!(ed.board().meta.archived);
+            ed.apply(Command::RestoreBoard { board_id: bid.clone() }).unwrap();
+            ed.reload().unwrap();
+            assert!(!ed.board().meta.archived);
         });
     }
 

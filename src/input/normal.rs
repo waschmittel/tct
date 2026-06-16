@@ -592,6 +592,47 @@ mod tests {
         });
     }
 
+    /// Full keypress path: Shift+Up on a visible card whose visible neighbor is
+    /// separated by archived (hidden) cards still moves it one visible slot.
+    /// Regression for migrated boards where archived cards interleave.
+    #[test]
+    fn shift_up_moves_past_interleaved_archived_cards() {
+        with_temp_dir(|| {
+            let mut meta = board_store::create_board("Board".into()).unwrap();
+            let mut list = CardList::new("TODO".into());
+            // top (visible), arch, arch, bottom (visible) — in card_ids order.
+            let titles_archived = [("top", false), ("a1", true), ("a2", true), ("bottom", false)];
+            let mut ids = Vec::new();
+            for (t, archived) in titles_archived {
+                let mut c = Card::new(t.into());
+                c.archived = archived;
+                card_store::save_card(&meta.id, &c).unwrap();
+                list.card_ids.push(c.id.clone());
+                ids.push(c.id);
+            }
+            list_store::save_list(&meta.id, &list).unwrap();
+            meta.list_order = vec![list.id.clone()];
+            board_store::save_board(&meta).unwrap();
+            let mut app = App::new(Some(meta.id.clone())).unwrap();
+
+            // Select the bottom visible card, then move it up.
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            let board = app.board().unwrap();
+            let sel = board.lists[0].card_ids[board.selected_card[0]].clone();
+            assert_eq!(sel, ids[3], "Down selects bottom visible card across the archived gap");
+
+            handle(&mut app, shift_key(KeyCode::Up)).unwrap();
+            let board = app.board().unwrap();
+            let visible: Vec<_> = board
+                .visible_cards(0, None)
+                .into_iter()
+                .map(|i| board.lists[0].card_ids[i].clone())
+                .collect();
+            assert_eq!(visible, vec![ids[3].clone(), ids[0].clone()], "bottom moved above top");
+            assert_eq!(board.lists[0].card_ids[board.selected_card[0]], ids[3], "selection follows");
+        });
+    }
+
     #[test]
     fn q_sets_should_quit() {
         with_temp_dir(|| {

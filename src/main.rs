@@ -772,52 +772,64 @@ mod tests {
         assert_eq!(board.labels[1].id, id1);
     }
 
+    use crate::board_editor::BoardEditor;
+    use crate::command::{Command, MoveDir};
+    use crate::model::board::{BoardMeta, ListMeta};
+    use crate::model::ids;
+
+    /// Build a two-list board on disk and load an editor. `a`/`b` give the
+    /// titles for list A / list B; cards get ascending integer positions.
+    fn two_list_editor(a: &[&str], b: &[&str]) -> (BoardEditor, Vec<String>, Vec<String>) {
+        let mut meta = BoardMeta::new("Board".into());
+        let la = ids::new_id();
+        let lb = ids::new_id();
+        meta.lists.push(ListMeta { id: la.clone(), name: "A".into(), archived: false });
+        meta.lists.push(ListMeta { id: lb.clone(), name: "B".into(), archived: false });
+        board_store::save_board(&meta).unwrap();
+        let save = |titles: &[&str], lid: &str| {
+            titles
+                .iter()
+                .enumerate()
+                .map(|(i, t)| {
+                    let mut c = Card::new((*t).into());
+                    c.list_id = lid.to_string();
+                    c.position = (i + 1) as f64;
+                    card_store::save_card(&meta.id, &c).unwrap();
+                    c.id
+                })
+                .collect()
+        };
+        let a_ids = save(a, &la);
+        let b_ids = save(b, &lb);
+        (BoardEditor::load(&meta.id).unwrap(), a_ids, b_ids)
+    }
+
     #[test]
-    fn move_card_between_lists_preserves_position() {
+    fn move_card_between_lists_lands_at_same_visible_slot() {
         with_temp_dir(|| {
-            let meta = board_store::create_board("Board".into()).unwrap();
-
-            let mut list_a = CardList::new("A".into());
-            let mut list_b = CardList::new("B".into());
-
-            let c1 = Card::new("card1".into());
-            let c2 = Card::new("card2".into());
-            let c3 = Card::new("card3".into());
-            let c4 = Card::new("card4".into());
-
-            card_store::save_card(&meta.id, &c1).unwrap();
-            card_store::save_card(&meta.id, &c2).unwrap();
-            card_store::save_card(&meta.id, &c3).unwrap();
-            card_store::save_card(&meta.id, &c4).unwrap();
-
-            list_a.card_ids = vec![c1.id.clone(), c2.id.clone(), c3.id.clone()];
-            list_b.card_ids = vec![c4.id.clone()];
-
-            // Move c2 (index 1) from list_a to list_b at same position
-            let ci = 1;
-            let card_id = list_a.card_ids.remove(ci);
-            let insert_at = ci.min(list_b.card_ids.len());
-            list_b.card_ids.insert(insert_at, card_id);
-
-            assert_eq!(list_a.card_ids, vec![c1.id.clone(), c3.id.clone()]);
-            assert_eq!(
-                list_b.card_ids,
-                vec![c4.id.clone(), c2.id.clone()]
-            );
-            assert_eq!(insert_at, 1);
+            let (mut ed, a, b) = two_list_editor(&["a0", "a1", "a2"], &["b0"]);
+            // Move a1 (visible slot 1) right into list B.
+            ed.apply(Command::MoveCard { card_id: a[1].clone(), direction: MoveDir::Right })
+                .unwrap();
+            assert_eq!(ed.board().lists[0].card_ids, vec![a[0].clone(), a[2].clone()]);
+            assert_eq!(ed.board().lists[1].card_ids, vec![b[0].clone(), a[1].clone()]);
+            assert_eq!(ed.board().cards[&a[1]].list_id, ed.board().lists[1].id);
+            // Persisted.
+            ed.reload().unwrap();
+            assert_eq!(ed.board().lists[1].card_ids, vec![b[0].clone(), a[1].clone()]);
         });
     }
 
     #[test]
     fn move_card_clamps_to_end_when_dst_shorter() {
-        // Moving card at index 4 to a list with only 2 items → inserts at index 2
-        let mut src = vec!["a", "b", "c", "d", "e"];
-        let mut dst = vec!["x", "y"];
-        let ci = 4;
-        let card = src.remove(ci);
-        let insert_at = ci.min(dst.len());
-        dst.insert(insert_at, card);
-        assert_eq!(dst, vec!["x", "y", "e"]);
-        assert_eq!(insert_at, 2);
+        with_temp_dir(|| {
+            let (mut ed, a, b) = two_list_editor(&["a0", "a1", "a2", "a3", "a4"], &["b0", "b1"]);
+            // a4 is at visible slot 4; list B has only 2 slots → lands at end.
+            ed.apply(Command::MoveCard { card_id: a[4].clone(), direction: MoveDir::Right })
+                .unwrap();
+            assert_eq!(ed.board().lists[1].card_ids, vec![b[0].clone(), b[1].clone(), a[4].clone()]);
+            ed.reload().unwrap();
+            assert_eq!(ed.board().lists[1].card_ids, vec![b[0].clone(), b[1].clone(), a[4].clone()]);
+        });
     }
 }
