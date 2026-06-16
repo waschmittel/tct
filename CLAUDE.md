@@ -33,7 +33,8 @@ Keybindings live in a **keymap table** per mode (`KEYMAP` in `input/board_select
 1. Add an `Action` enum variant and a `Binding` row to the mode's `KEYMAP` (key, action, help text, section)
 2. Add the action's match arm in the same file's `run()`
 3. The help overlay (`ui/mod.rs::render_help()`) generates rows from the table — only touch it if you introduce a new *section* (and extend the section list + the `help_layout_covers_all_keymap_sections` test)
-4. Update README.md keybindings table
+
+The help overlay is the single source of truth for keybindings — README.md no longer lists them.
 
 ### New dialog
 1. Create `src/dialog/<name>.rs` with a struct implementing `Dialog` (payload + cursor/scroll state, `render`, `handle_key`, optional `background`).
@@ -59,8 +60,7 @@ Keybindings live in a **keymap table** per mode (`KEYMAP` in `input/board_select
 1. Add a `<name>.rs` module in `src/cli/` with a `pub(super) fn run`
 2. Add `mod <name>;` in `src/cli/mod.rs`
 3. Wire the dispatch arm in `cli::run`'s `match sub`
-4. Add the command's usage block to the `HELP` string in `cli/mod.rs`
-5. Update README.md CLI section
+4. Add the command's usage block to the `HELP` string in `cli/mod.rs` (this is the full CLI reference — README.md only carries basic usage + an example workflow)
 
 ## Keep in Sync
 
@@ -68,8 +68,9 @@ When changing keybindings or features, update:
 - The mode's `KEYMAP` table (help overlay generates from it)
 - `src/ui/status_bar.rs` — mode hint strings (mode-level, rarely changes)
 - `src/ui/card_detail.rs` — bottom hint spans (for card detail modes)
-- `README.md` — keybindings tables
 - This file if architectural patterns change
+
+Keybindings are not duplicated in README.md (help overlay only). Full CLI reference lives in `cli/mod.rs` `HELP`; README.md keeps only basic usage + example workflow. Module-layout docs live in `docs/architecture.md`.
 
 ## Key Patterns
 

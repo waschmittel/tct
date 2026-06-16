@@ -37,6 +37,19 @@ tct stores everything as **plain JSON files** — one file per card, list, and b
 
 ## Installation
 
+Download a prebuilt binary for your platform from the
+[GitHub releases page](https://github.com/waschmittel/tct/releases), then put it
+on your `PATH`:
+
+```sh
+chmod +x tct
+mv tct /usr/local/bin/
+```
+
+### Build from source
+
+Requires a Rust toolchain.
+
 ```sh
 cargo install --path .
 ```
@@ -88,103 +101,7 @@ Team members who pull will see the board when they run `tct` from that project d
 
 For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs/user-guide.md).
 
-## Keybindings
-
-### Board Selector
-
-| Key | Action |
-| --- | --- |
-| Up/Down | Navigate boards |
-| Shift+Up/Down | Reorder board up/down |
-| Enter | Open board |
-| n | New board |
-| r | Rename board |
-| c | Cycle board accent color |
-| C | Pick board accent color (HSL color picker) |
-| a | Archive board |
-| v | View/restore archived boards |
-| ? | Help |
-| q | Quit |
-
-### Board View (Normal Mode)
-
-| Key | Action |
-| --- | --- |
-| Left/Right | Switch lists |
-| Up/Down | Navigate cards |
-| Shift+Left/Right | Move card to adjacent list |
-| Shift+Up/Down | Move card up/down within list |
-| j/k or ,/. | Switch to previous/next board |
-| g/G | First/last card |
-| Enter | Open card detail |
-| t | Quick-edit card title |
-| e | Edit card description |
-| y | Copy card title to clipboard |
-| n | New card |
-| N | New list |
-| r | Rename list |
-| A | Archive list (confirm) |
-| a | Archive card (confirm) |
-| h | View card change history |
-| v | View/restore/delete archived cards |
-| V | View/restore/delete archived lists |
-| </>  | Reorder list left/right |
-| / | Search |
-| f | Filter by label |
-| F | Clear filters |
-| l | Assign/remove labels (label picker) |
-| L | Manage labels |
-| u | Set due date (opens picker) |
-| U | Clear due date |
-| b | Back to board selector |
-| ? | Help |
-| q | Quit |
-
-### Card Detail
-
-| Key | Action |
-| --- | --- |
-| t | Edit title |
-| e | Edit description |
-| PgUp/PgDn | Scroll description |
-| y | Copy description to clipboard |
-| Y | Copy entire checklist as markdown to clipboard |
-| Up/Down | Navigate checklist items (auto-scrolls) |
-| Shift+Up/Down | Reorder selected checklist item |
-| Space | Toggle checklist item |
-| a | Add checklist item |
-| Enter | Edit selected checklist item |
-| x | Delete selected checklist item |
-| l | Assign/remove labels (label picker) |
-| L | Manage labels (create, rename, color, reorder, delete) |
-| u | Set due date (opens picker) |
-| U | Clear due date |
-| h | View card change history |
-| ? | Help |
-| Esc | Close |
-| q | Quit |
-
-In the due-date picker: arrow keys navigate the calendar (←→ ±day, ↑↓ ±week), PgUp/PgDn jump months (Shift = ±year), `t` jumps to today, typing digits/hyphens edits the text input, Enter saves, Esc cancels. Clearing the buffer (Ctrl+U) and pressing Enter removes the due date.
-
-### Description Editor
-
-| Key | Action |
-| --- | --- |
-| Ctrl+S | Save |
-| Ctrl+Z | Undo |
-| Ctrl+Y | Redo |
-| Ctrl+B | Bold (\*\*text\*\*) |
-| Ctrl+I | Italic (\*text\*) |
-| Ctrl+K | Inline code (\`text\`) |
-| Ctrl+L | Insert list item (- ) |
-| Up/Down | Move by visual (wrapped) line |
-| Enter | Auto-continue list items; numbered lists are renumbered (nested sublists are independent); plain newline at start of document |
-| Tab | Nest the current list item one level deeper (3 spaces); numbered items restart at 1 |
-| Shift+Tab | Un-nest the current list item one level (rejoins the parent list) |
-| Backspace/Delete | Numbered lists are renumbered when an edit changes the line count |
-| Esc | Cancel (confirms if changes exist) |
-
-On macOS, Cmd can be used instead of Ctrl in terminals that support it (kitty, Alacritty, WezTerm).
+All keybindings are discoverable in the TUI via the `?` help overlay, which is contextual to the current mode.
 
 ## CLI Usage
 
@@ -200,79 +117,7 @@ Commands use the pattern `tct <entity> <board> --<action> [args]`. Board (and ca
 
 Name arguments use **case-insensitive partial matching** by default. Pass `--by-id` anywhere in the command to match all identifier arguments by **exact ID** instead of name. IDs are shown in listings as `[xxxxxxxx]`. Multiple name matches produce an error listing all candidates with their IDs.
 
-### Boards
-
-```
-tct boards                              List active boards with card counts
-tct boards --archived                   List archived boards
-tct boards --create <name>              Create a new board
-tct boards --archive <name>             Archive a board
-tct boards --restore <name>             Restore an archived board
-tct boards --delete <name>              Permanently delete an archived board
-
-# Use --by-id to address by exact ID:
-tct boards --archive a1b2c3d4 --by-id
-```
-
-### Lists
-
-```
-tct lists <board>                         List all active lists on a board
-tct lists <board> --archived              List archived lists
-tct lists <board> --create <name>         Create a list
-tct lists <board> --rename <list> <name>  Rename a list
-tct lists <board> --archive <list>        Archive a list
-tct lists <board> --restore <list>        Restore an archived list
-tct lists <board> --delete <list>         Permanently delete an archived list and its cards
-```
-
-### Cards
-
-```
-tct cards <board>                            List all active cards grouped by list
-tct cards <board> --list <list>              List active cards in a specific list
-tct cards <board> --archived                 List archived cards
-tct cards <board> --show <card>              Show full card detail
-tct cards <board> --create <list> <title>    Create a card
-tct cards <board> --edit <card> [flags]      Edit card fields
-  --title <text>                               New title
-  --description <text>                         New description (replaces existing)
-  --due <YYYY-MM-DD|none>                      Set or clear due date
-tct cards <board> --archive <card>           Archive a card
-tct cards <board> --restore <card>           Restore an archived card to the first list
-tct cards <board> --delete <card>            Permanently delete an archived card
-```
-
-### Checklist
-
-```
-tct checklist <board> <card>                  Show checklist
-tct checklist <board> <card> --add <text>     Add a checklist item
-tct checklist <board> <card> --toggle <n>     Toggle item n (1-based index)
-tct checklist <board> <card> --delete <n>     Delete item n (1-based index)
-```
-
-### Labels
-
-```
-tct labels <board>                              List all labels
-tct labels <board> --create <name>              Create a label
-tct labels <board> --delete <label>             Delete a label (removes from all cards)
-tct labels <board> --assign <card> <label>      Assign a label to a card
-tct labels <board> --remove <card> <label>      Remove a label from a card
-```
-
-### Search
-
-```
-tct search <query>                      Search cards on all boards (case-insensitive substring)
-tct search <query> --board <name>       Limit to boards matching name (flag is repeatable)
-tct search <query> --list <name>        Limit to lists matching name
-tct search <query> --regex              Treat query as a regular expression
-tct search <query> --archived           Include archived cards in results
-```
-
-Searches match against card title, description, checklist item text, and label names.
+Entities: `boards`, `lists`, `cards`, `checklist`, `labels`, `search`. Run `tct <entity> --help` (or `tct --help`) for the full set of actions and flags on each.
 
 ### Examples
 
@@ -326,64 +171,7 @@ tct cards a1b2c3d4 --show e5f6a7b8 --by-id
 
 - **[User Guide](docs/user-guide.md)** — detailed usage, sync workflows, troubleshooting, data format reference
 - **[Architecture (arc42)](docs/arc42.md)** — system context, building blocks, runtime views, ADRs, quality scenarios
-
-## Architecture
-
-```
-src/
-  main.rs          # Entry point, CLI dispatch, TUI event loop
-  app.rs           # App state, modes, board loading
-  cli/
-    mod.rs         # CLI dispatch, help text
-    boards.rs      # `tct boards` subcommand
-    lists.rs       # `tct lists` subcommand
-    cards.rs       # `tct cards` subcommand
-    checklist.rs   # `tct checklist` subcommand
-    labels.rs      # `tct labels` subcommand
-    search.rs      # `tct search` subcommand
-    lookup.rs      # ID/name resolution shared by all subcommands
-    util.rs        # Flag parsing + output formatting helpers
-  model/
-    board.rs       # BoardMeta, ListMeta
-    card.rs        # Card (list_id, position), ChecklistItem
-    ids.rs         # ShortId generation
-    label.rs       # Label, LabelColor
-    list.rs        # CardList (derived view) + build_lists/ordered_card_ids
-  storage/
-    mod.rs         # StorageError, atomic_write
-    paths.rs       # Path helpers
-    board_store.rs # Board CRUD (triggers migration on load)
-    card_store.rs  # Card CRUD + load_all_cards + archived listing
-    migrate.rs     # One-time legacy list-*.json -> card-owned migration
-  input/
-    mod.rs         # Input dispatch by mode
-    normal.rs      # Board view keybindings
-    insert/
-      mod.rs           # Insert-mode dispatch + plain text-buffer editing
-      description.rs   # Markdown description editor keybindings
-      list_editing.rs  # List autocontinue, indent, renumber
-      due_date.rs      # Due-date calendar picker
-    card_detail_input.rs  # Card detail keybindings
-    dialog_input.rs       # Dialog handlers
-    board_selector_input.rs  # Board selector keybindings
-    command.rs            # `:` command-mode input
-  ui/
-    mod.rs         # Render dispatch + help overlay
-    board_view.rs  # Board columns layout
-    board_selector.rs  # Board list screen
-    card_detail.rs     # Card detail overlay + editor renderer
-    dialog.rs          # Confirmation + picker dialogs
-    search_bar.rs      # Search input bar
-    status_bar.rs      # Mode + hints + status messages
-    markdown.rs        # Markdown rendering, syntax highlighting
-    theme.rs           # Color theme
-    widgets/
-      card_widget.rs   # Individual card rendering
-      list_widget.rs   # List column rendering
-      date_picker.rs   # Calendar grid for due-date picker
-```
-
-Modal input dispatch: `AppMode` enum determines which input handler processes keys. `InsertTarget` tracks what's being edited. `DialogKind` tracks which dialog is showing.
+- **[Architecture (source tree)](docs/architecture.md)** — module layout and modal input dispatch overview
 
 ## License
 
