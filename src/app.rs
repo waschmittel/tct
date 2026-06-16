@@ -30,6 +30,11 @@ pub struct LoadedBoard {
     pub lists: Vec<CardList>,
     pub cards: HashMap<ShortId, Card>,
     pub selected_list: usize,
+    /// Per-list selection, as an ordinal into that list's *visible*
+    /// (non-archived) cards — NOT a raw `card_ids` index. Archived cards remain
+    /// in `card_ids` (ADR-0006) but are never selectable, so navigation,
+    /// clamping, rendering, and `current_card_id` all index the visible
+    /// sequence. Use `visible_cards(li, None)[ordinal]` to get the raw index.
     pub selected_card: Vec<usize>,
     pub scroll_offset: Vec<usize>,
     pub detail_item_idx: usize,
@@ -39,8 +44,12 @@ pub struct LoadedBoard {
 impl LoadedBoard {
     pub fn current_card_id(&self) -> Option<&ShortId> {
         let list = self.lists.get(self.selected_list)?;
-        let card_idx = *self.selected_card.get(self.selected_list)?;
-        list.card_ids.get(card_idx)
+        // `selected_card` is an ordinal into the *visible* (non-archived) cards,
+        // not a raw `card_ids` index — archived cards stay in `card_ids` but are
+        // never selectable (ADR-0006). Map the ordinal back to a raw index.
+        let ord = *self.selected_card.get(self.selected_list)?;
+        let raw = *self.visible_cards(self.selected_list, None).get(ord)?;
+        list.card_ids.get(raw)
     }
 
     pub fn current_card(&self) -> Option<&Card> {

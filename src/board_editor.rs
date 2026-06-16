@@ -214,33 +214,37 @@ impl BoardEditor {
     }
 
     /// Move selection down to the next visible Card (next match when a
-    /// search is active).
+    /// search is active). `selected_card` is an ordinal into the non-archived
+    /// visible cards; we step in raw-index space (so search can skip archived
+    /// *and* non-matching cards) then convert back to that ordinal.
     pub fn select_card_down(&mut self, search: Option<&str>) {
         let li = self.board.selected_list;
-        let current = self.board.selected_card.get(li).copied().unwrap_or(0);
-        let next = self
-            .board
-            .visible_cards(li, search)
-            .into_iter()
-            .find(|&i| i > current);
-        if let Some(next) = next {
-            self.board.selected_card[li] = next;
+        let base = self.board.visible_cards(li, None);
+        let cur_ord = self.board.selected_card.get(li).copied().unwrap_or(0);
+        let Some(&cur_raw) = base.get(cur_ord) else {
+            return;
+        };
+        if let Some(&next_raw) = self.board.visible_cards(li, search).iter().find(|&&i| i > cur_raw)
+            && let Some(ord) = base.iter().position(|&r| r == next_raw)
+        {
+            self.board.selected_card[li] = ord;
         }
     }
 
     /// Move selection up to the previous visible Card (previous match when
-    /// a search is active).
+    /// a search is active). See [`select_card_down`] for the ordinal handling.
     pub fn select_card_up(&mut self, search: Option<&str>) {
         let li = self.board.selected_list;
-        let current = self.board.selected_card.get(li).copied().unwrap_or(0);
-        let prev = self
-            .board
-            .visible_cards(li, search)
-            .into_iter()
-            .rev()
-            .find(|&i| i < current);
-        if let Some(prev) = prev {
-            self.board.selected_card[li] = prev;
+        let base = self.board.visible_cards(li, None);
+        let cur_ord = self.board.selected_card.get(li).copied().unwrap_or(0);
+        let Some(&cur_raw) = base.get(cur_ord) else {
+            return;
+        };
+        if let Some(&prev_raw) =
+            self.board.visible_cards(li, search).iter().rev().find(|&&i| i < cur_raw)
+            && let Some(ord) = base.iter().position(|&r| r == prev_raw)
+        {
+            self.board.selected_card[li] = ord;
         }
     }
 
@@ -262,9 +266,12 @@ impl BoardEditor {
     /// Jump to the first Card matching `query` anywhere on the board.
     pub fn select_first_match(&mut self, query: &str) {
         for li in 0..self.board.lists.len() {
-            if let Some(&ci) = self.board.visible_cards(li, Some(query)).first() {
+            if let Some(&raw) = self.board.visible_cards(li, Some(query)).first() {
                 self.board.selected_list = li;
-                self.board.selected_card[li] = ci;
+                if let Some(ord) = self.board.visible_cards(li, None).iter().position(|&r| r == raw)
+                {
+                    self.board.selected_card[li] = ord;
+                }
                 return;
             }
         }
@@ -558,16 +565,16 @@ impl BoardEditor {
                 card.position = pos;
                 card.log("Created");
                 let new_id = card.id.clone();
-                let list = &mut self.board.lists[li];
-                list.card_ids.push(card.id.clone());
-                let new_idx = list.card_ids.len() - 1;
+                self.board.lists[li].card_ids.push(card.id.clone());
                 self.board.cards.insert(card.id.clone(), card.clone());
                 pending.push(PendingWrite::Card(card));
                 self.last_added_card_id = Some(new_id);
-                // Selection follows the new card.
+                // Selection follows the new card — it is non-archived and last
+                // in the list, so its visible ordinal is the last visible slot.
                 self.board.selected_list = li;
+                let ord = self.board.visible_cards(li, None).len().saturating_sub(1);
                 if let Some(slot) = self.board.selected_card.get_mut(li) {
-                    *slot = new_idx;
+                    *slot = ord;
                 }
             }
             Command::MoveCard { card_id, direction } => {
@@ -773,6 +780,16 @@ impl BoardEditor {
             .map(|c| c.position)
     }
 
+    /// Ordinal of `card_id` within list `list_idx`'s visible (non-archived)
+    /// sequence — the index space of `selected_card`.
+    fn visible_ordinal(&self, list_idx: usize, card_id: &ShortId) -> Option<usize> {
+        let card_ids = &self.board.lists[list_idx].card_ids;
+        self.board
+            .visible_cards(list_idx, None)
+            .into_iter()
+            .position(|raw| card_ids[raw] == *card_id)
+    }
+
     /// Re-derive a list's in-memory `card_ids` from the current Card positions,
     /// so the live view matches what a reload would produce.
     fn rebuild_list(&mut self, list_idx: usize) {
@@ -843,13 +860,10 @@ impl BoardEditor {
                     card.position = new_pos;
                 }
                 self.rebuild_list(src_idx);
-                let new_ci = self.board.lists[src_idx]
-                    .card_ids
-                    .iter()
-                    .position(|id| id == card_id)
-                    .unwrap_or(ci);
-                if let Some(slot) = self.board.selected_card.get_mut(src_idx) {
-                    *slot = new_ci;
+                if let Some(ord) = self.visible_ordinal(src_idx, card_id)
+                    && let Some(slot) = self.board.selected_card.get_mut(src_idx)
+                {
+                    *slot = ord;
                 }
                 pending.push(PendingWrite::Card(self.board.cards[card_id].clone()));
             }
@@ -882,13 +896,10 @@ impl BoardEditor {
                 self.rebuild_list(src_idx);
                 self.rebuild_list(dst);
                 self.board.selected_list = dst;
-                let new_ci = self.board.lists[dst]
-                    .card_ids
-                    .iter()
-                    .position(|id| id == card_id)
-                    .unwrap_or(0);
-                if let Some(slot) = self.board.selected_card.get_mut(dst) {
-                    *slot = new_ci;
+                if let Some(ord) = self.visible_ordinal(dst, card_id)
+                    && let Some(slot) = self.board.selected_card.get_mut(dst)
+                {
+                    *slot = ord;
                 }
                 pending.push(PendingWrite::Card(self.board.cards[card_id].clone()));
             }
@@ -1107,7 +1118,7 @@ mod tests {
             };
             assert_eq!(visible_order(&editor), vec![bottom.clone(), top.clone()], "bottom moved above top");
             // Selection follows the moved card.
-            assert_eq!(editor.board().lists[0].card_ids[editor.board().selected_card[0]], bottom);
+            assert_eq!(editor.board().current_card_id(), Some(&bottom));
 
             editor.reload().unwrap();
             assert_eq!(visible_order(&editor), vec![bottom.clone(), top.clone()], "survives reload");

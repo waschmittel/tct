@@ -618,8 +618,11 @@ mod tests {
             // Select the bottom visible card, then move it up.
             handle(&mut app, key(KeyCode::Down)).unwrap();
             let board = app.board().unwrap();
-            let sel = board.lists[0].card_ids[board.selected_card[0]].clone();
-            assert_eq!(sel, ids[3], "Down selects bottom visible card across the archived gap");
+            assert_eq!(
+                board.current_card_id(),
+                Some(&ids[3]),
+                "Down selects bottom visible card across the archived gap"
+            );
 
             handle(&mut app, shift_key(KeyCode::Up)).unwrap();
             let board = app.board().unwrap();
@@ -629,7 +632,7 @@ mod tests {
                 .map(|i| board.lists[0].card_ids[i].clone())
                 .collect();
             assert_eq!(visible, vec![ids[3].clone(), ids[0].clone()], "bottom moved above top");
-            assert_eq!(board.lists[0].card_ids[board.selected_card[0]], ids[3], "selection follows");
+            assert_eq!(board.current_card_id(), Some(&ids[3]), "selection follows");
         });
     }
 
