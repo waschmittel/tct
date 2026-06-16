@@ -167,7 +167,7 @@ pub(super) fn find_archived_card(
     by_id: bool,
 ) -> anyhow::Result<Card> {
     resolve_one_owned(
-        card_store::list_archived_cards(board_id),
+        card_store::list_archived_cards(board_id)?,
         partial,
         by_id,
         |c| &c.id,

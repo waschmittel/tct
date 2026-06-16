@@ -18,6 +18,12 @@ pub enum StorageError {
     Io(#[from] io::Error),
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("corrupt file: {path}\n  parse error: {source}\n  hint: {hint}")]
+    Corrupt {
+        path: String,
+        source: serde_json::Error,
+        hint: &'static str,
+    },
     #[error("Board not found: {0}")]
     BoardNotFound(String),
     #[cfg(test)]
@@ -28,6 +34,30 @@ pub enum StorageError {
 }
 
 pub type Result<T> = std::result::Result<T, StorageError>;
+
+const CORRUPT_HINT: &str = "the file is not valid JSON for its schema — it may have been \
+hand-edited, truncated, or written by an incompatible version. Fix the JSON or restore from \
+backup. To skip unreadable files and load the rest, set TCT_SKIP_CORRUPT=1.";
+
+/// Build a [`StorageError::Corrupt`] that names the offending file, the
+/// underlying serde message (which carries line:column), and an actionable hint.
+pub(crate) fn corrupt(path: &Path, source: serde_json::Error) -> StorageError {
+    StorageError::Corrupt {
+        path: path.display().to_string(),
+        source,
+        hint: CORRUPT_HINT,
+    }
+}
+
+/// When set (`TCT_SKIP_CORRUPT` to a non-empty, non-`0` value), loaders that
+/// iterate a directory drop unreadable files and return partial data instead of
+/// failing the whole load. Single-file loads still fail — there is nothing to
+/// return partial of.
+pub(crate) fn skip_corrupt() -> bool {
+    std::env::var("TCT_SKIP_CORRUPT")
+        .map(|v| !v.is_empty() && v != "0")
+        .unwrap_or(false)
+}
 
 fn atomic_write(path: &Path, contents: &[u8]) -> io::Result<()> {
     let tmp = path.with_extension("tmp");

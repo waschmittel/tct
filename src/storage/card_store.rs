@@ -13,7 +13,7 @@ pub fn load_card(board_id: &str, card_id: &str) -> Result<Card> {
         return Err(StorageError::CardNotFound(card_id.to_string()));
     }
     let data = fs::read_to_string(&path)?;
-    let mut val: serde_json::Value = serde_json::from_str(&data)?;
+    let mut val: serde_json::Value = serde_json::from_str(&data).map_err(|e| super::corrupt(&path, e))?;
 
     let mut migrated = false;
 
@@ -51,7 +51,7 @@ pub fn load_card(board_id: &str, card_id: &str) -> Result<Card> {
             migrated = true;
         }
 
-    let card: Card = serde_json::from_value(val)?;
+    let card: Card = serde_json::from_value(val).map_err(|e| super::corrupt(&path, e))?;
 
     if migrated {
         let _ = save_card(board_id, &card);
@@ -145,7 +145,38 @@ mod tests {
             let path = paths::card_path(&board.id, "bad12345");
             std::fs::write(&path, "{ not valid json").unwrap();
             let err = load_card(&board.id, "bad12345").unwrap_err();
-            assert!(matches!(err, StorageError::Json(_)));
+            assert!(matches!(err, StorageError::Corrupt { .. }));
+        });
+    }
+
+    #[test]
+    fn load_all_cards_fails_on_corrupt_by_default() {
+        with_temp_dir(|| {
+            let board = make_board();
+            let good = Card::new("Good".into());
+            save_card(&board.id, &good).unwrap();
+            std::fs::write(paths::card_path(&board.id, "corrupt1"), "{ broken").unwrap();
+
+            let err = load_all_cards(&board.id).unwrap_err();
+            assert!(matches!(err, StorageError::Corrupt { .. }));
+        });
+    }
+
+    #[test]
+    fn load_all_cards_skips_corrupt_when_env_set() {
+        with_temp_dir(|| {
+            let board = make_board();
+            let good = Card::new("Good".into());
+            save_card(&board.id, &good).unwrap();
+            std::fs::write(paths::card_path(&board.id, "corrupt1"), "{ broken").unwrap();
+
+            unsafe { std::env::set_var("TCT_SKIP_CORRUPT", "1") };
+            let map = load_all_cards(&board.id);
+            unsafe { std::env::remove_var("TCT_SKIP_CORRUPT") };
+
+            let map = map.unwrap();
+            assert_eq!(map.len(), 1);
+            assert!(map.contains_key(&good.id));
         });
     }
 
@@ -202,7 +233,7 @@ mod tests {
             save_card(&board.id, &active).unwrap();
             save_card(&board.id, &archived).unwrap();
 
-            let list = list_archived_cards(&board.id);
+            let list = list_archived_cards(&board.id).unwrap();
             assert_eq!(list.len(), 1);
             assert_eq!(list[0].title, "Archived");
         });
@@ -239,9 +270,11 @@ mod tests {
 }
 
 /// Every Card stored for a board, keyed by id. Reads each `card-*.json`
-/// through [`load_card`] so per-card migrations run. Unreadable/corrupt files
-/// are skipped.
-pub fn load_all_cards(board_id: &str) -> HashMap<ShortId, Card> {
+/// through [`load_card`] so per-card migrations run. A corrupt card file fails
+/// the whole load (the error names the file + a hint) unless
+/// `TCT_SKIP_CORRUPT` is set, in which case the bad file is skipped and a
+/// warning is printed.
+pub fn load_all_cards(board_id: &str) -> Result<HashMap<ShortId, Card>> {
     let dir = paths::board_dir(board_id);
     let mut map = HashMap::new();
     if let Ok(entries) = fs::read_dir(&dir) {
@@ -250,30 +283,46 @@ pub fn load_all_cards(board_id: &str) -> HashMap<ShortId, Card> {
             let name = name.to_string_lossy();
             if let Some(rest) = name.strip_prefix("card-")
                 && let Some(id) = rest.strip_suffix(".json")
-                && let Ok(card) = load_card(board_id, id)
             {
-                map.insert(card.id.clone(), card);
+                match load_card(board_id, id) {
+                    Ok(card) => {
+                        map.insert(card.id.clone(), card);
+                    }
+                    Err(e) if super::skip_corrupt() => {
+                        eprintln!("tct: skipping {}: {e}", entry.path().display());
+                    }
+                    Err(e) => return Err(e),
+                }
             }
         }
     }
-    map
+    Ok(map)
 }
 
-pub fn list_archived_cards(board_id: &str) -> Vec<Card> {
+/// Archived Cards of a board, newest first. Reads each file through
+/// [`load_card`] (so migrations run); a corrupt file fails the whole call
+/// unless `TCT_SKIP_CORRUPT` is set, matching [`load_all_cards`].
+pub fn list_archived_cards(board_id: &str) -> Result<Vec<Card>> {
     let dir = paths::board_dir(board_id);
     let mut cards = Vec::new();
     if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if name.starts_with("card-") && name.ends_with(".json")
-                && let Ok(data) = fs::read_to_string(entry.path())
-                    && let Ok(card) = serde_json::from_str::<Card>(&data)
-                        && card.archived {
-                            cards.push(card);
-                        }
+            if let Some(rest) = name.strip_prefix("card-")
+                && let Some(id) = rest.strip_suffix(".json")
+            {
+                match load_card(board_id, id) {
+                    Ok(card) if card.archived => cards.push(card),
+                    Ok(_) => {}
+                    Err(e) if super::skip_corrupt() => {
+                        eprintln!("tct: skipping {}: {e}", entry.path().display());
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
         }
     }
     cards.sort_by_key(|c| std::cmp::Reverse(c.updated_at));
-    cards
+    Ok(cards)
 }

@@ -5,9 +5,11 @@
 //! History Entry, and stages writes for `commit_pending`. Selection State
 //! is mutated only through the selection verbs below (ADR-0002).
 
+use std::collections::{HashMap, HashSet};
+
 use crate::app::LoadedBoard;
 use crate::command::{Command, MoveDir};
-use crate::model::board::ListMeta;
+use crate::model::board::{BoardMeta, ListMeta};
 use crate::model::card::{Card, ChecklistItem};
 use crate::model::ids::ShortId;
 use crate::model::label::Label;
@@ -27,6 +29,10 @@ pub enum BoardEditorError {
 pub struct BoardEditor {
     board: LoadedBoard,
     last_added_card_id: Option<ShortId>,
+    /// Non-fatal issues found and auto-repaired while loading the board (orphan
+    /// cards reattached, dangling label refs stripped). Surfaced to the user as
+    /// a status message; empty on a clean load.
+    pub diagnostics: Vec<String>,
 }
 
 enum PendingWrite {
@@ -34,11 +40,100 @@ enum PendingWrite {
     Board,
 }
 
+/// Detect and auto-repair dangling references in freshly loaded cards, persisting
+/// each card that changed. Returns a human-readable line per repair (empty on a
+/// clean board). Two reference hazards are handled:
+///
+/// * **Orphan card** — `list_id` names a List that no longer exists (or is
+///   empty). The card would be invisible (never built into any List), so it is
+///   reattached to the board's first active List with a position past the
+///   current tail.
+/// * **Dangling label** — `label_ids` names a Label absent from the board; the
+///   id is stripped.
+fn repair_references(
+    board_id: &str,
+    meta: &BoardMeta,
+    cards: &mut HashMap<ShortId, Card>,
+) -> Vec<String> {
+    let valid_lists: HashSet<&ShortId> = meta.lists.iter().map(|l| &l.id).collect();
+    let valid_labels: HashSet<&ShortId> = meta.labels.iter().map(|l| &l.id).collect();
+    let default_list = meta
+        .lists
+        .iter()
+        .find(|l| !l.archived)
+        .or_else(|| meta.lists.first())
+        .map(|l| l.id.clone());
+
+    // Next free position in the reattach target, so reattached orphans land at
+    // the tail rather than colliding at 0.
+    let mut next_pos = default_list
+        .as_ref()
+        .map(|dst| {
+            cards
+                .values()
+                .filter(|c| &c.list_id == dst)
+                .map(|c| c.position)
+                .fold(0.0_f64, f64::max)
+                + 1.0
+        })
+        .unwrap_or(1.0);
+
+    let mut warnings = Vec::new();
+    let mut changed: Vec<ShortId> = Vec::new();
+
+    for card in cards.values_mut() {
+        let mut card_changed = false;
+
+        if !valid_lists.contains(&card.list_id) {
+            match &default_list {
+                Some(dst) => {
+                    warnings.push(format!(
+                        "card \"{}\" pointed at missing list — reattached to first list",
+                        card.title
+                    ));
+                    card.list_id = dst.clone();
+                    card.position = next_pos;
+                    next_pos += 1.0;
+                    card_changed = true;
+                }
+                None => warnings.push(format!(
+                    "card \"{}\" is orphaned and the board has no lists to attach it to",
+                    card.title
+                )),
+            }
+        }
+
+        let before = card.label_ids.len();
+        card.label_ids.retain(|lid| valid_labels.contains(lid));
+        let stripped = before - card.label_ids.len();
+        if stripped > 0 {
+            warnings.push(format!(
+                "card \"{}\" had {stripped} unknown label ref(s) removed",
+                card.title
+            ));
+            card_changed = true;
+        }
+
+        if card_changed {
+            changed.push(card.id.clone());
+        }
+    }
+
+    for id in &changed {
+        if let Some(card) = cards.get(id) {
+            let _ = card_store::save_card(board_id, card);
+        }
+    }
+
+    warnings
+}
+
 impl BoardEditor {
     pub fn load(board_id: &str) -> Result<Self, BoardEditorError> {
         // load_board migrates legacy boards in place before returning meta.
         let meta = board_store::load_board(board_id)?;
-        let cards = card_store::load_all_cards(board_id);
+        let mut cards = card_store::load_all_cards(board_id)?;
+        let diagnostics = repair_references(board_id, &meta, &mut cards);
         let lists = crate::model::list::build_lists(&meta, &cards, false);
         let num_lists = lists.len();
         Ok(Self {
@@ -53,13 +148,14 @@ impl BoardEditor {
                 detail_scroll: 0,
             },
             last_added_card_id: None,
+            diagnostics,
         })
     }
 
     /// Test-only constructor for in-memory fixtures (no disk).
     #[cfg(test)]
     pub fn from_loaded(board: LoadedBoard) -> Self {
-        Self { board, last_added_card_id: None }
+        Self { board, last_added_card_id: None, diagnostics: Vec::new() }
     }
 
     pub fn board(&self) -> &LoadedBoard {
@@ -77,7 +173,7 @@ impl BoardEditor {
     /// card cannot orphan data here. An error means the board file is gone.
     pub fn reload(&mut self) -> Result<(), BoardEditorError> {
         let meta = board_store::load_board(&self.board.meta.id)?;
-        let cards = card_store::load_all_cards(&self.board.meta.id);
+        let cards = card_store::load_all_cards(&self.board.meta.id)?;
         let lists = crate::model::list::build_lists(&meta, &cards, false);
 
         let num_lists = lists.len();
@@ -217,9 +313,10 @@ impl BoardEditor {
         self.board.cards.insert(card.id.clone(), card);
     }
 
-    /// Archived Cards of this board, read from disk.
-    pub fn archived_cards(&self) -> Vec<Card> {
-        card_store::list_archived_cards(&self.board.meta.id)
+    /// Archived Cards of this board, read from disk. Errors if a card file is
+    /// corrupt (unless `TCT_SKIP_CORRUPT` is set).
+    pub fn archived_cards(&self) -> Result<Vec<Card>, BoardEditorError> {
+        Ok(card_store::list_archived_cards(&self.board.meta.id)?)
     }
 
     /// Archived Lists of this board, built from the board's `ListMeta`s and the
@@ -851,6 +948,52 @@ mod tests {
         board_store::save_board(&meta).unwrap();
         card_store::save_card(&meta.id, &card).unwrap();
         (meta, card.id)
+    }
+
+    #[test]
+    fn load_reattaches_orphan_card_and_reports() {
+        with_temp_dir(|| {
+            let (meta, _) = seed_board_with_card();
+            let list_id = meta.lists[0].id.clone();
+            // A card whose list_id names a list that does not exist.
+            let mut orphan = Card::new("Lost".into());
+            orphan.list_id = "ghostlst".into();
+            card_store::save_card(&meta.id, &orphan).unwrap();
+
+            let editor = BoardEditor::load(&meta.id).unwrap();
+            assert_eq!(editor.diagnostics.len(), 1);
+            // Reattached to the only (first) list, in memory and on disk.
+            assert_eq!(editor.board().cards[&orphan.id].list_id, list_id);
+            let reloaded = card_store::load_card(&meta.id, &orphan.id).unwrap();
+            assert_eq!(reloaded.list_id, list_id);
+            // And now visible in that list.
+            assert!(editor.board().lists[0].card_ids.contains(&orphan.id));
+        });
+    }
+
+    #[test]
+    fn load_strips_dangling_label_refs() {
+        with_temp_dir(|| {
+            let (meta, card_id) = seed_board_with_card();
+            let mut card = card_store::load_card(&meta.id, &card_id).unwrap();
+            card.label_ids = vec!["nolabel1".into(), "nolabel2".into()];
+            card_store::save_card(&meta.id, &card).unwrap();
+
+            let editor = BoardEditor::load(&meta.id).unwrap();
+            assert_eq!(editor.diagnostics.len(), 1);
+            assert!(editor.board().cards[&card_id].label_ids.is_empty());
+            let reloaded = card_store::load_card(&meta.id, &card_id).unwrap();
+            assert!(reloaded.label_ids.is_empty());
+        });
+    }
+
+    #[test]
+    fn load_clean_board_has_no_diagnostics() {
+        with_temp_dir(|| {
+            let (meta, _) = seed_board_with_card();
+            let editor = BoardEditor::load(&meta.id).unwrap();
+            assert!(editor.diagnostics.is_empty());
+        });
     }
 
     #[test]

@@ -147,7 +147,7 @@ mod tests {
             assert!(migrated.list_order.is_empty());
 
             // Cards carry list_id + ascending position.
-            let cards = card_store::load_all_cards(&meta.id);
+            let cards = card_store::load_all_cards(&meta.id).unwrap();
             let g1 = &cards[&c1.id];
             let g2 = &cards[&c2.id];
             let g3 = &cards[&c3.id];

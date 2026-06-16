@@ -47,7 +47,10 @@ pub(super) fn lists_and_cards(meta: &BoardMeta) -> (Vec<CardList>, HashMap<Short
     // populated) before we derive membership — CLI reads can hit boards the TUI
     // has never opened.
     let fresh = board_store::load_board(&meta.id).unwrap_or_else(|_| meta.clone());
-    let cards = card_store::load_all_cards(&meta.id);
+    let cards = card_store::load_all_cards(&meta.id).unwrap_or_else(|e| {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    });
     let lists = crate::model::list::build_lists(&fresh, &cards, false);
     (lists, cards)
 }

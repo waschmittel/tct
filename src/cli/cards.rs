@@ -23,7 +23,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
 
     if has_flag(args, "--archived") {
         let board = find_board(board_partial, by_id)?;
-        let archived = card_store::list_archived_cards(&board.id);
+        let archived = card_store::list_archived_cards(&board.id)?;
         println!(
             "Board: {} [{}]  (archived cards: {})",
             board.name,

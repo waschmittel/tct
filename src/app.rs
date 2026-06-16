@@ -207,8 +207,15 @@ impl App {
     }
 
     pub fn load_board(&mut self, board_id: &str) -> anyhow::Result<()> {
-        self.editor = Some(BoardEditor::load(board_id)?);
+        let editor = BoardEditor::load(board_id)?;
+        let repaired = editor.diagnostics.len();
+        self.editor = Some(editor);
         self.mode = AppMode::Normal;
+        if repaired > 0 {
+            self.set_status(format!(
+                "Repaired {repaired} reference issue(s) on load — see card order/labels"
+            ));
+        }
         Ok(())
     }
 

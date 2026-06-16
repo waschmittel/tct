@@ -249,14 +249,17 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         }
         Action::ViewArchivedCards => {
             if let Some(editor) = &app.editor {
-                let archived = editor.archived_cards();
-                if archived.is_empty() {
-                    app.set_status("No archived cards".into());
-                } else {
-                    app.open_dialog(Box::new(ArchivedCards {
-                        cards: archived,
-                        selected: 0,
-                    }));
+                match editor.archived_cards() {
+                    Ok(archived) if archived.is_empty() => {
+                        app.set_status("No archived cards".into());
+                    }
+                    Ok(archived) => {
+                        app.open_dialog(Box::new(ArchivedCards {
+                            cards: archived,
+                            selected: 0,
+                        }));
+                    }
+                    Err(e) => app.set_status(format!("Error: {e}")),
                 }
             }
         }

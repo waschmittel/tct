@@ -17,7 +17,7 @@ pub fn load_board_order() -> Result<Vec<ShortId>> {
         return Ok(Vec::new());
     }
     let data = fs::read_to_string(&path)?;
-    Ok(serde_json::from_str(&data)?)
+    serde_json::from_str(&data).map_err(|e| super::corrupt(&path, e))
 }
 
 pub fn save_board_order(order: &[ShortId]) -> Result<()> {
@@ -39,7 +39,14 @@ pub fn list_boards() -> Result<Vec<BoardMeta>> {
             let meta_path = entry.path().join("board.json");
             if meta_path.exists() {
                 let data = fs::read_to_string(&meta_path)?;
-                let meta: BoardMeta = serde_json::from_str(&data)?;
+                let meta: BoardMeta = match serde_json::from_str(&data) {
+                    Ok(m) => m,
+                    Err(e) if super::skip_corrupt() => {
+                        eprintln!("tct: skipping {}: {e}", meta_path.display());
+                        continue;
+                    }
+                    Err(e) => return Err(super::corrupt(&meta_path, e)),
+                };
                 if !meta.archived {
                     all_boards.push(meta);
                 }
@@ -74,7 +81,14 @@ pub fn list_archived_boards() -> Result<Vec<BoardMeta>> {
             let meta_path = entry.path().join("board.json");
             if meta_path.exists() {
                 let data = fs::read_to_string(&meta_path)?;
-                let meta: BoardMeta = serde_json::from_str(&data)?;
+                let meta: BoardMeta = match serde_json::from_str(&data) {
+                    Ok(m) => m,
+                    Err(e) if super::skip_corrupt() => {
+                        eprintln!("tct: skipping {}: {e}", meta_path.display());
+                        continue;
+                    }
+                    Err(e) => return Err(super::corrupt(&meta_path, e)),
+                };
                 if meta.archived {
                     boards.push(meta);
                 }
@@ -92,7 +106,7 @@ pub fn load_board(board_id: &str) -> Result<BoardMeta> {
     }
     super::migrate::migrate_if_needed(board_id)?;
     let data = fs::read_to_string(&path)?;
-    Ok(serde_json::from_str(&data)?)
+    serde_json::from_str(&data).map_err(|e| super::corrupt(&path, e))
 }
 
 pub fn save_board(meta: &BoardMeta) -> Result<()> {
