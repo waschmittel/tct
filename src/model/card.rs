@@ -7,6 +7,16 @@ use super::label::Label;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Card {
     pub id: ShortId,
+    /// Id of the List this Card belongs to. Source of truth for membership —
+    /// the List no longer stores its Cards. Empty only for legacy cards before
+    /// migration stamps it.
+    #[serde(default)]
+    pub list_id: ShortId,
+    /// Fractional rank within the List. Cards render in ascending `position`
+    /// order; inserting between two cards uses the midpoint of their ranks, so
+    /// a move rewrites only the moved card.
+    #[serde(default)]
+    pub position: f64,
     pub title: String,
     pub description: String,
     #[serde(default)]
@@ -40,6 +50,8 @@ impl Card {
         let now = Utc::now();
         Self {
             id: ids::new_id(),
+            list_id: String::new(),
+            position: 0.0,
             title,
             description: String::new(),
             label_ids: Vec::new(),

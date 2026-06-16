@@ -625,7 +625,7 @@ tct reloads from disk every 15 seconds, but only in safe modes (board view, card
 
 ### Merge conflict in .tct/ files
 
-Each file is self-contained JSON. For card conflicts: pick one version (or merge the JSON manually). For `board.json` conflicts: the `list_order` array may need manual merging if both sides added/reordered lists.
+Each file is self-contained JSON. For card conflicts: pick one version (or merge the JSON manually). For `board.json` conflicts: the `lists` array may need manual merging if both sides added/reordered/renamed lists.
 
 ### Card or list missing after sync
 
@@ -635,7 +635,7 @@ Check if the file exists on disk:
 ls .tct/boards/*/card-*.json
 ```
 
-If a card file exists but isn't referenced in any list's `card_ids`, it's orphaned. Add its ID to the appropriate `list-*.json` file.
+A card is shown only if its `list_id` names a list in `board.json`. If a card is missing, open its `card-*.json` and check that `list_id` matches an `id` in the board's `lists` array (and that `archived` is `false`). Fix the `list_id` to re-home an orphaned card.
 
 ### macOS Cmd key not working
 
@@ -652,7 +652,10 @@ Cmd key support requires a terminal that sends Super modifier events. Supported:
   "id": "a1b2c3d4",
   "name": "Sprint 42",
   "description": "",
-  "list_order": ["e5f6a7b8", "c9d0e1f2"],
+  "lists": [
+    { "id": "e5f6a7b8", "name": "To Do", "archived": false },
+    { "id": "c9d0e1f2", "name": "Done", "archived": false }
+  ],
   "labels": [
     { "id": "11112222", "name": "bug", "color": "red" },
     { "id": "33334444", "name": "feature", "color": { "custom": { "r": 170, "g": 200, "b": 255 } } }
@@ -664,21 +667,17 @@ Cmd key support requires a terminal that sends Super modifier events. Supported:
 }
 ```
 
-### list-\<id\>.json
-
-```json
-{
-  "id": "e5f6a7b8",
-  "name": "To Do",
-  "card_ids": ["55667788", "99aabbcc"]
-}
-```
+Lists live inline in `board.json` (the `lists` array above) — there are no
+`list-*.json` files. A list's cards are every `card-*.json` whose `list_id`
+matches the list's `id`, ordered by ascending `position`.
 
 ### card-\<id\>.json
 
 ```json
 {
   "id": "55667788",
+  "list_id": "e5f6a7b8",
+  "position": 1.0,
   "title": "Fix login bug",
   "description": "Auth token expires too early.\n\n## Steps to reproduce\n1. Login\n2. Wait 5 minutes\n3. Token is invalid",
   "label_ids": ["11112222"],

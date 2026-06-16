@@ -38,6 +38,7 @@ pub fn board_meta_path(board_id: &str) -> PathBuf {
     board_dir(board_id).join("board.json")
 }
 
+#[cfg(test)]
 pub fn list_path(board_id: &str, list_id: &str) -> PathBuf {
     board_dir(board_id).join(format!("list-{list_id}.json"))
 }

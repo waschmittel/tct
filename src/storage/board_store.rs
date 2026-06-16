@@ -90,6 +90,7 @@ pub fn load_board(board_id: &str) -> Result<BoardMeta> {
     if !path.exists() {
         return Err(StorageError::BoardNotFound(board_id.to_string()));
     }
+    super::migrate::migrate_if_needed(board_id)?;
     let data = fs::read_to_string(&path)?;
     Ok(serde_json::from_str(&data)?)
 }

@@ -3,10 +3,9 @@
 use anyhow::{bail, Context};
 
 use super::lookup::{find_board, find_card_in_lists};
-use super::util::{flag_value, fmt_progress, load_all_cards};
+use super::util::{flag_value, fmt_progress, lists_and_cards};
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
-use crate::storage::list_store;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args
@@ -23,8 +22,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         .as_str();
 
     let board = find_board(board_partial, by_id)?;
-    let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-    let all_cards = load_all_cards(&board.id, &lists);
+    let (lists, all_cards) = lists_and_cards(&board);
 
     if let Some(text) = flag_value(args, "--add") {
         let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;

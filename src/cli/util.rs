@@ -11,7 +11,7 @@ use crate::model::card::Card;
 use crate::model::ids::ShortId;
 use crate::model::label::{Label, LabelColor};
 use crate::model::list::CardList;
-use crate::storage::{board_store, card_store, list_store};
+use crate::storage::{board_store, card_store};
 
 // ── Argument parsing ──────────────────────────────────────────────────────────
 
@@ -40,16 +40,16 @@ pub(super) fn flag_values_all<'a>(args: &'a [String], flag: &str) -> Vec<&'a str
 
 // ── Data loading ──────────────────────────────────────────────────────────────
 
-pub(super) fn load_all_cards(board_id: &str, lists: &[CardList]) -> HashMap<ShortId, Card> {
-    let mut map = HashMap::new();
-    for list in lists {
-        for card_id in &list.card_ids {
-            if let Ok(card) = card_store::load_card(board_id, card_id) {
-                map.insert(card_id.clone(), card);
-            }
-        }
-    }
-    map
+/// Load a board's full Card map and its active (non-archived) Lists, with each
+/// List's `card_ids` derived from the Cards' `list_id`/`position`.
+pub(super) fn lists_and_cards(meta: &BoardMeta) -> (Vec<CardList>, HashMap<ShortId, Card>) {
+    // Reload through load_board so a legacy board is migrated (and its `lists`
+    // populated) before we derive membership — CLI reads can hit boards the TUI
+    // has never opened.
+    let fresh = board_store::load_board(&meta.id).unwrap_or_else(|_| meta.clone());
+    let cards = card_store::load_all_cards(&meta.id);
+    let lists = crate::model::list::build_lists(&fresh, &cards, false);
+    (lists, cards)
 }
 
 pub(super) fn count_active(card_ids: &[ShortId], cards: &HashMap<ShortId, Card>) -> usize {
@@ -64,11 +64,7 @@ pub(super) fn board_summary_counts(board_id: &str) -> (usize, usize) {
         Ok(m) => m,
         Err(_) => return (0, 0),
     };
-    let lists = match list_store::load_all_lists(board_id, &meta.list_order) {
-        Ok(l) => l,
-        Err(_) => return (meta.list_order.len(), 0),
-    };
-    let cards = load_all_cards(board_id, &lists);
+    let (lists, cards) = lists_and_cards(&meta);
     let total = lists
         .iter()
         .map(|l| count_active(&l.card_ids, &cards))

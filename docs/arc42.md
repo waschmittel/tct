@@ -73,7 +73,7 @@ tct is a keyboard-driven terminal user interface (TUI) Kanban board application 
 | Convention | Details |
 |-----------|---------|
 | ID format | 8-char hex prefix of UUID v4 |
-| File naming | `board.json`, `list-<id>.json`, `card-<id>.json` |
+| File naming | `board.json` (incl. list defs), `card-<id>.json` |
 | Storage resolution | `TCT_DATA_DIR` > `.tct/` ancestor walk > `~/.tct/` |
 | Modal input | AppMode enum drives all input dispatch |
 
@@ -177,17 +177,17 @@ graph TB
         APP_MOD["app.rs<br><i>App state, modes, board loading</i>"]
 
         subgraph "model/"
-            BOARD_M["board.rs<br>BoardMeta"]
+            BOARD_M["board.rs<br>BoardMeta, ListMeta"]
             CARD_M["card.rs<br>Card, ChecklistItem"]
-            LIST_M["list.rs<br>CardList"]
+            LIST_M["list.rs<br>CardList (derived) + build_lists"]
             LABEL_M["label.rs<br>Label, LabelColor"]
             IDS_M["ids.rs<br>ShortId"]
         end
 
         subgraph "storage/"
             BOARD_S["board_store.rs<br>Board CRUD + ordering"]
-            LIST_S["list_store.rs<br>List CRUD"]
-            CARD_S["card_store.rs<br>Card CRUD + migration"]
+            MIGRATE_S["migrate.rs<br>legacy list-file migration"]
+            CARD_S["card_store.rs<br>Card CRUD + load_all_cards"]
             PATHS_S["paths.rs<br>Path resolution"]
             STORE_MOD["mod.rs<br>StorageError, atomic_write"]
         end
@@ -232,8 +232,8 @@ graph TB
     ENTRY --> INPUT_MOD
     ENTRY --> UI_MOD
     APP_MOD --> BOARD_S
-    APP_MOD --> LIST_S
     APP_MOD --> CARD_S
+    BOARD_S --> MIGRATE_S
     INPUT_MOD --> APP_MOD
     UI_MOD --> APP_MOD
 ```
@@ -245,8 +245,8 @@ graph TB
 | Module | Types | Purpose |
 |--------|-------|---------|
 | `board.rs` | `BoardMeta` | Board identity, name, list ordering, labels, accent color, archive flag |
-| `card.rs` | `Card`, `ChecklistItem` | Card data: title, description, labels, due date, checklist, archive flag |
-| `list.rs` | `CardList` | List identity, name, ordered card ID references |
+| `card.rs` | `Card`, `ChecklistItem` | Card data: `list_id`, `position`, title, description, labels, due date, checklist, archive flag |
+| `list.rs` | `CardList` | Derived in-memory view of a list; `build_lists`/`ordered_card_ids` assemble it from `ListMeta` + cards |
 | `label.rs` | `Label`, `LabelColor` | Label identity + color; HSL-based pastel generation |
 | `ids.rs` | `ShortId` (= `String`) | 8-char UUID v4 prefix generator |
 
@@ -255,9 +255,9 @@ graph TB
 | Module | Purpose |
 |--------|---------|
 | `paths.rs` | Resolves storage root: `TCT_DATA_DIR` > `.tct/` walk > `~/.tct/` |
-| `board_store.rs` | Board CRUD, board ordering (separate `board_order.json`) |
-| `list_store.rs` | List CRUD, `load_all_lists` for ordered loading |
-| `card_store.rs` | Card CRUD, archived listing, JSON schema migration |
+| `board_store.rs` | Board CRUD, board ordering (separate `board_order.json`); triggers `migrate` on load |
+| `migrate.rs` | One-time migration of legacy `list-*.json` boards to card-owned membership |
+| `card_store.rs` | Card CRUD, `load_all_cards` scan, archived listing, JSON schema migration |
 | `mod.rs` | `StorageError` enum, `atomic_write` helper |
 
 #### input/ — Input Handling (Controller)
@@ -342,9 +342,8 @@ sequenceDiagram
     CLI->>Storage: find_board("Board")
     Storage-->>CLI: BoardMeta
     CLI->>Storage: find_list("To Do")
-    Storage-->>CLI: CardList
-    CLI->>Storage: save_card(new Card)
-    CLI->>Storage: save_list(updated list)
+    Storage-->>CLI: CardList (derived)
+    CLI->>Storage: save_card(new Card with list_id + position)
     CLI-->>Script: stdout: "Created card 'Fix bug'..."
 ```
 
@@ -423,8 +422,7 @@ graph TB
             DATA_DIR[".tct/ or ~/.tct/"]
             BOARDS["boards/"]
             BOARD_DIR["<board-id>/"]
-            BOARD_JSON["board.json"]
-            LIST_JSON["list-*.json"]
+            BOARD_JSON["board.json<br>(incl. list defs)"]
             CARD_JSON["card-*.json"]
             ORDER_JSON["board_order.json"]
 
@@ -432,7 +430,6 @@ graph TB
             DATA_DIR --> ORDER_JSON
             BOARDS --> BOARD_DIR
             BOARD_DIR --> BOARD_JSON
-            BOARD_DIR --> LIST_JSON
             BOARD_DIR --> CARD_JSON
         end
 
@@ -467,10 +464,8 @@ flowchart TD
   board_order.json             # JSON array of board IDs (display order)
   boards/
     a1b2c3d4/                  # Board directory (8-char ID)
-      board.json               # BoardMeta: name, list_order, labels, accent_color
-      list-e5f6a7b8.json       # CardList: name, card_ids[]
-      list-c9d0e1f2.json
-      card-11223344.json       # Card: title, description, checklist, label_ids, due_date
+      board.json               # BoardMeta: name, lists[] (id/name/archived), labels, accent_color
+      card-11223344.json       # Card: list_id, position, title, description, checklist, label_ids, due_date
       card-55667788.json
     b2c3d4e5/                  # Another board
       board.json
@@ -682,7 +677,7 @@ mindmap
 | Term | Definition |
 |------|-----------|
 | **Board** | Top-level container holding lists, labels, and an accent color. Stored as `BoardMeta`. |
-| **List** | A column within a board containing an ordered list of card IDs. Stored as `CardList`. |
+| **List** | A column within a board. Defined by a `ListMeta` entry in `board.json`; its cards are those whose `list_id` matches, ordered by `position`. Assembled in memory as `CardList`. |
 | **Card** | A task item with title, description, checklist, labels, due date, and archive flag. |
 | **Label** | A board-level named tag with a color, assignable to cards via `label_ids`. |
 | **ShortId** | 8-character hex string (UUID v4 prefix) used as unique identifier. |

@@ -3,11 +3,11 @@
 use anyhow::{bail, Context};
 use regex::Regex;
 
-use super::util::{flag_value, flag_values_all, has_flag, load_all_cards, print_card_line};
+use super::util::{flag_value, flag_values_all, has_flag, lists_and_cards, print_card_line};
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
 use crate::model::label::Label;
-use crate::storage::{board_store, list_store};
+use crate::storage::board_store;
 
 pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
     let query = args
@@ -56,8 +56,7 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
     let mut total = 0usize;
 
     for board in &boards_to_search {
-        let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-        let all_cards = load_all_cards(&board.id, &lists);
+        let (lists, all_cards) = lists_and_cards(board);
 
         for list in &lists {
             if let Some(lf) = list_filter

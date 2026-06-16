@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use std::fs;
 
 use crate::model::card::Card;
+use crate::model::ids::ShortId;
 
 use super::paths;
 use super::{atomic_write, Result, StorageError};
@@ -234,6 +236,27 @@ mod tests {
             assert!(loaded.label_ids.is_empty());
         });
     }
+}
+
+/// Every Card stored for a board, keyed by id. Reads each `card-*.json`
+/// through [`load_card`] so per-card migrations run. Unreadable/corrupt files
+/// are skipped.
+pub fn load_all_cards(board_id: &str) -> HashMap<ShortId, Card> {
+    let dir = paths::board_dir(board_id);
+    let mut map = HashMap::new();
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if let Some(rest) = name.strip_prefix("card-")
+                && let Some(id) = rest.strip_suffix(".json")
+                && let Ok(card) = load_card(board_id, id)
+            {
+                map.insert(card.id.clone(), card);
+            }
+        }
+    }
+    map
 }
 
 pub fn list_archived_cards(board_id: &str) -> Vec<Card> {

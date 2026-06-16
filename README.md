@@ -62,12 +62,18 @@ This means you can keep project-specific boards alongside your code by creating 
   board_order.json        # Board display order
   boards/
     <board-id>/
-      board.json          # Board metadata + list order + labels
-      list-<id>.json      # List name + card ID order
-      card-<id>.json      # Card data (title, description, labels, etc.)
+      board.json          # Board metadata + ordered list definitions + labels
+      card-<id>.json      # Card data: list_id, position, title, description, labels, ...
 ```
 
-All writes are atomic (write to `.tmp`, then rename) — no partial files, even on crash.
+Each card owns its own list membership (`list_id`) and order within that list
+(`position`, a fractional rank). Lists are just named entries in `board.json` —
+there are no `list-*.json` files. This keeps a card's archived flag and its list
+membership in a single file, so they cannot diverge.
+
+All writes are atomic (write to `.tmp`, then rename) — no partial files, even on
+crash. Boards created by older versions (with `list-<id>.json` files) are
+migrated to this layout automatically the first time they are opened.
 
 ### Setting up shared boards with git
 
@@ -338,17 +344,17 @@ src/
     lookup.rs      # ID/name resolution shared by all subcommands
     util.rs        # Flag parsing + output formatting helpers
   model/
-    board.rs       # BoardMeta
-    card.rs        # Card, ChecklistItem
+    board.rs       # BoardMeta, ListMeta
+    card.rs        # Card (list_id, position), ChecklistItem
     ids.rs         # ShortId generation
     label.rs       # Label, LabelColor
-    list.rs        # CardList
+    list.rs        # CardList (derived view) + build_lists/ordered_card_ids
   storage/
     mod.rs         # StorageError, atomic_write
     paths.rs       # Path helpers
-    board_store.rs # Board CRUD
-    list_store.rs  # List CRUD
-    card_store.rs  # Card CRUD + archived listing
+    board_store.rs # Board CRUD (triggers migration on load)
+    card_store.rs  # Card CRUD + load_all_cards + archived listing
+    migrate.rs     # One-time legacy list-*.json -> card-owned migration
   input/
     mod.rs         # Input dispatch by mode
     normal.rs      # Board view keybindings

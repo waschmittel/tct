@@ -5,11 +5,11 @@ use chrono::NaiveDate;
 
 use super::lookup::{find_archived_card, find_board, find_card_in_lists, find_list};
 use super::util::{
-    flag_value, flag_values2, has_flag, load_all_cards, print_card_detail, print_card_line,
+    flag_value, flag_values2, has_flag, lists_and_cards, print_card_detail, print_card_line,
 };
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
-use crate::storage::{card_store, list_store};
+use crate::storage::card_store;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args
@@ -42,15 +42,13 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         }
     } else if let Some(card_partial) = flag_value(args, "--show") {
         let board = find_board(board_partial, by_id)?;
-        let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-        let all_cards = load_all_cards(&board.id, &lists);
+        let (lists, all_cards) = lists_and_cards(&board);
         let (list, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         print_card_detail(&card, &board, &list);
     } else if let Some(list_partial) = flag_value(args, "--list") {
         let board = find_board(board_partial, by_id)?;
-        let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
+        let (lists, all_cards) = lists_and_cards(&board);
         let list = find_list(&lists, list_partial, by_id)?.clone();
-        let all_cards = load_all_cards(&board.id, &lists);
         let active: Vec<_> = list
             .card_ids
             .iter()
@@ -70,7 +68,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         }
     } else if let Some((list_partial, title)) = flag_values2(args, "--create") {
         let board = find_board(board_partial, by_id)?;
-        let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
+        let (lists, _all_cards) = lists_and_cards(&board);
         let list = find_list(&lists, list_partial, by_id)?.clone();
         let list_name = list.name.clone();
         let list_id = list.id.clone();
@@ -94,8 +92,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         edit(args, board_partial, card_partial, by_id)?;
     } else if let Some(card_partial) = flag_value(args, "--archive") {
         let board = find_board(board_partial, by_id)?;
-        let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-        let all_cards = load_all_cards(&board.id, &lists);
+        let (lists, all_cards) = lists_and_cards(&board);
         let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         let title = card.title.clone();
         let card_id = card.id.clone();
@@ -122,8 +119,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     } else {
         // Default: list all active cards grouped by list
         let board = find_board(board_partial, by_id)?;
-        let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-        let all_cards = load_all_cards(&board.id, &lists);
+        let (lists, all_cards) = lists_and_cards(&board);
         println!("Board: {} [{}]", board.name, board.id);
         for list in &lists {
             let active: Vec<_> = list
@@ -148,8 +144,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
 
 fn edit(args: &[String], board_partial: &str, card_partial: &str, by_id: bool) -> anyhow::Result<()> {
     let board = find_board(board_partial, by_id)?;
-    let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-    let all_cards = load_all_cards(&board.id, &lists);
+    let (lists, all_cards) = lists_and_cards(&board);
     let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
     let card_id = card.id.clone();
 

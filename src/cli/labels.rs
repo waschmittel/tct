@@ -1,11 +1,10 @@
 //! `tct labels <board>` subcommand: list/create/delete/assign/remove board labels.
 
 use super::lookup::{find_board, find_card_in_lists, find_label};
-use super::util::{flag_value, flag_values2, label_color_name, load_all_cards};
+use super::util::{flag_value, flag_values2, label_color_name, lists_and_cards};
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
 use crate::model::label::LabelColor;
-use crate::storage::list_store;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args
@@ -36,8 +35,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     } else if let Some((card_partial, label_partial)) = flag_values2(args, "--assign") {
         let board = find_board(board_partial, by_id)?;
         let label = find_label(&board.labels, label_partial, by_id)?.clone();
-        let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-        let all_cards = load_all_cards(&board.id, &lists);
+        let (lists, all_cards) = lists_and_cards(&board);
         let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         if card.label_ids.contains(&label.id) {
             println!(
@@ -57,8 +55,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     } else if let Some((card_partial, label_partial)) = flag_values2(args, "--remove") {
         let board = find_board(board_partial, by_id)?;
         let label = find_label(&board.labels, label_partial, by_id)?.clone();
-        let lists = list_store::load_all_lists(&board.id, &board.list_order)?;
-        let all_cards = load_all_cards(&board.id, &lists);
+        let (lists, all_cards) = lists_and_cards(&board);
         let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         if !card.label_ids.contains(&label.id) {
             println!(
