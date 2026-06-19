@@ -136,7 +136,7 @@ impl BoardEditor {
         let diagnostics = repair_references(board_id, &meta, &mut cards);
         let lists = crate::model::list::build_lists(&meta, &cards, false);
         let num_lists = lists.len();
-        Ok(Self {
+        let editor = Self {
             board: LoadedBoard {
                 meta,
                 lists,
@@ -149,7 +149,12 @@ impl BoardEditor {
             },
             last_added_card_id: None,
             diagnostics,
-        })
+        };
+        #[cfg(debug_assertions)]
+        if let Err(e) = editor.check_invariants() {
+            panic!("board invariant violated after load+repair: {e}");
+        }
+        Ok(editor)
     }
 
     /// Test-only constructor for in-memory fixtures (no disk).
@@ -757,6 +762,87 @@ impl BoardEditor {
         }
         self.commit_pending(pending)?;
         self.board.clamp_selection();
+        #[cfg(debug_assertions)]
+        if let Err(e) = self.check_invariants() {
+            panic!("board invariant violated after applying command: {e}");
+        }
+        Ok(())
+    }
+
+    /// Verify the board's structural invariants, returning `Err` with the first
+    /// violation found. Run after `load` (post-repair) and after every `apply`
+    /// in debug builds, so a command that corrupts state fails loudly at the
+    /// point of introduction instead of surfacing later as a mystery bug (e.g.
+    /// the move-over-archived index-space regression — see ADR-0006). It is a
+    /// dev/test net, not a runtime guard: release builds skip it.
+    ///
+    /// Invariants:
+    /// 1. Every Card's `list_id` names a List in `meta.lists` (no orphan card —
+    ///    an orphan would be invisible in every view, the bug 0006 fought).
+    /// 2. Each active List's derived `card_ids` equals the canonical order
+    ///    rebuilt from card `position`s (derived view in sync with positions).
+    /// 3. `selected_card`/`scroll_offset` have one slot per active List,
+    ///    `selected_list` is in range, and each `selected_card` ordinal is
+    ///    within that List's visible-card count.
+    ///
+    /// Dangling `label_id`s are deliberately NOT checked: per 0006's lazy-cleanup
+    /// decision, `DeleteLabel` leaves dead refs on cards until their next save,
+    /// and `resolved_labels`/`matches_search` ignore unknown ids — tolerated
+    /// state, not corruption (`repair_references` strips them on load).
+    fn check_invariants(&self) -> Result<(), String> {
+        let b = &self.board;
+        let valid_lists: HashSet<&ShortId> = b.meta.lists.iter().map(|l| &l.id).collect();
+
+        for card in b.cards.values() {
+            if !valid_lists.contains(&card.list_id) {
+                return Err(format!(
+                    "card {} has list_id {:?} naming no known List",
+                    card.id, card.list_id
+                ));
+            }
+        }
+
+        for list in &b.lists {
+            let expected = crate::model::list::ordered_card_ids(&list.id, &b.cards);
+            if list.card_ids != expected {
+                return Err(format!(
+                    "list {} derived card_ids diverged from position order",
+                    list.id
+                ));
+            }
+        }
+
+        let n = b.lists.len();
+        if b.selected_card.len() != n {
+            return Err(format!(
+                "selected_card has {} slots, expected {n}",
+                b.selected_card.len()
+            ));
+        }
+        if b.scroll_offset.len() != n {
+            return Err(format!(
+                "scroll_offset has {} slots, expected {n}",
+                b.scroll_offset.len()
+            ));
+        }
+        if n > 0 && b.selected_list >= n {
+            return Err(format!("selected_list {} out of range (lists: {n})", b.selected_list));
+        }
+        for i in 0..n {
+            let count = b.visible_card_count(i);
+            let ord = b.selected_card[i];
+            if count == 0 && ord != 0 {
+                return Err(format!(
+                    "list idx {i} has no visible cards but selected_card ordinal is {ord}"
+                ));
+            }
+            if count > 0 && ord >= count {
+                return Err(format!(
+                    "list idx {i} selected_card ordinal {ord} >= visible count {count}"
+                ));
+            }
+        }
+
         Ok(())
     }
 
@@ -1414,6 +1500,61 @@ mod tests {
             detail_item_idx: 0,
             detail_scroll: 0,
         }
+    }
+
+    // Build a single-list board, one card homed in that list. `mutate` can
+    // break it before the invariant check runs.
+    fn invariant_board(mutate: impl FnOnce(&mut LoadedBoard)) -> BoardEditor {
+        let list_id = "lst00001".to_string();
+        let mut meta = BoardMeta::new("X".into());
+        meta.lists.push(ListMeta { id: list_id.clone(), name: "L".into(), archived: false });
+        let mut card = fixed_card("c0000001", "a");
+        card.list_id = list_id;
+        card.position = 1.0;
+        let cards: HashMap<_, _> = std::iter::once((card.id.clone(), card)).collect();
+        let lists = crate::model::list::build_lists(&meta, &cards, false);
+        let mut board = LoadedBoard {
+            meta,
+            lists,
+            cards,
+            selected_list: 0,
+            selected_card: vec![0],
+            scroll_offset: vec![0],
+            detail_item_idx: 0,
+            detail_scroll: 0,
+        };
+        mutate(&mut board);
+        BoardEditor::from_loaded(board)
+    }
+
+    #[test]
+    fn check_invariants_passes_on_well_formed_board() {
+        let editor = invariant_board(|_| {});
+        assert!(editor.check_invariants().is_ok());
+    }
+
+    #[test]
+    fn check_invariants_detects_orphan_card() {
+        let editor = invariant_board(|b| {
+            let id = b.lists[0].card_ids[0].clone();
+            b.cards.get_mut(&id).unwrap().list_id = "ghostlst".into();
+        });
+        let err = editor.check_invariants().unwrap_err();
+        assert!(err.contains("naming no known List"), "got: {err}");
+    }
+
+    #[test]
+    fn check_invariants_detects_selection_out_of_range() {
+        let editor = invariant_board(|b| b.selected_card[0] = 5);
+        let err = editor.check_invariants().unwrap_err();
+        assert!(err.contains("ordinal"), "got: {err}");
+    }
+
+    #[test]
+    fn check_invariants_detects_diverged_card_ids() {
+        let editor = invariant_board(|b| b.lists[0].card_ids.push("phantom0".into()));
+        let err = editor.check_invariants().unwrap_err();
+        assert!(err.contains("diverged"), "got: {err}");
     }
 
     #[test]
