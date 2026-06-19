@@ -34,8 +34,8 @@
 | Term            | Definition                                                                                    | Aliases to avoid                |
 | --------------- | --------------------------------------------------------------------------------------------- | ------------------------------- |
 | **App Mode**    | Top-level modal state (`BoardSelector`, `Normal`, `CardDetail`, `Insert`, `Command`, `Dialog`, `Help`) | State, screen, view      |
-| **Insert Target** | What is being edited inside `Insert` mode (e.g. `NewCardTitle`, `EditCardDescription`, `EditDueDate`) | Edit target, field      |
-| **Dialog Kind** | Variant of a modal dialog (confirmations, label picker, archived lists, card history, …)     | Popup, prompt, modal            |
+| **Insert Handler** | A struct implementing `InsertHandler` for one editable target (new card title, description, due date, …); the active one is `Box<dyn InsertHandler>` on `App` (ADR-0003) | Insert target, edit target, field |
+| **Dialog** | A struct implementing the `Dialog` trait for one modal kind (confirmations, label picker, archived lists, card history, …); active one is `Box<dyn Dialog>` (ADR-0003) | Dialog kind, popup, prompt, modal |
 | **Board Selector** | The screen listing all **Boards** for opening, renaming, archiving                         | Board picker, home screen       |
 | **Card Detail** | Focused view of one **Card** with its tabs (description, checklist, labels, history)          | Card view, detail panel         |
 | **Grab mode**   | Transient state where the selected **Card** moves with cursor keys                            | Drag, pickup, move mode         |
@@ -51,9 +51,9 @@
 
 ## Relationships
 
-- A **Board** owns 0..N **Lists**, ordered by `BoardMeta.list_order`
-- A **List** owns 0..N **Cards**, ordered by `CardList.card_ids`
-- A **Card** belongs to exactly one **List** at a time
+- A **Board** owns 0..N **Lists**, ordered by the inline `BoardMeta.lists` array (`list_order` is a legacy migration-only field)
+- A **List** owns 0..N **Cards**, ordered by each **Card**'s `position` (fractional rank); `CardList.card_ids` is the derived in-memory order
+- A **Card** belongs to exactly one **List** at a time, via its own `list_id`
 - A **Card** has 0..N **Labels**, each referencing a **Label** defined on its parent **Board**
 - A **Card** has 0..N **Checklist Items** and 0..N **History Entries** (capped at 50)
 - A **Board** has exactly one **Accent Color**; **Labels** each have one **Label Color**
@@ -82,5 +82,5 @@
 - **"List"** is overloaded — the domain object collides with stdlib/`Vec`. Codebase resolves this by naming the struct `CardList`. In docs and chat, prefer **List** for the domain concept; reserve `Vec`/`Vec<T>` for the data structure.
 - **"Archived"** vs **"Deleted"** — there is no true delete in the domain; every "delete" action is an archive. Avoid the word **delete** in user-facing copy unless referring to **Labels**, which *are* hard-deleted (see `ConfirmDeleteLabel`).
 - **"Color"** alone is ambiguous — clarify as **Label Color** (per-label) or **Accent Color** (per-board). Both share the `LabelColor` type but serve different roles.
-- **"Edit"** vs **"Insert"** — the `Insert` **App Mode** covers both new-entity creation *and* editing existing fields (see `InsertTarget` variants `NewCardTitle` vs `EditCardTitle`). Prefer **Insert mode** for the mode itself; say "create" or "edit" when describing the user-visible action.
-- **"List"** in `CardDetailTab` and in `BoardMeta.list_order` always means the domain **List**, never a generic collection. Method names like `clamp_selection` operate on the list-of-lists.
+- **"Edit"** vs **"Insert"** — the `Insert` **App Mode** covers both new-entity creation *and* editing existing fields (distinct **Insert Handler** structs, e.g. a new-card-title handler vs an edit-title handler — ADR-0003). Prefer **Insert mode** for the mode itself; say "create" or "edit" when describing the user-visible action.
+- **"List"** in `CardDetailTab` and in `BoardMeta.lists` always means the domain **List**, never a generic collection. Method names like `clamp_selection` operate on the list-of-lists.

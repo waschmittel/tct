@@ -29,8 +29,8 @@ graph LR
 
 | Principle | What it means |
 |-----------|--------------|
-| **Files are the API** | Every board, list, and card is a standalone JSON file. Any tool that can read/write files can interact with tct data. |
-| **Sync-friendly by default** | One file per entity, atomic writes (write `.tmp` then rename), and periodic reload make tct safe for use with git, Dropbox, Syncthing, or any file sync tool. |
+| **Files are the API** | Every board and card is a standalone JSON file (lists live inline in the board file). Any tool that can read/write files can interact with tct data. |
+| **Sync-friendly by default** | One file per board and per card, atomic writes (write `.tmp` then rename), and periodic reload make tct safe for use with git, Dropbox, Syncthing, or any file sync tool. |
 | **Keyboard-first** | Every action is reachable from the keyboard. No mouse needed. Modal input (like Vim) keeps keybindings contextual and safe. |
 | **Dual interface** | The same data is accessible via interactive TUI or headless CLI. Scripts and AI agents use the CLI; humans use the TUI. Both read and write the same files. |
 | **Zero infrastructure** | Single binary. No database. No network. Install and run. |
@@ -93,21 +93,22 @@ This means:
   board_order.json                 # Display order of boards (JSON array of IDs)
   boards/
     a1b2c3d4/                      # One directory per board
-      board.json                   # Board metadata: name, labels, accent color, list order
-      list-e5f6a7b8.json           # List: name + ordered card IDs
-      list-c9d0e1f2.json
-      card-11223344.json           # Card: title, description, checklist, labels, due date
+      board.json                   # Board metadata: name, inline lists, labels, accent color
+      card-11223344.json           # Card: list_id, position, title, description, checklist, labels, due date
       card-55667788.json
     b2c3d4e5/                      # Another board
       board.json
       ...
 ```
 
-Every entity (board, list, card) has its own file. This is deliberate:
+Lists are defined inline in `board.json`; there are no `list-*.json` files. A
+card owns its own list membership (`list_id`) and order (`position`). This is
+deliberate:
 
 - **Granular diffs** — changing one card produces a one-file diff, not a monolithic database change
 - **Conflict-friendly** — two people editing different cards never conflict, even without locking
 - **Human-readable** — open any `.json` file in an editor to inspect or fix data
+- **No divergence** — a card's archived flag and its list membership live in one file, so they cannot disagree (see ADR-0006)
 
 ### Setting up background sync
 

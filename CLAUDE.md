@@ -17,10 +17,10 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 - **Board Directory** (`src/board_directory.rs`): owns the board collection — create/archive/restore/rename/cycle accent/display order/listing. Used by the board selector, insert/dialog side effects, and `tct boards`. Stores are internals of the two aggregates.
 - **Visibility**: `LoadedBoard::visible_cards(list_idx, search)` is the single source of truth for which Cards show (archived always hidden; search hides non-matching). Navigation, clamping, and rendering all consume it.
 - **Dialog trait** (`src/dialog/`): One struct per dialog kind implementing `Dialog { render, handle_key, background }`. Each holds its own payload + cursor/scroll state. Returns `DialogOutcome { apply: Option<Command>, side_effect, status, follow }`. The dispatcher in `input/dialog_input.rs` interprets the outcome. See `docs/adr/0003-dialog-and-insert-as-traits.md`.
-- **InsertHandler trait** (`src/insert/`): One struct per insert target. Handlers are grouped by widget kind: `line_editor.rs` (11 line inputs sharing `LineInput`), `markdown_editor.rs` (description editor over `TextAreaInput`), `date_picker.rs` (due-date picker). Returns `InsertOutcome::{Stay, Cancel, Confirm(Command), ConfirmAndOpenDialog, OpenDialog, CancelWithStatus, ConfirmSideEffect}`. Dispatcher in `input/insert.rs`.
-- **Storage**: JSON files under `~/.tct/boards/`. One file per board (`board.json`) and per card (`card-<id>.json`); **no list files**. Lists are defined inline in `board.json` as ordered `lists: [ListMeta]`. A Card owns its membership (`list_id`) and order (`position`, fractional rank) — see ADR-0006. In-memory `CardList.card_ids` is *derived* (`model/list.rs::build_lists`/`ordered_card_ids`), never persisted. All writes use `atomic_write` (write `.tmp`, then rename). Override path with `TCT_DATA_DIR` env var. Legacy `list-*.json` boards are migrated on load by `storage/migrate.rs` (triggered from `board_store::load_board`); `list_store` is now `#[cfg(test)]`.
+- **InsertHandler trait** (`src/insert/`): One struct per insert target, grouped by widget kind: `line_editor.rs` (single-line inputs sharing `LineInput`), `markdown_editor.rs` (description editor over `TextAreaInput`), `date_picker.rs`. Returns `InsertOutcome` (`Stay`, `Cancel`, `Confirm(Command)`, `ConfirmAndOpenDialog`, `OpenDialog`, …). Dispatcher in `input/insert.rs`.
+- **Storage**: JSON files under `~/.tct/boards/` (override with `TCT_DATA_DIR`). One file per board (`board.json`) and per card (`card-<id>.json`); **no list files** — lists are inline ordered `lists: [ListMeta]` in `board.json`. A Card owns membership (`list_id`) + order (`position`, fractional rank) — ADR-0006; `CardList.card_ids` is *derived* (`model/list.rs`), never persisted. All writes via `atomic_write` (`.tmp` then rename). Legacy `list-*.json` boards migrate on load (`storage/migrate.rs` via `board_store::load_board`); `list_store` is now `#[cfg(test)]`.
 - **Description editing**: Lives on the `MarkdownEditor` insert handler (`src/insert/markdown_editor.rs`). Wraps `ratatui-textarea::TextArea` via `TextAreaInput` shared base. List autocontinue + renumbering + nest/unnest also live there. Renderer in `card_detail.rs::render_description_editor()` reads from the handler.
-- **Markdown rendering**: `MarkdownRenderer` in `ui/markdown.rs`. Word-wrap at `WRAP_WIDTH` (80 chars). `render()` returns a `Rendered` that owns the source↔visual cursor mapping: `cursor_at` (source→visual), `source_pos_at` (visual→source), `visual_line_count`, `src_row_for`. One wrap implementation for rendering and cursor movement.
+- **Markdown rendering**: `MarkdownRenderer` in `ui/markdown.rs`, word-wrap at `WRAP_WIDTH` (80). `render() -> Rendered` owns the source↔visual cursor mapping (see Key Patterns); one wrap impl serves both rendering and cursor movement.
 - **Label colors**: `LabelColor` enum with named pastel variants + `Custom { r, g, b }`. New labels get auto-generated pastel colors via `LabelColor::generate_pastel()` which picks maximally distant hue from existing labels.
 - **Board accent color**: Each board has an `accent_color: LabelColor` field in `BoardMeta`. All UI highlight/accent colors use `app.accent_color()` instead of hardcoded `Color::Cyan`. New boards auto-get a differentiated pastel color. Users cycle with 'c' in board selector. Help overlay keeps structural Cyan.
 - **Search**: When active, non-matching cards are hidden (not just dimmed). Navigation skips hidden cards. First match auto-selected on search confirm.
@@ -66,11 +66,10 @@ The help overlay is the single source of truth for keybindings — README.md no 
 
 When changing keybindings or features, update:
 - The mode's `KEYMAP` table (help overlay generates from it)
-- `src/ui/status_bar.rs` — mode hint strings (mode-level, rarely changes)
-- `src/ui/card_detail.rs` — bottom hint spans (for card detail modes)
+- `src/ui/status_bar.rs` mode hints; `src/ui/card_detail.rs` bottom hint spans
 - This file if architectural patterns change
 
-Keybindings are not duplicated in README.md (help overlay only). Full CLI reference lives in `cli/mod.rs` `HELP`; README.md keeps only basic usage + example workflow. Module-layout docs live in `docs/architecture.md`.
+Doc homes (don't duplicate elsewhere): keybindings → help overlay only; full CLI reference → `cli/mod.rs` `HELP`; module layout → `docs/architecture.md`; README keeps basic usage + one example workflow.
 
 ## Key Patterns
 
@@ -82,7 +81,7 @@ Keybindings are not duplicated in README.md (help overlay only). Full CLI refere
 - `card.touch()` — updates `updated_at` timestamp
 - `board.clamp_selection()` — fix selection indices after card removal
 - `markdown::WRAP_WIDTH` — word-wrap width for description (80 chars)
-- `markdown::build_visual_map()` / `markdown::source_to_visual()` — map source cursor ↔ visual (wrapped) line position
+- Source↔visual cursor mapping: `MarkdownRenderer::render() -> Rendered`, then `Rendered::{cursor_at, source_pos_at, src_row_for, visual_line_count}`
 
 ## Agent skills
 
@@ -96,4 +95,4 @@ Canonical names (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-hum
 
 ### Domain docs
 
-Single-context (`CONTEXT.md` + `docs/adr/` at root). See `docs/agents/domain.md`.
+Single-context: `UBIQUITOUS_LANGUAGE.md` (domain glossary) + `docs/adr/` at root. See `docs/agents/domain.md`.

@@ -150,7 +150,8 @@ graph TD
 | **Atomic writes** | Write to `.tmp` then rename; prevents corruption on crash |
 | **Single-threaded event loop** | Crossterm polling with 250ms tick; simple, sufficient for TUI perf |
 | **Dual interface (TUI + CLI)** | Same storage layer serves both; CLI enables automation |
-| **Type-driven modes** | `AppMode`, `InsertTarget`, `DialogKind` enums make illegal states unrepresentable |
+| **Type-driven modes** | `AppMode` enum drives dispatch; `Dialog` / `InsertHandler` traits make each dialog/insert target a self-contained struct (ADR-0003) |
+| **Single mutation chokepoint** | All domain writes go through the `Command` enum applied by the Board Editor aggregate (ADR-0001/0002) |
 
 ---
 
@@ -175,6 +176,9 @@ graph TB
             CLI_UTIL["util.rs<br>flags + formatting"]
         end
         APP_MOD["app.rs<br><i>App state, modes, board loading</i>"]
+        EDITOR["board_editor.rs<br><i>Aggregate root for open board (ADR-0001/0002)</i>"]
+        DIRECTORY["board_directory.rs<br><i>Board collection ops (ADR-0004)</i>"]
+        COMMAND["command.rs<br><i>Command enum — mutation chokepoint (ADR-0002)</i>"]
 
         subgraph "model/"
             BOARD_M["board.rs<br>BoardMeta, ListMeta"]
@@ -194,17 +198,25 @@ graph TB
 
         subgraph "input/"
             INPUT_MOD["mod.rs<br>Input dispatch by AppMode"]
+            KEYMAP_I["keymap.rs<br>Binding table + lookup + help_rows (ADR-0005)"]
             NORMAL_I["normal.rs<br>Board view keys"]
             DETAIL_I["card_detail_input.rs<br>Card detail keys"]
-            subgraph "insert/"
-                INSERT_MOD["mod.rs<br>dispatch + plain text-buffer"]
-                INSERT_DESC["description.rs<br>desc editor keys"]
-                INSERT_LIST["list_editing.rs<br>list autocontinue / renumber"]
-                INSERT_DUE["due_date.rs<br>date picker"]
-            end
-            DIALOG_I["dialog_input.rs<br>Dialog handlers"]
+            INSERT_I["insert.rs<br>Insert dispatch to active InsertHandler"]
+            DIALOG_I["dialog_input.rs<br>Dialog dispatch + side effects"]
             BSEL_I["board_selector_input.rs<br>Board selector keys"]
             CMD_I["command.rs<br>Search command"]
+        end
+
+        subgraph "insert/ (ADR-0003)"
+            INS_MOD["mod.rs<br>InsertHandler trait + InsertOutcome"]
+            INS_LINE["line_editor.rs<br>single-line inputs"]
+            INS_MD["markdown_editor.rs<br>desc editor: autocontinue / nest"]
+            INS_DATE["date_picker.rs<br>due-date picker"]
+        end
+
+        subgraph "dialog/ (ADR-0003)"
+            DLG_MOD["mod.rs<br>Dialog trait + DialogOutcome"]
+            DLG_STRUCTS["confirm_* / label_picker / label_manager<br>archived_* / card_history / color_picker"]
         end
 
         subgraph "ui/"
@@ -231,12 +243,21 @@ graph TB
     ENTRY --> EVENT
     ENTRY --> INPUT_MOD
     ENTRY --> UI_MOD
-    APP_MOD --> BOARD_S
-    APP_MOD --> CARD_S
+    APP_MOD --> EDITOR
+    EDITOR --> COMMAND
+    EDITOR --> BOARD_S
+    EDITOR --> CARD_S
+    DIRECTORY --> BOARD_S
     BOARD_S --> MIGRATE_S
     INPUT_MOD --> APP_MOD
+    INPUT_MOD --> EDITOR
+    INPUT_MOD --> DIRECTORY
     UI_MOD --> APP_MOD
 ```
+
+Mutations flow `input/` → `Command` → `BoardEditor::apply` → stores; the editor
+is the only path to disk for the open board, and `board_directory` is the only
+path for board-collection operations (ADR-0001/0002/0004).
 
 ### 5.2 Level 2 — Module Responsibilities
 
@@ -267,8 +288,9 @@ graph TB
 | `board_selector_input.rs` | `BoardSelector` |
 | `normal.rs` | `Normal` (board view) |
 | `card_detail_input.rs` | `CardDetail` |
-| `insert/` | `Insert(*)` — all text editing (split into `description.rs`, `list_editing.rs`, `due_date.rs`) |
-| `dialog_input.rs` | `Dialog(*)` — all dialogs |
+| `keymap.rs` | Generic `Binding` table + `lookup`/`help_rows`, shared by the three table-driven modes (ADR-0005) |
+| `insert.rs` | `Insert` — dispatches keys to the active `Box<dyn InsertHandler>` (handlers live in `src/insert/`) |
+| `dialog_input.rs` | `Dialog` — dispatches to the active `Box<dyn Dialog>` and applies side effects (dialogs live in `src/dialog/`) |
 | `command.rs` | `Command` (search bar) |
 
 #### ui/ — Rendering (View)
@@ -496,13 +518,13 @@ graph LR
     AppMode -->|BoardSelector| BSI[board_selector_input]
     AppMode -->|Normal| NI[normal]
     AppMode -->|CardDetail| CDI[card_detail_input]
-    AppMode -->|Insert_target| II[insert]
-    AppMode -->|Dialog_kind| DI[dialog_input]
+    AppMode -->|Insert| II[insert → Box dyn InsertHandler]
+    AppMode -->|Dialog| DI[dialog_input → Box dyn Dialog]
     AppMode -->|Command| CI[command]
     AppMode -->|Help| HI[inline handler]
 ```
 
-`InsertTarget` (12 variants) refines what text input applies to. `DialogKind` (10 variants) determines which dialog renders and handles input.
+`Insert` and `Dialog` are parameterless modes: the active handler is a `Box<dyn InsertHandler>` / `Box<dyn Dialog>` stored on `App`, each a self-contained struct that owns its render, input handling, and state (ADR-0003). The other modes dispatch through per-mode keymap tables (ADR-0005).
 
 ### 8.3 ID Generation
 
@@ -556,63 +578,24 @@ Migrated data is written back on load (lazy migration).
 
 ## 9. Architecture Decisions
 
-### ADR-1: JSON File Storage over SQLite
+The numbered, dated decision records live in [`docs/adr/`](adr/). Summary:
 
-**Context:** Need persistent storage for boards, lists, cards.
+| ADR | Decision |
+|-----|----------|
+| [0001](adr/0001-board-editor-aggregate.md) | Board Editor aggregate root — the only write path to disk for the open board |
+| [0002](adr/0002-command-enum-scope.md) | `Command` enum is the sole chokepoint for domain mutations |
+| [0003](adr/0003-dialog-and-insert-as-traits.md) | `Dialog` / `InsertHandler` traits replace flat `DialogKind` / `InsertTarget` enums |
+| [0004](adr/0004-board-directory.md) | Board Directory owns board-collection operations |
+| [0005](adr/0005-keymap-tables.md) | Keymap tables drive both dispatch and the help overlay |
+| [0006](adr/0006-card-owned-list-membership.md) | Cards own their list membership (`list_id` + `position`); no `list-*.json` files |
 
-**Decision:** Use individual JSON files (one per entity) instead of SQLite.
+Foundational decisions not captured as ADRs:
 
-**Rationale:**
-- Human-readable, debuggable
-- Git-friendly (meaningful diffs per card)
-- No native library linking
-- Enables multi-tool access (edit JSON directly, sync via git)
-- Trade-off: no transactions, no indexing, linear scan for search
-
-### ADR-2: Single-threaded Event Loop
-
-**Context:** TUI needs responsive input handling.
-
-**Decision:** Single-threaded event loop with 250ms poll timeout.
-
-**Rationale:**
-- crossterm polling is non-blocking
-- All I/O is local filesystem (fast enough synchronous)
-- No network calls, no need for async
-- Simpler reasoning about state mutations
-
-### ADR-3: Immediate-mode Rendering
-
-**Context:** UI needs to reflect state changes instantly.
-
-**Decision:** Full re-render on every frame via ratatui.
-
-**Rationale:**
-- No retained widget state to keep in sync
-- ratatui handles diffing at the terminal cell level
-- UI is simple enough that full render is fast
-
-### ADR-4: Modal Input over Keychord System
-
-**Context:** Many actions needed, limited key space.
-
-**Decision:** Vim-style modal input with `AppMode` enum.
-
-**Rationale:**
-- Same key can mean different things in different modes
-- Prevents accidental destructive actions (e.g., `d` for delete only in Normal mode)
-- Familiar to developer audience
-
-### ADR-5: Dual Interface (TUI + CLI)
-
-**Context:** Need both interactive and scriptable access.
-
-**Decision:** Single binary with arg-based dispatch. CLI uses same storage layer.
-
-**Rationale:**
-- CLI enables AI agent integration, shell scripting, piping
-- No separate server/client; same data format
-- CLI includes fuzzy name matching with `--by-id` fallback
+- **JSON files over SQLite** — human-readable, git-friendly diffs, no native linking; trade-off is no transactions/indexing and linear-scan search.
+- **Single-threaded event loop** (250ms poll) — crossterm polling is non-blocking and all I/O is local; no async needed.
+- **Immediate-mode rendering** — full re-render each frame via ratatui; no retained widget state to keep in sync.
+- **Modal input** — Vim-style `AppMode` lets one key mean different things per mode and guards destructive actions.
+- **Dual interface (TUI + CLI)** — single binary, shared storage layer; CLI enables scripting and AI-agent use.
 
 ---
 
@@ -639,7 +622,7 @@ mindmap
     Maintainability
       Type-driven mode dispatch
       Clear module boundaries
-      ~4100 lines total
+      ~15k lines total (incl. tests)
     Portability
       crossterm abstraction
       No platform-specific deps
@@ -682,8 +665,10 @@ mindmap
 | **Label** | A board-level named tag with a color, assignable to cards via `label_ids`. |
 | **ShortId** | 8-character hex string (UUID v4 prefix) used as unique identifier. |
 | **AppMode** | Enum controlling which input handler and renderer are active. |
-| **InsertTarget** | Enum specifying what text field is being edited in Insert mode. |
-| **DialogKind** | Enum specifying which dialog is displayed. |
+| **InsertHandler** | Trait; one struct per insert target owns its render + input + buffer state (ADR-0003). |
+| **Dialog** | Trait; one struct per dialog kind owns its render + input + state (ADR-0003). |
+| **Board Editor** | Aggregate root for the open board; only write path to disk (ADR-0001). |
+| **Command** | Enum covering every domain mutation; applied via `BoardEditor::apply` (ADR-0002). |
 | **Atomic write** | Write to `.tmp` then rename; ensures no partial file content. |
 | **Accent color** | Per-board `LabelColor` used for all UI highlights instead of hardcoded Cyan. |
 | **Pastel generation** | HSL-based algorithm that picks maximally distant hue from existing colors. |
