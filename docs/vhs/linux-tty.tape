@@ -1,5 +1,5 @@
 # vhs tape: exercises the degraded rendering tier (TERM=linux) and the
-# shift-free card-move bindings. vhs's xterm-based terminal renders more
+# shift-free grab-mode card moves. vhs's xterm-based terminal renders more
 # glyphs than a real console font, but TERM=linux makes the binary take
 # the same code path a real console would: 16-color quantization,
 # double-line selection border, `x` check marks. Also the only tape that
@@ -30,15 +30,19 @@ Sleep 2s
 Enter
 Sleep 1.5s
 
-# Move the selected card without Shift: down/up within the list,
-# then to the adjacent list and back
-Type "J"
+# Grab the selected card (status chip flips to MOVE), move it around
+# with plain arrows, then drop it back where it started
+Type "m"
 Sleep 800ms
-Type "K"
+Down
 Sleep 800ms
-Type "]"
+Right
 Sleep 800ms
-Type "["
+Left
+Sleep 800ms
+Up
+Sleep 800ms
+Type "m"
 Sleep 1s
 
 # Card detail shows the console-safe checklist marks

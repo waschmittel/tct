@@ -254,6 +254,19 @@ fn snapshot_date_picker() {
     insta::assert_snapshot!(buffer_to_string(terminal.backend().buffer()));
 }
 
+/// Grab state: the status-bar chip flips to MOVE while `m` has a card
+/// grabbed (arrow keys move it instead of navigating).
+#[test]
+fn snapshot_board_view_grab_mode() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('m'));
+        assert!(app.grab_active);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
 /// Degraded tier (Linux console): the selected card gets a double-line
 /// border instead of the heavy one — visible in the text golden.
 #[test]

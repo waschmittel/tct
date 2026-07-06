@@ -52,6 +52,10 @@ fn main() -> anyhow::Result<()> {
     let open_board_id = cli::resolve_board_flag(&args)?;
 
     let mut terminal = ratatui::init();
+    // The Linux console has no alternate screen buffer, so entering it does
+    // not blank the screen — without a forced clear, the diff renderer
+    // never repaints "empty" cells and stale shell output shines through.
+    terminal.clear()?;
     let mut app = App::new(open_board_id)?;
     // Only the real TUI entry consults the environment — App::new defaults
     // to full caps so tests and goldens stay deterministic.

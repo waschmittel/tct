@@ -9,6 +9,9 @@ use crate::app::{App, AppMode};
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let mode_str = match &app.mode {
         AppMode::BoardSelector => "BOARDS",
+        // Grab state lives inside Normal mode (input/normal.rs swallows
+        // everything but arrows/drop keys while it's set).
+        AppMode::Normal if app.grab_active => "MOVE",
         AppMode::Normal => "NORMAL",
         AppMode::CardDetail => "DETAIL",
         AppMode::Insert => "INSERT",

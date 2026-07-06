@@ -26,6 +26,7 @@ pub enum Action {
     MoveCardRight,
     MoveCardUp,
     MoveCardDown,
+    GrabCard,
     JumpFirstCard,
     JumpLastCard,
     SwitchBoardPrev,
@@ -76,17 +77,14 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Char('a'), shift: None, action: Action::ArchiveCard, keys: "a", help: "Archive card", section: "Card" },
     Binding { code: KeyCode::Char('v'), shift: None, action: Action::ViewArchivedCards, keys: "v", help: "View archived cards", section: "Card" },
     Binding { code: KeyCode::Char('h'), shift: None, action: Action::CardHistoryDialog, keys: "h", help: "View change history", section: "Card" },
-    // Move. The char aliases are not redundant: the Linux console (and
-    // vhs) never transmits modifiers on arrow keys, so Shift+arrows can't
-    // be the only way to move cards.
+    // Move. Grab mode exists because the Linux console (and vhs) never
+    // transmits modifiers on arrow keys — Shift+arrows can't be the only
+    // way to move cards.
     Binding { code: KeyCode::Left, shift: Some(true), action: Action::MoveCardLeft, keys: "Shift+Left/Right", help: "Move to adjacent list", section: "Move" },
     Binding { code: KeyCode::Right, shift: Some(true), action: Action::MoveCardRight, keys: "Shift+Left/Right", help: "Move to adjacent list", section: "Move" },
-    Binding { code: KeyCode::Char('['), shift: None, action: Action::MoveCardLeft, keys: "[ / ]", help: "Move to adjacent list", section: "Move" },
-    Binding { code: KeyCode::Char(']'), shift: None, action: Action::MoveCardRight, keys: "[ / ]", help: "Move to adjacent list", section: "Move" },
     Binding { code: KeyCode::Up, shift: Some(true), action: Action::MoveCardUp, keys: "Shift+Up/Down", help: "Move within list", section: "Move" },
     Binding { code: KeyCode::Down, shift: Some(true), action: Action::MoveCardDown, keys: "Shift+Up/Down", help: "Move within list", section: "Move" },
-    Binding { code: KeyCode::Char('K'), shift: None, action: Action::MoveCardUp, keys: "K / J", help: "Move within list", section: "Move" },
-    Binding { code: KeyCode::Char('J'), shift: None, action: Action::MoveCardDown, keys: "K / J", help: "Move within list", section: "Move" },
+    Binding { code: KeyCode::Char('m'), shift: None, action: Action::GrabCard, keys: "m", help: "Grab/drop card (arrows)", section: "Move" },
     // Lists
     Binding { code: KeyCode::Char('N'), shift: None, action: Action::NewList, keys: "N", help: "New list", section: "Lists" },
     Binding { code: KeyCode::Char('r'), shift: None, action: Action::RenameList, keys: "r", help: "Rename list", section: "Lists" },
@@ -110,6 +108,24 @@ pub static KEYMAP: &[Binding<Action>] = &[
 ];
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
+    // Grab state: plain arrows move the grabbed card — usable on terminals
+    // that never report Shift+arrows (Linux console). Every other key is
+    // swallowed until the card is dropped, so the mode can't change
+    // underneath an active grab.
+    if app.grab_active {
+        match key.code {
+            KeyCode::Left => return move_card_in_direction(app, MoveDir::Left),
+            KeyCode::Right => return move_card_in_direction(app, MoveDir::Right),
+            KeyCode::Up => return move_card_in_direction(app, MoveDir::Up),
+            KeyCode::Down => return move_card_in_direction(app, MoveDir::Down),
+            KeyCode::Esc | KeyCode::Enter | KeyCode::Char('m') => {
+                app.grab_active = false;
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
     let Some(action) = keymap::lookup(KEYMAP, key.code, shift) else {
         return Ok(());
@@ -177,6 +193,11 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         Action::MoveCardRight => move_card_in_direction(app, MoveDir::Right)?,
         Action::MoveCardUp => move_card_in_direction(app, MoveDir::Up)?,
         Action::MoveCardDown => move_card_in_direction(app, MoveDir::Down)?,
+        Action::GrabCard => {
+            if app.board().and_then(|b| b.current_card_id()).is_some() {
+                app.grab_active = true;
+            }
+        }
         Action::JumpFirstCard => {
             if let Some(editor) = &mut app.editor {
                 editor.select_first_card();
@@ -589,14 +610,30 @@ mod tests {
         });
     }
 
-    // Char aliases for the card moves: terminals without modifier
-    // reporting on arrows (Linux console) can't produce Shift+arrow.
+    // Grab mode: `m` grabs the selected card, plain arrows move it — the
+    // only move path on terminals without modifier reporting on arrows
+    // (Linux console).
 
     #[test]
-    fn close_bracket_moves_card_to_next_list() {
+    fn grab_then_down_moves_card_within_list() {
         with_temp_dir(|| {
             let (mut app, _, a_cards, _) = fixture();
-            handle(&mut app, key(KeyCode::Char(']'))).unwrap();
+            handle(&mut app, key(KeyCode::Char('m'))).unwrap();
+            assert!(app.grab_active);
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            let board = app.board().unwrap();
+            assert_eq!(board.lists[0].card_ids[1], a_cards[0].id);
+            assert_eq!(board.selected_card[0], 1);
+            assert!(app.grab_active, "card stays grabbed across moves");
+        });
+    }
+
+    #[test]
+    fn grab_then_right_moves_card_to_next_list() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            handle(&mut app, key(KeyCode::Char('m'))).unwrap();
+            handle(&mut app, key(KeyCode::Right)).unwrap();
             let board = app.board().unwrap();
             assert_eq!(board.lists[0].card_ids.len(), 2);
             assert!(board.lists[1].card_ids.contains(&a_cards[0].id));
@@ -605,40 +642,48 @@ mod tests {
     }
 
     #[test]
-    fn open_bracket_moves_card_to_previous_list() {
+    fn esc_drops_grab_and_arrows_navigate_again() {
         with_temp_dir(|| {
             let (mut app, _, a_cards, _) = fixture();
-            handle(&mut app, key(KeyCode::Char(']'))).unwrap();
-            handle(&mut app, key(KeyCode::Char('['))).unwrap();
+            handle(&mut app, key(KeyCode::Char('m'))).unwrap();
+            handle(&mut app, key(KeyCode::Esc)).unwrap();
+            assert!(!app.grab_active);
+            handle(&mut app, key(KeyCode::Down)).unwrap();
             let board = app.board().unwrap();
-            assert_eq!(board.lists[0].card_ids.len(), 3);
-            assert!(board.lists[0].card_ids.contains(&a_cards[0].id));
-            assert_eq!(board.selected_list, 0);
-        });
-    }
-
-    /// Real terminals report `J` as Char('J') *with* SHIFT — the binding
-    /// must match regardless of the modifier flag.
-    #[test]
-    fn uppercase_j_moves_card_down() {
-        with_temp_dir(|| {
-            let (mut app, _, a_cards, _) = fixture();
-            handle(&mut app, shift_key(KeyCode::Char('J'))).unwrap();
-            let board = app.board().unwrap();
-            assert_eq!(board.lists[0].card_ids[1], a_cards[0].id);
+            // Selection moved, card order untouched.
+            assert_eq!(board.lists[0].card_ids[0], a_cards[0].id);
             assert_eq!(board.selected_card[0], 1);
         });
     }
 
     #[test]
-    fn uppercase_k_moves_card_up() {
+    fn m_drops_grab_again() {
         with_temp_dir(|| {
-            let (mut app, _, a_cards, _) = fixture();
-            app.board_mut().unwrap().selected_card[0] = 1;
-            handle(&mut app, shift_key(KeyCode::Char('K'))).unwrap();
-            let board = app.board().unwrap();
-            assert_eq!(board.lists[0].card_ids[0], a_cards[1].id);
-            assert_eq!(board.selected_card[0], 0);
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, key(KeyCode::Char('m'))).unwrap();
+            handle(&mut app, key(KeyCode::Char('m'))).unwrap();
+            assert!(!app.grab_active);
+        });
+    }
+
+    #[test]
+    fn grab_swallows_other_keys() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            handle(&mut app, key(KeyCode::Char('m'))).unwrap();
+            handle(&mut app, key(KeyCode::Char('n'))).unwrap();
+            assert!(app.grab_active);
+            assert!(matches!(app.mode, AppMode::Normal));
+            assert!(app.insert.is_none(), "grab must not open the new-card insert");
+        });
+    }
+
+    #[test]
+    fn grab_needs_a_selected_card() {
+        with_temp_dir(|| {
+            let (mut app, _) = single_list_fixture(&[]);
+            handle(&mut app, key(KeyCode::Char('m'))).unwrap();
+            assert!(!app.grab_active);
         });
     }
 

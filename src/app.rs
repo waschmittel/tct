@@ -149,6 +149,11 @@ pub struct App {
     /// Defaults to full so tests are environment-independent; `main` sets
     /// the detected value before the first frame.
     pub caps: crate::term_caps::TermCaps,
+    /// Grab state in the board view (`m`): while set, plain arrow keys
+    /// move the selected card and all other keys are swallowed — the
+    /// shift-free move path for terminals that don't report Shift+arrows
+    /// (Linux console). Only `input/normal.rs` reads or clears it.
+    pub grab_active: bool,
 }
 
 /// Resolved once at startup; the data dir cannot change mid-session.
@@ -186,6 +191,7 @@ impl App {
             version: crate::VERSION,
             data_dir_display: data_dir_display(),
             caps: crate::term_caps::TermCaps::full(),
+            grab_active: false,
         };
         if let Some(board_id) = open_board_id {
             app.load_board(&board_id)?;
@@ -225,6 +231,7 @@ impl App {
         self.editor.is_some()
             && matches!(self.mode, AppMode::Normal | AppMode::Help | AppMode::CardDetail)
             && self.insert.is_none()
+            && !self.grab_active
     }
 
     fn try_reload_board(&mut self) {
@@ -466,6 +473,7 @@ mod tests {
             version: crate::VERSION,
             data_dir_display: data_dir_display(),
             caps: crate::term_caps::TermCaps::full(),
+            grab_active: false,
         }
     }
 
@@ -689,6 +697,27 @@ mod tests {
             app.on_tick();
 
             // Should NOT have reloaded
+            assert_eq!(app.board().unwrap().lists[0].card_ids.len(), 3);
+        });
+    }
+
+    #[test]
+    fn reload_skipped_while_card_grabbed() {
+        with_temp_dir(|| {
+            let (meta, mut list, _) = make_board_with_cards();
+            let mut app = App::new(Some(meta.id.clone())).unwrap();
+            app.grab_active = true;
+
+            let new_card = Card::new("Disk".into());
+            card_store::save_card(&meta.id, &new_card).unwrap();
+            list.card_ids.push(new_card.id.clone());
+            list_store::save_list(&meta.id, &list).unwrap();
+
+            app.reload_interval = Duration::from_millis(0);
+            app.last_reload = Instant::now() - Duration::from_secs(1);
+            app.on_tick();
+
+            // Reload would clobber the in-flight move — skipped.
             assert_eq!(app.board().unwrap().lists[0].card_ids.len(), 3);
         });
     }

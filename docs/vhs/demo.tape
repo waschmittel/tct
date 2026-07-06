@@ -5,8 +5,8 @@
 # between runs). Regenerate the golden via docs/vhs/check.sh, not raw vhs.
 # Regression check: docs/vhs/check.sh
 #
-# Note: vhs cannot send Shift+Arrow; card moves are demonstrated via their
-# char aliases in linux-tty.tape.
+# Note: vhs cannot send Shift+Arrow; card moves are demonstrated via
+# grab mode (m + arrows) in linux-tty.tape.
 
 Output docs/vhs/demo.gif
 Output docs/vhs/golden/demo.txt

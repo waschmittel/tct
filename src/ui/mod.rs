@@ -305,7 +305,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 row("Up / Down", "Previous / next week"),
                 row("PgUp / PgDn", "Previous / next month"),
                 row("Shift+PgUp/PgDn", "Previous / next year"),
-                row("< / >", "Previous / next year"),
+                row(", / .", "Previous / next year"),
                 row("Home / End", "First / last of month"),
                 row("t", "Today"),
             ],

@@ -65,12 +65,13 @@ impl InsertHandler for DatePicker {
                 InsertOutcome::Stay
             }
             // Year jump. Also reachable via Shift+PgUp/PgDn, but terminals
-            // without modifier reporting (Linux console) need plain chars.
-            KeyCode::Char('<') => {
+            // without modifier reporting (Linux console) need plain keys —
+            // `,`/`.` are unshifted on every common layout (unlike `<`/`>`).
+            KeyCode::Char(',') => {
                 self.shift_months(-12);
                 InsertOutcome::Stay
             }
-            KeyCode::Char('>') => {
+            KeyCode::Char('.') => {
                 self.shift_months(12);
                 InsertOutcome::Stay
             }
@@ -246,14 +247,14 @@ mod tests {
     }
 
     #[test]
-    fn angle_brackets_jump_a_year() {
+    fn comma_and_period_jump_a_year() {
         let mut p = make_picker();
-        p.handle_key(KeyEvent::new(KeyCode::Char('>'), KeyModifiers::empty()), None);
+        p.handle_key(KeyEvent::new(KeyCode::Char('.'), KeyModifiers::empty()), None);
         assert_eq!(p.picker_date, NaiveDate::from_ymd_opt(2027, 5, 18));
-        p.handle_key(KeyEvent::new(KeyCode::Char('<'), KeyModifiers::empty()), None);
-        p.handle_key(KeyEvent::new(KeyCode::Char('<'), KeyModifiers::empty()), None);
+        p.handle_key(KeyEvent::new(KeyCode::Char(','), KeyModifiers::empty()), None);
+        p.handle_key(KeyEvent::new(KeyCode::Char(','), KeyModifiers::empty()), None);
         assert_eq!(p.picker_date, NaiveDate::from_ymd_opt(2025, 5, 18));
-        // Angle brackets must never leak into the text buffer.
+        // The jump keys must never leak into the text buffer.
         assert_eq!(p.buffer, "2025-05-18");
     }
 
