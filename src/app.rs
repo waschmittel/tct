@@ -25,6 +25,20 @@ pub enum AppMode {
     Help,
 }
 
+impl AppMode {
+    /// Base modes are full-screen views the user can rest in. Everything
+    /// else (Insert/Command/Dialog/Help) is a transient *overlay* whose
+    /// state lives on a companion `App` field, so an overlay mode must
+    /// never be recorded as a return target: restoring it without its
+    /// companion state swallows all input (UI freeze).
+    pub fn is_base(&self) -> bool {
+        matches!(
+            self,
+            AppMode::BoardSelector | AppMode::Normal | AppMode::CardDetail
+        )
+    }
+}
+
 pub struct LoadedBoard {
     pub meta: BoardMeta,
     pub lists: Vec<CardList>,
@@ -264,12 +278,63 @@ impl App {
         Ok(())
     }
 
+    /// Record the current mode as the overlay return target. Only *base*
+    /// modes are recorded: when one overlay opens another (dialog → insert
+    /// → dialog), the originally recorded base mode stays put, so closing
+    /// the last overlay always lands on solid ground.
+    pub fn remember_return_mode(&mut self) {
+        if self.mode.is_base() {
+            self.previous_mode = Some(self.mode.clone());
+        }
+    }
+
+    /// Take the recorded return target. Guaranteed to be a base mode —
+    /// anything else falls back to `Normal` (board loaded) or
+    /// `BoardSelector`.
+    pub fn take_return_mode(&mut self) -> AppMode {
+        let fallback = if self.editor.is_some() {
+            AppMode::Normal
+        } else {
+            AppMode::BoardSelector
+        };
+        match self.previous_mode.take() {
+            Some(m) if m.is_base() => m,
+            _ => fallback,
+        }
+    }
+
+    /// Mode ↔ companion-state consistency. Violations froze the UI before
+    /// (e.g. `mode == Insert` with no insert handler swallows every key),
+    /// so this panics in debug/test builds and self-heals to the return
+    /// target in release builds. Called after every input event.
+    pub fn enforce_mode_invariants(&mut self) {
+        if self.previous_mode.as_ref().is_some_and(|m| !m.is_base()) {
+            debug_assert!(
+                false,
+                "overlay mode {:?} recorded as return target",
+                self.previous_mode
+            );
+            self.previous_mode = None;
+        }
+        let orphaned = match self.mode {
+            AppMode::Insert => self.insert.is_none(),
+            AppMode::Dialog => self.dialog.is_none(),
+            _ => false,
+        };
+        if orphaned {
+            debug_assert!(
+                false,
+                "mode {:?} active without its companion handler",
+                self.mode
+            );
+            self.mode = self.take_return_mode();
+        }
+    }
+
     /// Open a modal **Dialog**, remembering the current mode so the
     /// dispatcher can restore it on `Close`.
     pub fn open_dialog(&mut self, dialog: Box<dyn crate::dialog::Dialog>) {
-        if !matches!(self.mode, AppMode::Dialog) {
-            self.previous_mode = Some(self.mode.clone());
-        }
+        self.remember_return_mode();
         self.dialog = Some(dialog);
         self.mode = AppMode::Dialog;
     }
@@ -288,12 +353,7 @@ impl App {
     /// falling back to `Normal` (or `BoardSelector` when no board loaded).
     pub fn close_dialog(&mut self) {
         self.dialog = None;
-        let fallback = if self.editor.is_some() {
-            AppMode::Normal
-        } else {
-            AppMode::BoardSelector
-        };
-        self.mode = self.previous_mode.take().unwrap_or(fallback);
+        self.mode = self.take_return_mode();
     }
 
     /// Close the active dialog to an explicit target mode (does not
@@ -306,19 +366,15 @@ impl App {
     /// Enter **Insert** mode with the given handler, remembering the
     /// current mode for cancel-return.
     pub fn start_insert(&mut self, handler: Box<dyn crate::insert::InsertHandler>) {
-        if !matches!(self.mode, AppMode::Insert) {
-            self.previous_mode = Some(self.mode.clone());
-        }
+        self.remember_return_mode();
         self.insert = Some(handler);
         self.mode = AppMode::Insert;
     }
 
-    /// Cancel insert and restore `previous_mode`.
+    /// Cancel insert and restore the return mode.
     pub fn cancel_insert(&mut self) {
         self.insert = None;
-        self.mode = self.previous_mode.take().unwrap_or_else(|| {
-            if self.editor.is_some() { AppMode::Normal } else { AppMode::BoardSelector }
-        });
+        self.mode = self.take_return_mode();
     }
 }
 

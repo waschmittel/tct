@@ -163,7 +163,13 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             .map(|h| h.title() == "Edit Description")
             .unwrap_or(false);
 
-    let title = if is_editing_desc {
+    // Help opened from inside a dialog (`?` → `Follow::Help`): the dialog
+    // declares its own reference rows via `Dialog::help()`.
+    let dialog_help = app.dialog.as_ref().and_then(|d| d.help());
+
+    let title = if let Some(dh) = &dialog_help {
+        dh.title
+    } else if is_editing_desc {
         " Help — Description Editor "
     } else if is_card_detail {
         " Help — Card Detail "
@@ -235,7 +241,14 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         lines
     }
 
-    let (left, right): (Vec<Line>, Vec<Line>) = if is_editing_desc {
+    let (left, right): (Vec<Line>, Vec<Line>) = if let Some(dh) = &dialog_help {
+        (
+            std::iter::once(header("Keys"))
+                .chain(dh.rows.iter().map(|(k, h)| row(k, h)))
+                .collect(),
+            vec![],
+        )
+    } else if is_editing_desc {
         // Description-editor keys live on the MarkdownEditor handler, not a
         // mode keymap — documented here directly.
         (

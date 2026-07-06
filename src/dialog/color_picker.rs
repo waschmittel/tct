@@ -1,8 +1,9 @@
-//! Color Picker dialog — free HSL selection of a board's accent color.
+//! Color Picker dialog — free HSL selection of a color.
 //!
-//! Opened from the Board Selector (Shift+C). Edits Hue / Saturation /
-//! Lightness sliders with a live preview swatch and writes the result as a
-//! `Custom { r, g, b }` accent color via `SetSelectedBoardAccent`.
+//! Two targets: the board accent color (opened from the Board Selector
+//! with Shift+C, applied via `SetSelectedBoardAccent`) and a label color
+//! (opened from the Label Manager with Shift+C, applied via
+//! `Command::SetLabelColor`; returns to the Label Manager afterwards).
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::Frame;
@@ -13,24 +14,66 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 use super::{Dialog, DialogBackground, DialogOutcome, DialogSideEffect};
 use crate::app::LoadedBoard;
+use crate::command::Command;
+use crate::model::ids::ShortId;
 use crate::model::label::{self, LabelColor};
 
 const HUE_STEP: f64 = 5.0;
 const SL_STEP: f64 = 0.02;
 const BAR_WIDTH: usize = 24;
 
+/// What the picked color is applied to.
+pub enum ColorTarget {
+    /// Accent color of the board selected in the Board Selector.
+    BoardAccent,
+    /// A label in the open board's palette. Carries the Label Manager
+    /// return state (`label_idx` selection, `from_picker` origin).
+    Label {
+        label_id: ShortId,
+        label_idx: usize,
+        from_picker: bool,
+    },
+}
+
 pub struct ColorPicker {
     h: f64,
     s: f64,
     l: f64,
     field: usize,
+    target: ColorTarget,
 }
 
 impl ColorPicker {
-    pub fn from_color(color: LabelColor) -> Self {
+    fn seeded(color: LabelColor, target: ColorTarget) -> Self {
         let (r, g, b) = color.to_rgb();
         let (h, s, l) = label::rgb_to_hsl(r, g, b);
-        Self { h, s, l, field: 0 }
+        Self { h, s, l, field: 0, target }
+    }
+
+    pub fn for_board(color: LabelColor) -> Self {
+        Self::seeded(color, ColorTarget::BoardAccent)
+    }
+
+    pub fn for_label(
+        color: LabelColor,
+        label_id: ShortId,
+        label_idx: usize,
+        from_picker: bool,
+    ) -> Self {
+        Self::seeded(color, ColorTarget::Label { label_id, label_idx, from_picker })
+    }
+
+    /// The Label Manager to return to (label target only).
+    fn back_to_manager(&self) -> Option<Box<dyn Dialog>> {
+        match &self.target {
+            ColorTarget::BoardAccent => None,
+            ColorTarget::Label { label_idx, from_picker, .. } => {
+                Some(Box::new(super::label_manager::LabelManager {
+                    selected_idx: *label_idx,
+                    from_picker: *from_picker,
+                }))
+            }
+        }
     }
 
     fn current_color(&self) -> LabelColor {
@@ -75,8 +118,16 @@ impl Dialog for ColorPicker {
 
         frame.render_widget(Clear, popup);
 
+        let title = match self.target {
+            ColorTarget::BoardAccent => {
+                " Board Color (↑↓ field, ←→ adjust, Enter:apply, Esc:cancel) "
+            }
+            ColorTarget::Label { .. } => {
+                " Label Color (↑↓ field, ←→ adjust, Enter:apply, Esc:cancel) "
+            }
+        };
         let block = Block::default()
-            .title(" Board Color (↑↓ field, ←→ adjust, Enter:apply, Esc:cancel) ")
+            .title(title)
             .borders(Borders::ALL)
             .border_style(Style::default().fg(accent));
         let inner = block.inner(popup);
@@ -118,23 +169,43 @@ impl Dialog for ColorPicker {
                 self.adjust(1.0);
                 DialogOutcome::stay()
             }
-            KeyCode::Enter => {
-                DialogOutcome::side_effect(DialogSideEffect::SetSelectedBoardAccent {
-                    color: self.current_color(),
-                })
-                .with_close_to(crate::app::AppMode::BoardSelector)
-                .with_status(format!(
-                    "Board color set to {}",
-                    self.current_color().display_name()
-                ))
-            }
-            KeyCode::Esc => DialogOutcome::close_to(crate::app::AppMode::BoardSelector),
+            KeyCode::Enter => match &self.target {
+                ColorTarget::BoardAccent => {
+                    DialogOutcome::side_effect(DialogSideEffect::SetSelectedBoardAccent {
+                        color: self.current_color(),
+                    })
+                    .with_close_to(crate::app::AppMode::BoardSelector)
+                    .with_status(format!(
+                        "Board color set to {}",
+                        self.current_color().display_name()
+                    ))
+                }
+                ColorTarget::Label { label_id, .. } => {
+                    let mut out = DialogOutcome::apply(Command::SetLabelColor {
+                        label_id: label_id.clone(),
+                        color: self.current_color(),
+                    })
+                    .with_status(format!(
+                        "Label color set to {}",
+                        self.current_color().display_name()
+                    ));
+                    out.follow = super::Follow::Open(self.back_to_manager().unwrap());
+                    out
+                }
+            },
+            KeyCode::Esc => match self.back_to_manager() {
+                Some(manager) => DialogOutcome::open(manager),
+                None => DialogOutcome::close_to(crate::app::AppMode::BoardSelector),
+            },
             _ => DialogOutcome::stay(),
         }
     }
 
     fn background(&self) -> DialogBackground {
-        DialogBackground::BoardSelector
+        match self.target {
+            ColorTarget::BoardAccent => DialogBackground::BoardSelector,
+            ColorTarget::Label { .. } => DialogBackground::Auto,
+        }
     }
 }
 
@@ -149,7 +220,7 @@ mod tests {
 
     #[test]
     fn seeds_from_color_and_roundtrips() {
-        let picker = ColorPicker::from_color(LabelColor::Custom { r: 170, g: 200, b: 255 });
+        let picker = ColorPicker::for_board(LabelColor::Custom { r: 170, g: 200, b: 255 });
         match picker.current_color() {
             LabelColor::Custom { r, g, b } => {
                 // HSL roundtrip is lossy by at most 1 per channel.
@@ -163,7 +234,7 @@ mod tests {
 
     #[test]
     fn down_up_moves_field() {
-        let mut p = ColorPicker::from_color(LabelColor::Cyan);
+        let mut p = ColorPicker::for_board(LabelColor::Cyan);
         assert_eq!(p.field, 0);
         p.handle_key(key(KeyCode::Down), None);
         assert_eq!(p.field, 1);
@@ -178,7 +249,7 @@ mod tests {
 
     #[test]
     fn right_left_adjusts_selected_field() {
-        let mut p = ColorPicker::from_color(LabelColor::Cyan);
+        let mut p = ColorPicker::for_board(LabelColor::Cyan);
         let h0 = p.h;
         p.handle_key(key(KeyCode::Right), None);
         assert_eq!(p.h, (h0 + HUE_STEP).rem_euclid(360.0));
@@ -188,7 +259,7 @@ mod tests {
 
     #[test]
     fn saturation_clamps_at_bounds() {
-        let mut p = ColorPicker::from_color(LabelColor::Cyan);
+        let mut p = ColorPicker::for_board(LabelColor::Cyan);
         p.field = 1;
         for _ in 0..100 {
             p.handle_key(key(KeyCode::Left), None);
@@ -202,7 +273,7 @@ mod tests {
 
     #[test]
     fn enter_emits_set_accent_side_effect() {
-        let mut p = ColorPicker::from_color(LabelColor::Cyan);
+        let mut p = ColorPicker::for_board(LabelColor::Cyan);
         let out = p.handle_key(key(KeyCode::Enter), None);
         assert!(matches!(
             out.side_effect,

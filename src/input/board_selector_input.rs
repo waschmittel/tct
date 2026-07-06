@@ -91,7 +91,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
             }
         }
         Action::Help => {
-            app.previous_mode = Some(app.mode.clone());
+            app.remember_return_mode();
             app.mode = AppMode::Help;
         }
         Action::CycleAccentColor => {
@@ -107,7 +107,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         Action::PickAccentColor => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let color = board.accent_color;
-                app.open_dialog(Box::new(ColorPicker::from_color(color)));
+                app.open_dialog(Box::new(ColorPicker::for_board(color)));
             }
         }
         Action::ArchiveBoard => {

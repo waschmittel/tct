@@ -62,6 +62,10 @@ pub enum Follow {
     CloseTo(crate::app::AppMode),
     /// Replace this dialog with another.
     Open(Box<dyn Dialog>),
+    /// Show the Help overlay for this dialog (the dialog stays alive on
+    /// `App.dialog`; Esc in Help returns to it). Only meaningful for
+    /// dialogs that implement [`Dialog::help`].
+    Help,
 }
 
 impl DialogOutcome {
@@ -111,6 +115,14 @@ impl DialogOutcome {
             side_effect: None,
             status: None,
             follow: Follow::Open(d),
+        }
+    }
+    pub fn help() -> Self {
+        Self {
+            apply: None,
+            side_effect: None,
+            status: None,
+            follow: Follow::Help,
         }
     }
     pub fn side_effect(eff: DialogSideEffect) -> Self {
@@ -175,12 +187,15 @@ pub enum DialogSideEffect {
     },
     /// Start an Insert handler for a new label name. Opens the
     /// Insert mode; the resulting label will trigger a follow-up
-    /// LabelManager dialog on confirm.
-    StartNewLabelInsert,
+    /// LabelManager dialog on confirm. `from_picker` is threaded
+    /// through so the reopened manager still returns to the
+    /// LabelPicker on close.
+    StartNewLabelInsert { from_picker: bool },
     /// Start an Insert handler for renaming a label at the given index.
     StartRenameLabelInsert {
         label_idx: usize,
         current_name: String,
+        from_picker: bool,
     },
 }
 
@@ -207,4 +222,19 @@ pub trait Dialog {
     fn background(&self) -> DialogBackground {
         DialogBackground::Auto
     }
+
+    /// Keybinding reference shown in the Help overlay when `?` is pressed
+    /// inside this dialog (return `DialogOutcome::help()` from
+    /// `handle_key`). `None` (default) = dialog has no help page.
+    fn help(&self) -> Option<DialogHelp> {
+        None
+    }
+}
+
+/// Help-overlay content for a dialog: dialogs don't have keymap tables
+/// (keys live in `handle_key`), so they declare their reference rows here.
+pub struct DialogHelp {
+    /// Overlay title, e.g. `" Help — Label Manager "`.
+    pub title: &'static str,
+    pub rows: Vec<(&'static str, &'static str)>,
 }

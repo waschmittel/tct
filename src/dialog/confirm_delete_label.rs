@@ -16,6 +16,9 @@ pub struct ConfirmDeleteLabel {
     /// the label at confirm time so the dialog stays in sync with any
     /// reorders happening underneath.
     pub label_idx: usize,
+    /// Threaded through from the LabelManager so the reopened manager
+    /// still returns to the LabelPicker on close.
+    pub from_picker: bool,
 }
 
 impl Dialog for ConfirmDeleteLabel {
@@ -52,17 +55,20 @@ impl Dialog for ConfirmDeleteLabel {
                         .with_status(format!("Deleted label '{name}'"));
                     out.follow = super::Follow::Open(Box::new(super::label_manager::LabelManager {
                         selected_idx: self.label_idx,
+                        from_picker: self.from_picker,
                     }));
                     out
                 } else {
                     DialogOutcome::open(Box::new(super::label_manager::LabelManager {
                         selected_idx: self.label_idx,
+                        from_picker: self.from_picker,
                     }))
                 }
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                 DialogOutcome::open(Box::new(super::label_manager::LabelManager {
                     selected_idx: self.label_idx,
+                    from_picker: self.from_picker,
                 }))
             }
             _ => DialogOutcome::stay(),

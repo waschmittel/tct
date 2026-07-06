@@ -299,9 +299,14 @@ pub struct NewLabelName {
     /// Label index to keep selected in the LabelManager follow-up
     /// (set by the dispatcher after confirm — appended).
     pub label_selected_idx: usize,
+    /// Threaded through so the reopened LabelManager still returns to
+    /// the LabelPicker on close.
+    pub from_picker: bool,
 }
 impl NewLabelName {
-    pub fn new() -> Self { Self { input: LineInput::new(), label_selected_idx: 0 } }
+    pub fn new(from_picker: bool) -> Self {
+        Self { input: LineInput::new(), label_selected_idx: 0, from_picker }
+    }
 }
 impl InsertHandler for NewLabelName {
     fn handle_key(&mut self, key: KeyEvent, board: Option<&LoadedBoard>) -> InsertOutcome {
@@ -311,6 +316,7 @@ impl InsertHandler for NewLabelName {
                 if text.is_empty() {
                     return InsertOutcome::OpenDialog(Box::new(LabelManager {
                         selected_idx: self.label_selected_idx,
+                        from_picker: self.from_picker,
                     }));
                 }
                 let color = board
@@ -322,11 +328,15 @@ impl InsertHandler for NewLabelName {
                 let new_idx = board.map(|b| b.meta.labels.len()).unwrap_or(0);
                 InsertOutcome::ConfirmAndOpenDialog(
                     Command::DefineLabel { name: text, color },
-                    Box::new(LabelManager { selected_idx: new_idx }),
+                    Box::new(LabelManager {
+                        selected_idx: new_idx,
+                        from_picker: self.from_picker,
+                    }),
                 )
             }
             LineKey::Cancel => InsertOutcome::OpenDialog(Box::new(LabelManager {
                 selected_idx: self.label_selected_idx,
+                from_picker: self.from_picker,
             })),
             _ => InsertOutcome::Stay,
         }
@@ -344,10 +354,13 @@ pub struct EditLabelName {
     pub input: LineInput,
     pub label_id: ShortId,
     pub label_idx: usize,
+    /// Threaded through so the reopened LabelManager still returns to
+    /// the LabelPicker on close.
+    pub from_picker: bool,
 }
 impl EditLabelName {
-    pub fn new(label_id: ShortId, label_idx: usize, current: &str) -> Self {
-        Self { input: LineInput::with_initial(current), label_id, label_idx }
+    pub fn new(label_id: ShortId, label_idx: usize, current: &str, from_picker: bool) -> Self {
+        Self { input: LineInput::with_initial(current), label_id, label_idx, from_picker }
     }
 }
 impl InsertHandler for EditLabelName {
@@ -358,6 +371,7 @@ impl InsertHandler for EditLabelName {
                 if text.is_empty() {
                     return InsertOutcome::OpenDialog(Box::new(LabelManager {
                         selected_idx: self.label_idx,
+                        from_picker: self.from_picker,
                     }));
                 }
                 InsertOutcome::ConfirmAndOpenDialog(
@@ -365,11 +379,15 @@ impl InsertHandler for EditLabelName {
                         label_id: self.label_id.clone(),
                         name: text,
                     },
-                    Box::new(LabelManager { selected_idx: self.label_idx }),
+                    Box::new(LabelManager {
+                        selected_idx: self.label_idx,
+                        from_picker: self.from_picker,
+                    }),
                 )
             }
             LineKey::Cancel => InsertOutcome::OpenDialog(Box::new(LabelManager {
                 selected_idx: self.label_idx,
+                from_picker: self.from_picker,
             })),
             _ => InsertOutcome::Stay,
         }

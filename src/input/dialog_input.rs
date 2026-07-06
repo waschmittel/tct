@@ -43,6 +43,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             app.dialog = Some(next);
             // Mode stays AppMode::Dialog.
         }
+        Follow::Help => {
+            // Dialog stays alive on `app.dialog`; Help-Esc returns to it.
+            app.mode = AppMode::Help;
+        }
     }
     Ok(())
 }
@@ -95,7 +99,7 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
         DialogSideEffect::DiscardDescriptionEdit => {
             app.insert = None;
             app.dialog = None;
-            app.mode = app.previous_mode.take().unwrap_or(AppMode::CardDetail);
+            app.mode = app.take_return_mode();
         }
         DialogSideEffect::ResumeDescriptionEdit => {
             // The MarkdownEditor handler is still on `app.insert` — just
@@ -106,15 +110,16 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
         DialogSideEffect::ReorderLabels { from, to } => {
             app.apply(crate::command::Command::ReorderLabels { from, to })?;
         }
-        DialogSideEffect::StartNewLabelInsert => {
+        DialogSideEffect::StartNewLabelInsert { from_picker } => {
             // Close the LabelManager and start NewLabelName insert. The
             // confirm handler reopens LabelManager.
             app.dialog = None;
-            app.start_insert(Box::new(line_editor::NewLabelName::new()));
+            app.start_insert(Box::new(line_editor::NewLabelName::new(from_picker)));
         }
         DialogSideEffect::StartRenameLabelInsert {
             label_idx,
             current_name,
+            from_picker,
         } => {
             let label_id = app
                 .board()
@@ -125,6 +130,7 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
                     label_id,
                     label_idx,
                     &current_name,
+                    from_picker,
                 )));
             }
         }

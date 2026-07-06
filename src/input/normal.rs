@@ -139,7 +139,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
     match action {
         Action::Quit => app.should_quit = true,
         Action::Help => {
-            app.previous_mode = Some(app.mode.clone());
+            app.remember_return_mode();
             app.mode = AppMode::Help;
         }
         Action::CloseBoard => {
@@ -297,7 +297,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                 }
         }
         Action::ManageLabels => {
-            app.open_dialog(Box::new(LabelManager { selected_idx: 0 }));
+            app.open_dialog(Box::new(LabelManager { selected_idx: 0, from_picker: false }));
         }
         Action::SetDueDate => {
             if let Some(board) = app.board()
