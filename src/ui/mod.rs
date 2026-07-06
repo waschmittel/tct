@@ -90,6 +90,11 @@ pub fn render(frame: &mut Frame, app: &App) {
     // 3. Transient status toast, top-right, above everything. The top row
     // is free on both surfaces (popups start at y >= 1).
     render_status_toast(frame, area, app);
+
+    // 4. Degrade the finished frame to the terminal's color support. Style
+    // sites stay tier-unaware; only styles whose quantized form would be
+    // unusable consult `app.caps` directly (e.g. the selection background).
+    app.caps.adapt_buffer(frame.buffer_mut());
 }
 
 /// Yellow toast with the active status message in the top-right corner.
@@ -300,6 +305,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 row("Up / Down", "Previous / next week"),
                 row("PgUp / PgDn", "Previous / next month"),
                 row("Shift+PgUp/PgDn", "Previous / next year"),
+                row("< / >", "Previous / next year"),
                 row("Home / End", "First / last of month"),
                 row("t", "Today"),
             ],

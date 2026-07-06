@@ -9,6 +9,7 @@ mod input;
 mod insert;
 mod model;
 mod storage;
+mod term_caps;
 mod ui;
 
 #[cfg(test)]
@@ -52,6 +53,9 @@ fn main() -> anyhow::Result<()> {
 
     let mut terminal = ratatui::init();
     let mut app = App::new(open_board_id)?;
+    // Only the real TUI entry consults the environment — App::new defaults
+    // to full caps so tests and goldens stay deterministic.
+    app.caps = term_caps::TermCaps::detect();
     let events = EventHandler::new(Duration::from_millis(250));
 
     let result = run_app(&mut terminal, &mut app, &events);

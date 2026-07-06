@@ -254,6 +254,63 @@ fn snapshot_date_picker() {
     insta::assert_snapshot!(buffer_to_string(terminal.backend().buffer()));
 }
 
+/// Degraded tier (Linux console): the selected card gets a double-line
+/// border instead of the heavy one — visible in the text golden.
+#[test]
+fn snapshot_board_view_linux_tty() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        app.caps = crate::term_caps::TermCaps::linux_tty();
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// Degraded tier: checklist marks render as `x` (✓ is missing from
+/// console fonts).
+#[test]
+fn snapshot_card_detail_linux_tty() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        app.caps = crate::term_caps::TermCaps::linux_tty();
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// On the bottom tier no RGB color may survive to the terminal (the Linux
+/// console collapses them to unreadable black/white), and the selected
+/// card must keep a visible background. Style-level check — the text
+/// goldens above can't see colors.
+#[test]
+fn linux_tty_render_has_no_rgb_and_visible_selection() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        app.caps = crate::term_caps::TermCaps::linux_tty();
+
+        let backend = TestBackend::new(WIDTH, HEIGHT);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| crate::ui::render(frame, &app)).unwrap();
+        let buffer = terminal.backend().buffer();
+
+        use ratatui::style::Color;
+        let mut selection_bg_cells = 0;
+        for cell in buffer.content.iter() {
+            assert!(
+                !matches!(cell.fg, Color::Rgb(..)) && !matches!(cell.bg, Color::Rgb(..)),
+                "RGB color leaked into a degraded frame: {cell:?}"
+            );
+            if cell.bg == app.caps.selection_bg() {
+                selection_bg_cells += 1;
+            }
+        }
+        assert!(selection_bg_cells > 0, "selected card background not visible");
+    });
+}
+
 #[test]
 fn snapshot_board_view_empty() {
     with_temp_dir(|| {

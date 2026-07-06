@@ -145,6 +145,10 @@ pub struct App {
     /// (e.g. `~/.tct`). Pinned in test builds for stable goldens (the real
     /// value would be a per-test temp dir).
     pub data_dir_display: String,
+    /// Terminal capabilities the renderer degrades to (colors, glyphs).
+    /// Defaults to full so tests are environment-independent; `main` sets
+    /// the detected value before the first frame.
+    pub caps: crate::term_caps::TermCaps,
 }
 
 /// Resolved once at startup; the data dir cannot change mid-session.
@@ -181,6 +185,7 @@ impl App {
             insert: None,
             version: crate::VERSION,
             data_dir_display: data_dir_display(),
+            caps: crate::term_caps::TermCaps::full(),
         };
         if let Some(board_id) = open_board_id {
             app.load_board(&board_id)?;
@@ -460,6 +465,7 @@ mod tests {
             insert: None,
             version: crate::VERSION,
             data_dir_display: data_dir_display(),
+            caps: crate::term_caps::TermCaps::full(),
         }
     }
 

@@ -6,6 +6,7 @@ use ratatui::Frame;
 
 use crate::model::card::Card;
 use crate::model::label::Label;
+use crate::term_caps::TermCaps;
 
 pub fn render(
     frame: &mut Frame,
@@ -15,12 +16,13 @@ pub fn render(
     dimmed: bool,
     board_labels: &[Label],
     accent: Color,
+    caps: TermCaps,
 ) {
     if area.height < 2 {
         return;
     }
 
-    let selection_bg = Color::Rgb(40, 40, 55);
+    let selection_bg = caps.selection_bg();
     let base_style = if dimmed {
         Style::default().fg(Color::DarkGray)
     } else if selected {
@@ -44,7 +46,7 @@ pub fn render(
         .borders(Borders::ALL)
         .border_style(border_style)
         .border_type(if selected {
-            BorderType::Thick
+            caps.selected_border_type()
         } else {
             BorderType::Plain
         });

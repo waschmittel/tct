@@ -210,6 +210,7 @@ pub fn render(
                 false,
                 &board.meta.labels,
                 accent,
+                app.caps,
             );
 
             y_offset += ch;

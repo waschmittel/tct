@@ -23,9 +23,9 @@ expression: render_to_string(&app)
 │    │                                               u               Set due date             │    │
 │    │Move                                           U               Clear due date           │    │
 │    │  Shift+Left/RightMove to adjacent list                                                 │    │
-│    │  Shift+Up/Down   Move within list           App                                        │    │
-│    │                                               b               Back to selector         │    │
-│    │                                               ?               Help                     │    │
+│    │  [ / ]           Move to adjacent list      App                                        │    │
+│    │  Shift+Up/Down   Move within list             b               Back to selector         │    │
+│    │  K / J           Move within list             ?               Help                     │    │
 │    │                                               q               Quit                     │    │
 │    │                                                                                        │    │
 │    │                                                                                        │    │

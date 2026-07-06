@@ -91,7 +91,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             .enumerate()
             .map(|(ii, item)| {
                 let is_active = ii == board.detail_item_idx;
-                let check = if item.completed { "✓" } else { " " };
+                let check = if item.completed { app.caps.check_mark() } else { " " };
                 let style = if is_active {
                     Style::default().fg(accent).add_modifier(Modifier::BOLD)
                 } else if item.completed {

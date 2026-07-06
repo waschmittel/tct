@@ -76,11 +76,17 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Char('a'), shift: None, action: Action::ArchiveCard, keys: "a", help: "Archive card", section: "Card" },
     Binding { code: KeyCode::Char('v'), shift: None, action: Action::ViewArchivedCards, keys: "v", help: "View archived cards", section: "Card" },
     Binding { code: KeyCode::Char('h'), shift: None, action: Action::CardHistoryDialog, keys: "h", help: "View change history", section: "Card" },
-    // Move
+    // Move. The char aliases are not redundant: the Linux console (and
+    // vhs) never transmits modifiers on arrow keys, so Shift+arrows can't
+    // be the only way to move cards.
     Binding { code: KeyCode::Left, shift: Some(true), action: Action::MoveCardLeft, keys: "Shift+Left/Right", help: "Move to adjacent list", section: "Move" },
     Binding { code: KeyCode::Right, shift: Some(true), action: Action::MoveCardRight, keys: "Shift+Left/Right", help: "Move to adjacent list", section: "Move" },
+    Binding { code: KeyCode::Char('['), shift: None, action: Action::MoveCardLeft, keys: "[ / ]", help: "Move to adjacent list", section: "Move" },
+    Binding { code: KeyCode::Char(']'), shift: None, action: Action::MoveCardRight, keys: "[ / ]", help: "Move to adjacent list", section: "Move" },
     Binding { code: KeyCode::Up, shift: Some(true), action: Action::MoveCardUp, keys: "Shift+Up/Down", help: "Move within list", section: "Move" },
     Binding { code: KeyCode::Down, shift: Some(true), action: Action::MoveCardDown, keys: "Shift+Up/Down", help: "Move within list", section: "Move" },
+    Binding { code: KeyCode::Char('K'), shift: None, action: Action::MoveCardUp, keys: "K / J", help: "Move within list", section: "Move" },
+    Binding { code: KeyCode::Char('J'), shift: None, action: Action::MoveCardDown, keys: "K / J", help: "Move within list", section: "Move" },
     // Lists
     Binding { code: KeyCode::Char('N'), shift: None, action: Action::NewList, keys: "N", help: "New list", section: "Lists" },
     Binding { code: KeyCode::Char('r'), shift: None, action: Action::RenameList, keys: "r", help: "Rename list", section: "Lists" },
@@ -580,6 +586,59 @@ mod tests {
             let board = app.board().unwrap();
             assert_eq!(board.lists[0].card_ids.len(), 3);
             assert_eq!(board.lists[0].card_ids[0], a_cards[0].id);
+        });
+    }
+
+    // Char aliases for the card moves: terminals without modifier
+    // reporting on arrows (Linux console) can't produce Shift+arrow.
+
+    #[test]
+    fn close_bracket_moves_card_to_next_list() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            handle(&mut app, key(KeyCode::Char(']'))).unwrap();
+            let board = app.board().unwrap();
+            assert_eq!(board.lists[0].card_ids.len(), 2);
+            assert!(board.lists[1].card_ids.contains(&a_cards[0].id));
+            assert_eq!(board.selected_list, 1);
+        });
+    }
+
+    #[test]
+    fn open_bracket_moves_card_to_previous_list() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            handle(&mut app, key(KeyCode::Char(']'))).unwrap();
+            handle(&mut app, key(KeyCode::Char('['))).unwrap();
+            let board = app.board().unwrap();
+            assert_eq!(board.lists[0].card_ids.len(), 3);
+            assert!(board.lists[0].card_ids.contains(&a_cards[0].id));
+            assert_eq!(board.selected_list, 0);
+        });
+    }
+
+    /// Real terminals report `J` as Char('J') *with* SHIFT — the binding
+    /// must match regardless of the modifier flag.
+    #[test]
+    fn uppercase_j_moves_card_down() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            handle(&mut app, shift_key(KeyCode::Char('J'))).unwrap();
+            let board = app.board().unwrap();
+            assert_eq!(board.lists[0].card_ids[1], a_cards[0].id);
+            assert_eq!(board.selected_card[0], 1);
+        });
+    }
+
+    #[test]
+    fn uppercase_k_moves_card_up() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            app.board_mut().unwrap().selected_card[0] = 1;
+            handle(&mut app, shift_key(KeyCode::Char('K'))).unwrap();
+            let board = app.board().unwrap();
+            assert_eq!(board.lists[0].card_ids[0], a_cards[1].id);
+            assert_eq!(board.selected_card[0], 0);
         });
     }
 

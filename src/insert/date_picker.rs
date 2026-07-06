@@ -64,6 +64,16 @@ impl InsertHandler for DatePicker {
                 self.shift_months(if shift { 12 } else { 1 });
                 InsertOutcome::Stay
             }
+            // Year jump. Also reachable via Shift+PgUp/PgDn, but terminals
+            // without modifier reporting (Linux console) need plain chars.
+            KeyCode::Char('<') => {
+                self.shift_months(-12);
+                InsertOutcome::Stay
+            }
+            KeyCode::Char('>') => {
+                self.shift_months(12);
+                InsertOutcome::Stay
+            }
             KeyCode::Char('t') | KeyCode::Char('T') => {
                 let today = chrono::Local::now().date_naive();
                 self.set_date(today);
@@ -233,6 +243,18 @@ mod tests {
         let mut p = make_picker();
         p.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::SHIFT), None);
         assert_eq!(p.picker_date, NaiveDate::from_ymd_opt(2027, 5, 18));
+    }
+
+    #[test]
+    fn angle_brackets_jump_a_year() {
+        let mut p = make_picker();
+        p.handle_key(KeyEvent::new(KeyCode::Char('>'), KeyModifiers::empty()), None);
+        assert_eq!(p.picker_date, NaiveDate::from_ymd_opt(2027, 5, 18));
+        p.handle_key(KeyEvent::new(KeyCode::Char('<'), KeyModifiers::empty()), None);
+        p.handle_key(KeyEvent::new(KeyCode::Char('<'), KeyModifiers::empty()), None);
+        assert_eq!(p.picker_date, NaiveDate::from_ymd_opt(2025, 5, 18));
+        // Angle brackets must never leak into the text buffer.
+        assert_eq!(p.buffer, "2025-05-18");
     }
 
     #[test]

@@ -11,6 +11,7 @@ src/
   board_directory.rs # Board collection: create/archive/rename/order (ADR-0004)
   command.rs         # Command enum — sole chokepoint for domain mutations (ADR-0002)
   event.rs           # Crossterm event polling (key + tick)
+  term_caps.rs       # Terminal capability detection + color/glyph degradation
   cli/
     mod.rs           # CLI dispatch, help text
     boards.rs        # `tct boards`
