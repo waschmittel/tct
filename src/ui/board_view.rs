@@ -64,9 +64,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         frame.render_widget(empty, chunks[1]);
     } else {
         let num_lists = board.lists.len();
-        let constraints: Vec<Constraint> = (0..num_lists)
-            .map(|_| Constraint::Percentage((100 / num_lists as u16).max(1)))
-            .collect();
+        let constraints: Vec<Constraint> = (0..num_lists).map(|_| Constraint::Fill(1)).collect();
         let list_areas = Layout::horizontal(constraints).split(chunks[1]);
 
         for (i, list) in board.lists.iter().enumerate() {
