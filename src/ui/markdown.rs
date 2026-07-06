@@ -6,30 +6,17 @@ pub const WRAP_WIDTH: usize = 80;
 /// Renders markdown text into styled, word-wrapped visual lines.
 ///
 /// `MarkdownRenderer` is the single public entry point for turning raw
-/// markdown source into ratatui `Line<'static>` values plus the cursor
-/// mapping used by the description editor. List indentation is detected
-/// automatically per source line; callers don't pass it in.
+/// markdown source into ratatui `Line<'static>` values. List indentation
+/// is detected automatically per source line; callers don't pass it in.
 pub struct MarkdownRenderer<'a> {
-    source: Source<'a>,
+    text: &'a str,
     width: usize,
     accent: Color,
 }
 
-/// How the source markdown is provided to the renderer. The two shapes
-/// correspond to the two callers: a raw string (`card.description`) where
-/// trailing blank lines aren't meaningful, and pre-split textarea lines
-/// where they are.
-enum Source<'a> {
-    Text(&'a str),
-    Lines(&'a [String]),
-}
-
-/// Result of rendering markdown: the visual lines, plus a private mapping
-/// from source `(row, col)` positions to visual `(row, col)` positions.
+/// Result of rendering markdown: the styled, word-wrapped visual lines.
 pub struct Rendered {
     pub lines: Vec<Line<'static>>,
-    /// Per-visual-line entry: `(source_row, source_col_offset, visual_line_len, visual_indent)`.
-    map: Vec<(usize, usize, usize, usize)>,
 }
 
 impl<'a> MarkdownRenderer<'a> {
@@ -37,35 +24,20 @@ impl<'a> MarkdownRenderer<'a> {
     /// `str::lines()`, which drops a trailing empty entry for a trailing '\n'
     /// — matching the existing description-text behavior.
     pub fn new(text: &'a str, width: usize, accent: Color) -> Self {
-        Self { source: Source::Text(text), width, accent }
-    }
-
-    /// Build a renderer over pre-split source lines (e.g. textarea contents).
-    /// Trailing blank lines are preserved.
-    pub fn from_lines(lines: &'a [String], width: usize, accent: Color) -> Self {
-        Self { source: Source::Lines(lines), width, accent }
+        Self { text, width, accent }
     }
 
     pub fn render(&self) -> Rendered {
-        match self.source {
-            Source::Text(text) => {
-                let refs: Vec<&str> = text.lines().collect();
-                render_source_lines(&refs, self.width, self.accent)
-            }
-            Source::Lines(lines) => {
-                let refs: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
-                render_source_lines(&refs, self.width, self.accent)
-            }
-        }
+        let refs: Vec<&str> = self.text.lines().collect();
+        render_source_lines(&refs, self.width, self.accent)
     }
 }
 
 fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Rendered {
     let mut lines: Vec<Line<'static>> = Vec::new();
-    let mut map: Vec<(usize, usize, usize, usize)> = Vec::new();
     let mut in_code_block = false;
 
-    for (li, &line_text) in source_lines.iter().enumerate() {
+    for &line_text in source_lines {
         // Code fence / code block lines: no inline highlighting, no wrapping.
         if line_text.starts_with("```") {
             in_code_block = !in_code_block;
@@ -73,19 +45,14 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
                 line_text.to_string(),
                 Style::default().fg(Color::DarkGray),
             );
-            let vlen = line_text.chars().count();
             lines.push(Line::from(vec![span]));
-            map.push((li, 0, vlen, 0));
             continue;
         }
         if in_code_block {
-            let rendered = format!("  {line_text}");
-            let vlen = rendered.chars().count();
             lines.push(Line::from(vec![Span::styled(
-                rendered,
+                format!("  {line_text}"),
                 Style::default().fg(Color::Green),
             )]));
-            map.push((li, 0, vlen, 0));
             continue;
         }
 
@@ -97,70 +64,15 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
             wrap_spans(highlighted, width)
         };
 
-        // Build the visual map for this source line in lock-step with `wrapped`.
-        let line_chars: Vec<char> = line_text.chars().collect();
-        let mut source_char_offset = 0;
-        for (wi, wl) in wrapped.iter().enumerate() {
-            let display_v_char_len: usize =
-                wl.spans.iter().map(|s| s.content.chars().count()).sum();
-
-            let mut actual_source_len = display_v_char_len;
-            let mut current_v_indent = 0;
-            if wi > 0 && list_indent > 0 {
-                actual_source_len = display_v_char_len.saturating_sub(list_indent);
-                current_v_indent = list_indent;
-            }
-
-            map.push((li, source_char_offset, display_v_char_len, current_v_indent));
-
-            let gap = if source_char_offset + actual_source_len < line_chars.len()
-                && line_chars[source_char_offset + actual_source_len] == ' '
-            {
-                1
-            } else {
-                0
-            };
-            source_char_offset += actual_source_len + gap;
-        }
-
         lines.extend(wrapped);
     }
 
-    Rendered { lines, map }
+    Rendered { lines }
 }
 
 impl Rendered {
     pub fn lines(&self) -> &[Line<'static>] {
         &self.lines
-    }
-
-    /// Map a source `(row, col)` cursor position to the corresponding visual
-    /// `(row, col)` position, accounting for wrapping and list indentation.
-    pub fn cursor_at(&self, src_row: usize, src_col: usize) -> (u16, u16) {
-        let (vrow, vcol) = source_to_visual(&self.map, src_row, src_col);
-        (vrow as u16, vcol as u16)
-    }
-
-    /// Returns the source row index that produced visual line `visual_idx`,
-    /// or `None` if out of bounds. Used by the description editor to confirm
-    /// the cursor's visual row actually corresponds to its source row before
-    /// painting the current-line highlight.
-    pub fn src_row_for(&self, visual_idx: usize) -> Option<usize> {
-        self.map.get(visual_idx).map(|&(src_row, _, _, _)| src_row)
-    }
-
-    pub fn visual_line_count(&self) -> usize {
-        self.map.len()
-    }
-
-    /// Map a visual `(row, col)` position back to the source `(row, col)`,
-    /// clamping the column into the visual line's segment. Inverse of
-    /// `cursor_at`; used for visual-line cursor movement in the editor.
-    pub fn source_pos_at(&self, visual_row: usize, visual_col: usize) -> Option<(usize, usize)> {
-        let &(src_row, src_offset, vlen, vindent) = self.map.get(visual_row)?;
-        let actual_len = vlen.saturating_sub(vindent);
-        let col = src_offset + visual_col.saturating_sub(vindent).min(actual_len);
-        Some((src_row, col))
     }
 }
 
@@ -179,40 +91,6 @@ fn detect_list_indent(line: &str) -> usize {
         }
     }
     0
-}
-
-pub(crate) fn highlight_lines(text: &str, accent: Color) -> Vec<Line<'static>> {
-    MarkdownRenderer::new(text, WRAP_WIDTH, accent).render().lines
-}
-
-#[cfg(test)]
-fn build_visual_map(
-    lines: &[String],
-    accent: Color,
-    wrap_width: usize,
-) -> Vec<(usize, usize, usize, usize)> {
-    MarkdownRenderer::from_lines(lines, wrap_width, accent).render().map
-}
-
-fn source_to_visual(
-    visual_map: &[(usize, usize, usize, usize)],
-    cursor_row: usize,
-    cursor_col: usize,
-) -> (usize, usize) {
-    for (vi, &(src_row, src_offset, vlen, vindent)) in visual_map.iter().enumerate() {
-        if src_row == cursor_row {
-            let actual_src_len = vlen.saturating_sub(vindent);
-            let col_in_segment = cursor_col.saturating_sub(src_offset);
-
-            if col_in_segment <= actual_src_len
-                || vi + 1 >= visual_map.len()
-                || visual_map[vi + 1].0 != cursor_row
-            {
-                return (vi, col_in_segment.min(actual_src_len) + vindent);
-            }
-        }
-    }
-    (0, cursor_col)
 }
 
 fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'static>> {
@@ -553,66 +431,6 @@ mod tests {
     }
 
     #[test]
-    fn test_visual_map_single_line_no_wrap() {
-        let lines = vec!["short line".to_string()];
-        let map = build_visual_map(&lines, Color::Cyan, 80);
-        assert_eq!(map.len(), 1);
-        assert_eq!(map[0], (0, 0, 10, 0));
-    }
-
-    #[test]
-    fn test_visual_map_wrapped_line() {
-        // 100 chars, wraps at 80
-        let text = "word ".repeat(20);
-        let lines = vec![text.trim_end().to_string()];
-        let map = build_visual_map(&lines, Color::Cyan, 20);
-        assert!(map.len() >= 2, "expected wrapping, got {} entries", map.len());
-        // All entries should reference source row 0
-        for entry in &map {
-            assert_eq!(entry.0, 0);
-        }
-        // Source offsets should be strictly increasing
-        for w in map.windows(2) {
-            assert!(w[1].1 > w[0].1);
-        }
-    }
-
-    #[test]
-    fn test_source_to_visual_no_wrap() {
-        let lines = vec!["hello world".to_string()];
-        let map = build_visual_map(&lines, Color::Cyan, 80);
-        let (vrow, vcol) = source_to_visual(&map, 0, 5);
-        assert_eq!(vrow, 0);
-        assert_eq!(vcol, 5);
-    }
-
-    #[test]
-    fn test_source_to_visual_after_wrap() {
-        // "aaaa bbbb cccc dddd" wraps at 10 → "aaaa bbbb" (9) + "cccc dddd" (9)
-        let lines = vec!["aaaa bbbb cccc dddd".to_string()];
-        let map = build_visual_map(&lines, Color::Cyan, 10);
-        assert_eq!(map.len(), 2);
-        // Source col 0 → visual row 0, col 0
-        assert_eq!(source_to_visual(&map, 0, 0), (0, 0));
-        // Source col 10 ('c') → visual row 1, col 0
-        let (vrow, vcol) = source_to_visual(&map, 0, 10);
-        assert_eq!(vrow, 1);
-        assert_eq!(vcol, 0);
-        // Source col 14 ('d') → visual row 1, col 4
-        let (vrow, vcol) = source_to_visual(&map, 0, 14);
-        assert_eq!(vrow, 1);
-        assert_eq!(vcol, 4);
-    }
-
-    #[test]
-    fn test_source_to_visual_multiline() {
-        let lines = vec!["short".to_string(), "also short".to_string()];
-        let map = build_visual_map(&lines, Color::Cyan, 80);
-        assert_eq!(map.len(), 2);
-        assert_eq!(source_to_visual(&map, 1, 5), (1, 5));
-    }
-
-    #[test]
     fn test_wrap_spans_content_matches_source() {
         let source = "hello world foo bar baz qux quux corge grault";
         let spans = vec![Span::raw(source.to_string())];
@@ -684,49 +502,6 @@ mod tests {
     }
 
     #[test]
-    fn test_source_to_visual_eol_boundary() {
-        // "aaaa bbbb" wrapped at 4 → "aaaa" + "bbbb"
-        let lines = vec!["aaaa bbbb".to_string()];
-        let map = build_visual_map(&lines, Color::Cyan, 4);
-        // Cursor at col 4 (end of first word, before space) — should land on row 0 col 4
-        let (vrow, _vcol) = source_to_visual(&map, 0, 4);
-        assert!(vrow <= 1);
-    }
-
-    #[test]
-    fn test_source_pos_at_inverts_cursor_at() {
-        // Wrapped list item: cursor positions must roundtrip through the
-        // visual mapping (modulo clamping into the segment).
-        let lines = vec!["- aaaa bbbb cccc dddd".to_string(), "next".to_string()];
-        let rendered = MarkdownRenderer::from_lines(&lines, 10, Color::Cyan).render();
-        for (src_row, line) in lines.iter().enumerate() {
-            for src_col in 0..=line.chars().count() {
-                let (vrow, vcol) = rendered.cursor_at(src_row, src_col);
-                let (back_row, back_col) = rendered
-                    .source_pos_at(vrow as usize, vcol as usize)
-                    .unwrap();
-                assert_eq!(back_row, src_row);
-                assert!(back_col <= line.chars().count());
-            }
-        }
-    }
-
-    #[test]
-    fn test_build_visual_map_empty_lines() {
-        let lines: Vec<String> = vec![];
-        let map = build_visual_map(&lines, Color::Cyan, 80);
-        assert!(map.is_empty());
-    }
-
-    #[test]
-    fn test_build_visual_map_blank_line() {
-        let lines = vec!["".to_string()];
-        let map = build_visual_map(&lines, Color::Cyan, 80);
-        assert_eq!(map.len(), 1);
-        assert_eq!(map[0].0, 0);
-    }
-
-    #[test]
     fn test_highlight_lines_nested_backtick_in_text() {
         // ` inside text, not a fence — should not crash
         let r = render("inline `code` and **bold**", Color::Cyan, WRAP_WIDTH);
@@ -788,17 +563,5 @@ mod tests {
         let wrapped2 = wrap_spans_with_indent(highlighted2, 10, 5);
         assert!(wrapped2.len() > 1);
         assert!(wrapped2[1].spans[0].content.starts_with("     "));
-    }
-
-    #[test]
-    fn test_renderer_cursor_at_no_wrap() {
-        let r = render("hello world", Color::Cyan, 80);
-        assert_eq!(r.cursor_at(0, 5), (0, 5));
-    }
-
-    #[test]
-    fn test_renderer_cursor_at_after_wrap() {
-        let r = render("aaaa bbbb cccc dddd", Color::Cyan, 10);
-        assert_eq!(r.cursor_at(0, 10), (1, 0));
     }
 }

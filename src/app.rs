@@ -53,6 +53,12 @@ pub struct LoadedBoard {
     pub scroll_offset: Vec<usize>,
     pub detail_item_idx: usize,
     pub detail_scroll: usize,
+    /// Effective max scroll of the description pane, reported by the
+    /// renderer each frame (it depends on the popup layout, which only the
+    /// renderer knows). Interior-mutable because rendering takes `&App`.
+    /// Input clamps `detail_scroll` against this so scrolling up responds
+    /// immediately even if the stored value ran past the rendered max.
+    pub detail_max_scroll: std::cell::Cell<usize>,
 }
 
 impl LoadedBoard {
@@ -431,6 +437,7 @@ mod tests {
             scroll_offset: vec![0],
             detail_item_idx: 0,
             detail_scroll: 0,
+            detail_max_scroll: std::cell::Cell::new(0),
         }
     }
 

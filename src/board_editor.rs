@@ -146,6 +146,7 @@ impl BoardEditor {
                 scroll_offset: vec![0; num_lists],
                 detail_item_idx: 0,
                 detail_scroll: 0,
+                detail_max_scroll: std::cell::Cell::new(0),
             },
             last_added_card_id: None,
             diagnostics,
@@ -308,13 +309,16 @@ impl BoardEditor {
     }
 
     /// Scroll the description pane by `step`, clamped to `max_scroll`
-    /// (computed by the renderer from the wrapped line count).
+    /// (reported by the renderer). The stored value is clamped first so a
+    /// position that ran past the rendered max (e.g. after a layout change)
+    /// responds to the very next key press instead of eating presses.
     pub fn scroll_detail(&mut self, step: usize, down: bool, max_scroll: usize) {
-        if down {
-            self.board.detail_scroll = (self.board.detail_scroll + step).min(max_scroll);
+        let current = self.board.detail_scroll.min(max_scroll);
+        self.board.detail_scroll = if down {
+            (current + step).min(max_scroll)
         } else {
-            self.board.detail_scroll = self.board.detail_scroll.saturating_sub(step);
-        }
+            current.saturating_sub(step)
+        };
     }
 
 
@@ -1499,6 +1503,7 @@ mod tests {
             scroll_offset: vec![0],
             detail_item_idx: 0,
             detail_scroll: 0,
+            detail_max_scroll: std::cell::Cell::new(0),
         }
     }
 
@@ -1522,6 +1527,7 @@ mod tests {
             scroll_offset: vec![0],
             detail_item_idx: 0,
             detail_scroll: 0,
+            detail_max_scroll: std::cell::Cell::new(0),
         };
         mutate(&mut board);
         BoardEditor::from_loaded(board)

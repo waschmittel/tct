@@ -231,6 +231,7 @@ mod tests {
             scroll_offset: vec![],
             detail_item_idx: 0,
             detail_scroll: 0,
+            detail_max_scroll: std::cell::Cell::new(0),
         }
     }
 

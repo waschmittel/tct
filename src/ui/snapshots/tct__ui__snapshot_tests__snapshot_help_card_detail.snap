@@ -8,7 +8,7 @@ expression: render_to_string(&app)
 │┃Fix│Card                                         Labels & Due                               │   ││
 │┃[bu│  t               Edit title                   l               Assign / remove labels   │───┘│
 │┃[1/│  e               Edit description             L               Manage labels            │    │
-│┗━━━│  PgUp / PgDn     Scroll description           u               Set due date             │    │
+│┗━━━│  PgUp/PgDn ←/→   Scroll description           u               Set due date             │    │
 │┌───│  y               Copy description             U               Clear due date           │    │
 ││Red│  Y               Copy checklist (md)                                                   │    │
 │└───│  h               View change history        App                                        │    │

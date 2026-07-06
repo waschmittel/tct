@@ -29,8 +29,6 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     frame.render_widget(Clear, popup);
 
-    let title_display = format!(" {} ", card.title);
-
     // Detect "editing description" via the active insert handler.
     let editing_desc_handler = if matches!(app.mode, AppMode::Insert) {
         app.insert.as_ref().and_then(|h| {
@@ -39,6 +37,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         })
     } else {
         None
+    };
+
+    let title_display = if editing_desc_handler.is_some() {
+        format!(" {} (editing description) ", card.title)
+    } else {
+        format!(" {} ", card.title)
     };
     let block = Block::default()
         .title(title_display)
@@ -53,13 +57,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     // If editing description, render the editor instead.
     if let Some(handler) = editing_desc_handler {
-        render_description_editor(
-            frame,
-            inner,
-            &handler.input.textarea,
-            handler.input.scroll,
-            accent,
-        );
+        render_description_editor(frame, inner, &handler.input.textarea, accent);
         return;
     }
 
@@ -191,6 +189,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // Clamp description scroll
     let desc_max_scroll = desc_full.saturating_sub(desc_h);
     let desc_scroll = (board.detail_scroll as u16).min(desc_max_scroll);
+    // Report the effective max back to the input layer so scroll keys clamp
+    // against what is actually rendered.
+    board.detail_max_scroll.set(desc_max_scroll as usize);
 
     // Auto-scroll checklist to keep selected item visible
     let ck_max_scroll = ck_full.saturating_sub(ck_h);
@@ -207,19 +208,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // Top blank
     y += top_pad;
 
-    // Description header (with optional scroll hint)
-    let desc_header_text = if desc_full > desc_h {
-        let total_visual_lines = desc_full.max(1);
-        let bottom = (desc_scroll + desc_h).min(total_visual_lines);
-        format!("Description  [{}-{} / {}]", desc_scroll + 1, bottom, total_visual_lines)
-    } else {
-        "Description".to_string()
-    };
+    // Description header
     if y < inner.y + inner.height {
         let header_area = Rect::new(inner.x, y, inner.width, desc_header_h);
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
-                desc_header_text,
+                "Description",
                 Style::default().fg(accent).add_modifier(Modifier::BOLD),
             ))),
             header_area,
@@ -227,12 +221,22 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         y += desc_header_h;
     }
 
-    // Description body
+    // Description body (scrollbar on the right when it overflows)
     if desc_h > 0 && y < inner.y + inner.height {
         let desc_area = Rect::new(inner.x + pad, y, md_inner_width, desc_h);
         let desc_paragraph =
             Paragraph::new(desc_lines.clone()).scroll((desc_scroll, 0));
         frame.render_widget(desc_paragraph, desc_area);
+        if desc_full > desc_h {
+            let bar_area = Rect::new(inner.x, y, inner.width, desc_h);
+            render_scrollbar(
+                frame,
+                bar_area,
+                desc_full as usize,
+                desc_scroll as usize,
+                accent,
+            );
+        }
         y += desc_h;
     }
 
@@ -404,72 +408,38 @@ fn render_description_editor(
     frame: &mut Frame,
     area: Rect,
     textarea: &ratatui_textarea::TextArea<'static>,
-    editor_scroll: usize,
     accent: Color,
 ) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(accent))
-        .title(Line::from(Span::styled(
-            " Edit Description ",
-            Style::default().fg(accent).add_modifier(Modifier::BOLD),
-        )));
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+    // Cap the text width at WRAP_WIDTH so the editor wraps at the same
+    // width as the rendered description view; leave the rightmost column
+    // of the detail view for the scrollbar.
+    let width = area.width.saturating_sub(1).min(markdown::WRAP_WIDTH as u16);
+    let editor_area = Rect::new(area.x, area.y, width, area.height);
+    frame.render_widget(textarea, editor_area);
 
-    if inner.height == 0 || inner.width == 0 {
-        return;
+    // Scrollbar tracks the cursor's data line — the textarea keeps the
+    // cursor in view, so this follows the viewport closely enough.
+    let total = textarea.lines().len();
+    if total > area.height as usize {
+        let ratatui_textarea::DataCursor(cursor_row, _) = textarea.cursor();
+        render_scrollbar(frame, area, total, cursor_row, accent);
     }
+}
 
-    let visible_height = inner.height as usize;
-    let lines: Vec<String> = textarea.lines().iter().map(|s| s.to_string()).collect();
-    let ratatui_textarea::DataCursor(cursor_row, cursor_col) = textarea.cursor();
-
-    let wrap_width = markdown::WRAP_WIDTH.min(inner.width as usize);
-
-    let rendered = markdown::MarkdownRenderer::from_lines(&lines, wrap_width, accent).render();
-    let visual_lines = rendered.lines();
-    let (cursor_visual_row_u16, cursor_visual_col_u16) = rendered.cursor_at(cursor_row, cursor_col);
-    let cursor_visual_row = cursor_visual_row_u16 as usize;
-    let cursor_visual_col = cursor_visual_col_u16 as usize;
-
-    // Adjust scroll to keep cursor visible
-    let scroll = if cursor_visual_row < editor_scroll {
-        cursor_visual_row
-    } else if cursor_visual_row >= editor_scroll + visible_height {
-        cursor_visual_row - visible_height + 1
-    } else {
-        editor_scroll
-    };
-
-    let end = (scroll + visible_height).min(visual_lines.len());
-    let start = scroll.min(end);
-
-    for (vi, idx) in (start..end).enumerate() {
-        let vline = &visual_lines[idx];
-        let src_li = rendered.src_row_for(idx).unwrap_or(0);
-
-        let y = inner.y + vi as u16;
-        let line_area = Rect::new(inner.x, y, inner.width, 1);
-
-        let line_spans: Vec<Span<'static>> = vline.spans.to_vec();
-
-        if src_li == cursor_row && idx == cursor_visual_row {
-            frame.render_widget(
-                Paragraph::new(Line::from(line_spans))
-                    .style(Style::default().bg(Color::Rgb(30, 30, 40))),
-                line_area,
-            );
-        } else {
-            frame.render_widget(Paragraph::new(Line::from(line_spans)), line_area);
-        }
-    }
-
-    if cursor_visual_row >= start && cursor_visual_row < end {
-        let cx = inner.x + (cursor_visual_col as u16).min(inner.width.saturating_sub(1));
-        let cy = inner.y + (cursor_visual_row - start) as u16;
-        frame.set_cursor_position((cx, cy));
-    }
+fn render_scrollbar(frame: &mut Frame, area: Rect, total: usize, position: usize, accent: Color) {
+    use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
+    let mut state = ScrollbarState::new(total)
+        .position(position)
+        .viewport_content_length(area.height as usize);
+    frame.render_stateful_widget(
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None)
+            .track_symbol(None)
+            .style(Style::default().fg(accent)),
+        area,
+        &mut state,
+    );
 }
 
 fn render_input_dialog(

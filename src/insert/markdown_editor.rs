@@ -1,5 +1,7 @@
 //! Description editor — multi-line markdown editing with list
-//! auto-continuation, renumbering, and a syntax-highlighted render.
+//! auto-continuation, renumbering, and markdown formatting shortcuts.
+//! The textarea widget renders itself (soft wrap, scroll, selection);
+//! the styled markdown preview appears in the card detail view.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui_textarea::CursorMove;
@@ -30,9 +32,7 @@ impl MarkdownEditor {
 
 impl InsertHandler for MarkdownEditor {
     fn handle_key(&mut self, key: KeyEvent, _b: Option<&LoadedBoard>) -> InsertOutcome {
-        let outcome = self.dispatch_key(key);
-        self.update_scroll();
-        outcome
+        self.dispatch_key(key)
     }
 
     fn surface(&self) -> InsertSurface { InsertSurface::CardDetail }
@@ -95,14 +95,6 @@ impl MarkdownEditor {
                 handle_shift_tab_unnest(&mut self.input.textarea);
                 InsertOutcome::Stay
             }
-            (KeyCode::Up, _) => {
-                move_cursor_visual(&mut self.input.textarea, -1);
-                InsertOutcome::Stay
-            }
-            (KeyCode::Down, _) => {
-                move_cursor_visual(&mut self.input.textarea, 1);
-                InsertOutcome::Stay
-            }
             _ => {
                 let before = self.input.textarea.lines().len();
                 self.input.textarea.input(key);
@@ -112,16 +104,6 @@ impl MarkdownEditor {
                 }
                 InsertOutcome::Stay
             }
-        }
-    }
-
-    fn update_scroll(&mut self) {
-        let ratatui_textarea::DataCursor(cursor_row, _) = self.input.textarea.cursor();
-        let visible_height = 20usize;
-        if cursor_row < self.input.scroll {
-            self.input.scroll = cursor_row;
-        } else if cursor_row >= self.input.scroll + visible_height {
-            self.input.scroll = cursor_row - visible_height + 1;
         }
     }
 }
@@ -321,37 +303,6 @@ pub(crate) fn renumber_all(textarea: &mut ratatui_textarea::TextArea<'static>) {
 
     let ratatui_textarea::DataCursor(sr, sc) = saved;
     textarea.move_cursor(CursorMove::Jump(sr as u16, sc as u16));
-}
-
-fn move_cursor_visual(textarea: &mut ratatui_textarea::TextArea<'static>, direction: i32) {
-    use crate::ui::markdown;
-    use ratatui::style::Color;
-
-    let accent = Color::Cyan;
-    let ratatui_textarea::DataCursor(cursor_row, cursor_col) = textarea.cursor();
-    let lines: Vec<String> = textarea.lines().to_vec();
-
-    let rendered =
-        markdown::MarkdownRenderer::from_lines(&lines, markdown::WRAP_WIDTH, accent).render();
-    let (current_vrow, visual_col) = rendered.cursor_at(cursor_row, cursor_col);
-    let (current_vrow, visual_col) = (current_vrow as usize, visual_col as usize);
-
-    let target_vrow = if direction < 0 {
-        current_vrow.checked_sub(1)
-    } else {
-        let next = current_vrow + 1;
-        (next < rendered.visual_line_count()).then_some(next)
-    };
-
-    let Some(target_vrow) = target_vrow else {
-        return;
-    };
-    let Some((target_src_row, target_col)) = rendered.source_pos_at(target_vrow, visual_col)
-    else {
-        return;
-    };
-
-    textarea.move_cursor(CursorMove::Jump(target_src_row as u16, target_col as u16));
 }
 
 fn wrap_selection_or_insert(

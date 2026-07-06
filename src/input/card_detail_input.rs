@@ -43,8 +43,10 @@ pub static KEYMAP: &[Binding<Action>] = &[
     // Card
     Binding { code: KeyCode::Char('t'), shift: None, action: Action::EditTitle, keys: "t", help: "Edit title", section: "Card" },
     Binding { code: KeyCode::Char('e'), shift: None, action: Action::EditDescription, keys: "e", help: "Edit description", section: "Card" },
-    Binding { code: KeyCode::PageUp, shift: None, action: Action::ScrollUp, keys: "PgUp / PgDn", help: "Scroll description", section: "Card" },
-    Binding { code: KeyCode::PageDown, shift: None, action: Action::ScrollDown, keys: "PgUp / PgDn", help: "Scroll description", section: "Card" },
+    Binding { code: KeyCode::PageUp, shift: None, action: Action::ScrollUp, keys: "PgUp/PgDn ←/→", help: "Scroll description", section: "Card" },
+    Binding { code: KeyCode::PageDown, shift: None, action: Action::ScrollDown, keys: "PgUp/PgDn ←/→", help: "Scroll description", section: "Card" },
+    Binding { code: KeyCode::Left, shift: None, action: Action::ScrollUp, keys: "PgUp/PgDn ←/→", help: "Scroll description", section: "Card" },
+    Binding { code: KeyCode::Right, shift: None, action: Action::ScrollDown, keys: "PgUp/PgDn ←/→", help: "Scroll description", section: "Card" },
     Binding { code: KeyCode::Char('y'), shift: None, action: Action::CopyDescription, keys: "y", help: "Copy description", section: "Card" },
     Binding { code: KeyCode::Char('Y'), shift: None, action: Action::CopyChecklist, keys: "Y", help: "Copy checklist (md)", section: "Card" },
     Binding { code: KeyCode::Char('h'), shift: None, action: Action::HistoryDialog, keys: "h", help: "View change history", section: "Card" },
@@ -94,8 +96,8 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                 editor.detail_item_up();
             }
         }
-        Action::ScrollDown => scroll_description(app, 5, true),
-        Action::ScrollUp => scroll_description(app, 5, false),
+        Action::ScrollDown => scroll_description(app, 1, true),
+        Action::ScrollUp => scroll_description(app, 1, false),
         Action::ReorderItemDown => {
             if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned()
@@ -469,11 +471,8 @@ mod tests {
     fn page_down_scrolls_description() {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
-            // Set a multi-line description so scroll is bounded by content.
-            let board = app.board_mut().unwrap();
-            let card_id = board.current_card_id().cloned().unwrap();
-            let card = board.cards.get_mut(&card_id).unwrap();
-            card.description = (0..30).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+            // The renderer reports the effective max scroll; simulate it.
+            app.board().unwrap().detail_max_scroll.set(20);
             press(&mut app, KeyCode::PageDown);
             assert!(app.board().unwrap().detail_scroll > 0);
             press(&mut app, KeyCode::PageUp);
@@ -481,24 +480,48 @@ mod tests {
         });
     }
 
+    #[test]
+    fn arrow_keys_scroll_description() {
+        with_temp_dir(|| {
+            let mut app = setup_card_detail();
+            app.board().unwrap().detail_max_scroll.set(20);
+            press(&mut app, KeyCode::Right);
+            assert_eq!(app.board().unwrap().detail_scroll, 1);
+            press(&mut app, KeyCode::Left);
+            assert_eq!(app.board().unwrap().detail_scroll, 0);
+        });
+    }
+
+    #[test]
+    fn scroll_up_responds_immediately_after_overscroll() {
+        with_temp_dir(|| {
+            let mut app = setup_card_detail();
+            // Stored scroll ran past the rendered max (e.g. layout change).
+            app.board().unwrap().detail_max_scroll.set(10);
+            app.board_mut().unwrap().detail_scroll = 50;
+            press(&mut app, KeyCode::PageUp);
+            assert_eq!(app.board().unwrap().detail_scroll, 9);
+        });
+    }
+
+    #[test]
+    fn scroll_down_clamps_to_rendered_max() {
+        with_temp_dir(|| {
+            let mut app = setup_card_detail();
+            app.board().unwrap().detail_max_scroll.set(3);
+            for _ in 0..10 {
+                press(&mut app, KeyCode::PageDown);
+            }
+            assert_eq!(app.board().unwrap().detail_scroll, 3);
+        });
+    }
 }
 
 fn scroll_description(app: &mut App, step: usize, down: bool) {
-    let accent = app.accent_color();
-    let visual_count = if let Some(board) = app.board() {
-        if let Some(card) = board.current_card() {
-            if card.description.is_empty() {
-                1
-            } else {
-                crate::ui::markdown::highlight_lines(&card.description, accent).len()
-            }
-        } else {
-            0
-        }
-    } else {
-        0
-    };
-    let max_scroll = visual_count.saturating_sub(1);
+    let max_scroll = app
+        .board()
+        .map(|b| b.detail_max_scroll.get())
+        .unwrap_or(0);
     if let Some(editor) = &mut app.editor {
         editor.scroll_detail(step, down, max_scroll);
     }
