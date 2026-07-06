@@ -35,7 +35,15 @@ impl Dialog for ConfirmCancelEdit {
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                 DialogOutcome::side_effect(DialogSideEffect::ResumeDescriptionEdit)
             }
+            KeyCode::Char('?') => DialogOutcome::help(),
             _ => DialogOutcome::stay(),
         }
+    }
+
+    fn help(&self) -> Option<super::DialogHelp> {
+        Some(super::DialogHelp {
+            title: " Help — Discard Changes ",
+            rows: vec![("y", "Discard changes"), ("n / Esc", "Keep editing")],
+        })
     }
 }

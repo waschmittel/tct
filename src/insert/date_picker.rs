@@ -108,6 +108,8 @@ impl InsertHandler for DatePicker {
                 self.sync_from_buffer();
                 InsertOutcome::Stay
             }
+            // `?` is never date input, so the picker can offer help.
+            KeyCode::Char('?') => InsertOutcome::Help,
             _ => InsertOutcome::Stay,
         }
     }

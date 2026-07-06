@@ -56,6 +56,11 @@ pub enum InsertOutcome {
     /// Confirm via a generic side effect (e.g. board create — not
     /// expressible as `Command` since the board isn't loaded).
     ConfirmSideEffect(Box<InsertSideEffect>),
+    /// Show the Help overlay while the handler stays alive on
+    /// `App.insert`; Esc in Help returns to Insert mode. Only handlers
+    /// whose input doesn't consume `?` as text (the date picker) emit
+    /// this.
+    Help,
 }
 
 /// Direct side effects an insert handler can request when the operation

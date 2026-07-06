@@ -154,23 +154,39 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         || (matches!(effective_mode, AppMode::Insert)
             && matches!(insert_surface_v, Some(InsertSurface::CardDetail)));
 
-    // Description editor: previous mode is `Insert` and handler is the
-    // MarkdownEditor (titled "Edit Description").
-    let is_editing_desc = matches!(effective_mode, AppMode::Insert)
-        && app
-            .insert
-            .as_ref()
-            .map(|h| h.title() == "Edit Description")
-            .unwrap_or(false);
-
     // Help opened from inside a dialog (`?` → `Follow::Help`): the dialog
     // declares its own reference rows via `Dialog::help()`.
     let dialog_help = app.dialog.as_ref().and_then(|d| d.help());
+
+    // Help opened over a live insert handler (`?` → `InsertOutcome::Help`).
+    // A dialog takes precedence: a dialog over insert (e.g. the discard
+    // prompt) shows its own help page.
+    let insert_handler = if dialog_help.is_none() {
+        app.insert.as_ref()
+    } else {
+        None
+    };
+    let is_editing_desc = insert_handler
+        .map(|h| {
+            h.as_any()
+                .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
+                .is_some()
+        })
+        .unwrap_or(false);
+    let is_date_picker = insert_handler
+        .map(|h| {
+            h.as_any()
+                .downcast_ref::<crate::insert::date_picker::DatePicker>()
+                .is_some()
+        })
+        .unwrap_or(false);
 
     let title = if let Some(dh) = &dialog_help {
         dh.title
     } else if is_editing_desc {
         " Help — Description Editor "
+    } else if is_date_picker {
+        " Help — Due Date "
     } else if is_card_detail {
         " Help — Card Detail "
     } else if is_board_selector_base {
@@ -272,6 +288,29 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 Line::raw(""),
                 header("Navigation"),
                 row("Up / Down", "Move by visual line"),
+            ],
+        )
+    } else if is_date_picker {
+        // Date-picker keys live on the DatePicker handler, not a mode
+        // keymap — documented here directly.
+        (
+            vec![
+                header("Calendar"),
+                row("Left / Right", "Previous / next day"),
+                row("Up / Down", "Previous / next week"),
+                row("PgUp / PgDn", "Previous / next month"),
+                row("Shift+PgUp/PgDn", "Previous / next year"),
+                row("Home / End", "First / last of month"),
+                row("t", "Today"),
+            ],
+            vec![
+                header("Input"),
+                row("0-9 / -", "Type date (YYYY-MM-DD)"),
+                row("Ctrl+U", "Clear (remove due date)"),
+                Line::raw(""),
+                header("File"),
+                row("Enter", "Save"),
+                row("Esc", "Cancel"),
             ],
         )
     } else if is_card_detail {

@@ -100,6 +100,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
             apply_side_effect(app, *eff)?;
             app.cancel_insert();
         }
+        InsertOutcome::Help => {
+            // Handler stays alive on `app.insert`; Help-Esc returns to it.
+            app.mode = crate::app::AppMode::Help;
+        }
     }
     Ok(())
 }

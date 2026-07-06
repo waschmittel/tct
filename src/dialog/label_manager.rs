@@ -25,7 +25,7 @@ impl Dialog for LabelManager {
         frame: &mut Frame,
         area: Rect,
         board: Option<&LoadedBoard>,
-        accent: Color,
+        _accent: Color,
     ) {
         let board = match board {
             Some(b) => b,
@@ -45,16 +45,6 @@ impl Dialog for LabelManager {
 
         let block = Block::default()
             .title(" Label Manager ")
-            .title_bottom(Line::from(vec![
-                Span::styled(" n", Style::default().fg(accent)),
-                Span::raw(":new  "),
-                Span::styled("d", Style::default().fg(accent)),
-                Span::raw(":delete  "),
-                Span::styled("?", Style::default().fg(accent)),
-                Span::raw(":help  "),
-                Span::styled("Esc", Style::default().fg(Color::Yellow)),
-                Span::raw(":close "),
-            ]))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Yellow));
         let inner = block.inner(popup);
@@ -63,7 +53,7 @@ impl Dialog for LabelManager {
         if labels.is_empty() {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "No labels. Press 'n' to create one.",
+                    "No labels.",
                     Style::default().fg(Color::DarkGray),
                 )),
                 inner,

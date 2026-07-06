@@ -45,7 +45,15 @@ impl Dialog for ConfirmArchiveList {
                 }
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => DialogOutcome::close(),
+            KeyCode::Char('?') => DialogOutcome::help(),
             _ => DialogOutcome::stay(),
         }
+    }
+
+    fn help(&self) -> Option<super::DialogHelp> {
+        Some(super::DialogHelp {
+            title: " Help — Archive List ",
+            rows: vec![("y", "Archive list"), ("n / Esc", "Cancel")],
+        })
     }
 }

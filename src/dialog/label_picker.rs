@@ -47,7 +47,7 @@ impl Dialog for LabelPicker {
         frame.render_widget(Clear, popup);
 
         let block = Block::default()
-            .title(" Labels (Space:toggle, L:manage, ?:help) ")
+            .title(" Labels ")
             .borders(Borders::ALL)
             .border_style(Style::default().fg(accent));
         let inner = block.inner(popup);
@@ -56,7 +56,7 @@ impl Dialog for LabelPicker {
         if board_labels.is_empty() {
             frame.render_widget(
                 Paragraph::new(Span::styled(
-                    "No labels. Press L to manage.",
+                    "No labels.",
                     Style::default().fg(Color::DarkGray),
                 )),
                 inner,

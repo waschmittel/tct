@@ -13,8 +13,8 @@ pub fn render(
     picker_date: Option<NaiveDate>,
     accent: Color,
 ) {
-    let width = 38u16.min(area.width.saturating_sub(2));
-    let height = 14u16.min(area.height.saturating_sub(2));
+    let width = 25u16.min(area.width.saturating_sub(2));
+    let height = 12u16.min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(width)) / 2;
     let y = area.y + (area.height.saturating_sub(height)) / 2;
     let dialog = Rect::new(x, y, width, height);
@@ -35,25 +35,39 @@ pub fn render(
         return;
     }
 
+    // Center the 21-column calendar block (7 × " dd") inside the popup.
+    let content_w = 21u16.min(inner.width);
+    let content = Rect::new(
+        inner.x + (inner.width - content_w) / 2,
+        inner.y,
+        content_w,
+        inner.height,
+    );
+
     let chunks = Layout::vertical([
         Constraint::Length(1), // text input
         Constraint::Length(1), // blank
         Constraint::Length(1), // month header
         Constraint::Length(1), // day-of-week header
         Constraint::Min(6),    // calendar grid
-        Constraint::Length(2), // hints
     ])
-    .split(inner);
+    .split(content);
 
-    // Text input line
-    let visible_w = chunks[0].width as usize;
+    // Text input line, indented one column to line up with the grid cells.
+    let input_area = Rect::new(
+        chunks[0].x + 1,
+        chunks[0].y,
+        chunks[0].width.saturating_sub(1),
+        1,
+    );
+    let visible_w = input_area.width as usize;
     let cursor_char_idx = buffer[..cursor.min(buffer.len())].chars().count();
     let scroll = cursor_char_idx.saturating_sub(visible_w.saturating_sub(1));
     let visible: String = buffer.chars().skip(scroll).take(visible_w).collect();
-    frame.render_widget(Paragraph::new(visible), chunks[0]);
-    let cx = chunks[0].x + (cursor_char_idx - scroll) as u16;
-    if cx < chunks[0].x + chunks[0].width {
-        frame.set_cursor_position((cx, chunks[0].y));
+    frame.render_widget(Paragraph::new(visible), input_area);
+    let cx = input_area.x + (cursor_char_idx - scroll) as u16;
+    if cx < input_area.x + input_area.width {
+        frame.set_cursor_position((cx, input_area.y));
     }
 
     // Calendar grid (only if we have a parsed date)
@@ -80,19 +94,6 @@ pub fn render(
 
     let grid_lines = build_grid(date, accent);
     frame.render_widget(Paragraph::new(grid_lines), chunks[4]);
-
-    // Hints
-    let hint_lines = vec![
-        Line::from(Span::styled(
-            "←→:day  ↑↓:week  PgUp/Dn:month  t:today",
-            Style::default().fg(Color::DarkGray),
-        )),
-        Line::from(Span::styled(
-            "Type to edit  Enter:save  Esc:cancel",
-            Style::default().fg(Color::DarkGray),
-        )),
-    ];
-    frame.render_widget(Paragraph::new(hint_lines), chunks[5]);
 }
 
 fn month_name(month: u32) -> &'static str {
@@ -177,3 +178,4 @@ fn days_in_month(year: i32, month: u32) -> u32 {
     let first_next = NaiveDate::from_ymd_opt(ny, nm, 1).unwrap();
     first_next.pred_opt().unwrap().day()
 }
+

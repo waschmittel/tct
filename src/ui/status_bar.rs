@@ -17,6 +17,10 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         AppMode::Help => "HELP",
     };
 
+    // The status bar carries exactly one hint: `?` for the contextual help
+    // overlay (the overlay itself documents everything else). Insert-mode
+    // handlers consume plain text keys, so only the date picker — which
+    // ignores `?` — offers it; the other handlers show just their title.
     let insert_hint = if matches!(app.mode, AppMode::Insert) {
         app.insert.as_ref().map(|h| {
             let title = h.title();
@@ -24,14 +28,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 .downcast_ref::<crate::insert::date_picker::DatePicker>()
                 .is_some()
             {
-                format!("{title}  ←→↑↓:navigate  t:today  Enter:save  Esc:cancel")
-            } else if h.as_any()
-                .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
-                .is_some()
-            {
-                format!("{title}  Ctrl+S:save  Esc:cancel  Tab:nest")
+                format!("{title}  ?:help")
             } else {
-                format!("{title}  Enter:confirm  Esc:cancel")
+                title.to_string()
             }
         })
     } else {
@@ -39,13 +38,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     };
 
     let hints: &str = match &app.mode {
-        AppMode::BoardSelector => "?:help  q:quit",
-        AppMode::Normal => "?:help  q:quit",
-        AppMode::CardDetail => "?:help  Esc:close",
-        AppMode::Insert => insert_hint.as_deref().unwrap_or("Enter:confirm  Esc:cancel"),
-        AppMode::Command => "Enter:search  Esc:cancel",
-        AppMode::Dialog => "y:confirm  n:cancel",
-        AppMode::Help => "Esc:close",
+        AppMode::BoardSelector
+        | AppMode::Normal
+        | AppMode::CardDetail
+        | AppMode::Dialog => "?:help",
+        AppMode::Insert => insert_hint.as_deref().unwrap_or(""),
+        AppMode::Command | AppMode::Help => "",
     };
 
     // Single row: mode chip + key hints left, data dir right. Transient

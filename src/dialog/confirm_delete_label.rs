@@ -71,7 +71,15 @@ impl Dialog for ConfirmDeleteLabel {
                     from_picker: self.from_picker,
                 }))
             }
+            KeyCode::Char('?') => DialogOutcome::help(),
             _ => DialogOutcome::stay(),
         }
+    }
+
+    fn help(&self) -> Option<super::DialogHelp> {
+        Some(super::DialogHelp {
+            title: " Help — Delete Label ",
+            rows: vec![("y", "Delete label from all cards"), ("n / Esc", "Cancel")],
+        })
     }
 }

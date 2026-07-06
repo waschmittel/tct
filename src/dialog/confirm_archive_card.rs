@@ -43,7 +43,15 @@ impl Dialog for ConfirmArchiveCard {
                 }
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => DialogOutcome::close(),
+            KeyCode::Char('?') => DialogOutcome::help(),
             _ => DialogOutcome::stay(),
         }
+    }
+
+    fn help(&self) -> Option<super::DialogHelp> {
+        Some(super::DialogHelp {
+            title: " Help — Archive Card ",
+            rows: vec![("y", "Archive card"), ("n / Esc", "Cancel")],
+        })
     }
 }

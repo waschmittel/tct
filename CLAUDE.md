@@ -17,7 +17,7 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 - **Board Editor** (`src/board_editor.rs`, ADR-0001/0002): aggregate root for the open board. `App.editor: Option<BoardEditor>`; reads via `app.board() -> Option<&LoadedBoard>`; domain mutations via `app.apply(Command)`; selection moves via editor verbs (`select_card_down`, `detail_item_up`, `reset_detail_cursor`, …). Input/UI code never mutates `LoadedBoard` fields directly.
 - **Board Directory** (`src/board_directory.rs`): owns the board collection — create/archive/restore/rename/cycle accent/display order/listing. Used by the board selector, insert/dialog side effects, and `tct boards`. Stores are internals of the two aggregates.
 - **Visibility**: `LoadedBoard::visible_cards(list_idx, search)` is the single source of truth for which Cards show (archived always hidden; search hides non-matching). Navigation, clamping, and rendering all consume it.
-- **Dialog trait** (`src/dialog/`): One struct per dialog kind implementing `Dialog { render, handle_key, background, help }`. Each holds its own payload + cursor/scroll state. Returns `DialogOutcome { apply: Option<Command>, side_effect, status, follow }`. The dispatcher in `input/dialog_input.rs` interprets the outcome. See `docs/adr/0003-dialog-and-insert-as-traits.md`. Dialogs with non-trivial keybindings implement `help()` (`DialogHelp` rows for the Help overlay) and map `?` to `DialogOutcome::help()` — `Follow::Help` shows the overlay while the dialog stays alive; Help-Esc returns to it.
+- **Dialog trait** (`src/dialog/`): One struct per dialog kind implementing `Dialog { render, handle_key, background, help }`. Each holds its own payload + cursor/scroll state. Returns `DialogOutcome { apply: Option<Command>, side_effect, status, follow }`. The dispatcher in `input/dialog_input.rs` interprets the outcome. See `docs/adr/0003-dialog-and-insert-as-traits.md`. Every dialog implements `help()` (`DialogHelp` rows for the Help overlay) and maps `?` to `DialogOutcome::help()` — `Follow::Help` shows the overlay while the dialog stays alive; Help-Esc returns to it.
 - **InsertHandler trait** (`src/insert/`): One struct per insert target, grouped by widget kind: `line_editor.rs` (single-line inputs sharing `LineInput`), `markdown_editor.rs` (description editor over `TextAreaInput`), `date_picker.rs`. Returns `InsertOutcome` (`Stay`, `Cancel`, `Confirm(Command)`, `ConfirmAndOpenDialog`, `OpenDialog`, …). Dispatcher in `input/insert.rs`.
 - **Storage**: JSON files under `~/.tct/boards/` (override with `TCT_DATA_DIR`). One file per board (`board.json`) and per card (`card-<id>.json`); **no list files** — lists are inline ordered `lists: [ListMeta]` in `board.json`. A Card owns membership (`list_id`) + order (`position`, fractional rank) — ADR-0006; `CardList.card_ids` is *derived* (`model/list.rs`), never persisted. All writes via `atomic_write` (`.tmp` then rename). Legacy `list-*.json` boards migrate on load (`storage/migrate.rs` via `board_store::load_board`); `list_store` is now `#[cfg(test)]`.
 - **Description editing**: Lives on the `MarkdownEditor` insert handler (`src/insert/markdown_editor.rs`). Wraps `ratatui-textarea::TextArea` via `TextAreaInput` shared base. List autocontinue + renumbering + nest/unnest also live there. Renderer in `card_detail.rs::render_description_editor()` reads from the handler.
@@ -41,7 +41,8 @@ The help overlay is the single source of truth for keybindings — README.md no 
 1. Create `src/dialog/<name>.rs` with a struct implementing `Dialog` (payload + cursor/scroll state, `render`, `handle_key`, optional `background`).
 2. Register the module in `src/dialog/mod.rs`.
 3. Open from input handlers with `app.open_dialog(Box::new(MyDialog { ... }))`.
-4. If the dialog needs side effects beyond `Command` (hard delete, board create) add a variant to `DialogSideEffect` and handle in `input/dialog_input.rs::apply_side_effect`.
+4. Implement `help()` (its `DialogHelp` rows document all the dialog's keys) and map `?` to `DialogOutcome::help()` in `handle_key` — every dialog does this; there are no inline hints.
+5. If the dialog needs side effects beyond `Command` (hard delete, board create) add a variant to `DialogSideEffect` and handle in `input/dialog_input.rs::apply_side_effect`.
 
 ### New card field
 1. Add field to `Card` struct in `model/card.rs` (with serde attributes)
@@ -67,8 +68,10 @@ The help overlay is the single source of truth for keybindings — README.md no 
 
 When changing keybindings or features, update:
 - The mode's `KEYMAP` table (help overlay generates from it)
-- `src/ui/status_bar.rs` mode hints; `src/ui/card_detail.rs` bottom hint spans
+- The matching help page: `Dialog::help()` rows for dialogs, the date-picker/description-editor pages in `ui/mod.rs::render_help()` for insert handlers
 - This file if architectural patterns change
+
+The status bar carries a single `?:help` hint (plus the insert title); there are **no other inline shortcut hints** anywhere — all shortcuts live in the contextual help overlay only.
 
 Doc homes (don't duplicate elsewhere): keybindings → help overlay only; full CLI reference → `cli/mod.rs` `HELP`; module layout → `docs/architecture.md`; README keeps basic usage + one example workflow.
 

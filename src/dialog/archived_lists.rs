@@ -38,14 +38,6 @@ impl Dialog for ArchivedLists {
 
         let block = Block::default()
             .title(" Archived Lists ")
-            .title_bottom(Line::from(vec![
-                Span::styled(" Enter", Style::default().fg(Color::Green)),
-                Span::raw(":restore  "),
-                Span::styled("x", Style::default().fg(Color::Red)),
-                Span::raw(":delete  "),
-                Span::styled("Esc", Style::default().fg(Color::Yellow)),
-                Span::raw(":close "),
-            ]))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Yellow));
         let inner = block.inner(popup);
@@ -121,8 +113,21 @@ impl Dialog for ArchivedLists {
                 }
                 out
             }
+            KeyCode::Char('?') => DialogOutcome::help(),
             KeyCode::Esc => DialogOutcome::close(),
             _ => DialogOutcome::stay(),
         }
+    }
+
+    fn help(&self) -> Option<super::DialogHelp> {
+        Some(super::DialogHelp {
+            title: " Help — Archived Lists ",
+            rows: vec![
+                ("Up / Down", "Select list"),
+                ("Enter", "Restore list"),
+                ("x", "Delete permanently"),
+                ("Esc", "Close"),
+            ],
+        })
     }
 }

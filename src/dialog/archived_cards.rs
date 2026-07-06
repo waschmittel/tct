@@ -37,14 +37,6 @@ impl Dialog for ArchivedCards {
 
         let block = Block::default()
             .title(" Archived Cards ")
-            .title_bottom(Line::from(vec![
-                Span::styled(" Enter", Style::default().fg(Color::Green)),
-                Span::raw(":restore  "),
-                Span::styled("x", Style::default().fg(Color::Red)),
-                Span::raw(":delete  "),
-                Span::styled("Esc", Style::default().fg(Color::Yellow)),
-                Span::raw(":close "),
-            ]))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Yellow));
         let inner = block.inner(popup);
@@ -119,8 +111,21 @@ impl Dialog for ArchivedCards {
                 }
                 out
             }
+            KeyCode::Char('?') => DialogOutcome::help(),
             KeyCode::Esc => DialogOutcome::close(),
             _ => DialogOutcome::stay(),
         }
+    }
+
+    fn help(&self) -> Option<super::DialogHelp> {
+        Some(super::DialogHelp {
+            title: " Help — Archived Cards ",
+            rows: vec![
+                ("Up / Down", "Select card"),
+                ("Enter", "Restore card"),
+                ("x", "Delete permanently"),
+                ("Esc", "Close"),
+            ],
+        })
     }
 }

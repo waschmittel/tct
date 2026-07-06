@@ -119,12 +119,8 @@ impl Dialog for ColorPicker {
         frame.render_widget(Clear, popup);
 
         let title = match self.target {
-            ColorTarget::BoardAccent => {
-                " Board Color (↑↓ field, ←→ adjust, Enter:apply, Esc:cancel) "
-            }
-            ColorTarget::Label { .. } => {
-                " Label Color (↑↓ field, ←→ adjust, Enter:apply, Esc:cancel) "
-            }
+            ColorTarget::BoardAccent => " Board Color ",
+            ColorTarget::Label { .. } => " Label Color ",
         };
         let block = Block::default()
             .title(title)
@@ -193,12 +189,25 @@ impl Dialog for ColorPicker {
                     out
                 }
             },
+            KeyCode::Char('?') => DialogOutcome::help(),
             KeyCode::Esc => match self.back_to_manager() {
                 Some(manager) => DialogOutcome::open(manager),
                 None => DialogOutcome::close_to(crate::app::AppMode::BoardSelector),
             },
             _ => DialogOutcome::stay(),
         }
+    }
+
+    fn help(&self) -> Option<super::DialogHelp> {
+        Some(super::DialogHelp {
+            title: " Help — Color Picker ",
+            rows: vec![
+                ("Up / Down", "Select field (hue, saturation, lightness)"),
+                ("Left / Right", "Adjust selected field"),
+                ("Enter", "Apply color"),
+                ("Esc", "Cancel"),
+            ],
+        })
     }
 
     fn background(&self) -> DialogBackground {

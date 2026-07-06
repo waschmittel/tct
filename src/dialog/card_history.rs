@@ -52,12 +52,6 @@ impl Dialog for CardHistory {
         let title = format!(" History — {} ", truncate_for_title(&card.title, 40));
         let block = Block::default()
             .title(title)
-            .title_bottom(Line::from(vec![
-                Span::styled(" Up/Dn", Style::default().fg(accent)),
-                Span::raw(":scroll  "),
-                Span::styled("Esc", Style::default().fg(Color::Yellow)),
-                Span::raw(":close "),
-            ]))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(accent));
         let inner = block.inner(popup);
@@ -104,9 +98,22 @@ impl Dialog for CardHistory {
                 self.scroll = 0;
                 DialogOutcome::stay()
             }
+            KeyCode::Char('?') => DialogOutcome::help(),
             KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('h') => DialogOutcome::close(),
             _ => DialogOutcome::stay(),
         }
+    }
+
+    fn help(&self) -> Option<super::DialogHelp> {
+        Some(super::DialogHelp {
+            title: " Help — Card History ",
+            rows: vec![
+                ("Up / Down / j / k", "Scroll"),
+                ("PgUp / PgDn", "Scroll by 10"),
+                ("g / Home", "Jump to top"),
+                ("Esc / q / h", "Close"),
+            ],
+        })
     }
 }
 

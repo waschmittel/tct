@@ -1,4 +1,4 @@
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
@@ -40,31 +40,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     } else {
         None
     };
-    let is_editing_desc = editing_desc_handler.is_some();
-
-    let bottom_hints = if is_editing_desc {
-        vec![
-            Span::styled(" Ctrl+S", Style::default().fg(Color::Yellow)),
-            Span::raw(":save  "),
-            Span::styled("Esc", Style::default().fg(accent)),
-            Span::raw(":cancel "),
-        ]
-    } else {
-        vec![
-            Span::styled(" ?", Style::default().fg(accent)),
-            Span::raw(":help  "),
-            Span::styled("PgUp/PgDn", Style::default().fg(accent)),
-            Span::raw(":scroll desc  "),
-            Span::styled("h", Style::default().fg(accent)),
-            Span::raw(":history  "),
-            Span::styled("Esc", Style::default().fg(accent)),
-            Span::raw(":close "),
-        ]
-    };
-
     let block = Block::default()
         .title(title_display)
-        .title_bottom(Line::from(bottom_hints))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(accent));
     let inner = block.inner(popup);
@@ -93,7 +70,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // --- Build content for each section ---
     let desc_lines: Vec<Line<'static>> = if card.description.is_empty() {
         vec![Line::from(Span::styled(
-            "(no description — press 'e' to add)",
+            "(no description)",
             Style::default().fg(Color::DarkGray),
         ))]
     } else if desc_wrap_width == 0 {
@@ -107,7 +84,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     let checklist_lines: Vec<Line<'static>> = if card.checklist.is_empty() {
         vec![Line::from(Span::styled(
-            "  (no items — press 'a' to add)",
+            "  (no items)",
             Style::default().fg(Color::DarkGray),
         ))]
     } else {
@@ -136,7 +113,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let resolved = card.resolved_labels(&board.meta.labels);
     let labels_lines: Vec<Line<'static>> = if resolved.is_empty() {
         vec![Line::from(Span::styled(
-            "  (no labels — press 'l' to add)",
+            "  (no labels)",
             Style::default().fg(Color::DarkGray),
         ))]
     } else {
@@ -177,7 +154,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         ]
     } else {
         vec![Line::from(Span::styled(
-            "  (no due date — press 'u' to set)",
+            "  (no due date)",
             Style::default().fg(Color::DarkGray),
         ))]
     };
@@ -436,15 +413,7 @@ fn render_description_editor(
         .title(Line::from(Span::styled(
             " Edit Description ",
             Style::default().fg(accent).add_modifier(Modifier::BOLD),
-        )))
-        .title_bottom(Line::from(vec![
-            Span::styled(" Ctrl+S", Style::default().fg(accent)),
-            Span::raw(":save  "),
-            Span::styled("Esc", Style::default().fg(accent)),
-            Span::raw(":cancel  "),
-            Span::styled("Tab", Style::default().fg(accent)),
-            Span::raw(":nest "),
-        ]));
+        )));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -512,7 +481,7 @@ fn render_input_dialog(
     accent: Color,
 ) {
     let width = 50u16.min(area.width.saturating_sub(2));
-    let height = 5u16;
+    let height = 3u16;
     let x = area.x + (area.width.saturating_sub(width)) / 2;
     let y = area.y + (area.height.saturating_sub(height)) / 2;
     let dialog = Rect::new(x, y, width, height);
@@ -526,25 +495,16 @@ fn render_input_dialog(
     let inner = block.inner(dialog);
     frame.render_widget(block, dialog);
 
-    let chunks = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).split(inner);
-
-    let visible_w = chunks[0].width as usize;
+    let visible_w = inner.width as usize;
     let cursor_char_idx = input[..cursor].chars().count();
     let scroll = if cursor_char_idx >= visible_w {
         cursor_char_idx - visible_w + 1
     } else {
         0
     };
-    
+
     let visible: String = input.chars().skip(scroll).take(visible_w).collect();
-    frame.render_widget(Paragraph::new(visible), chunks[0]);
-    frame.render_widget(
-        Paragraph::new(Span::styled(
-            "Enter: confirm  Esc: cancel",
-            Style::default().fg(Color::DarkGray),
-        )),
-        chunks[1],
-    );
+    frame.render_widget(Paragraph::new(visible), inner);
 
     let cx = inner.x + (cursor_char_idx - scroll) as u16;
     if cx < inner.x + inner.width {

@@ -41,11 +41,19 @@ impl Dialog for ConfirmArchiveBoard {
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                 DialogOutcome::close_to(crate::app::AppMode::BoardSelector)
             }
+            KeyCode::Char('?') => DialogOutcome::help(),
             _ => DialogOutcome::stay(),
         }
     }
 
     fn background(&self) -> DialogBackground {
         DialogBackground::BoardSelector
+    }
+
+    fn help(&self) -> Option<super::DialogHelp> {
+        Some(super::DialogHelp {
+            title: " Help — Archive Board ",
+            rows: vec![("y", "Archive board"), ("n / Esc", "Cancel")],
+        })
     }
 }

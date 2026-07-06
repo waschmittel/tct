@@ -24,11 +24,13 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         AppMode::Dialog => dialog_input::handle(app, key),
         AppMode::Help => {
             if matches!(key.code, crossterm::event::KeyCode::Esc | crossterm::event::KeyCode::Char('q')) {
-                // Help opened over a live dialog returns to it; the
-                // recorded base return mode stays put for the dialog's
-                // own close.
+                // Help opened over a live dialog or insert handler
+                // returns to it; the recorded base return mode stays put
+                // for the overlay's own close.
                 if app.dialog.is_some() {
                     app.mode = AppMode::Dialog;
+                } else if app.insert.is_some() {
+                    app.mode = AppMode::Insert;
                 } else {
                     app.mode = app.take_return_mode();
                 }
@@ -115,6 +117,25 @@ mod tests {
             press(&mut app, KeyCode::Char('L'));
             assert!(matches!(app.mode, AppMode::Dialog));
             press(&mut app, KeyCode::Esc);
+            assert!(matches!(app.mode, AppMode::CardDetail));
+        });
+    }
+
+    /// `?` inside the date picker shows Help and Esc returns to the
+    /// still-alive insert handler, not to the base mode.
+    #[test]
+    fn help_over_date_picker_returns_to_insert() {
+        with_temp_dir(|| {
+            let mut app = app_in_card_detail();
+            press(&mut app, KeyCode::Char('u')); // due-date picker
+            assert!(matches!(app.mode, AppMode::Insert));
+            press(&mut app, KeyCode::Char('?'));
+            assert!(matches!(app.mode, AppMode::Help));
+            assert!(app.insert.is_some());
+            press(&mut app, KeyCode::Esc);
+            assert!(matches!(app.mode, AppMode::Insert));
+            assert!(app.insert.is_some());
+            press(&mut app, KeyCode::Esc); // cancel picker
             assert!(matches!(app.mode, AppMode::CardDetail));
         });
     }

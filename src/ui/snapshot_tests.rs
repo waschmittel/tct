@@ -22,11 +22,7 @@ use crate::test_support::with_temp_dir;
 const WIDTH: u16 = 100;
 const HEIGHT: u16 = 30;
 
-fn render_to_string(app: &App) -> String {
-    let backend = TestBackend::new(WIDTH, HEIGHT);
-    let mut terminal = Terminal::new(backend).unwrap();
-    terminal.draw(|frame| crate::ui::render(frame, app)).unwrap();
-    let buffer = terminal.backend().buffer();
+fn buffer_to_string(buffer: &ratatui::buffer::Buffer) -> String {
     let mut out = String::new();
     for y in 0..buffer.area.height {
         let mut line = String::new();
@@ -37,6 +33,13 @@ fn render_to_string(app: &App) -> String {
         out.push('\n');
     }
     out
+}
+
+fn render_to_string(app: &App) -> String {
+    let backend = TestBackend::new(WIDTH, HEIGHT);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal.draw(|frame| crate::ui::render(frame, app)).unwrap();
+    buffer_to_string(terminal.backend().buffer())
 }
 
 fn press(app: &mut App, code: KeyCode) {
@@ -173,6 +176,29 @@ fn snapshot_help_card_detail() {
         press(&mut app, KeyCode::Char('?'));
         insta::assert_snapshot!(render_to_string(&app));
     });
+}
+
+/// Widget-level golden for the date-picker popup (layout broke twice:
+/// oversized popup, off-center calendar). Rendered with a fixed date so
+/// the text is deterministic — the today-highlight is style-only and
+/// invisible in the text golden.
+#[test]
+fn snapshot_date_picker() {
+    let backend = TestBackend::new(40, 14);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            crate::ui::widgets::date_picker::render(
+                frame,
+                frame.area(),
+                "2026-05-18",
+                10,
+                chrono::NaiveDate::from_ymd_opt(2026, 5, 18),
+                ratatui::style::Color::Cyan,
+            );
+        })
+        .unwrap();
+    insta::assert_snapshot!(buffer_to_string(terminal.backend().buffer()));
 }
 
 #[test]
