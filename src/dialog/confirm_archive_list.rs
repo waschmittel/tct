@@ -34,11 +34,12 @@ impl Dialog for ConfirmArchiveList {
     fn handle_key(&mut self, key: KeyEvent, board: Option<&LoadedBoard>) -> DialogOutcome {
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
-                if let Some(list_id) =
-                    board.and_then(|b| b.lists.get(b.selected_list).map(|l| l.id.clone()))
+                if let Some((list_id, name)) = board
+                    .and_then(|b| b.lists.get(b.selected_list))
+                    .map(|l| (l.id.clone(), l.name.clone()))
                 {
                     DialogOutcome::apply_and_close(Command::ArchiveList { list_id })
-                        .with_status("List archived".into())
+                        .with_status(format!("Archived list '{name}'"))
                 } else {
                     DialogOutcome::close()
                 }

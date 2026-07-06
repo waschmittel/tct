@@ -218,13 +218,15 @@ impl App {
         self.status_message = Some((msg, Instant::now()));
     }
 
-    pub fn copy_to_clipboard(&mut self, text: String) {
+    /// `what` names the copied content in the status message, e.g.
+    /// "title 'Fix login flow'" or "description of 'Fix login flow'".
+    pub fn copy_to_clipboard(&mut self, text: String, what: &str) {
         match Clipboard::new() {
             Ok(mut clipboard) => {
                 if let Err(e) = clipboard.set_text(text) {
                     self.set_status(format!("Clipboard error: {}", e));
                 } else {
-                    self.set_status("Copied to clipboard".into());
+                    self.set_status(format!("Copied {what} to clipboard"));
                 }
             }
             Err(e) => {

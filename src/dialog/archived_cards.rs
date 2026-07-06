@@ -98,7 +98,7 @@ impl Dialog for ArchivedCards {
                 }
                 let mut out =
                     DialogOutcome::side_effect(DialogSideEffect::StageAndRestoreCard { card })
-                        .with_status(format!("Restored '{title}'"));
+                        .with_status(format!("Restored card '{title}'"));
                 if self.cards.is_empty() {
                     out = out.with_close();
                 }
@@ -113,7 +113,7 @@ impl Dialog for ArchivedCards {
                 let mut out = DialogOutcome::side_effect(
                     DialogSideEffect::DeleteArchivedCard { card_id: card.id },
                 )
-                .with_status(format!("Deleted '{title}'"));
+                .with_status(format!("Deleted card '{title}'"));
                 if self.cards.is_empty() {
                     out = out.with_close();
                 }

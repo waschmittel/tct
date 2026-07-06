@@ -123,7 +123,10 @@ impl Dialog for ColorPicker {
                     color: self.current_color(),
                 })
                 .with_close_to(crate::app::AppMode::BoardSelector)
-                .with_status("Board color changed".into())
+                .with_status(format!(
+                    "Board color set to {}",
+                    self.current_color().display_name()
+                ))
             }
             KeyCode::Esc => DialogOutcome::close_to(crate::app::AppMode::BoardSelector),
             _ => DialogOutcome::stay(),

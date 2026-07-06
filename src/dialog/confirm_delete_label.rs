@@ -49,7 +49,7 @@ impl Dialog for ConfirmDeleteLabel {
                 });
                 if let Some((label_id, name)) = target {
                     let mut out = DialogOutcome::apply(Command::DeleteLabel { label_id })
-                        .with_status(format!("Label '{name}' deleted"));
+                        .with_status(format!("Deleted label '{name}'"));
                     out.follow = super::Follow::Open(Box::new(super::label_manager::LabelManager {
                         selected_idx: self.label_idx,
                     }));

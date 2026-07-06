@@ -44,6 +44,21 @@ impl LabelColor {
         Color::Rgb(r, g, b)
     }
 
+    /// Human-readable name for status messages, e.g. "green" or "#aabbcc".
+    pub fn display_name(self) -> String {
+        match self {
+            Self::Red => "red".into(),
+            Self::Orange => "orange".into(),
+            Self::Yellow => "yellow".into(),
+            Self::Green => "green".into(),
+            Self::Blue => "blue".into(),
+            Self::Purple => "purple".into(),
+            Self::Pink => "pink".into(),
+            Self::Cyan => "cyan".into(),
+            Self::Custom { r, g, b } => format!("#{r:02x}{g:02x}{b:02x}"),
+        }
+    }
+
     pub fn to_rgb(self) -> (u8, u8, u8) {
         match self {
             Self::Red => (255, 179, 186),

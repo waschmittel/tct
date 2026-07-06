@@ -125,7 +125,7 @@ fn snapshot_status_toast() {
     with_temp_dir(|| {
         let id = seed_demo_board();
         let mut app = App::new(Some(id)).unwrap();
-        app.set_status("Card archived".into());
+        app.set_status("Archived card 'Fix login flow'".into());
         insta::assert_snapshot!(render_to_string(&app));
     });
 }

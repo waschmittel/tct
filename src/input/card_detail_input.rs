@@ -185,7 +185,8 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
             if let Some(board) = app.board()
                 && let Some(card) = board.current_card() {
                     let desc = card.description.clone();
-                    app.copy_to_clipboard(desc);
+                    let what = format!("description of '{}'", card.title);
+                    app.copy_to_clipboard(desc, &what);
                 }
         }
         Action::CopyChecklist => {
@@ -195,7 +196,8 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                         app.set_status("Checklist is empty".into());
                     } else {
                         let md = card.checklist_as_markdown();
-                        app.copy_to_clipboard(md);
+                        let what = format!("checklist of '{}'", card.title);
+                        app.copy_to_clipboard(md, &what);
                     }
                 }
         }
@@ -221,10 +223,13 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         }
         Action::ClearDueDate => {
             if let Some(board) = app.board()
-                && let Some(card_id) = board.current_card_id().cloned() {
-                    app.apply(Command::ClearDueDate { card_id })?;
-                    app.set_status("Due date cleared".into());
-                }
+                && let Some((card_id, title)) = board
+                    .current_card()
+                    .map(|c| (c.id.clone(), c.title.clone()))
+            {
+                app.apply(Command::ClearDueDate { card_id })?;
+                app.set_status(format!("Cleared due date of '{title}'"));
+            }
         }
         Action::HistoryDialog => {
             if let Some(board) = app.board()

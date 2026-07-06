@@ -8,6 +8,15 @@ use crossterm::event::KeyEvent;
 
 use crate::app::App;
 use crate::insert::{InsertOutcome, InsertSideEffect};
+use crate::model::ids::ShortId;
+
+/// Title of a card on the loaded board, for status messages.
+fn card_title(app: &App, card_id: &ShortId) -> String {
+    app.board()
+        .and_then(|b| b.cards.get(card_id))
+        .map(|c| c.title.clone())
+        .unwrap_or_else(|| "card".into())
+}
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     // Move the handler out so it can be `&mut` while we borrow `board`.
@@ -38,23 +47,23 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 crate::command::Command::RenameList { name, .. } => {
                     Some(format!("Renamed list to '{name}'"))
                 }
-                crate::command::Command::EditCardTitle { .. } => {
-                    Some("Title saved".into())
+                crate::command::Command::EditCardTitle { title, .. } => {
+                    Some(format!("Renamed card to '{title}'"))
                 }
-                crate::command::Command::SetDueDate { date, .. } => {
-                    Some(format!("Due date set to {date}"))
+                crate::command::Command::SetDueDate { card_id, date } => {
+                    Some(format!("Due date of '{}' set to {date}", card_title(app, card_id)))
                 }
-                crate::command::Command::ClearDueDate { .. } => {
-                    Some("Cleared due date".into())
+                crate::command::Command::ClearDueDate { card_id } => {
+                    Some(format!("Cleared due date of '{}'", card_title(app, card_id)))
                 }
-                crate::command::Command::EditCardDescription { .. } => {
-                    Some("Description saved".into())
+                crate::command::Command::EditCardDescription { card_id, .. } => {
+                    Some(format!("Saved description of '{}'", card_title(app, card_id)))
                 }
-                crate::command::Command::AddChecklistItem { .. } => {
-                    Some("Item added".into())
+                crate::command::Command::AddChecklistItem { text, .. } => {
+                    Some(format!("Added item '{text}'"))
                 }
-                crate::command::Command::EditChecklistItem { .. } => {
-                    Some("Item saved".into())
+                crate::command::Command::EditChecklistItem { text, .. } => {
+                    Some(format!("Saved item '{text}'"))
                 }
                 _ => None,
             };

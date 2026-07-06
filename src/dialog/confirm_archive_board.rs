@@ -36,7 +36,7 @@ impl Dialog for ConfirmArchiveBoard {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
                 DialogOutcome::side_effect(DialogSideEffect::ArchiveSelectedBoard)
                     .with_close_to(crate::app::AppMode::BoardSelector)
-                    .with_status("Board archived".into())
+                    .with_status(format!("Archived board '{}'", self.board_name))
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                 DialogOutcome::close_to(crate::app::AppMode::BoardSelector)

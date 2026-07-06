@@ -2,7 +2,7 @@
 source: src/ui/snapshot_tests.rs
 expression: render_to_string(&app)
 ---
- Demo (2 lists)                                                                       Card archived
+ Demo (2 lists)                                                      Archived card 'Fix login flow'
 ┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
 │┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓││┌──────────────────────────────────────────────┐│
 │┃Fix login flow                                ┃│││Ship release notes                            ││

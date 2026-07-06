@@ -131,7 +131,7 @@ fn cycle_open_board(app: &mut App, delta: i32) -> anyhow::Result<()> {
     let new_id = app.boards[new_idx].id.clone();
     app.load_board(&new_id)?;
     app.selected_board_idx = new_idx;
-    app.set_status(format!("Switched to '{}'", app.boards[new_idx].name));
+    app.set_status(format!("Switched to board '{}'", app.boards[new_idx].name));
     Ok(())
 }
 
@@ -194,7 +194,8 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
             if let Some(board) = app.board()
                 && let Some(card) = board.current_card() {
                     let title = card.title.clone();
-                    app.copy_to_clipboard(title);
+                    let what = format!("title '{title}'");
+                    app.copy_to_clipboard(title, &what);
                 }
         }
         Action::EditDescription => {
@@ -317,10 +318,13 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         }
         Action::ClearDueDate => {
             if let Some(board) = app.board()
-                && let Some(card_id) = board.current_card_id().cloned() {
-                    app.apply(Command::ClearDueDate { card_id })?;
-                    app.set_status("Due date cleared".into());
-                }
+                && let Some((card_id, title)) = board
+                    .current_card()
+                    .map(|c| (c.id.clone(), c.title.clone()))
+            {
+                app.apply(Command::ClearDueDate { card_id })?;
+                app.set_status(format!("Cleared due date of '{title}'"));
+            }
         }
     }
     Ok(())

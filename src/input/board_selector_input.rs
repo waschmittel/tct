@@ -101,7 +101,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                 if let Some(b) = app.boards.get_mut(app.selected_board_idx) {
                     b.accent_color = next;
                 }
-                app.set_status("Board color changed".into());
+                app.set_status(format!("Board color set to {}", next.display_name()));
             }
         }
         Action::PickAccentColor => {

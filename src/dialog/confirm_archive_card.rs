@@ -32,9 +32,12 @@ impl Dialog for ConfirmArchiveCard {
     fn handle_key(&mut self, key: KeyEvent, board: Option<&LoadedBoard>) -> DialogOutcome {
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
-                if let Some(card_id) = board.and_then(|b| b.current_card_id().cloned()) {
+                if let Some((card_id, title)) = board
+                    .and_then(|b| b.current_card())
+                    .map(|c| (c.id.clone(), c.title.clone()))
+                {
                     DialogOutcome::apply_and_close(Command::ArchiveCard { card_id })
-                        .with_status("Card archived".into())
+                        .with_status(format!("Archived card '{title}'"))
                 } else {
                     DialogOutcome::close()
                 }
