@@ -86,6 +86,44 @@ pub fn render(frame: &mut Frame, app: &App) {
             }
         }
     }
+
+    // 3. Transient status toast, top-right, above everything. The top row
+    // is free on both surfaces (popups start at y >= 1).
+    render_status_toast(frame, area, app);
+}
+
+/// Yellow toast with the active status message in the top-right corner.
+/// Truncated with a trailing ellipsis if wider than the frame.
+fn render_status_toast(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
+    use ratatui::style::{Color, Style};
+    use ratatui::text::Span;
+    use ratatui::widgets::Paragraph;
+
+    let Some((msg, _)) = &app.status_message else {
+        return;
+    };
+    if area.width < 5 || area.height < 1 {
+        return;
+    }
+    let max = area.width as usize - 2;
+    let text = if msg.chars().count() > max {
+        let head: String = msg.chars().take(max - 1).collect();
+        format!("{head}…")
+    } else {
+        msg.clone()
+    };
+    let width = text.chars().count() as u16 + 2;
+    let rect = ratatui::layout::Rect::new(
+        area.x + area.width - width,
+        area.y,
+        width,
+        1,
+    );
+    let toast = Paragraph::new(Span::styled(
+        format!(" {text} "),
+        Style::default().fg(Color::Yellow),
+    ));
+    frame.render_widget(toast, rect);
 }
 
 fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {

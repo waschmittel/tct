@@ -121,6 +121,16 @@ fn snapshot_board_view_search_active() {
 }
 
 #[test]
+fn snapshot_status_toast() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        app.set_status("Card archived".into());
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
 fn snapshot_card_detail() {
     with_temp_dir(|| {
         let id = seed_demo_board();

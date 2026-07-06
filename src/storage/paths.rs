@@ -22,6 +22,17 @@ pub fn base_dir() -> PathBuf {
         .join(".tct")
 }
 
+/// Home-shortened display form of [`base_dir`], e.g. `~/.tct`.
+pub fn display_base_dir() -> String {
+    let dir = base_dir();
+    if let Some(home) = dirs::home_dir()
+        && let Ok(rest) = dir.strip_prefix(&home)
+    {
+        return format!("~/{}", rest.display());
+    }
+    dir.display().to_string()
+}
+
 pub fn boards_dir() -> PathBuf {
     base_dir().join("boards")
 }

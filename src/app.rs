@@ -121,6 +121,23 @@ pub struct App {
     /// Build-stamped version string, shown in the help overlay. Defaults to
     /// the compile-time [`crate::VERSION`]; tests pin it for stable goldens.
     pub version: &'static str,
+    /// Data directory shown bottom-right in the status bar, home-shortened
+    /// (e.g. `~/.tct`). Pinned in test builds for stable goldens (the real
+    /// value would be a per-test temp dir).
+    pub data_dir_display: String,
+}
+
+/// Resolved once at startup; the data dir cannot change mid-session.
+#[cfg(not(test))]
+fn data_dir_display() -> String {
+    crate::storage::paths::display_base_dir()
+}
+
+/// Test builds run under per-test `TCT_DATA_DIR` temp dirs — pin the display
+/// so golden screens stay deterministic.
+#[cfg(test)]
+fn data_dir_display() -> String {
+    "~/.tct".into()
 }
 
 impl App {
@@ -143,6 +160,7 @@ impl App {
             dialog: None,
             insert: None,
             version: crate::VERSION,
+            data_dir_display: data_dir_display(),
         };
         if let Some(board_id) = open_board_id {
             app.load_board(&board_id)?;
@@ -376,6 +394,7 @@ mod tests {
             dialog: None,
             insert: None,
             version: crate::VERSION,
+            data_dir_display: data_dir_display(),
         }
     }
 

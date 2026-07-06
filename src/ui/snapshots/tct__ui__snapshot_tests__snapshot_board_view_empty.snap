@@ -30,4 +30,5 @@ expression: render_to_string(&app)
 
 
 
- NORMAL  ?:help  q:quit
+
+ NORMAL  ?:help  q:quit                                                                      ~/.tct

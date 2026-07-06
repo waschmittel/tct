@@ -16,7 +16,9 @@ Set TypingSpeed 40ms
 Set Padding 10
 
 Hide
-Type `cargo build -q && cp target/debug/tct ./tct && export TCT_DATA_DIR="$(mktemp -d)" && TCT=./tct ./docs/vhs/seed.sh >/dev/null && clear`
+# Fixed data dir (not mktemp): the path shows bottom-right in the status
+# bar, so it must be deterministic for the frame-text golden.
+Type `cargo build -q && cp target/debug/tct ./tct && export TCT_DATA_DIR="/tmp/tct-vhs-demo" && rm -rf "$TCT_DATA_DIR" && TCT=./tct ./docs/vhs/seed.sh >/dev/null && clear`
 Enter
 Sleep 3s
 Show

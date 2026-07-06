@@ -7,7 +7,7 @@ use ratatui::Frame;
 use crate::app::App;
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
-    let bar_area = Rect::new(area.x, area.height.saturating_sub(3), area.width, 1);
+    let bar_area = Rect::new(area.x, area.height.saturating_sub(2), area.width, 1);
 
     frame.render_widget(Clear, bar_area);
 

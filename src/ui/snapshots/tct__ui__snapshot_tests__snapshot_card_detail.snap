@@ -29,5 +29,6 @@ expression: render_to_string(&app)
 │         │Due Date                                                                      │         │
 │         │  (no due date — press 'u' to set)                                            │         │
 │         └ ?:help  PgUp/PgDn:scroll desc  h:history  Esc:close ─────────────────────────┘         │
+│                                                ││                                                │
 └────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
- DETAIL  ?:help  Esc:close
+ DETAIL  ?:help  Esc:close                                                                   ~/.tct
