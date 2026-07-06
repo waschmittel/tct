@@ -211,7 +211,7 @@ impl App {
 
     pub fn on_tick(&mut self) {
         if let Some((_, instant)) = &self.status_message
-            && instant.elapsed() > Duration::from_secs(3) {
+            && instant.elapsed() > Duration::from_secs(30) {
                 self.status_message = None;
             }
 
@@ -569,7 +569,7 @@ mod tests {
     fn on_tick_clears_old_status_message() {
         let mut app = bare_app();
         app.mode = AppMode::Normal;
-        app.status_message = Some(("hi".into(), Instant::now() - Duration::from_secs(10)));
+        app.status_message = Some(("hi".into(), Instant::now() - Duration::from_secs(31)));
         app.on_tick();
         assert!(app.status_message.is_none());
     }

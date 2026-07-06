@@ -25,6 +25,7 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 - **Label colors**: `LabelColor` enum with named pastel variants + `Custom { r, g, b }`. New labels get auto-generated pastel colors via `LabelColor::generate_pastel()` which picks maximally distant hue from existing labels.
 - **Board accent color**: Each board has an `accent_color: LabelColor` field in `BoardMeta`. All UI highlight/accent colors use `app.accent_color()` instead of hardcoded `Color::Cyan`. New boards auto-get a differentiated pastel color. Users cycle with 'c' in board selector. Help overlay keeps structural Cyan.
 - **Terminal capabilities** (`src/term_caps.rs`): `App.caps` holds the detected `TermCaps` (set once in `main`; `TermCaps::full()` everywhere else so tests are environment-independent). `ui::render` post-processes the finished buffer — RGB colors quantize to 256 colors when `COLORTERM` doesn't advertise truecolor, and to the 16 ANSI colors on `TERM=linux`, which also swaps glyphs missing from console fonts (`selected_border_type()`, `check_mark()`, `selection_bg()`). Style sites stay tier-unaware; consult `app.caps` only where the quantized style would be unusable. Because the Linux console never transmits modifiers on arrow keys, card moves (`[`/`]`, `K`/`J`) and date-picker year jumps (`<`/`>`) have plain-char aliases alongside their Shift bindings.
+- **Status messages**: Transient feedback ("Card archived", …) renders as a yellow toast in the *top-right corner* (`ui/mod.rs::render_status_toast`) — not in the status bar, so the `?:help` hint stays visible. Set via `app.set_status(msg)`; cleared by `App::on_tick()` after 30s. The status bar (`ui/status_bar.rs`) carries only the mode chip, the single hint, and the data dir (right-aligned).
 - **Search**: When active, non-matching cards are hidden (not just dimmed). Navigation skips hidden cards. First match auto-selected on search confirm.
 - **Periodic reload**: `App::on_tick()` reloads board from filesystem every 15s (configurable via `reload_interval`). Skipped during editing/dialog/grab modes. Preserves selection state.
 
@@ -72,7 +73,7 @@ When changing keybindings or features, update:
 - The matching help page: `Dialog::help()` rows for dialogs, the date-picker/description-editor pages in `ui/mod.rs::render_help()` for insert handlers
 - This file if architectural patterns change
 
-The status bar carries a single `?:help` hint (plus the insert title); there are **no other inline shortcut hints** anywhere — all shortcuts live in the contextual help overlay only.
+The status bar carries a single `?:help` hint (plus the insert title); there are **no other inline shortcut hints** anywhere — all shortcuts live in the contextual help overlay only. Status messages never occupy the status bar; they toast top-right (see "Status messages" above).
 
 Doc homes (don't duplicate elsewhere): keybindings → help overlay only; full CLI reference → `cli/mod.rs` `HELP`; module layout → `docs/architecture.md`; README keeps basic usage + one example workflow.
 
