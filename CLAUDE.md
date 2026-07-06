@@ -8,7 +8,7 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 ```
 
 - **Golden-screen tests**: `src/ui/snapshot_tests.rs` renders the full UI into a ratatui `TestBackend` and snapshots the text with `insta` (goldens in `src/ui/snapshots/`). After intentional UI changes: `INSTA_UPDATE=always cargo test snapshot_ -- --test-threads=1`, inspect the `.snap` diff, commit. Fixture rule: no due dates / history timestamps (rendered relative to now → churn).
-- **vhs demo + visual regression**: `docs/vhs/demo.tape` drives the real binary (seeded by `docs/vhs/seed.sh`) and produces `docs/vhs/demo.gif` + a frame-text golden. `./docs/vhs/check.sh` re-records and diffs (requires `brew install vhs`; goldens are platform/font dependent — regenerate locally, don't compare cross-platform).
+- **vhs demo + visual regression**: `docs/vhs/demo.tape` drives the real binary (seeded by `docs/vhs/seed.sh`) and produces `docs/vhs/demo.gif` + a final-frame text golden (check.sh trims vhs's multi-frame .txt to its last frame — intermediate frames race against status-message timing). `./docs/vhs/check.sh` re-records and diffs (requires `brew install vhs`; goldens are platform/font dependent — regenerate locally, don't compare cross-platform).
 
 ## Architecture
 

@@ -1,6 +1,8 @@
 # vhs tape: drives the real tct binary in a fresh TCT_DATA_DIR.
 # Produces a demo gif and a final-frame text golden (docs/vhs/golden/demo.txt).
-# Run from the repo root (builds + seeds itself):  vhs docs/vhs/demo.tape
+# vhs writes every sampled frame to the .txt; check.sh trims it to the final
+# frame (intermediate frames race against status-message timing and differ
+# between runs). Regenerate the golden via docs/vhs/check.sh, not raw vhs.
 # Regression check: docs/vhs/check.sh
 #
 # Note: vhs cannot send Shift+Arrow, so card-move bindings aren't shown.
