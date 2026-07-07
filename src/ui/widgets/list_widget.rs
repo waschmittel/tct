@@ -10,54 +10,13 @@ use crate::model::list::CardList;
 
 use super::card_widget;
 
-/// Counts how many lines `text` occupies when word-wrapped at `width` columns.
-pub fn wrapped_line_count(text: &str, width: u16) -> u16 {
-    if width == 0 || text.is_empty() {
-        return 1;
-    }
-    let mut lines: u16 = 1;
-    let mut current_width: u16 = 0;
-    for word in text.split_whitespace() {
-        let word_len = word.len() as u16;
-        if current_width == 0 {
-            if word_len >= width {
-                lines += word_len / width;
-                current_width = word_len % width;
-            } else {
-                current_width = word_len;
-            }
-        } else {
-            let needed = current_width + 1 + word_len;
-            if needed > width {
-                lines += 1;
-                if word_len >= width {
-                    lines += word_len / width;
-                    current_width = word_len % width;
-                } else {
-                    current_width = word_len;
-                }
-            } else {
-                current_width = needed;
-            }
-        }
-    }
-    lines
-}
-
-/// Returns the rendered height (including borders) for a card in a list column.
+/// Returns the rendered height (including borders) for a card in a list
+/// column. Counts the exact lines the card widget renders (styles don't
+/// affect the count), so height and content can't drift apart.
 pub fn card_height(card: &Card, board_labels: &[Label], card_inner_width: u16) -> u16 {
-    let title_lines = wrapped_line_count(&card.title, card_inner_width);
-    // Same wrapping as the card widget — labels may span several lines.
-    let label_lines = super::labels::label_lines(
-        &card.resolved_labels(board_labels),
-        card_inner_width as usize,
-        false,
-    )
-    .len() as u16;
-    let has_info = card.due_date.is_some()
-        || card.checklist_progress().is_some()
-        || card.has_description();
-    let inner_lines = title_lines + label_lines + if has_info { 1 } else { 0 };
+    let inner_lines =
+        card_widget::card_lines(card, board_labels, card_inner_width, Style::default(), false)
+            .len() as u16;
     2 + inner_lines // 2 for borders
 }
 
@@ -259,53 +218,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wrapped_line_count_empty() {
-        assert_eq!(wrapped_line_count("", 20), 1);
-    }
-
-    #[test]
-    fn wrapped_line_count_fits_one_line() {
-        assert_eq!(wrapped_line_count("hello world", 20), 1);
-    }
-
-    #[test]
-    fn wrapped_line_count_exact_fit() {
-        // "hello world" = 11 chars, width 11 → 1 line
-        assert_eq!(wrapped_line_count("hello world", 11), 1);
-    }
-
-    #[test]
-    fn wrapped_line_count_wraps_to_two_lines() {
-        // "hello world" = 11 chars, width 7 → "hello" (5) fits, "world" (5) needs new line
-        assert_eq!(wrapped_line_count("hello world", 7), 2);
-    }
-
-    #[test]
-    fn wrapped_line_count_three_words_two_lines() {
-        // width 10: "one two" = 7, fits; "three" = 5, 7+1+5=13 > 10 → wrap → 2 lines
-        assert_eq!(wrapped_line_count("one two three", 10), 2);
-    }
-
-    #[test]
-    fn wrapped_line_count_long_word_hard_wraps() {
-        // "abcdefghij" (10 chars) at width 4 → takes ceil(10/4)=3 lines (4+4+2)
-        assert_eq!(wrapped_line_count("abcdefghij", 4), 3);
-    }
-
-    #[test]
-    fn wrapped_line_count_zero_width_returns_one() {
-        assert_eq!(wrapped_line_count("hello", 0), 1);
-    }
-
-    #[test]
-    fn wrapped_line_count_many_words() {
-        // Each word "aa" (2) at width 5: "aa aa" (5) fits, "aa aa" (5) fits → 2 lines for 4 words
-        // "aa aa" = 5, next "aa" needs 5+1+2=8 > 5 → wrap
-        // line1: "aa aa", line2: "aa aa" → 2 lines
-        assert_eq!(wrapped_line_count("aa aa aa aa", 5), 2);
-    }
-
-    #[test]
     fn card_height_with_info_no_labels() {
         let mut card = Card::new("Title".into());
         card.description = "desc".into();
@@ -318,5 +230,16 @@ mod tests {
         let card = Card::new("Title".into());
         // title(1) + borders(2) = 3
         assert_eq!(card_height(&card, &[], 20), 3);
+    }
+
+    #[test]
+    fn card_height_counts_wrapped_title_and_labels() {
+        let label = Label::new("a rather long label".into(), crate::model::label::LabelColor::Red);
+        let mut card = Card::new("one two three four".into());
+        card.label_ids = vec![label.id.clone()];
+        card.description = "desc".into();
+        // width 9: title wraps to 3 ("one two"/"three"/"four"),
+        // "[a rather long label]" (21) cut to one line, info(1), borders(2)
+        assert_eq!(card_height(&card, &[label], 9), 7);
     }
 }
