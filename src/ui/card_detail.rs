@@ -254,10 +254,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             frame.render_widget(desc_paragraph, desc_area);
             if desc_full > desc_h {
                 let bar_area = Rect::new(inner.x, y, inner.width, desc_h);
+                // positions = max_scroll + 1 so the thumb reaches the track
+                // bottom at max scroll (ratatui puts it there only when
+                // position == content_length - 1).
                 render_scrollbar(
                     frame,
                     bar_area,
-                    desc_full as usize,
+                    (desc_max_scroll + 1) as usize,
                     desc_scroll as usize,
                     accent,
                 );
@@ -453,9 +456,11 @@ fn render_description_editor(
     }
 }
 
-fn render_scrollbar(frame: &mut Frame, area: Rect, total: usize, position: usize, accent: Color) {
+/// `positions` is the number of thumb positions: the thumb sits at the track
+/// bottom when `position == positions - 1`.
+fn render_scrollbar(frame: &mut Frame, area: Rect, positions: usize, position: usize, accent: Color) {
     use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
-    let mut state = ScrollbarState::new(total)
+    let mut state = ScrollbarState::new(positions)
         .position(position)
         .viewport_content_length(area.height as usize);
     frame.render_stateful_widget(

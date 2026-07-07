@@ -186,6 +186,26 @@ fn snapshot_card_detail_long_description_scrollbar() {
 }
 
 #[test]
+fn snapshot_card_detail_scrollbar_at_bottom() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_long_description(&mut app);
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        // The renderer reports the description's max scroll; draw once so
+        // the scroll keys have a bound (as in the real render loop).
+        let _ = render_to_string(&app);
+        // Scroll well past the end; input clamps at max scroll. The thumb
+        // must sit at the very bottom of the track.
+        for _ in 0..80 {
+            press(&mut app, KeyCode::PageDown);
+        }
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
 fn snapshot_description_editor_scrollbar() {
     with_temp_dir(|| {
         let id = seed_demo_board();
