@@ -36,7 +36,11 @@ fn buffer_to_string(buffer: &ratatui::buffer::Buffer) -> String {
 }
 
 fn render_to_string(app: &App) -> String {
-    let backend = TestBackend::new(WIDTH, HEIGHT);
+    render_to_string_sized(app, WIDTH, HEIGHT)
+}
+
+fn render_to_string_sized(app: &App, width: u16, height: u16) -> String {
+    let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).unwrap();
     terminal.draw(|frame| crate::ui::render(frame, app)).unwrap();
     buffer_to_string(terminal.backend().buffer())
@@ -202,6 +206,41 @@ fn snapshot_card_detail_scrollbar_at_bottom() {
             press(&mut app, KeyCode::PageDown);
         }
         insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// Long checklist items wrap; continuation lines align under the item text.
+#[test]
+fn snapshot_card_detail_long_checklist_item_wraps() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        {
+            let board = app.board_mut().unwrap();
+            let card_id = board.current_card_id().cloned().unwrap();
+            let card = board.cards.get_mut(&card_id).unwrap();
+            card.checklist[1].text =
+                "Write a failing test that reproduces the premature token expiry \
+                 on refresh, including the clock-skew edge case"
+                    .into();
+        }
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// The popup stops growing once the description hits WRAP_WIDTH — on a
+/// wide terminal it stays at wrap width + padding instead of 80% of the
+/// screen.
+#[test]
+fn snapshot_card_detail_wide_terminal_capped() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        insta::assert_snapshot!(render_to_string_sized(&app, 160, 30));
     });
 }
 

@@ -9,6 +9,11 @@ use crate::insert::InsertSurface;
 
 use super::markdown;
 
+/// Horizontal padding between the popup border and the description text.
+const PAD: u16 = 2;
+/// One space between the popup border and section headers / bodies.
+const LEFT_PAD: u16 = 1;
+
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let board = match app.board() {
         Some(b) => b,
@@ -21,7 +26,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     let accent = app.accent_color();
 
-    let width = (area.width * 80 / 100).max(40).min(area.width.saturating_sub(2));
+    // Text wraps at WRAP_WIDTH, so a wider popup is wasted space:
+    // cap at wrap width + horizontal padding + borders.
+    let max_width = markdown::WRAP_WIDTH as u16 + 2 * PAD + 2;
+    let width = (area.width * 80 / 100)
+        .max(40)
+        .min(max_width)
+        .min(area.width.saturating_sub(2));
     let height = (area.height * 80 / 100).max(20).min(area.height.saturating_sub(2));
     let x = (area.width.saturating_sub(width)) / 2;
     let y = (area.height.saturating_sub(height)) / 2;
@@ -61,9 +72,15 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    let pad: u16 = 2;
-    let md_inner_width = inner.width.saturating_sub(pad * 2);
-    let desc_wrap_width = (md_inner_width as usize).min(markdown::WRAP_WIDTH);
+    // The popup is capped at WRAP_WIDTH + padding, so the inner width
+    // already bounds the wrap width.
+    let md_inner_width = inner.width.saturating_sub(PAD * 2);
+    let desc_wrap_width = md_inner_width as usize;
+
+    // Sections (headers, checklist, labels, due) sit one space off the
+    // left and right borders so text doesn't touch the frame.
+    let left = inner.x + LEFT_PAD;
+    let body_w = inner.width.saturating_sub(LEFT_PAD * 2);
 
     // --- Section visibility ---
     // Empty sections are hidden to avoid wasted space. Exception for
@@ -96,6 +113,10 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             .to_vec()
     };
 
+    // Long items wrap; continuation lines align under the item text, so an
+    // item can span several lines. `checklist_item_offsets` maps item index
+    // to (first line, line count) for selection-driven scrolling.
+    let mut checklist_item_offsets: Vec<(usize, usize)> = Vec::new();
     let checklist_lines: Vec<Line<'static>> = if !show_checklist {
         Vec::new()
     } else if card.checklist.is_empty() {
@@ -104,26 +125,30 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(Color::DarkGray),
         ))]
     } else {
-        card.checklist
-            .iter()
-            .enumerate()
-            .map(|(ii, item)| {
-                let is_active = ii == board.detail_item_idx;
-                let check = if item.completed { app.caps.check_mark() } else { " " };
-                let style = if is_active {
-                    Style::default().fg(accent).add_modifier(Modifier::BOLD)
-                } else if item.completed {
-                    Style::default().fg(Color::Green)
-                } else {
-                    Style::default()
-                };
-                let prefix = if is_active { "» " } else { "  " };
-                Line::from(Span::styled(
+        let mut lines = Vec::new();
+        for (ii, item) in card.checklist.iter().enumerate() {
+            let is_active = ii == board.detail_item_idx;
+            let check = if item.completed { app.caps.check_mark() } else { " " };
+            let style = if is_active {
+                Style::default().fg(accent).add_modifier(Modifier::BOLD)
+            } else if item.completed {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default()
+            };
+            let prefix = if is_active { "» " } else { "  " };
+            let wrapped = markdown::wrap_spans_with_indent(
+                vec![Span::styled(
                     format!("{prefix}[{check}] {}", item.text),
                     style,
-                ))
-            })
-            .collect()
+                )],
+                body_w as usize,
+                6, // width of "» [x] " — continuation lines align under the text
+            );
+            checklist_item_offsets.push((lines.len(), wrapped.len()));
+            lines.extend(wrapped);
+        }
+        lines
     };
 
     let labels_lines: Vec<Line<'static>> = if !show_labels {
@@ -134,11 +159,13 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(Color::DarkGray),
         ))]
     } else {
+        // Same look as on the card in the list view: [name] on the
+        // label's color.
         resolved
             .iter()
             .map(|label| {
                 Line::from(Span::styled(
-                    format!("  ● {}", label.name),
+                    format!("[{}]", label.name),
                     Style::default()
                         .fg(Color::Black)
                         .bg(label.color.to_ratatui_color()),
@@ -213,13 +240,16 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // against what is actually rendered.
     board.detail_max_scroll.set(desc_max_scroll as usize);
 
-    // Auto-scroll checklist to keep selected item visible
+    // Auto-scroll checklist to keep the selected item's last line visible
     let ck_max_scroll = ck_full.saturating_sub(ck_h);
     let ck_scroll = if ck_h == 0 {
         0
     } else {
-        let idx = board.detail_item_idx as u16;
-        idx.saturating_sub(ck_h.saturating_sub(1)).min(ck_max_scroll)
+        let (start, h) = checklist_item_offsets
+            .get(board.detail_item_idx)
+            .copied()
+            .unwrap_or((0, 1));
+        ((start + h) as u16).saturating_sub(ck_h).min(ck_max_scroll)
     };
 
     // --- Render sections sequentially ---
@@ -235,7 +265,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     if show_desc {
         // Description header
         if y < inner.y + inner.height {
-            let header_area = Rect::new(inner.x, y, inner.width, header_h);
+            let header_area = Rect::new(left, y, body_w, header_h);
             frame.render_widget(
                 Paragraph::new(Line::from(Span::styled(
                     "Description",
@@ -248,7 +278,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
         // Description body (scrollbar on the right when it overflows)
         if desc_h > 0 && y < inner.y + inner.height {
-            let desc_area = Rect::new(inner.x + pad, y, md_inner_width, desc_h);
+            let desc_area = Rect::new(inner.x + PAD, y, md_inner_width, desc_h);
             let desc_paragraph =
                 Paragraph::new(desc_lines.clone()).scroll((desc_scroll, 0));
             frame.render_widget(desc_paragraph, desc_area);
@@ -291,7 +321,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             "Checklist".to_string()
         };
         if y < inner.y + inner.height {
-            let header_area = Rect::new(inner.x, y, inner.width, header_h);
+            let header_area = Rect::new(left, y, body_w, header_h);
             frame.render_widget(
                 Paragraph::new(Line::from(Span::styled(
                     ck_header_text,
@@ -307,7 +337,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             let start = ck_scroll as usize;
             let end = (start + ck_h as usize).min(checklist_lines.len());
             let visible: Vec<Line<'static>> = checklist_lines[start..end].to_vec();
-            let ck_area = Rect::new(inner.x, y, inner.width, ck_h);
+            let ck_area = Rect::new(left, y, body_w, ck_h);
             frame.render_widget(Paragraph::new(visible), ck_area);
             y += ck_h;
         }
@@ -325,7 +355,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
         // Labels header + body
         if y < inner.y + inner.height {
-            let header_area = Rect::new(inner.x, y, inner.width, header_h);
+            let header_area = Rect::new(left, y, body_w, header_h);
             frame.render_widget(
                 Paragraph::new(Line::from(Span::styled(
                     "Labels",
@@ -338,7 +368,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         if labels_full > 0 && y < inner.y + inner.height {
             let remaining = (inner.y + inner.height).saturating_sub(y);
             let h = labels_full.min(remaining);
-            let labels_area = Rect::new(inner.x, y, inner.width, h);
+            let labels_area = Rect::new(left, y, body_w, h);
             frame.render_widget(Paragraph::new(labels_lines), labels_area);
             y += h;
         }
@@ -356,7 +386,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
         // Due date header + body
         if y < inner.y + inner.height {
-            let header_area = Rect::new(inner.x, y, inner.width, header_h);
+            let header_area = Rect::new(left, y, body_w, header_h);
             frame.render_widget(
                 Paragraph::new(Line::from(Span::styled(
                     "Due Date",
@@ -369,7 +399,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         if due_full > 0 && y < inner.y + inner.height {
             let remaining = (inner.y + inner.height).saturating_sub(y);
             let h = due_full.min(remaining);
-            let due_area = Rect::new(inner.x, y, inner.width, h);
+            let due_area = Rect::new(left, y, body_w, h);
             frame.render_widget(Paragraph::new(due_lines), due_area);
         }
     }
@@ -440,11 +470,11 @@ fn render_description_editor(
     textarea: &ratatui_textarea::TextArea<'static>,
     accent: Color,
 ) {
-    // Cap the text width at WRAP_WIDTH so the editor wraps at the same
-    // width as the rendered description view; leave the rightmost column
-    // of the detail view for the scrollbar.
-    let width = area.width.saturating_sub(1).min(markdown::WRAP_WIDTH as u16);
-    let editor_area = Rect::new(area.x, area.y, width, area.height);
+    // Match the rendered description view's wrap width (inner width minus
+    // padding); this also leaves the rightmost column for the scrollbar.
+    // The text sits one space off the left border.
+    let width = area.width.saturating_sub(PAD * 2);
+    let editor_area = Rect::new(area.x + LEFT_PAD, area.y, width, area.height);
     frame.render_widget(textarea, editor_area);
 
     // Scrollbar tracks the cursor's data line — the textarea keeps the

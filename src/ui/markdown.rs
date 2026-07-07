@@ -97,7 +97,7 @@ fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'static>>
     wrap_spans_with_indent(spans, max_width, 0)
 }
 
-fn wrap_spans_with_indent(
+pub(super) fn wrap_spans_with_indent(
     spans: Vec<Span<'static>>,
     max_width: usize,
     indent: usize,
