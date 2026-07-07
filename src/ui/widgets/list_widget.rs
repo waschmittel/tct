@@ -47,13 +47,17 @@ pub fn wrapped_line_count(text: &str, width: u16) -> u16 {
 /// Returns the rendered height (including borders) for a card in a list column.
 pub fn card_height(card: &Card, board_labels: &[Label], card_inner_width: u16) -> u16 {
     let title_lines = wrapped_line_count(&card.title, card_inner_width);
-    let has_labels = !card.resolved_labels(board_labels).is_empty();
+    // Same wrapping as the card widget — labels may span several lines.
+    let label_lines = super::labels::label_lines(
+        &card.resolved_labels(board_labels),
+        card_inner_width as usize,
+        false,
+    )
+    .len() as u16;
     let has_info = card.due_date.is_some()
         || card.checklist_progress().is_some()
         || card.has_description();
-    let inner_lines = title_lines
-        + if has_labels { 1 } else { 0 }
-        + if has_info { 1 } else { 0 };
+    let inner_lines = title_lines + label_lines + if has_info { 1 } else { 0 };
     2 + inner_lines // 2 for borders
 }
 

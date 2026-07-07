@@ -209,6 +209,54 @@ fn snapshot_card_detail_scrollbar_at_bottom() {
     });
 }
 
+/// Give the selected card enough labels to wrap across several lines.
+fn add_many_labels(app: &mut App) {
+    let board = app.board_mut().unwrap();
+    let card_id = board.current_card_id().cloned().unwrap();
+    let mut ids = Vec::new();
+    for name in [
+        "frontend",
+        "backend",
+        "urgent",
+        "blocked",
+        "needs-review",
+        "good first issue", // spaces: must wrap as one unit
+        "documentation",
+        "performance",
+    ] {
+        let label = Label::new(name.into(), LabelColor::Red);
+        ids.push(label.id.clone());
+        board.meta.labels.push(label);
+    }
+    let card = board.cards.get_mut(&card_id).unwrap();
+    card.label_ids.extend(ids);
+}
+
+/// Labels wrap at chip boundaries in the list view, and the info line
+/// (due/checklist/description markers) keeps its row below them.
+#[test]
+fn snapshot_board_view_many_labels_wrap() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        add_many_labels(&mut app);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// Detail view shows label chips side by side, wrapped like on the card.
+#[test]
+fn snapshot_card_detail_many_labels_wrap() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        add_many_labels(&mut app);
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
 /// Long checklist items wrap; continuation lines align under the item text.
 #[test]
 fn snapshot_card_detail_long_checklist_item_wraps() {

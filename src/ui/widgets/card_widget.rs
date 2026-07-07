@@ -64,24 +64,15 @@ pub fn render(
 
     lines.push(Line::from(Span::styled(card.title.clone(), base_style.add_modifier(Modifier::BOLD))));
 
+    // Pre-wrapped at chip boundaries; `list_widget::card_height` counts
+    // the same lines, so the info line below always keeps its row.
     let resolved = card.resolved_labels(board_labels);
     if !resolved.is_empty() && (lines.len() as u16) < inner.height {
-        let label_spans: Vec<Span> = resolved
-            .iter()
-            .map(|l| {
-                if dimmed {
-                    Span::styled(format!("[{}]", l.name), Style::default().fg(Color::DarkGray))
-                } else {
-                    Span::styled(
-                        format!("[{}]", l.name),
-                        Style::default()
-                            .fg(Color::Black)
-                            .bg(l.color.to_ratatui_color()),
-                    )
-                }
-            })
-            .collect();
-        lines.push(Line::from(label_spans));
+        lines.extend(super::labels::label_lines(
+            &resolved,
+            inner.width as usize,
+            dimmed,
+        ));
     }
 
     if (lines.len() as u16) < inner.height {
@@ -155,18 +146,7 @@ mod tests {
 
         let resolved = card.resolved_labels(board_labels);
         if !resolved.is_empty() && (lines.len() as u16) < inner_height {
-            let label_spans: Vec<Span> = resolved
-                .iter()
-                .map(|l| {
-                    Span::styled(
-                        format!("[{}]", l.name),
-                        Style::default()
-                            .fg(Color::Black)
-                            .bg(l.color.to_ratatui_color()),
-                    )
-                })
-                .collect();
-            lines.push(Line::from(label_spans));
+            lines.extend(super::super::labels::label_lines(&resolved, 40, false));
         }
 
         if (lines.len() as u16) < inner_height {

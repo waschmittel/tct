@@ -159,19 +159,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(Color::DarkGray),
         ))]
     } else {
-        // Same look as on the card in the list view: [name] on the
-        // label's color.
-        resolved
-            .iter()
-            .map(|label| {
-                Line::from(Span::styled(
-                    format!("[{}]", label.name),
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(label.color.to_ratatui_color()),
-                ))
-            })
-            .collect()
+        // Same look as on the card in the list view: [name] chips on the
+        // label's color, side by side, wrapped at chip boundaries.
+        super::widgets::labels::label_lines(&resolved, body_w as usize, false)
     };
 
     let due_lines: Vec<Line<'static>> = if !show_due {
