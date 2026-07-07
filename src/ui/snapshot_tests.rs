@@ -144,6 +144,20 @@ fn snapshot_card_detail() {
     });
 }
 
+/// Empty sections are hidden — except when every section is empty, all
+/// four show with their placeholders (discoverability).
+#[test]
+fn snapshot_card_detail_all_sections_empty() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Down); // "Redesign dashboard": no content at all
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
 fn set_long_description(app: &mut App) {
     let board = app.board_mut().unwrap();
     let card_id = board.current_card_id().cloned().unwrap();

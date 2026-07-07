@@ -65,8 +65,24 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let md_inner_width = inner.width.saturating_sub(pad * 2);
     let desc_wrap_width = (md_inner_width as usize).min(markdown::WRAP_WIDTH);
 
-    // --- Build content for each section ---
-    let desc_lines: Vec<Line<'static>> = if card.description.is_empty() {
+    // --- Section visibility ---
+    // Empty sections are hidden to avoid wasted space. Exception for
+    // discoverability: when every section is empty, all of them show
+    // (with their placeholders).
+    let resolved = card.resolved_labels(&board.meta.labels);
+    let show_all = card.description.is_empty()
+        && card.checklist.is_empty()
+        && resolved.is_empty()
+        && card.due_date.is_none();
+    let show_desc = show_all || !card.description.is_empty();
+    let show_checklist = show_all || !card.checklist.is_empty();
+    let show_labels = show_all || !resolved.is_empty();
+    let show_due = show_all || card.due_date.is_some();
+
+    // --- Build content for each visible section ---
+    let desc_lines: Vec<Line<'static>> = if !show_desc {
+        Vec::new()
+    } else if card.description.is_empty() {
         vec![Line::from(Span::styled(
             "(no description)",
             Style::default().fg(Color::DarkGray),
@@ -80,7 +96,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             .to_vec()
     };
 
-    let checklist_lines: Vec<Line<'static>> = if card.checklist.is_empty() {
+    let checklist_lines: Vec<Line<'static>> = if !show_checklist {
+        Vec::new()
+    } else if card.checklist.is_empty() {
         vec![Line::from(Span::styled(
             "  (no items)",
             Style::default().fg(Color::DarkGray),
@@ -108,8 +126,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             .collect()
     };
 
-    let resolved = card.resolved_labels(&board.meta.labels);
-    let labels_lines: Vec<Line<'static>> = if resolved.is_empty() {
+    let labels_lines: Vec<Line<'static>> = if !show_labels {
+        Vec::new()
+    } else if resolved.is_empty() {
         vec![Line::from(Span::styled(
             "  (no labels)",
             Style::default().fg(Color::DarkGray),
@@ -128,7 +147,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             .collect()
     };
 
-    let due_lines: Vec<Line<'static>> = if let Some(due) = card.due_date {
+    let due_lines: Vec<Line<'static>> = if !show_due {
+        Vec::new()
+    } else if let Some(due) = card.due_date {
         let today = chrono::Local::now().date_naive();
         let days = (due - today).num_days();
         let (status, color) = if days < 0 {
@@ -158,29 +179,28 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     };
 
     // --- Compute heights with caps for scrollable sections ---
-    // Fixed chrome:
-    //  1 (top blank) + 1 (desc header)
-    //  + 3 (divider ═)
-    //  + 1 (checklist header)
-    //  + 3 (divider ─)
-    //  + 1 (labels header)
-    //  + 3 (divider ─)
-    //  + 1 (due header)
-    // = 14
+    // Fixed chrome: 1 (top blank) + 1 header per visible section
+    // + a 3-line divider between each pair of adjacent visible sections.
     let top_pad: u16 = 1;
-    let desc_header_h: u16 = 1;
-    let ck_header_h: u16 = 1;
-    let labels_header_h: u16 = 1;
-    let due_header_h: u16 = 1;
+    let header_h: u16 = 1;
     let div_h: u16 = 3;
 
     let labels_full = labels_lines.len() as u16;
     let due_full = due_lines.len() as u16;
 
+    let visible_sections = [show_desc, show_checklist, show_labels, show_due]
+        .iter()
+        .filter(|s| **s)
+        .count() as u16;
+    let div_total = visible_sections.saturating_sub(1) * div_h;
+
     // Reserve full space for labels + due; they're small.
-    let bottom_h = div_h + labels_header_h + labels_full + div_h + due_header_h + due_full;
-    let fixed_top = top_pad + desc_header_h + div_h + ck_header_h;
-    let available = inner.height.saturating_sub(fixed_top + bottom_h);
+    let bottom_h = (if show_labels { header_h + labels_full } else { 0 })
+        + (if show_due { header_h + due_full } else { 0 });
+    let fixed_top = top_pad
+        + (if show_desc { header_h } else { 0 })
+        + (if show_checklist { header_h } else { 0 });
+    let available = inner.height.saturating_sub(fixed_top + div_total + bottom_h);
 
     let desc_full = desc_lines.len() as u16;
     let ck_full = checklist_lines.len() as u16;
@@ -208,153 +228,147 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // Top blank
     y += top_pad;
 
-    // Description header
-    if y < inner.y + inner.height {
-        let header_area = Rect::new(inner.x, y, inner.width, desc_header_h);
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                "Description",
-                Style::default().fg(accent).add_modifier(Modifier::BOLD),
-            ))),
-            header_area,
-        );
-        y += desc_header_h;
-    }
+    // Divider drawn before each section after the first; the one following
+    // the description is heavier (═).
+    let mut divider: Option<&str> = None;
 
-    // Description body (scrollbar on the right when it overflows)
-    if desc_h > 0 && y < inner.y + inner.height {
-        let desc_area = Rect::new(inner.x + pad, y, md_inner_width, desc_h);
-        let desc_paragraph =
-            Paragraph::new(desc_lines.clone()).scroll((desc_scroll, 0));
-        frame.render_widget(desc_paragraph, desc_area);
-        if desc_full > desc_h {
-            let bar_area = Rect::new(inner.x, y, inner.width, desc_h);
-            render_scrollbar(
-                frame,
-                bar_area,
-                desc_full as usize,
-                desc_scroll as usize,
-                accent,
+    if show_desc {
+        // Description header
+        if y < inner.y + inner.height {
+            let header_area = Rect::new(inner.x, y, inner.width, header_h);
+            frame.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    "Description",
+                    Style::default().fg(accent).add_modifier(Modifier::BOLD),
+                ))),
+                header_area,
             );
+            y += header_h;
         }
-        y += desc_h;
+
+        // Description body (scrollbar on the right when it overflows)
+        if desc_h > 0 && y < inner.y + inner.height {
+            let desc_area = Rect::new(inner.x + pad, y, md_inner_width, desc_h);
+            let desc_paragraph =
+                Paragraph::new(desc_lines.clone()).scroll((desc_scroll, 0));
+            frame.render_widget(desc_paragraph, desc_area);
+            if desc_full > desc_h {
+                let bar_area = Rect::new(inner.x, y, inner.width, desc_h);
+                render_scrollbar(
+                    frame,
+                    bar_area,
+                    desc_full as usize,
+                    desc_scroll as usize,
+                    accent,
+                );
+            }
+            y += desc_h;
+        }
+
+        divider = Some("═");
     }
 
-    // Divider (blank + ═ + blank)
-    if y + div_h <= inner.y + inner.height {
-        let divider_area = Rect::new(inner.x, y, inner.width, div_h);
-        let lines = vec![
-            Line::raw(""),
-            Line::from(Span::styled(
-                "═".repeat(inner.width as usize),
-                Style::default().fg(Color::DarkGray),
-            )),
-            Line::raw(""),
-        ];
-        frame.render_widget(Paragraph::new(lines), divider_area);
-        y += div_h;
-    }
+    if show_checklist {
+        if let Some(glyph) = divider.take()
+            && y + div_h <= inner.y + inner.height
+        {
+            render_divider(frame, inner, y, glyph);
+            y += div_h;
+        }
 
-    // Checklist header
-    let (done, total) = card.checklist_progress().unwrap_or((0, 0));
-    let ck_header_text = if total > 0 {
-        if ck_full > ck_h {
-            format!("Checklist [{done}/{total}]  ({} hidden)", ck_full - ck_h)
+        // Checklist header
+        let (done, total) = card.checklist_progress().unwrap_or((0, 0));
+        let ck_header_text = if total > 0 {
+            if ck_full > ck_h {
+                format!("Checklist [{done}/{total}]  ({} hidden)", ck_full - ck_h)
+            } else {
+                format!("Checklist [{done}/{total}]")
+            }
         } else {
-            format!("Checklist [{done}/{total}]")
+            "Checklist".to_string()
+        };
+        if y < inner.y + inner.height {
+            let header_area = Rect::new(inner.x, y, inner.width, header_h);
+            frame.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    ck_header_text,
+                    Style::default().fg(accent).add_modifier(Modifier::BOLD),
+                ))),
+                header_area,
+            );
+            y += header_h;
         }
-    } else {
-        "Checklist".to_string()
-    };
-    if y < inner.y + inner.height {
-        let header_area = Rect::new(inner.x, y, inner.width, ck_header_h);
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                ck_header_text,
-                Style::default().fg(accent).add_modifier(Modifier::BOLD),
-            ))),
-            header_area,
-        );
-        y += ck_header_h;
+
+        // Checklist body (sliced)
+        if ck_h > 0 && y < inner.y + inner.height {
+            let start = ck_scroll as usize;
+            let end = (start + ck_h as usize).min(checklist_lines.len());
+            let visible: Vec<Line<'static>> = checklist_lines[start..end].to_vec();
+            let ck_area = Rect::new(inner.x, y, inner.width, ck_h);
+            frame.render_widget(Paragraph::new(visible), ck_area);
+            y += ck_h;
+        }
+
+        divider = Some("─");
     }
 
-    // Checklist body (sliced)
-    if ck_h > 0 && y < inner.y + inner.height {
-        let start = ck_scroll as usize;
-        let end = (start + ck_h as usize).min(checklist_lines.len());
-        let visible: Vec<Line<'static>> = checklist_lines[start..end].to_vec();
-        let ck_area = Rect::new(inner.x, y, inner.width, ck_h);
-        frame.render_widget(Paragraph::new(visible), ck_area);
-        y += ck_h;
+    if show_labels {
+        if let Some(glyph) = divider.take()
+            && y + div_h <= inner.y + inner.height
+        {
+            render_divider(frame, inner, y, glyph);
+            y += div_h;
+        }
+
+        // Labels header + body
+        if y < inner.y + inner.height {
+            let header_area = Rect::new(inner.x, y, inner.width, header_h);
+            frame.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    "Labels",
+                    Style::default().fg(accent).add_modifier(Modifier::BOLD),
+                ))),
+                header_area,
+            );
+            y += header_h;
+        }
+        if labels_full > 0 && y < inner.y + inner.height {
+            let remaining = (inner.y + inner.height).saturating_sub(y);
+            let h = labels_full.min(remaining);
+            let labels_area = Rect::new(inner.x, y, inner.width, h);
+            frame.render_widget(Paragraph::new(labels_lines), labels_area);
+            y += h;
+        }
+
+        divider = Some("─");
     }
 
-    // Divider
-    if y + div_h <= inner.y + inner.height {
-        let divider_area = Rect::new(inner.x, y, inner.width, div_h);
-        let lines = vec![
-            Line::raw(""),
-            Line::from(Span::styled(
-                "─".repeat(inner.width as usize),
-                Style::default().fg(Color::DarkGray),
-            )),
-            Line::raw(""),
-        ];
-        frame.render_widget(Paragraph::new(lines), divider_area);
-        y += div_h;
-    }
+    if show_due {
+        if let Some(glyph) = divider.take()
+            && y + div_h <= inner.y + inner.height
+        {
+            render_divider(frame, inner, y, glyph);
+            y += div_h;
+        }
 
-    // Labels header + body
-    if y < inner.y + inner.height {
-        let header_area = Rect::new(inner.x, y, inner.width, labels_header_h);
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                "Labels",
-                Style::default().fg(accent).add_modifier(Modifier::BOLD),
-            ))),
-            header_area,
-        );
-        y += labels_header_h;
-    }
-    if labels_full > 0 && y < inner.y + inner.height {
-        let remaining = (inner.y + inner.height).saturating_sub(y);
-        let h = labels_full.min(remaining);
-        let labels_area = Rect::new(inner.x, y, inner.width, h);
-        frame.render_widget(Paragraph::new(labels_lines), labels_area);
-        y += h;
-    }
-
-    // Divider
-    if y + div_h <= inner.y + inner.height {
-        let divider_area = Rect::new(inner.x, y, inner.width, div_h);
-        let lines = vec![
-            Line::raw(""),
-            Line::from(Span::styled(
-                "─".repeat(inner.width as usize),
-                Style::default().fg(Color::DarkGray),
-            )),
-            Line::raw(""),
-        ];
-        frame.render_widget(Paragraph::new(lines), divider_area);
-        y += div_h;
-    }
-
-    // Due date header + body
-    if y < inner.y + inner.height {
-        let header_area = Rect::new(inner.x, y, inner.width, due_header_h);
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                "Due Date",
-                Style::default().fg(accent).add_modifier(Modifier::BOLD),
-            ))),
-            header_area,
-        );
-        y += due_header_h;
-    }
-    if due_full > 0 && y < inner.y + inner.height {
-        let remaining = (inner.y + inner.height).saturating_sub(y);
-        let h = due_full.min(remaining);
-        let due_area = Rect::new(inner.x, y, inner.width, h);
-        frame.render_widget(Paragraph::new(due_lines), due_area);
+        // Due date header + body
+        if y < inner.y + inner.height {
+            let header_area = Rect::new(inner.x, y, inner.width, header_h);
+            frame.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    "Due Date",
+                    Style::default().fg(accent).add_modifier(Modifier::BOLD),
+                ))),
+                header_area,
+            );
+            y += header_h;
+        }
+        if due_full > 0 && y < inner.y + inner.height {
+            let remaining = (inner.y + inner.height).saturating_sub(y);
+            let h = due_full.min(remaining);
+            let due_area = Rect::new(inner.x, y, inner.width, h);
+            frame.render_widget(Paragraph::new(due_lines), due_area);
+        }
     }
 
     // Input dialogs rendered on top — driven by the active insert handler
@@ -379,6 +393,19 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             render_input_dialog(frame, popup, handler.title(), buf, cursor, accent);
         }
     }
+}
+
+fn render_divider(frame: &mut Frame, inner: Rect, y: u16, glyph: &str) {
+    let divider_area = Rect::new(inner.x, y, inner.width, 3);
+    let lines = vec![
+        Line::raw(""),
+        Line::from(Span::styled(
+            glyph.repeat(inner.width as usize),
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::raw(""),
+    ];
+    frame.render_widget(Paragraph::new(lines), divider_area);
 }
 
 fn split_available(desc_full: u16, ck_full: u16, avail: u16) -> (u16, u16) {
