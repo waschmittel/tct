@@ -4,6 +4,7 @@ use anyhow::{bail, Context};
 
 use super::lookup::{find_board, find_card_in_lists};
 use super::util::{flag_value, fmt_progress, lists_and_cards};
+use crate::outln;
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
 
@@ -30,7 +31,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let card_title = card.title.clone();
         let mut editor = BoardEditor::load(&board.id)?;
         editor.apply(Command::AddChecklistItem { card_id, text: text.to_string() })?;
-        println!("Added checklist item '{}' to card '{}'.", text, card_title);
+        outln!("Added checklist item '{}' to card '{}'.", text, card_title);
     } else if let Some(n_str) = flag_value(args, "--toggle") {
         let n: usize = n_str
             .parse()
@@ -55,7 +56,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
             .map(|i| i.completed)
             .unwrap_or(false);
         let state = if new_state { "done" } else { "undone" };
-        println!("Toggled item {n} ('{item_text}') → {state}.");
+        outln!("Toggled item {n} ('{item_text}') → {state}.");
     } else if let Some(n_str) = flag_value(args, "--delete") {
         let n: usize = n_str
             .parse()
@@ -74,17 +75,17 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let card_id = card.id.clone();
         let mut editor = BoardEditor::load(&board.id)?;
         editor.apply(Command::RemoveChecklistItem { card_id, item_idx: idx })?;
-        println!("Deleted checklist item '{removed_text}'.");
+        outln!("Deleted checklist item '{removed_text}'.");
     } else {
         // Default: show checklist
         let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
-        println!("Card: {}  Checklist: {}", card.title, fmt_progress(&card));
+        outln!("Card: {}  Checklist: {}", card.title, fmt_progress(&card));
         if card.checklist.is_empty() {
-            println!("  (no items)");
+            outln!("  (no items)");
         } else {
             for (i, item) in card.checklist.iter().enumerate() {
                 let mark = if item.completed { "x" } else { " " };
-                println!("  {}. [{}] {}", i + 1, mark, item.text);
+                outln!("  {}. [{}] {}", i + 1, mark, item.text);
             }
         }
     }

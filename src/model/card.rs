@@ -1,17 +1,20 @@
 use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::ids::{self, ShortId};
+use super::id::{CardId, LabelId, ListId};
 use super::label::Label;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Card {
-    pub id: ShortId,
+    /// Not persisted — a Card's id is its file name (`card-<id>.json`), and
+    /// `card_store` stamps it on load. See ADR-0007.
+    #[serde(skip)]
+    pub id: CardId,
     /// Id of the List this Card belongs to. Source of truth for membership —
     /// the List no longer stores its Cards. Empty only for legacy cards before
     /// migration stamps it.
     #[serde(default)]
-    pub list_id: ShortId,
+    pub list_id: ListId,
     /// Fractional rank within the List. Cards render in ascending `position`
     /// order; inserting between two cards uses the midpoint of their ranks, so
     /// a move rewrites only the moved card.
@@ -20,7 +23,7 @@ pub struct Card {
     pub title: String,
     pub description: String,
     #[serde(default)]
-    pub label_ids: Vec<ShortId>,
+    pub label_ids: Vec<LabelId>,
     pub due_date: Option<NaiveDate>,
     #[serde(default)]
     pub checklist: Vec<ChecklistItem>,
@@ -49,8 +52,8 @@ impl Card {
     pub fn new(title: String) -> Self {
         let now = Utc::now();
         Self {
-            id: ids::new_id(),
-            list_id: String::new(),
+            id: CardId::generate(),
+            list_id: ListId::default(),
             position: 0.0,
             title,
             description: String::new(),

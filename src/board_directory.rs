@@ -7,7 +7,7 @@
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
 use crate::model::board::BoardMeta;
-use crate::model::ids::ShortId;
+use crate::model::id::BoardId;
 use crate::model::label::LabelColor;
 use crate::storage::board_store;
 
@@ -33,28 +33,28 @@ pub fn create(name: String) -> anyhow::Result<BoardMeta> {
     Ok(meta)
 }
 
-pub fn archive(board_id: &ShortId) -> anyhow::Result<()> {
+pub fn archive(board_id: &BoardId) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
     editor.apply(Command::ArchiveBoard { board_id: board_id.clone() })?;
     board_store::remove_from_order(board_id)?;
     Ok(())
 }
 
-pub fn restore(board_id: &ShortId) -> anyhow::Result<()> {
+pub fn restore(board_id: &BoardId) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
     editor.apply(Command::RestoreBoard { board_id: board_id.clone() })?;
     board_store::append_to_order(board_id)?;
     Ok(())
 }
 
-pub fn rename(board_id: &ShortId, name: String) -> anyhow::Result<()> {
+pub fn rename(board_id: &BoardId, name: String) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
     editor.apply(Command::RenameBoard { name })?;
     Ok(())
 }
 
 /// Cycle the Board's Accent Color to the next named variant and persist.
-pub fn cycle_accent(board_id: &ShortId) -> anyhow::Result<LabelColor> {
+pub fn cycle_accent(board_id: &BoardId) -> anyhow::Result<LabelColor> {
     let mut editor = BoardEditor::load(board_id)?;
     let next = editor.board().meta.accent_color.next();
     editor.apply(Command::SetAccentColor { color: next })?;
@@ -62,21 +62,21 @@ pub fn cycle_accent(board_id: &ShortId) -> anyhow::Result<LabelColor> {
 }
 
 /// Set the Board's Accent Color to an explicit value and persist.
-pub fn set_accent(board_id: &ShortId, color: LabelColor) -> anyhow::Result<()> {
+pub fn set_accent(board_id: &BoardId, color: LabelColor) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
     editor.apply(Command::SetAccentColor { color })?;
     Ok(())
 }
 
 /// Permanently delete an archived Board's directory from disk.
-pub fn delete(board_id: &str) -> anyhow::Result<()> {
+pub fn delete(board_id: &BoardId) -> anyhow::Result<()> {
     Ok(board_store::delete_board(board_id)?)
 }
 
 /// Swap two Boards in the persisted display order. `displayed` is the
 /// current on-screen order, used to backfill boards missing from the
 /// order file.
-pub fn swap_order(a: &ShortId, b: &ShortId, displayed: &[ShortId]) -> anyhow::Result<()> {
+pub fn swap_order(a: &BoardId, b: &BoardId, displayed: &[BoardId]) -> anyhow::Result<()> {
     let mut order = board_store::load_board_order().unwrap_or_default();
     if !order.contains(a) || !order.contains(b) {
         for id in displayed {

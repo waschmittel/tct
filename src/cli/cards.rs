@@ -7,6 +7,7 @@ use super::lookup::{find_archived_card, find_board, find_card_in_lists, find_lis
 use super::util::{
     flag_value, flag_values2, has_flag, lists_and_cards, print_card_detail, print_card_line,
 };
+use crate::outln;
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
 use crate::storage::card_store;
@@ -24,7 +25,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     if has_flag(args, "--archived") {
         let board = find_board(board_partial, by_id)?;
         let archived = card_store::list_archived_cards(&board.id)?;
-        println!(
+        outln!(
             "Board: {} [{}]  (archived cards: {})",
             board.name,
             board.id,
@@ -32,7 +33,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         );
         for (i, card) in archived.iter().enumerate() {
             let date = card.updated_at.format("%Y-%m-%d");
-            println!(
+            outln!(
                 "  {}. [{}]  {}  (archived: {})",
                 i + 1,
                 card.id,
@@ -55,7 +56,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
             .filter_map(|id| all_cards.get(id))
             .filter(|c| !c.archived)
             .collect();
-        println!(
+        outln!(
             "Board: {} [{}]  List: {} [{}]  ({} active cards)",
             board.name,
             board.id,
@@ -84,7 +85,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
             .get(&new_id)
             .map(|c| c.title.clone())
             .unwrap_or_else(|| title.to_string());
-        println!(
+        outln!(
             "Created card '{}' in list '{}' on board '{}'.",
             card_title, list_name, board.name
         );
@@ -98,7 +99,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let card_id = card.id.clone();
         let mut editor = BoardEditor::load(&board.id)?;
         editor.apply(Command::ArchiveCard { card_id })?;
-        println!("Archived card '{title}'.");
+        outln!("Archived card '{title}'.");
     } else if let Some(card_partial) = flag_value(args, "--restore") {
         let board = find_board(board_partial, by_id)?;
         let card = find_archived_card(&board.id, card_partial, by_id)?;
@@ -109,18 +110,18 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         // can find it; the editor will reattach it to a list.
         editor.with_extra_card(card);
         editor.apply(Command::RestoreCard { card_id })?;
-        println!("Restored card '{title}'.");
+        outln!("Restored card '{title}'.");
     } else if let Some(card_partial) = flag_value(args, "--delete") {
         let board = find_board(board_partial, by_id)?;
         let card = find_archived_card(&board.id, card_partial, by_id)?;
         let title = card.title.clone();
         card_store::delete_card(&board.id, &card.id)?;
-        println!("Permanently deleted card '{title}'.");
+        outln!("Permanently deleted card '{title}'.");
     } else {
         // Default: list all active cards grouped by list
         let board = find_board(board_partial, by_id)?;
         let (lists, all_cards) = lists_and_cards(&board);
-        println!("Board: {} [{}]", board.name, board.id);
+        outln!("Board: {} [{}]", board.name, board.id);
         for list in &lists {
             let active: Vec<_> = list
                 .card_ids
@@ -128,7 +129,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
                 .filter_map(|id| all_cards.get(id))
                 .filter(|c| !c.archived)
                 .collect();
-            println!(
+            outln!(
                 "  List: {} [{}]  ({} active cards)",
                 list.name,
                 list.id,
@@ -191,6 +192,6 @@ fn edit(args: &[String], board_partial: &str, card_partial: &str, by_id: bool) -
         .get(&card_id)
         .map(|c| c.title.clone())
         .unwrap_or_default();
-    println!("Updated card '{title}'.");
+    outln!("Updated card '{title}'.");
     Ok(())
 }

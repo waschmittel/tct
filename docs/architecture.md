@@ -12,6 +12,7 @@ src/
   command.rs         # Command enum — sole chokepoint for domain mutations (ADR-0002)
   event.rs           # Crossterm event polling (key + tick)
   term_caps.rs       # Terminal capability detection + color/glyph degradation
+  term_out.rs        # outln!/errln! — control-char-safe output for the CLI surfaces
   cli/
     mod.rs           # CLI dispatch, help text
     boards.rs        # `tct boards`
@@ -23,14 +24,14 @@ src/
     lookup.rs        # ID/name resolution shared by all subcommands
     util.rs          # Flag parsing + output formatting helpers
   model/
-    board.rs         # BoardMeta, ListMeta (lists live inline in board.json)
-    card.rs          # Card (list_id, position), ChecklistItem, history
-    ids.rs           # ShortId generation
+    board.rs         # BoardMeta (id derived from its directory), ListMeta (inline in board.json)
+    card.rs          # Card (id derived from its file name; list_id, position), ChecklistItem, history
+    id.rs            # BoardId/CardId/ListId/LabelId — validated id newtypes
     label.rs         # Label, LabelColor (pastel generation)
     list.rs          # CardList (derived view) + build_lists/ordered_card_ids
   storage/
     mod.rs           # StorageError, atomic_write
-    paths.rs         # Data-dir resolution + path helpers
+    paths.rs         # Data-dir resolution + path helpers (only BoardId/CardId build paths)
     board_store.rs   # Board CRUD (triggers migration on load)
     card_store.rs    # Card CRUD + load_all_cards + archived listing
     migrate.rs       # One-time legacy list-*.json -> card-owned migration

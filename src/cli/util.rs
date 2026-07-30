@@ -6,9 +6,10 @@ use std::collections::HashMap;
 
 use chrono::Utc;
 
+use crate::{errln, outln};
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
-use crate::model::ids::ShortId;
+use crate::model::id::{BoardId, CardId};
 use crate::model::label::{Label, LabelColor};
 use crate::model::list::CardList;
 use crate::storage::{board_store, card_store};
@@ -42,27 +43,27 @@ pub(super) fn flag_values_all<'a>(args: &'a [String], flag: &str) -> Vec<&'a str
 
 /// Load a board's full Card map and its active (non-archived) Lists, with each
 /// List's `card_ids` derived from the Cards' `list_id`/`position`.
-pub(super) fn lists_and_cards(meta: &BoardMeta) -> (Vec<CardList>, HashMap<ShortId, Card>) {
+pub(super) fn lists_and_cards(meta: &BoardMeta) -> (Vec<CardList>, HashMap<CardId, Card>) {
     // Reload through load_board so a legacy board is migrated (and its `lists`
     // populated) before we derive membership — CLI reads can hit boards the TUI
     // has never opened.
     let fresh = board_store::load_board(&meta.id).unwrap_or_else(|_| meta.clone());
     let cards = card_store::load_all_cards(&meta.id).unwrap_or_else(|e| {
-        eprintln!("Error: {e}");
+        errln!("Error: {e}");
         std::process::exit(1);
     });
     let lists = crate::model::list::build_lists(&fresh, &cards, false);
     (lists, cards)
 }
 
-pub(super) fn count_active(card_ids: &[ShortId], cards: &HashMap<ShortId, Card>) -> usize {
+pub(super) fn count_active(card_ids: &[CardId], cards: &HashMap<CardId, Card>) -> usize {
     card_ids
         .iter()
         .filter(|id| cards.get(*id).map(|c| !c.archived).unwrap_or(false))
         .count()
 }
 
-pub(super) fn board_summary_counts(board_id: &str) -> (usize, usize) {
+pub(super) fn board_summary_counts(board_id: &BoardId) -> (usize, usize) {
     let meta = match board_store::load_board(board_id) {
         Ok(m) => m,
         Err(_) => return (0, 0),
@@ -103,16 +104,16 @@ pub(super) fn print_card_line(idx: usize, card: &Card, labels: &[Label]) {
         None => String::new(),
         Some((done, total)) => format!("  checklist: {done}/{total}"),
     };
-    println!(
+    outln!(
         "    {idx}. [{}]  {}{label_str}{due_str}{checklist_str}",
         card.id, card.title
     );
 }
 
 pub(super) fn print_card_detail(card: &Card, board: &BoardMeta, list: &CardList) {
-    println!("Card:        {} [{}]", card.title, card.id);
-    println!("Board:       {} [{}]", board.name, board.id);
-    println!("List:        {} [{}]", list.name, list.id);
+    outln!("Card:        {} [{}]", card.title, card.id);
+    outln!("Board:       {} [{}]", board.name, board.id);
+    outln!("List:        {} [{}]", list.name, list.id);
 
     let label_names: Vec<_> = card
         .resolved_labels(&board.labels)
@@ -120,33 +121,33 @@ pub(super) fn print_card_detail(card: &Card, board: &BoardMeta, list: &CardList)
         .map(|l| l.name.as_str())
         .collect();
     if !label_names.is_empty() {
-        println!("Labels:      {}", label_names.join(", "));
+        outln!("Labels:      {}", label_names.join(", "));
     }
 
     if let Some(d) = card.due_date {
         let today = Utc::now().date_naive();
         if d < today {
-            println!("Due:         {d} (OVERDUE)");
+            outln!("Due:         {d} (OVERDUE)");
         } else {
-            println!("Due:         {d}");
+            outln!("Due:         {d}");
         }
     }
 
     if let Some((done, total)) = card.checklist_progress() {
-        println!("Checklist:   {done}/{total}");
+        outln!("Checklist:   {done}/{total}");
         for item in &card.checklist {
             let mark = if item.completed { "x" } else { " " };
-            println!("  [{}] {}", mark, item.text);
+            outln!("  [{}] {}", mark, item.text);
         }
     }
 
-    println!("Created:     {}", card.created_at.format("%Y-%m-%d"));
-    println!("Updated:     {}", card.updated_at.format("%Y-%m-%d"));
+    outln!("Created:     {}", card.created_at.format("%Y-%m-%d"));
+    outln!("Updated:     {}", card.updated_at.format("%Y-%m-%d"));
 
     if !card.description.is_empty() {
-        println!("Description:");
+        outln!("Description:");
         for line in card.description.lines() {
-            println!("  {line}");
+            outln!("  {line}");
         }
     }
 }

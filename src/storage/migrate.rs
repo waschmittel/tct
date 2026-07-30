@@ -16,12 +16,13 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::model::board::{BoardMeta, ListMeta};
+use crate::model::board::ListMeta;
+use crate::model::id::BoardId;
 use crate::model::list::CardList;
 
 use super::{card_store, paths, Result};
 
-fn list_files(board_id: &str) -> Vec<PathBuf> {
+fn list_files(board_id: &BoardId) -> Vec<PathBuf> {
     let dir = paths::board_dir(board_id);
     let mut files = Vec::new();
     if let Ok(entries) = fs::read_dir(&dir) {
@@ -38,21 +39,19 @@ fn list_files(board_id: &str) -> Vec<PathBuf> {
 
 /// Migrate a board in place if it is still in the legacy format. No-op when no
 /// `list-*.json` files exist.
-pub fn migrate_if_needed(board_id: &str) -> Result<()> {
+pub fn migrate_if_needed(board_id: &BoardId) -> Result<()> {
     let files = list_files(board_id);
     if files.is_empty() {
         return Ok(());
     }
 
-    // Read board.json directly (not via board_store::load_board — that calls us).
-    let meta_path = paths::board_meta_path(board_id);
-    let data = fs::read_to_string(&meta_path)?;
-    let mut meta: BoardMeta = serde_json::from_str(&data)?;
+    // Not via board_store::load_board — that calls us.
+    let mut meta = super::board_store::read_board_at(board_id)?;
 
     // Parse every legacy list file into the (still-compatible) CardList shape.
     let mut lists: Vec<CardList> = Vec::new();
     for path in &files {
-        if let Ok(raw) = fs::read_to_string(path)
+        if let Ok(raw) = super::read_unlinked(path)
             && let Ok(list) = serde_json::from_str::<CardList>(&raw)
         {
             lists.push(list);
@@ -105,6 +104,7 @@ pub fn migrate_if_needed(board_id: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::board::BoardMeta;
     use crate::model::card::Card;
     use crate::storage::{board_store, list_store};
     use crate::test_support::with_temp_dir;
@@ -130,7 +130,7 @@ mod tests {
 
             // Legacy: cards have no list_id/position; save raw.
             for c in [&mut c1, &mut c2, &mut c3] {
-                c.list_id = String::new();
+                c.list_id = crate::model::id::ListId::default();
                 c.position = 0.0;
                 card_store::save_card(&meta.id, c).unwrap();
             }

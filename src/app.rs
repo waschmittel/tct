@@ -7,7 +7,7 @@ use ratatui::style::Color;
 use crate::board_editor::BoardEditor;
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
-use crate::model::ids::ShortId;
+use crate::model::id::{BoardId, CardId};
 use crate::model::label::LabelColor;
 use crate::model::list::CardList;
 use crate::storage::board_store;
@@ -42,7 +42,7 @@ impl AppMode {
 pub struct LoadedBoard {
     pub meta: BoardMeta,
     pub lists: Vec<CardList>,
-    pub cards: HashMap<ShortId, Card>,
+    pub cards: HashMap<CardId, Card>,
     pub selected_list: usize,
     /// Per-list selection, as an ordinal into that list's *visible*
     /// (non-archived) cards — NOT a raw `card_ids` index. Archived cards remain
@@ -62,7 +62,7 @@ pub struct LoadedBoard {
 }
 
 impl LoadedBoard {
-    pub fn current_card_id(&self) -> Option<&ShortId> {
+    pub fn current_card_id(&self) -> Option<&CardId> {
         let list = self.lists.get(self.selected_list)?;
         // `selected_card` is an ordinal into the *visible* (non-archived) cards,
         // not a raw `card_ids` index — archived cards stay in `card_ids` but are
@@ -170,7 +170,7 @@ fn data_dir_display() -> String {
 }
 
 impl App {
-    pub fn new(open_board_id: Option<String>) -> anyhow::Result<Self> {
+    pub fn new(open_board_id: Option<BoardId>) -> anyhow::Result<Self> {
         board_store::ensure_base_dirs()?;
         let boards = board_store::list_boards()?;
         let mut app = Self {
@@ -267,7 +267,7 @@ impl App {
         }
     }
 
-    pub fn load_board(&mut self, board_id: &str) -> anyhow::Result<()> {
+    pub fn load_board(&mut self, board_id: &BoardId) -> anyhow::Result<()> {
         let editor = BoardEditor::load(board_id)?;
         let repaired = editor.diagnostics.len();
         self.editor = Some(editor);
@@ -405,7 +405,7 @@ impl App {
 
     /// Route a Command through the Board Editor. The result is the id of a
     /// card created by `AddCard`, if any.
-    pub fn apply(&mut self, cmd: crate::command::Command) -> anyhow::Result<Option<ShortId>> {
+    pub fn apply(&mut self, cmd: crate::command::Command) -> anyhow::Result<Option<CardId>> {
         let editor = self
             .editor
             .as_mut()

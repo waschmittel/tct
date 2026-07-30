@@ -1,7 +1,7 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use super::ids::{self, ShortId};
+use super::id::{BoardId, ListId};
 use super::label::{Label, LabelColor};
 
 /// Persisted definition of a List. Membership (which Cards belong to it) is
@@ -9,7 +9,7 @@ use super::label::{Label, LabelColor};
 /// archived flag and its List membership in one file, so they cannot diverge.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListMeta {
-    pub id: ShortId,
+    pub id: ListId,
     pub name: String,
     #[serde(default)]
     pub archived: bool,
@@ -17,7 +17,10 @@ pub struct ListMeta {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoardMeta {
-    pub id: ShortId,
+    /// Not persisted — a Board's id is the directory holding its `board.json`,
+    /// and `board_store` stamps it on load. See ADR-0007.
+    #[serde(skip)]
+    pub id: BoardId,
     pub name: String,
     pub description: String,
     /// Ordered List definitions (active and archived). Order in this Vec is
@@ -29,7 +32,7 @@ pub struct BoardMeta {
     /// ids and kept membership in separate `list-*.json` files. Read on load
     /// to drive the one-time migration, then never written again.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub list_order: Vec<ShortId>,
+    pub list_order: Vec<ListId>,
     #[serde(default)]
     pub labels: Vec<Label>,
     #[serde(default)]
@@ -44,7 +47,7 @@ impl BoardMeta {
     pub fn new(name: String) -> Self {
         let now = Utc::now();
         Self {
-            id: ids::new_id(),
+            id: BoardId::generate(),
             name,
             description: String::new(),
             lists: Vec::new(),

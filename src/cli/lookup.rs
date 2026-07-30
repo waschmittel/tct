@@ -11,7 +11,7 @@ use anyhow::bail;
 
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
-use crate::model::ids::ShortId;
+use crate::model::id::{BoardId, CardId};
 use crate::model::label::Label;
 use crate::model::list::CardList;
 use crate::storage::{board_store, card_store};
@@ -114,7 +114,7 @@ pub(super) fn find_list<'a>(
 
 pub(super) fn find_card_in_lists(
     lists: &[CardList],
-    all_cards: &HashMap<ShortId, Card>,
+    all_cards: &HashMap<CardId, Card>,
     partial: &str,
     include_archived: bool,
     by_id: bool,
@@ -162,7 +162,7 @@ pub(super) fn find_card_in_lists(
 }
 
 pub(super) fn find_archived_card(
-    board_id: &str,
+    board_id: &BoardId,
     partial: &str,
     by_id: bool,
 ) -> anyhow::Result<Card> {

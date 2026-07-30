@@ -3,7 +3,7 @@
 //! See `docs/adr/0002-command-enum-scope.md`. Selection moves are NOT
 //! commands — they are direct methods on `BoardEditor`.
 
-use crate::model::ids::ShortId;
+use crate::model::id::{BoardId, CardId, LabelId, ListId};
 use crate::model::label::LabelColor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,38 +17,38 @@ pub enum MoveDir {
 #[derive(Debug, Clone)]
 pub enum Command {
     // Card commands
-    ArchiveCard { card_id: ShortId },
-    RestoreCard { card_id: ShortId },
-    EditCardTitle { card_id: ShortId, title: String },
-    EditCardDescription { card_id: ShortId, body: String },
-    SetDueDate { card_id: ShortId, date: chrono::NaiveDate },
-    ClearDueDate { card_id: ShortId },
-    AddChecklistItem { card_id: ShortId, text: String },
-    EditChecklistItem { card_id: ShortId, item_idx: usize, text: String },
-    ToggleChecklistItem { card_id: ShortId, item_idx: usize },
-    RemoveChecklistItem { card_id: ShortId, item_idx: usize },
-    ReorderChecklistItem { card_id: ShortId, from: usize, to: usize },
-    ToggleLabel { card_id: ShortId, label_id: ShortId },
-    AddCard { list_id: ShortId, title: String },
-    MoveCard { card_id: ShortId, direction: MoveDir },
+    ArchiveCard { card_id: CardId },
+    RestoreCard { card_id: CardId },
+    EditCardTitle { card_id: CardId, title: String },
+    EditCardDescription { card_id: CardId, body: String },
+    SetDueDate { card_id: CardId, date: chrono::NaiveDate },
+    ClearDueDate { card_id: CardId },
+    AddChecklistItem { card_id: CardId, text: String },
+    EditChecklistItem { card_id: CardId, item_idx: usize, text: String },
+    ToggleChecklistItem { card_id: CardId, item_idx: usize },
+    RemoveChecklistItem { card_id: CardId, item_idx: usize },
+    ReorderChecklistItem { card_id: CardId, from: usize, to: usize },
+    ToggleLabel { card_id: CardId, label_id: LabelId },
+    AddCard { list_id: ListId, title: String },
+    MoveCard { card_id: CardId, direction: MoveDir },
 
     // List commands
     AddList { name: String },
-    ArchiveList { list_id: ShortId },
-    RestoreList { list_id: ShortId },
-    RenameList { list_id: ShortId, name: String },
-    MoveList { list_id: ShortId, direction: MoveDir },
+    ArchiveList { list_id: ListId },
+    RestoreList { list_id: ListId },
+    RenameList { list_id: ListId, name: String },
+    MoveList { list_id: ListId, direction: MoveDir },
 
     // Board commands (operate on the loaded board)
-    ArchiveBoard { board_id: ShortId },
-    RestoreBoard { board_id: ShortId },
+    ArchiveBoard { board_id: BoardId },
+    RestoreBoard { board_id: BoardId },
     RenameBoard { name: String },
     SetAccentColor { color: LabelColor },
 
     // Label commands
     DefineLabel { name: String, color: LabelColor },
-    RenameLabel { label_id: ShortId, name: String },
-    SetLabelColor { label_id: ShortId, color: LabelColor },
-    DeleteLabel { label_id: ShortId },
+    RenameLabel { label_id: LabelId, name: String },
+    SetLabelColor { label_id: LabelId, color: LabelColor },
+    DeleteLabel { label_id: LabelId },
     ReorderLabels { from: usize, to: usize },
 }

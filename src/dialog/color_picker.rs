@@ -15,7 +15,7 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use super::{Dialog, DialogBackground, DialogOutcome, DialogSideEffect};
 use crate::app::LoadedBoard;
 use crate::command::Command;
-use crate::model::ids::ShortId;
+use crate::model::id::LabelId;
 use crate::model::label::{self, LabelColor};
 
 const HUE_STEP: f64 = 5.0;
@@ -29,7 +29,7 @@ pub enum ColorTarget {
     /// A label in the open board's palette. Carries the Label Manager
     /// return state (`label_idx` selection, `from_picker` origin).
     Label {
-        label_id: ShortId,
+        label_id: LabelId,
         label_idx: usize,
         from_picker: bool,
     },
@@ -56,7 +56,7 @@ impl ColorPicker {
 
     pub fn for_label(
         color: LabelColor,
-        label_id: ShortId,
+        label_id: LabelId,
         label_idx: usize,
         from_picker: bool,
     ) -> Self {

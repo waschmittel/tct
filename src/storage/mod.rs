@@ -24,6 +24,8 @@ pub enum StorageError {
         source: serde_json::Error,
         hint: &'static str,
     },
+    #[error("refusing to follow a symlink: {path}\n  hint: {hint}")]
+    Symlink { path: String, hint: &'static str },
     #[error("Board not found: {0}")]
     BoardNotFound(String),
     #[cfg(test)]
@@ -46,6 +48,34 @@ pub(crate) fn corrupt(path: &Path, source: serde_json::Error) -> StorageError {
         path: path.display().to_string(),
         source,
         hint: CORRUPT_HINT,
+    }
+}
+
+const SYMLINK_HINT: &str = "everything under the data directory must be a real file or \
+directory. Validated ids keep a path from naming somewhere outside the data dir, but a symlink \
+redirects in the filesystem instead, where the path cannot show it — so tct does not follow one. \
+Replace the link with the file itself.";
+
+/// Read a file that must not be a symlink.
+///
+/// `symlink_metadata` does not follow links, so this distinguishes "a file
+/// here" from "a pointer to a file somewhere else". Every read under the data
+/// directory goes through it: the data dir may be a checked-out repository, and
+/// a repository can carry symlinks.
+pub(crate) fn read_unlinked(path: &Path) -> Result<String> {
+    reject_symlink(path)?;
+    Ok(fs::read_to_string(path)?)
+}
+
+/// Fail if `path` is a symlink. Missing paths are not symlinks — callers that
+/// care about existence check it themselves.
+pub(crate) fn reject_symlink(path: &Path) -> Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(meta) if meta.file_type().is_symlink() => Err(StorageError::Symlink {
+            path: path.display().to_string(),
+            hint: SYMLINK_HINT,
+        }),
+        _ => Ok(()),
     }
 }
 

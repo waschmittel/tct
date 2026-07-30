@@ -185,7 +185,7 @@ graph TB
             CARD_M["card.rs<br>Card, ChecklistItem"]
             LIST_M["list.rs<br>CardList (derived) + build_lists"]
             LABEL_M["label.rs<br>Label, LabelColor"]
-            IDS_M["ids.rs<br>ShortId"]
+            IDS_M["id.rs<br>BoardId, CardId, ListId, LabelId"]
         end
 
         subgraph "storage/"
@@ -269,7 +269,7 @@ path for board-collection operations (ADR-0001/0002/0004).
 | `card.rs` | `Card`, `ChecklistItem` | Card data: `list_id`, `position`, title, description, labels, due date, checklist, archive flag |
 | `list.rs` | `CardList` | Derived in-memory view of a list; `build_lists`/`ordered_card_ids` assemble it from `ListMeta` + cards |
 | `label.rs` | `Label`, `LabelColor` | Label identity + color; HSL-based pastel generation |
-| `ids.rs` | `ShortId` (= `String`) | 8-char UUID v4 prefix generator |
+| `id.rs` | `BoardId`, `CardId`, `ListId`, `LabelId` | Validated id newtypes; 8-char UUID v4 prefix generator (ADR-0007) |
 
 #### storage/ — Persistence Layer
 
@@ -531,10 +531,15 @@ graph LR
 IDs are 8-character hex strings: first 8 chars of a UUID v4. Compact for display, sufficient entropy for single-user local storage.
 
 ```rust
-pub fn new_id() -> ShortId {
-    uuid::Uuid::new_v4().to_string()[..8].to_string()
+impl CardId {
+    pub fn generate() -> Self { /* first 8 chars of a UUID v4 */ }
 }
 ```
+
+A Board's id is the directory holding its `board.json` and a Card's id is its
+file name, so neither is stored inside the file (ADR-0007). List and Label ids
+are references into `board.json` and have their own types, which `storage::paths`
+does not accept.
 
 ### 8.4 Label Color System
 
@@ -570,7 +575,7 @@ flowchart TD
 | Migration | Old Format | New Format |
 |-----------|-----------|------------|
 | Checklist | `"checklists": [{title, items: [...]}]` | `"checklist": [ChecklistItem]` |
-| Labels | `"labels": [{name, color}]` | `"label_ids": [ShortId]` (board-level labels) |
+| Labels | `"labels": [{name, color}]` | `"label_ids": [LabelId]` (board-level labels) |
 
 Migrated data is written back on load (lazy migration).
 
@@ -663,7 +668,8 @@ mindmap
 | **List** | A column within a board. Defined by a `ListMeta` entry in `board.json`; its cards are those whose `list_id` matches, ordered by `position`. Assembled in memory as `CardList`. |
 | **Card** | A task item with title, description, checklist, labels, due date, and archive flag. |
 | **Label** | A board-level named tag with a color, assignable to cards via `label_ids`. |
-| **ShortId** | 8-character hex string (UUID v4 prefix) used as unique identifier. |
+| **BoardId / CardId** | Identifier that *is* a location: the board's directory name, the card's file name (ADR-0007). |
+| **ListId / LabelId** | Identifier that is a reference into `board.json`, where Lists and Labels live inline. |
 | **AppMode** | Enum controlling which input handler and renderer are active. |
 | **InsertHandler** | Trait; one struct per insert target owns its render + input + buffer state (ADR-0003). |
 | **Dialog** | Trait; one struct per dialog kind owns its render + input + state (ADR-0003). |

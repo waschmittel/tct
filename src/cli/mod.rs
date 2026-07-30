@@ -21,6 +21,8 @@ pub(crate) use search::card_matches_regex as card_matches_regex_pub;
 
 use anyhow::bail;
 
+use crate::model::id::BoardId;
+
 const HELP: &str = "\
 tct - Terminal Card Tracker
 
@@ -96,7 +98,7 @@ pub fn print_help() {
 }
 
 /// Resolve `--board <name>` flag from args, returning the matching board's ID.
-pub fn resolve_board_flag(args: &[String]) -> anyhow::Result<Option<String>> {
+pub fn resolve_board_flag(args: &[String]) -> anyhow::Result<Option<BoardId>> {
     let mut i = 0;
     while i < args.len() {
         if args[i] == "--board" {

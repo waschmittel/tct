@@ -14,6 +14,7 @@ use ratatui::Terminal;
 
 use crate::app::{App, AppMode};
 use crate::model::card::{Card, ChecklistItem};
+use crate::model::id::BoardId;
 use crate::model::label::{Label, LabelColor};
 use crate::model::list::CardList;
 use crate::storage::{board_store, card_store, list_store};
@@ -52,7 +53,7 @@ fn press(app: &mut App, code: KeyCode) {
 
 /// Seed a deterministic demo board: two lists, cards with labels,
 /// checklist, and description. No due dates (relative rendering).
-fn seed_demo_board() -> String {
+fn seed_demo_board() -> BoardId {
     let mut meta = crate::model::board::BoardMeta::new("Demo".into());
     let label = Label::new("bug".into(), LabelColor::Red);
     let label_id = label.id.clone();

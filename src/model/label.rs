@@ -1,11 +1,11 @@
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
-use super::ids::{self, ShortId};
+use super::id::LabelId;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Label {
-    pub id: ShortId,
+    pub id: LabelId,
     pub name: String,
     pub color: LabelColor,
 }
@@ -13,7 +13,7 @@ pub struct Label {
 impl Label {
     pub fn new(name: String, color: LabelColor) -> Self {
         Self {
-            id: ids::new_id(),
+            id: LabelId::generate(),
             name,
             color,
         }

@@ -1,27 +1,27 @@
 use std::fs;
 
-use crate::model::ids::ShortId;
+use crate::model::id::{BoardId, ListId};
 use crate::model::list::CardList;
 
 use super::paths;
 use super::{atomic_write, Result, StorageError};
 
-pub fn load_list(board_id: &str, list_id: &str) -> Result<CardList> {
+pub fn load_list(board_id: &BoardId, list_id: &ListId) -> Result<CardList> {
     let path = paths::list_path(board_id, list_id);
     if !path.exists() {
         return Err(StorageError::ListNotFound(list_id.to_string()));
     }
-    let data = fs::read_to_string(&path)?;
+    let data = super::read_unlinked(&path)?;
     Ok(serde_json::from_str(&data)?)
 }
 
-pub fn save_list(board_id: &str, list: &CardList) -> Result<()> {
+pub fn save_list(board_id: &BoardId, list: &CardList) -> Result<()> {
     let json = serde_json::to_string_pretty(list)?;
     atomic_write(&paths::list_path(board_id, &list.id), json.as_bytes())?;
     Ok(())
 }
 
-pub fn delete_list_file(board_id: &str, list_id: &str) -> Result<()> {
+pub fn delete_list_file(board_id: &BoardId, list_id: &ListId) -> Result<()> {
     let path = paths::list_path(board_id, list_id);
     if path.exists() {
         fs::remove_file(path)?;
@@ -29,7 +29,7 @@ pub fn delete_list_file(board_id: &str, list_id: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn load_all_lists(board_id: &str, list_order: &[ShortId]) -> Result<Vec<CardList>> {
+pub fn load_all_lists(board_id: &BoardId, list_order: &[ListId]) -> Result<Vec<CardList>> {
     let mut lists = Vec::with_capacity(list_order.len());
     for id in list_order {
         lists.push(load_list(board_id, id)?);
@@ -59,7 +59,7 @@ mod tests {
     fn load_missing_list_returns_not_found() {
         with_temp_dir(|| {
             let board = board_store::create_board("Board".into()).unwrap();
-            let err = load_list(&board.id, "missing1").unwrap_err();
+            let err = load_list(&board.id, &"missing1".into()).unwrap_err();
             assert!(matches!(err, StorageError::ListNotFound(_)));
         });
     }
@@ -68,9 +68,9 @@ mod tests {
     fn load_corrupt_list_returns_json_error() {
         with_temp_dir(|| {
             let board = board_store::create_board("Board".into()).unwrap();
-            let path = paths::list_path(&board.id, "broken12");
+            let path = paths::list_path(&board.id, &"broken12".into());
             std::fs::write(&path, "not json").unwrap();
-            let err = load_list(&board.id, "broken12").unwrap_err();
+            let err = load_list(&board.id, &"broken12".into()).unwrap_err();
             assert!(matches!(err, StorageError::Json(_)));
         });
     }
@@ -91,7 +91,7 @@ mod tests {
     fn delete_missing_list_is_ok() {
         with_temp_dir(|| {
             let board = board_store::create_board("Board".into()).unwrap();
-            delete_list_file(&board.id, "nope1234").unwrap();
+            delete_list_file(&board.id, &"nope1234".into()).unwrap();
         });
     }
 
@@ -118,7 +118,7 @@ mod tests {
     fn load_all_lists_errors_on_missing_id() {
         with_temp_dir(|| {
             let board = board_store::create_board("Board".into()).unwrap();
-            let order = vec!["doesnotxx".to_string()];
+            let order = vec![ListId::from("doesnotxx")];
             let err = load_all_lists(&board.id, &order).unwrap_err();
             assert!(matches!(err, StorageError::ListNotFound(_)));
         });

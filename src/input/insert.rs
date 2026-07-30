@@ -8,10 +8,10 @@ use crossterm::event::KeyEvent;
 
 use crate::app::App;
 use crate::insert::{InsertOutcome, InsertSideEffect};
-use crate::model::ids::ShortId;
+use crate::model::id::CardId;
 
 /// Title of a card on the loaded board, for status messages.
-fn card_title(app: &App, card_id: &ShortId) -> String {
+fn card_title(app: &App, card_id: &CardId) -> String {
     app.board()
         .and_then(|b| b.cards.get(card_id))
         .map(|c| c.title.clone())

@@ -4,6 +4,7 @@ use anyhow::{bail, Context};
 use regex::Regex;
 
 use super::util::{flag_value, flag_values_all, has_flag, lists_and_cards, print_card_line};
+use crate::outln;
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
 use crate::model::label::Label;
@@ -51,7 +52,7 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
 
     let mode = if use_regex { "regex" } else { "substring" };
     let board_count = boards_to_search.len();
-    println!("Searching {board_count} board(s) for {query:?} ({mode}):");
+    outln!("Searching {board_count} board(s) for {query:?} ({mode}):");
 
     let mut total = 0usize;
 
@@ -81,7 +82,7 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
                 .collect();
 
             if !matching.is_empty() {
-                println!(
+                outln!(
                     "\n  Board: {} [{}]  List: {} [{}]",
                     board.name, board.id, list.name, list.id
                 );
@@ -94,9 +95,9 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
     }
 
     if total == 0 {
-        println!("\nNo cards found.");
+        outln!("\nNo cards found.");
     } else {
-        println!("\nFound {total} card(s).");
+        outln!("\nFound {total} card(s).");
     }
 
     Ok(())

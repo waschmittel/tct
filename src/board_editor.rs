@@ -11,7 +11,7 @@ use crate::app::LoadedBoard;
 use crate::command::{Command, MoveDir};
 use crate::model::board::{BoardMeta, ListMeta};
 use crate::model::card::{Card, ChecklistItem};
-use crate::model::ids::ShortId;
+use crate::model::id::{BoardId, CardId, LabelId, ListId};
 use crate::model::label::Label;
 use crate::model::list::CardList;
 use crate::storage::{self, board_store, card_store};
@@ -28,7 +28,7 @@ pub enum BoardEditorError {
 
 pub struct BoardEditor {
     board: LoadedBoard,
-    last_added_card_id: Option<ShortId>,
+    last_added_card_id: Option<CardId>,
     /// Non-fatal issues found and auto-repaired while loading the board (orphan
     /// cards reattached, dangling label refs stripped). Surfaced to the user as
     /// a status message; empty on a clean load.
@@ -51,12 +51,12 @@ enum PendingWrite {
 /// * **Dangling label** — `label_ids` names a Label absent from the board; the
 ///   id is stripped.
 fn repair_references(
-    board_id: &str,
+    board_id: &BoardId,
     meta: &BoardMeta,
-    cards: &mut HashMap<ShortId, Card>,
+    cards: &mut HashMap<CardId, Card>,
 ) -> Vec<String> {
-    let valid_lists: HashSet<&ShortId> = meta.lists.iter().map(|l| &l.id).collect();
-    let valid_labels: HashSet<&ShortId> = meta.labels.iter().map(|l| &l.id).collect();
+    let valid_lists: HashSet<&ListId> = meta.lists.iter().map(|l| &l.id).collect();
+    let valid_labels: HashSet<&LabelId> = meta.labels.iter().map(|l| &l.id).collect();
     let default_list = meta
         .lists
         .iter()
@@ -79,7 +79,7 @@ fn repair_references(
         .unwrap_or(1.0);
 
     let mut warnings = Vec::new();
-    let mut changed: Vec<ShortId> = Vec::new();
+    let mut changed: Vec<CardId> = Vec::new();
 
     for card in cards.values_mut() {
         let mut card_changed = false;
@@ -129,7 +129,7 @@ fn repair_references(
 }
 
 impl BoardEditor {
-    pub fn load(board_id: &str) -> Result<Self, BoardEditorError> {
+    pub fn load(board_id: &BoardId) -> Result<Self, BoardEditorError> {
         // load_board migrates legacy boards in place before returning meta.
         let meta = board_store::load_board(board_id)?;
         let mut cards = card_store::load_all_cards(board_id)?;
@@ -343,7 +343,7 @@ impl BoardEditor {
 
     /// Permanently delete an archived Card's file. The only hard delete on
     /// Cards — everything else is Archive.
-    pub fn delete_archived_card(&mut self, card_id: &ShortId) -> Result<(), BoardEditorError> {
+    pub fn delete_archived_card(&mut self, card_id: &CardId) -> Result<(), BoardEditorError> {
         card_store::delete_card(&self.board.meta.id, card_id)?;
         self.board.cards.remove(card_id);
         Ok(())
@@ -353,8 +353,8 @@ impl BoardEditor {
     /// Card files and the `ListMeta`, then persists the board.
     pub fn delete_archived_list(
         &mut self,
-        list_id: &ShortId,
-        card_ids: &[ShortId],
+        list_id: &ListId,
+        card_ids: &[CardId],
     ) -> Result<(), BoardEditorError> {
         for cid in card_ids {
             let _ = card_store::delete_card(&self.board.meta.id, cid);
@@ -367,7 +367,7 @@ impl BoardEditor {
 
     /// Most recently added card id, set by `Command::AddCard`. Cleared at the
     /// start of every `apply()` call so callers see only this run's result.
-    pub fn last_added_card_id(&self) -> Option<&ShortId> {
+    pub fn last_added_card_id(&self) -> Option<&CardId> {
         self.last_added_card_id.as_ref()
     }
 
@@ -545,7 +545,7 @@ impl BoardEditor {
                     .map(|l| l.name.clone())
                     .ok_or_else(|| BoardEditorError::NotFound {
                         kind: "label",
-                        id: label_id.clone(),
+                        id: label_id.to_string(),
                     })?;
                 let card = self.card_mut(&card_id)?;
                 let action = if let Some(pos) = card.label_ids.iter().position(|id| *id == label_id) {
@@ -566,7 +566,7 @@ impl BoardEditor {
                     .position(|l| l.id == list_id)
                     .ok_or_else(|| BoardEditorError::NotFound {
                         kind: "list",
-                        id: list_id.clone(),
+                        id: list_id.to_string(),
                     })?;
                 let pos = self.next_position(&list_id);
                 let mut card = Card::new(title);
@@ -590,7 +590,7 @@ impl BoardEditor {
                 self.move_card(&card_id, direction, &mut pending)?;
             }
             Command::AddList { name } => {
-                let meta = ListMeta { id: crate::model::ids::new_id(), name, archived: false };
+                let meta = ListMeta { id: ListId::generate(), name, archived: false };
                 self.board.lists.push(CardList {
                     id: meta.id.clone(),
                     name: meta.name.clone(),
@@ -612,7 +612,7 @@ impl BoardEditor {
                     .position(|l| l.id == list_id)
                     .ok_or_else(|| BoardEditorError::NotFound {
                         kind: "list",
-                        id: list_id.clone(),
+                        id: list_id.to_string(),
                     })?;
                 // Flip the ListMeta flag; Cards keep their list_id and reappear
                 // on restore. Drop the active-list view row.
@@ -638,7 +638,7 @@ impl BoardEditor {
                     .find(|l| l.id == list_id)
                     .ok_or_else(|| BoardEditorError::NotFound {
                         kind: "list",
-                        id: list_id.clone(),
+                        id: list_id.to_string(),
                     })?;
                 lm.archived = false;
                 let name = lm.name.clone();
@@ -663,7 +663,7 @@ impl BoardEditor {
                     .find(|l| l.id == list_id)
                     .ok_or_else(|| BoardEditorError::NotFound {
                         kind: "list",
-                        id: list_id.clone(),
+                        id: list_id.to_string(),
                     })?;
                 lm.name = name.clone();
                 if let Some(list) = self.board.lists.iter_mut().find(|l| l.id == list_id) {
@@ -678,7 +678,7 @@ impl BoardEditor {
                 if board_id != self.board.meta.id {
                     return Err(BoardEditorError::NotFound {
                         kind: "board",
-                        id: board_id,
+                        id: board_id.to_string(),
                     });
                 }
                 self.board.meta.archived = true;
@@ -688,7 +688,7 @@ impl BoardEditor {
                 if board_id != self.board.meta.id {
                     return Err(BoardEditorError::NotFound {
                         kind: "board",
-                        id: board_id,
+                        id: board_id.to_string(),
                     });
                 }
                 self.board.meta.archived = false;
@@ -716,7 +716,7 @@ impl BoardEditor {
                     .find(|l| l.id == label_id)
                     .ok_or_else(|| BoardEditorError::NotFound {
                         kind: "label",
-                        id: label_id.clone(),
+                        id: label_id.to_string(),
                     })?;
                 label.name = name;
                 pending.push(PendingWrite::Board);
@@ -730,7 +730,7 @@ impl BoardEditor {
                     .find(|l| l.id == label_id)
                     .ok_or_else(|| BoardEditorError::NotFound {
                         kind: "label",
-                        id: label_id.clone(),
+                        id: label_id.to_string(),
                     })?;
                 label.color = color;
                 pending.push(PendingWrite::Board);
@@ -744,7 +744,7 @@ impl BoardEditor {
                     .position(|l| l.id == label_id)
                     .ok_or_else(|| BoardEditorError::NotFound {
                         kind: "label",
-                        id: label_id.clone(),
+                        id: label_id.to_string(),
                     })?;
                 self.board.meta.labels.remove(pos);
                 // Dead label_ids are NOT scrubbed from every card here. They are
@@ -795,7 +795,7 @@ impl BoardEditor {
     /// state, not corruption (`repair_references` strips them on load).
     fn check_invariants(&self) -> Result<(), String> {
         let b = &self.board;
-        let valid_lists: HashSet<&ShortId> = b.meta.lists.iter().map(|l| &l.id).collect();
+        let valid_lists: HashSet<&ListId> = b.meta.lists.iter().map(|l| &l.id).collect();
 
         for card in b.cards.values() {
             if !valid_lists.contains(&card.list_id) {
@@ -851,11 +851,11 @@ impl BoardEditor {
     }
 
     /// Fractional rank one past the last Card currently in `list_id`.
-    fn next_position(&self, list_id: &str) -> f64 {
+    fn next_position(&self, list_id: &ListId) -> f64 {
         self.board
             .cards
             .values()
-            .filter(|c| c.list_id == list_id)
+            .filter(|c| c.list_id == *list_id)
             .map(|c| c.position)
             .fold(0.0_f64, f64::max)
             + 1.0
@@ -872,7 +872,7 @@ impl BoardEditor {
 
     /// Ordinal of `card_id` within list `list_idx`'s visible (non-archived)
     /// sequence — the index space of `selected_card`.
-    fn visible_ordinal(&self, list_idx: usize, card_id: &ShortId) -> Option<usize> {
+    fn visible_ordinal(&self, list_idx: usize, card_id: &CardId) -> Option<usize> {
         let card_ids = &self.board.lists[list_idx].card_ids;
         self.board
             .visible_cards(list_idx, None)
@@ -888,19 +888,19 @@ impl BoardEditor {
             crate::model::list::ordered_card_ids(&lid, &self.board.cards);
     }
 
-    fn card_mut(&mut self, card_id: &ShortId) -> Result<&mut Card, BoardEditorError> {
+    fn card_mut(&mut self, card_id: &CardId) -> Result<&mut Card, BoardEditorError> {
         self.board
             .cards
             .get_mut(card_id)
             .ok_or_else(|| BoardEditorError::NotFound {
                 kind: "card",
-                id: card_id.clone(),
+                id: card_id.to_string(),
             })
     }
 
     fn move_card(
         &mut self,
-        card_id: &ShortId,
+        card_id: &CardId,
         direction: MoveDir,
         pending: &mut Vec<PendingWrite>,
     ) -> Result<(), BoardEditorError> {
@@ -913,7 +913,7 @@ impl BoardEditor {
             .find_map(|(li, l)| l.card_ids.iter().position(|id| id == card_id).map(|ci| (li, ci)))
             .ok_or_else(|| BoardEditorError::NotFound {
                 kind: "card",
-                id: card_id.clone(),
+                id: card_id.to_string(),
             })?;
 
         // Moves operate over the *visible* sequence (archived Cards are hidden,
@@ -999,7 +999,7 @@ impl BoardEditor {
 
     fn move_list(
         &mut self,
-        list_id: &ShortId,
+        list_id: &ListId,
         direction: MoveDir,
         pending: &mut Vec<PendingWrite>,
     ) -> Result<(), BoardEditorError> {
@@ -1010,7 +1010,7 @@ impl BoardEditor {
             .position(|l| &l.id == list_id)
             .ok_or_else(|| BoardEditorError::NotFound {
                 kind: "list",
-                id: list_id.clone(),
+                id: list_id.to_string(),
             })?;
         let target = match direction {
             MoveDir::Left => {
@@ -1071,13 +1071,12 @@ impl BoardEditor {
 mod tests {
     use super::*;
     use crate::model::board::BoardMeta;
-    use crate::model::ids;
     use crate::test_support::with_temp_dir;
     use std::collections::HashMap;
 
-    fn seed_board_with_card() -> (BoardMeta, String) {
+    fn seed_board_with_card() -> (BoardMeta, CardId) {
         let mut meta = BoardMeta::new("Test".into());
-        let list_id = ids::new_id();
+        let list_id = ListId::generate();
         meta.lists.push(ListMeta { id: list_id.clone(), name: "Backlog".into(), archived: false });
         let mut card = Card::new("Task".into());
         card.list_id = list_id;
@@ -1174,7 +1173,7 @@ mod tests {
     fn move_up_skips_interleaved_archived_card() {
         with_temp_dir(|| {
             let mut meta = BoardMeta::new("Test".into());
-            let lid = ids::new_id();
+            let lid = ListId::generate();
             meta.lists.push(ListMeta { id: lid.clone(), name: "TODO".into(), archived: false });
             board_store::save_board(&meta).unwrap();
 
@@ -1199,7 +1198,7 @@ mod tests {
 
             editor.apply(Command::MoveCard { card_id: bottom.clone(), direction: MoveDir::Up }).unwrap();
 
-            let visible_order = |ed: &BoardEditor| -> Vec<ShortId> {
+            let visible_order = |ed: &BoardEditor| -> Vec<CardId> {
                 ed.board()
                     .visible_cards(0, None)
                     .into_iter()
@@ -1219,8 +1218,8 @@ mod tests {
     fn move_card_all_directions_persist_across_reload() {
         with_temp_dir(|| {
             let mut meta = BoardMeta::new("Test".into());
-            let la = ids::new_id();
-            let lb = ids::new_id();
+            let la = ListId::generate();
+            let lb = ListId::generate();
             meta.lists.push(ListMeta { id: la.clone(), name: "A".into(), archived: false });
             meta.lists.push(ListMeta { id: lb.clone(), name: "B".into(), archived: false });
             board_store::save_board(&meta).unwrap();
@@ -1272,9 +1271,9 @@ mod tests {
 
     /// Seed a board with one list and the given card titles (ascending
     /// positions), returning the editor plus the card ids in order.
-    fn editor_with_cards(titles: &[&str]) -> (BoardEditor, ShortId, Vec<ShortId>) {
+    fn editor_with_cards(titles: &[&str]) -> (BoardEditor, ListId, Vec<CardId>) {
         let mut meta = BoardMeta::new("Test".into());
-        let lid = ids::new_id();
+        let lid = ListId::generate();
         meta.lists.push(ListMeta { id: lid.clone(), name: "L".into(), archived: false });
         board_store::save_board(&meta).unwrap();
         let ids_v = titles
@@ -1510,7 +1509,7 @@ mod tests {
     // Build a single-list board, one card homed in that list. `mutate` can
     // break it before the invariant check runs.
     fn invariant_board(mutate: impl FnOnce(&mut LoadedBoard)) -> BoardEditor {
-        let list_id = "lst00001".to_string();
+        let list_id = ListId::parse("lst00001").unwrap();
         let mut meta = BoardMeta::new("X".into());
         meta.lists.push(ListMeta { id: list_id.clone(), name: "L".into(), archived: false });
         let mut card = fixed_card("c0000001", "a");
@@ -1608,7 +1607,7 @@ mod tests {
         with_temp_dir(|| {
             let (meta, _) = seed_board_with_card();
             let mut editor = BoardEditor::load(&meta.id).unwrap();
-            let bogus = ids::new_id();
+            let bogus = CardId::generate();
             let err = editor.apply(Command::ArchiveCard { card_id: bogus }).unwrap_err();
             assert!(matches!(err, BoardEditorError::NotFound { kind: "card", .. }));
         });

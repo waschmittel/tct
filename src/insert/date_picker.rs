@@ -7,10 +7,10 @@ use super::line_input::has_ctrl_or_cmd;
 use super::{InsertHandler, InsertOutcome, InsertSurface};
 use crate::app::LoadedBoard;
 use crate::command::Command;
-use crate::model::ids::ShortId;
+use crate::model::id::CardId;
 
 pub struct DatePicker {
-    pub card_id: ShortId,
+    pub card_id: CardId,
     pub buffer: String,
     pub cursor: usize,
     pub picker_date: Option<NaiveDate>,
@@ -18,7 +18,7 @@ pub struct DatePicker {
 }
 
 impl DatePicker {
-    pub fn new(card_id: ShortId, prefill: &str, surface: InsertSurface) -> Self {
+    pub fn new(card_id: CardId, prefill: &str, surface: InsertSurface) -> Self {
         let initial = NaiveDate::parse_from_str(prefill, "%Y-%m-%d")
             .ok()
             .unwrap_or_else(|| chrono::Local::now().date_naive());

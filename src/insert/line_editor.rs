@@ -14,7 +14,7 @@ use super::{InsertHandler, InsertOutcome, InsertSideEffect, InsertSurface};
 use crate::app::LoadedBoard;
 use crate::command::Command;
 use crate::dialog::label_manager::LabelManager;
-use crate::model::ids::ShortId;
+use crate::model::id::{CardId, LabelId, ListId};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -125,10 +125,10 @@ impl InsertHandler for NewCardTitle {
 pub struct EditCardTitle {
     pub input: LineInput,
     pub inline: bool,
-    pub card_id: ShortId,
+    pub card_id: CardId,
 }
 impl EditCardTitle {
-    pub fn new(card_id: ShortId, current: &str, inline: bool) -> Self {
+    pub fn new(card_id: CardId, current: &str, inline: bool) -> Self {
         Self { input: LineInput::with_initial(current), inline, card_id }
     }
 }
@@ -191,10 +191,10 @@ impl InsertHandler for NewListName {
 
 pub struct RenameList {
     pub input: LineInput,
-    pub list_id: ShortId,
+    pub list_id: ListId,
 }
 impl RenameList {
-    pub fn new(list_id: ShortId, current: &str) -> Self {
+    pub fn new(list_id: ListId, current: &str) -> Self {
         Self { input: LineInput::with_initial(current), list_id }
     }
 }
@@ -226,10 +226,10 @@ impl InsertHandler for RenameList {
 
 pub struct NewChecklistItem {
     pub input: LineInput,
-    pub card_id: ShortId,
+    pub card_id: CardId,
 }
 impl NewChecklistItem {
-    pub fn new(card_id: ShortId) -> Self { Self { input: LineInput::new(), card_id } }
+    pub fn new(card_id: CardId) -> Self { Self { input: LineInput::new(), card_id } }
 }
 impl InsertHandler for NewChecklistItem {
     fn handle_key(&mut self, key: KeyEvent, _b: Option<&LoadedBoard>) -> InsertOutcome {
@@ -259,11 +259,11 @@ impl InsertHandler for NewChecklistItem {
 
 pub struct EditChecklistItem {
     pub input: LineInput,
-    pub card_id: ShortId,
+    pub card_id: CardId,
     pub item_idx: usize,
 }
 impl EditChecklistItem {
-    pub fn new(card_id: ShortId, item_idx: usize, current: &str) -> Self {
+    pub fn new(card_id: CardId, item_idx: usize, current: &str) -> Self {
         Self { input: LineInput::with_initial(current), card_id, item_idx }
     }
 }
@@ -352,14 +352,14 @@ impl InsertHandler for NewLabelName {
 
 pub struct EditLabelName {
     pub input: LineInput,
-    pub label_id: ShortId,
+    pub label_id: LabelId,
     pub label_idx: usize,
     /// Threaded through so the reopened LabelManager still returns to
     /// the LabelPicker on close.
     pub from_picker: bool,
 }
 impl EditLabelName {
-    pub fn new(label_id: ShortId, label_idx: usize, current: &str, from_picker: bool) -> Self {
+    pub fn new(label_id: LabelId, label_idx: usize, current: &str, from_picker: bool) -> Self {
         Self { input: LineInput::with_initial(current), label_id, label_idx, from_picker }
     }
 }

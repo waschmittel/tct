@@ -422,7 +422,7 @@ mod tests {
         (app, metas)
     }
 
-    fn open_board_id(app: &App) -> crate::model::ids::ShortId {
+    fn open_board_id(app: &App) -> crate::model::id::BoardId {
         app.board().unwrap().meta.id.clone()
     }
 

@@ -151,17 +151,17 @@ impl DialogOutcome {
 /// expressed as a `Command` (e.g. hard-deleting an archived board file).
 pub enum DialogSideEffect {
     /// Hard-delete an archived board's directory.
-    DeleteArchivedBoard { board_id: crate::model::ids::ShortId },
+    DeleteArchivedBoard { board_id: crate::model::id::BoardId },
     /// Hard-delete an archived list and all its cards.
     DeleteArchivedList {
-        list_id: crate::model::ids::ShortId,
-        card_ids: Vec<crate::model::ids::ShortId>,
+        list_id: crate::model::id::ListId,
+        card_ids: Vec<crate::model::id::CardId>,
     },
     /// Hard-delete an archived card.
-    DeleteArchivedCard { card_id: crate::model::ids::ShortId },
+    DeleteArchivedCard { card_id: crate::model::id::CardId },
     /// Restore an archived board: apply the RestoreBoard command via a
     /// fresh editor (board is not loaded) AND re-add to board order.
-    RestoreArchivedBoard { board_id: crate::model::ids::ShortId },
+    RestoreArchivedBoard { board_id: crate::model::id::BoardId },
     /// Archive the currently-selected board (in Board Selector context):
     /// load editor for that board, apply ArchiveBoard, remove from order.
     ArchiveSelectedBoard,

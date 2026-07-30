@@ -10,6 +10,7 @@ mod insert;
 mod model;
 mod storage;
 mod term_caps;
+mod term_out;
 mod ui;
 
 #[cfg(test)]
@@ -42,7 +43,7 @@ fn main() -> anyhow::Result<()> {
     // Subcommand mode: first arg is a non-flag word
     if args.first().map(|a| !a.starts_with('-')).unwrap_or(false) {
         if let Err(e) = cli::run(&args) {
-            eprintln!("Error: {e}");
+            errln!("Error: {e}");
             std::process::exit(1);
         }
         return Ok(());
@@ -87,6 +88,7 @@ fn run_app(
 mod tests {
     use crate::model::card::{Card, ChecklistItem};
     use crate::model::label::{Label, LabelColor};
+    use crate::model::id::{CardId, ListId};
     use crate::model::list::CardList;
     use crate::storage::{board_store, card_store, list_store};
     #[allow(unused_imports)]
@@ -783,24 +785,23 @@ mod tests {
     use crate::board_editor::BoardEditor;
     use crate::command::{Command, MoveDir};
     use crate::model::board::{BoardMeta, ListMeta};
-    use crate::model::ids;
 
     /// Build a two-list board on disk and load an editor. `a`/`b` give the
     /// titles for list A / list B; cards get ascending integer positions.
-    fn two_list_editor(a: &[&str], b: &[&str]) -> (BoardEditor, Vec<String>, Vec<String>) {
+    fn two_list_editor(a: &[&str], b: &[&str]) -> (BoardEditor, Vec<CardId>, Vec<CardId>) {
         let mut meta = BoardMeta::new("Board".into());
-        let la = ids::new_id();
-        let lb = ids::new_id();
+        let la = ListId::generate();
+        let lb = ListId::generate();
         meta.lists.push(ListMeta { id: la.clone(), name: "A".into(), archived: false });
         meta.lists.push(ListMeta { id: lb.clone(), name: "B".into(), archived: false });
         board_store::save_board(&meta).unwrap();
-        let save = |titles: &[&str], lid: &str| {
+        let save = |titles: &[&str], lid: &ListId| {
             titles
                 .iter()
                 .enumerate()
                 .map(|(i, t)| {
                     let mut c = Card::new((*t).into());
-                    c.list_id = lid.to_string();
+                    c.list_id = lid.clone();
                     c.position = (i + 1) as f64;
                     card_store::save_card(&meta.id, &c).unwrap();
                     c.id

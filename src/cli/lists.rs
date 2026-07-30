@@ -2,6 +2,7 @@
 
 use super::lookup::{find_board, find_list};
 use super::util::{count_active, flag_value, flag_values2, has_flag, lists_and_cards};
+use crate::outln;
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
 
@@ -18,14 +19,14 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     if has_flag(args, "--archived") {
         let board = find_board(board_partial, by_id)?;
         let archived = BoardEditor::load(&board.id)?.archived_lists();
-        println!(
+        outln!(
             "Board: {} [{}]  (archived lists: {})",
             board.name,
             board.id,
             archived.len()
         );
         for (i, list) in archived.iter().enumerate() {
-            println!(
+            outln!(
                 "  {}. [{}]  {}  ({} cards)",
                 i + 1,
                 list.id,
@@ -38,7 +39,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let board_name = board.name.clone();
         let mut editor = BoardEditor::load(&board.id)?;
         editor.apply(Command::AddList { name: name.to_string() })?;
-        println!("Created list '{}' on board '{}'.", name, board_name);
+        outln!("Created list '{}' on board '{}'.", name, board_name);
     } else if let Some((list_partial, new_name)) = flag_values2(args, "--rename") {
         let board = find_board(board_partial, by_id)?;
         let (lists, _) = lists_and_cards(&board);
@@ -46,7 +47,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let old_name = list.name.clone();
         let mut editor = BoardEditor::load(&board.id)?;
         editor.apply(Command::RenameList { list_id: list.id, name: new_name.to_string() })?;
-        println!("Renamed list '{old_name}' to '{new_name}'.");
+        outln!("Renamed list '{old_name}' to '{new_name}'.");
     } else if let Some(list_partial) = flag_value(args, "--archive") {
         let board = find_board(board_partial, by_id)?;
         let (lists, _) = lists_and_cards(&board);
@@ -54,7 +55,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let name = list.name.clone();
         let mut editor = BoardEditor::load(&board.id)?;
         editor.apply(Command::ArchiveList { list_id: list.id })?;
-        println!("Archived list '{name}'.");
+        outln!("Archived list '{name}'.");
     } else if let Some(list_partial) = flag_value(args, "--restore") {
         let board = find_board(board_partial, by_id)?;
         let mut editor = BoardEditor::load(&board.id)?;
@@ -62,7 +63,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let list = find_list(&archived, list_partial, by_id)?.clone();
         let name = list.name.clone();
         editor.apply(Command::RestoreList { list_id: list.id })?;
-        println!("Restored list '{name}'.");
+        outln!("Restored list '{name}'.");
     } else if let Some(list_partial) = flag_value(args, "--delete") {
         let board = find_board(board_partial, by_id)?;
         let mut editor = BoardEditor::load(&board.id)?;
@@ -70,18 +71,18 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let list = find_list(&archived, list_partial, by_id)?.clone();
         let name = list.name.clone();
         editor.delete_archived_list(&list.id, &list.card_ids)?;
-        println!("Permanently deleted list '{name}' and its cards.");
+        outln!("Permanently deleted list '{name}' and its cards.");
     } else {
         // Default: list all active lists on board
         let board = find_board(board_partial, by_id)?;
         let (lists, all_cards) = lists_and_cards(&board);
-        println!("Board: {} [{}]", board.name, board.id);
+        outln!("Board: {} [{}]", board.name, board.id);
         if lists.is_empty() {
-            println!("  (no lists)");
+            outln!("  (no lists)");
         } else {
             for (i, list) in lists.iter().enumerate() {
                 let count = count_active(&list.card_ids, &all_cards);
-                println!(
+                outln!(
                     "  {}. [{}]  {}  ({} active cards)",
                     i + 1,
                     list.id,

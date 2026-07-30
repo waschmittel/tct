@@ -12,17 +12,17 @@ use super::{InsertHandler, InsertOutcome, InsertSurface};
 use crate::app::LoadedBoard;
 use crate::command::Command;
 use crate::dialog::confirm_cancel_edit::ConfirmCancelEdit;
-use crate::model::ids::ShortId;
+use crate::model::id::CardId;
 
 const NEST_INDENT: usize = 3;
 
 pub struct MarkdownEditor {
     pub input: TextAreaInput,
-    pub card_id: ShortId,
+    pub card_id: CardId,
 }
 
 impl MarkdownEditor {
-    pub fn new(card_id: ShortId, initial: &str) -> Self {
+    pub fn new(card_id: CardId, initial: &str) -> Self {
         Self {
             input: TextAreaInput::from_initial(initial),
             card_id,

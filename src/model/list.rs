@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::board::BoardMeta;
 use super::card::Card;
-use super::ids::ShortId;
+use super::id::{CardId, ListId};
 
 /// In-memory view of a List: its metadata plus the ordered ids of the Cards
 /// that belong to it (archived Cards included — visibility is decided by
@@ -13,9 +13,9 @@ use super::ids::ShortId;
 /// `CardList`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CardList {
-    pub id: ShortId,
+    pub id: ListId,
     pub name: String,
-    pub card_ids: Vec<ShortId>,
+    pub card_ids: Vec<CardId>,
     #[serde(default)]
     pub archived: bool,
 }
@@ -24,7 +24,7 @@ impl CardList {
     #[cfg(test)]
     pub fn new(name: String) -> Self {
         Self {
-            id: super::ids::new_id(),
+            id: ListId::generate(),
             name,
             card_ids: Vec::new(),
             archived: false,
@@ -34,8 +34,8 @@ impl CardList {
 
 /// Cards belonging to `list_id`, sorted ascending by `position` (ties broken by
 /// `created_at` then `id` for stable, deterministic ordering).
-pub fn ordered_card_ids(list_id: &str, cards: &HashMap<ShortId, Card>) -> Vec<ShortId> {
-    let mut members: Vec<&Card> = cards.values().filter(|c| c.list_id == list_id).collect();
+pub fn ordered_card_ids(list_id: &ListId, cards: &HashMap<CardId, Card>) -> Vec<CardId> {
+    let mut members: Vec<&Card> = cards.values().filter(|c| c.list_id == *list_id).collect();
     members.sort_by(|a, b| {
         a.position
             .partial_cmp(&b.position)
@@ -49,7 +49,7 @@ pub fn ordered_card_ids(list_id: &str, cards: &HashMap<ShortId, Card>) -> Vec<Sh
 /// Build the in-memory `CardList`s for a board from its `ListMeta` definitions
 /// and the full Card map. When `archived` is false, returns the active Lists in
 /// board order; when true, returns the archived Lists.
-pub fn build_lists(meta: &BoardMeta, cards: &HashMap<ShortId, Card>, archived: bool) -> Vec<CardList> {
+pub fn build_lists(meta: &BoardMeta, cards: &HashMap<CardId, Card>, archived: bool) -> Vec<CardList> {
     meta.lists
         .iter()
         .filter(|lm| lm.archived == archived)
