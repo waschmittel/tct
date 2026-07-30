@@ -58,8 +58,8 @@ pub fn boards_dir() -> PathBuf {
     base_dir().join("boards")
 }
 
-pub fn board_order_path() -> PathBuf {
-    base_dir().join("board_order.json")
+pub fn version_path() -> PathBuf {
+    base_dir().join(".version")
 }
 
 /// The empty id is legal as a Card's "unassigned" `list_id`, but it is not a
@@ -74,11 +74,6 @@ pub fn board_dir(board_id: &BoardId) -> PathBuf {
 
 pub fn board_meta_path(board_id: &BoardId) -> PathBuf {
     board_dir(board_id).join("board.json")
-}
-
-#[cfg(test)]
-pub fn list_path(board_id: &BoardId, list_id: &crate::model::id::ListId) -> PathBuf {
-    board_dir(board_id).join(format!("list-{list_id}.json"))
 }
 
 pub fn card_path(board_id: &BoardId, card_id: &CardId) -> PathBuf {
@@ -106,9 +101,9 @@ mod tests {
     }
 
     #[test]
-    fn board_order_path_under_base() {
+    fn version_path_under_base() {
         with_temp_dir(|| {
-            assert_eq!(board_order_path(), base_dir().join("board_order.json"));
+            assert_eq!(version_path(), base_dir().join(".version"));
         });
     }
 
@@ -116,15 +111,6 @@ mod tests {
     fn board_dir_uses_board_id() {
         with_temp_dir(|| {
             assert_eq!(board_dir(&"abc123".into()), boards_dir().join("abc123"));
-        });
-    }
-
-    #[test]
-    fn list_path_format() {
-        with_temp_dir(|| {
-            let p = list_path(&"brd1".into(), &"lst1".into());
-            assert!(p.ends_with("list-lst1.json"));
-            assert!(p.to_string_lossy().contains("brd1"));
         });
     }
 

@@ -1,12 +1,7 @@
 pub mod board_store;
 pub mod card_store;
-/// Legacy per-List file storage. After the card-owned-membership migration
-/// (see [`migrate`]) no `list-*.json` files are written; this module survives
-/// only to build legacy fixtures in tests.
-#[cfg(test)]
-pub mod list_store;
-pub mod migrate;
 pub mod paths;
+pub mod version;
 
 use std::fs;
 use std::io;
@@ -26,11 +21,14 @@ pub enum StorageError {
     },
     #[error("refusing to follow a symlink: {path}\n  hint: {hint}")]
     Symlink { path: String, hint: &'static str },
+    #[error("data directory is version {found}, but this tct reads version {supported}\n  hint: it was written by a newer tct. Upgrade, or point TCT_DATA_DIR at a different directory.")]
+    VersionTooNew { found: u32, supported: u32 },
+    #[error("data directory is version {found}, but this tct reads version {supported}\n  hint: the format it uses is no longer readable. Convert it with the tct version that wrote it, or start a fresh data directory.")]
+    VersionTooOld { found: u32, supported: u32 },
+    #[error("unreadable version file: {found:?}\n  hint: .tct/.version must hold a single integer.")]
+    VersionUnreadable { found: String },
     #[error("Board not found: {0}")]
     BoardNotFound(String),
-    #[cfg(test)]
-    #[error("List not found: {0}")]
-    ListNotFound(String),
     #[error("Card not found: {0}")]
     CardNotFound(String),
 }

@@ -255,25 +255,20 @@ mod tests {
     use super::*;
     use crate::app::{App, AppMode};
     use crate::model::card::{Card, ChecklistItem};
-    use crate::model::list::CardList;
-    use crate::storage::{board_store, card_store, list_store};
+    
+    use crate::storage::board_store;
     use crate::test_support::with_temp_dir;
 
     fn setup_card_detail() -> App {
         let mut meta = board_store::create_board("Test".into()).unwrap();
-        let mut list = CardList::new("To Do".into());
+        let list = crate::test_support::add_list(&mut meta, "To Do");
         let mut card = Card::new("Card".into());
         card.checklist = vec![
             ChecklistItem { text: "a".into(), completed: false },
             ChecklistItem { text: "b".into(), completed: false },
             ChecklistItem { text: "c".into(), completed: false },
         ];
-        card.due_date = Some(chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap());
-        card_store::save_card(&meta.id, &card).unwrap();
-        list.card_ids.push(card.id.clone());
-        list_store::save_list(&meta.id, &list).unwrap();
-        meta.list_order = vec![list.id.clone()];
-        board_store::save_board(&meta).unwrap();
+        card.due_date = Some(chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap());        crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
 
         let mut app = App::new(Some(meta.id)).unwrap();
         app.mode = AppMode::CardDetail;

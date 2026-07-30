@@ -1,5 +1,7 @@
 # The path is the id
 
+> Two claims below were overtaken by [ADR-0008](0008-board-order-as-rank.md) and [ADR-0009](0009-versioned-format-no-migrations.md): `board_order.json` and the legacy migration are gone, so **no** file content reaches a path component any more. Id validation is now defence in depth plus the filter that decides whether a directory or file name is a record at all. A hand-renamed board directory re-ids the board and falls to creation order, not alphabetical.
+
 A Board's id is the directory holding its `board.json`; a Card's id is the `<id>` in its `card-<id>.json` file name. Neither is stored *inside* its file: `Card.id` and `BoardMeta.id` are `#[serde(skip)]`, and the two loaders (`board_store::read_board_at`, `card_store::load_card`) stamp the id from the path they read. An `"id"` key left over in an older file is ignored.
 
 Ids are also typed and validated on the way in (`model/id.rs`): `BoardId`, `CardId`, `ListId` and `LabelId` are separate newtypes whose `Deserialize` accepts only `[A-Za-z0-9_-]{0,64}`. `storage::paths` takes only the two that name locations, so an id that identifies nothing on disk cannot build a path, and a swapped argument is a compile error.

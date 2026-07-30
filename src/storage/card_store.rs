@@ -17,51 +17,8 @@ pub fn load_card(board_id: &BoardId, card_id: &CardId) -> Result<Card> {
         return Err(StorageError::CardNotFound(card_id.to_string()));
     }
     let data = super::read_unlinked(&path)?;
-    let mut val: serde_json::Value = serde_json::from_str(&data).map_err(|e| super::corrupt(&path, e))?;
-
-    let mut migrated = false;
-
-    // Migrate old "checklists" (Vec<{title, items}>) → flat "checklist" (Vec<ChecklistItem>)
-    if let Some(checklists) = val.get("checklists")
-        && checklists.is_array() {
-            let mut flat_items = Vec::new();
-            if let Some(arr) = checklists.as_array() {
-                for cl in arr {
-                    if let Some(items) = cl.get("items").and_then(|i| i.as_array()) {
-                        for item in items {
-                            flat_items.push(item.clone());
-                        }
-                    }
-                }
-            }
-            val.as_object_mut().unwrap().remove("checklists");
-            val.as_object_mut()
-                .unwrap()
-                .insert("checklist".to_string(), serde_json::Value::Array(flat_items));
-            migrated = true;
-        }
-
-    // Migrate old "labels" (Vec<{name, color}>) → "label_ids" (Vec<CardId>)
-    // Old labels without "id" are dropped here; they'll be re-created during board-level migration
-    if let Some(labels) = val.get("labels")
-        && labels.is_array() {
-            val.as_object_mut().unwrap().remove("labels");
-            if !val.as_object().unwrap().contains_key("label_ids") {
-                val.as_object_mut().unwrap().insert(
-                    "label_ids".to_string(),
-                    serde_json::Value::Array(Vec::new()),
-                );
-            }
-            migrated = true;
-        }
-
-    let mut card: Card = serde_json::from_value(val).map_err(|e| super::corrupt(&path, e))?;
+    let mut card: Card = serde_json::from_str(&data).map_err(|e| super::corrupt(&path, e))?;
     card.id = card_id.clone();
-
-    if migrated {
-        let _ = save_card(board_id, &card);
-    }
-
     Ok(card)
 }
 
@@ -91,50 +48,6 @@ mod tests {
 
     fn make_board() -> BoardMeta {
         board_store::create_board("Board".into()).unwrap()
-    }
-
-    #[test]
-    fn migration_old_checklists_format() {
-        with_temp_dir(|| {
-            let board = make_board();
-            let card = Card::new("Task".into());
-            // Write legacy JSON with "checklists" array format
-            let legacy = serde_json::json!({
-                "id": card.id,
-                "title": card.title,
-                "description": "",
-                "label_ids": [],
-                "due_date": null,
-                "checklists": [
-                    {
-                        "title": "Checklist 1",
-                        "items": [
-                            { "text": "item A", "completed": false },
-                            { "text": "item B", "completed": true }
-                        ]
-                    },
-                    {
-                        "title": "Checklist 2",
-                        "items": [
-                            { "text": "item C", "completed": false }
-                        ]
-                    }
-                ],
-                "archived": false,
-                "created_at": card.created_at,
-                "updated_at": card.updated_at
-            });
-            let path = paths::card_path(&board.id, &card.id);
-            std::fs::write(&path, serde_json::to_string_pretty(&legacy).unwrap()).unwrap();
-
-            let loaded = load_card(&board.id, &card.id).unwrap();
-            assert_eq!(loaded.checklist.len(), 3);
-            assert_eq!(loaded.checklist[0].text, "item A");
-            assert!(!loaded.checklist[0].completed);
-            assert_eq!(loaded.checklist[1].text, "item B");
-            assert!(loaded.checklist[1].completed);
-            assert_eq!(loaded.checklist[2].text, "item C");
-        });
     }
 
     #[test]
@@ -244,35 +157,6 @@ mod tests {
             let list = list_archived_cards(&board.id).unwrap();
             assert_eq!(list.len(), 1);
             assert_eq!(list[0].title, "Archived");
-        });
-    }
-
-    #[test]
-    fn migration_old_labels_format() {
-        with_temp_dir(|| {
-            let board = make_board();
-            let card = Card::new("Task".into());
-            // Write legacy JSON with inline "labels" array (no ids)
-            let legacy = serde_json::json!({
-                "id": card.id,
-                "title": card.title,
-                "description": "",
-                "due_date": null,
-                "checklist": [],
-                "labels": [
-                    { "name": "bug", "color": "red" },
-                    { "name": "urgent", "color": "orange" }
-                ],
-                "archived": false,
-                "created_at": card.created_at,
-                "updated_at": card.updated_at
-            });
-            let path = paths::card_path(&board.id, &card.id);
-            std::fs::write(&path, serde_json::to_string_pretty(&legacy).unwrap()).unwrap();
-
-            let loaded = load_card(&board.id, &card.id).unwrap();
-            // Old labels without IDs are dropped; label_ids starts empty
-            assert!(loaded.label_ids.is_empty());
         });
     }
 

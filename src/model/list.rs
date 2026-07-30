@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
-
 use super::board::BoardMeta;
 use super::card::Card;
 use super::id::{CardId, ListId};
@@ -11,25 +9,11 @@ use super::id::{CardId, ListId};
 /// `LoadedBoard::visible_cards`, not by membership). `card_ids` is derived from
 /// each Card's `list_id` + `position` at load time; it is never persisted as a
 /// `CardList`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct CardList {
     pub id: ListId,
     pub name: String,
     pub card_ids: Vec<CardId>,
-    #[serde(default)]
-    pub archived: bool,
-}
-
-impl CardList {
-    #[cfg(test)]
-    pub fn new(name: String) -> Self {
-        Self {
-            id: ListId::generate(),
-            name,
-            card_ids: Vec::new(),
-            archived: false,
-        }
-    }
 }
 
 /// Cards belonging to `list_id`, sorted ascending by `position` (ties broken by
@@ -37,9 +21,7 @@ impl CardList {
 pub fn ordered_card_ids(list_id: &ListId, cards: &HashMap<CardId, Card>) -> Vec<CardId> {
     let mut members: Vec<&Card> = cards.values().filter(|c| c.list_id == *list_id).collect();
     members.sort_by(|a, b| {
-        a.position
-            .partial_cmp(&b.position)
-            .unwrap_or(std::cmp::Ordering::Equal)
+        super::rank::cmp(a.position, b.position)
             .then(a.created_at.cmp(&b.created_at))
             .then(a.id.cmp(&b.id))
     });
@@ -57,18 +39,6 @@ pub fn build_lists(meta: &BoardMeta, cards: &HashMap<CardId, Card>, archived: bo
             id: lm.id.clone(),
             name: lm.name.clone(),
             card_ids: ordered_card_ids(&lm.id, cards),
-            archived: lm.archived,
         })
         .collect()
-}
-
-/// A fractional rank that orders strictly between `prev` and `next`. Used when
-/// inserting/moving a Card: only the moved Card's `position` changes.
-pub fn fractional_between(prev: Option<f64>, next: Option<f64>) -> f64 {
-    match (prev, next) {
-        (None, None) => 1.0,
-        (Some(p), None) => p + 1.0,
-        (None, Some(n)) => n - 1.0,
-        (Some(p), Some(n)) => (p + n) / 2.0,
-    }
 }

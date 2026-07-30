@@ -116,7 +116,7 @@ pub fn resolve_board_flag(args: &[String]) -> anyhow::Result<Option<BoardId>> {
 }
 
 pub fn run(args: &[String]) -> anyhow::Result<()> {
-    crate::storage::board_store::ensure_base_dirs()?;
+    crate::storage::board_store::open_data_dir()?;
     let by_id = args.iter().any(|a| a == "--by-id");
     let args: Vec<String> = args.iter().filter(|a| *a != "--by-id").cloned().collect();
     let sub = args[0].as_str();

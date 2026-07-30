@@ -595,7 +595,6 @@ impl BoardEditor {
                     id: meta.id.clone(),
                     name: meta.name.clone(),
                     card_ids: Vec::new(),
-                    archived: false,
                 });
                 self.board.meta.lists.push(meta);
                 self.board.selected_card.push(0);
@@ -648,7 +647,6 @@ impl BoardEditor {
                     id: list_id.clone(),
                     name,
                     card_ids,
-                    archived: false,
                 });
                 self.board.selected_card.push(0);
                 self.board.scroll_offset.push(0);
@@ -934,7 +932,7 @@ impl BoardEditor {
                         }
                         let prev = (vp >= 2).then(|| self.pos_of_raw(src_idx, vis[vp - 2])).flatten();
                         let next = self.pos_of_raw(src_idx, vis[vp - 1]);
-                        crate::model::list::fractional_between(prev, next)
+                        crate::model::rank::between(prev, next)
                     }
                     MoveDir::Down => {
                         if vp + 1 >= vis.len() {
@@ -942,7 +940,7 @@ impl BoardEditor {
                         }
                         let prev = self.pos_of_raw(src_idx, vis[vp + 1]);
                         let next = vis.get(vp + 2).and_then(|&r| self.pos_of_raw(src_idx, r));
-                        crate::model::list::fractional_between(prev, next)
+                        crate::model::rank::between(prev, next)
                     }
                     _ => unreachable!(),
                 };
@@ -977,7 +975,7 @@ impl BoardEditor {
                     .then(|| self.pos_of_raw(dst, vis_dst[insert_vp - 1]))
                     .flatten();
                 let next = vis_dst.get(insert_vp).and_then(|&r| self.pos_of_raw(dst, r));
-                let new_pos = crate::model::list::fractional_between(prev, next);
+                let new_pos = crate::model::rank::between(prev, next);
                 let dst_list_id = self.board.lists[dst].id.clone();
                 if let Some(card) = self.board.cards.get_mut(card_id) {
                     card.list_id = dst_list_id;
@@ -1495,7 +1493,7 @@ mod tests {
         let cards_map: HashMap<_, _> = cards.into_iter().map(|c| (c.id.clone(), c)).collect();
         LoadedBoard {
             meta: BoardMeta::new("X".into()),
-            lists: vec![CardList { id: "l".into(), name: "L".into(), card_ids, archived: false }],
+            lists: vec![CardList { id: "l".into(), name: "L".into(), card_ids }],
             cards: cards_map,
             selected_list: 0,
             selected_card: vec![0],

@@ -29,13 +29,13 @@ src/
     id.rs            # BoardId/CardId/ListId/LabelId — validated id newtypes
     label.rs         # Label, LabelColor (pastel generation)
     list.rs          # CardList (derived view) + build_lists/ordered_card_ids
+    rank.rs          # Fractional ranking shared by Cards in a List and Boards
   storage/
     mod.rs           # StorageError, atomic_write
     paths.rs         # Data-dir resolution + path helpers (only BoardId/CardId build paths)
-    board_store.rs   # Board CRUD (triggers migration on load)
+    board_store.rs   # Board CRUD + display order by position
     card_store.rs    # Card CRUD + load_all_cards + archived listing
-    migrate.rs       # One-time legacy list-*.json -> card-owned migration
-    list_store.rs    # Legacy/test-only (#[cfg(test)]) — see ADR-0006
+    version.rs       # .tct/.version gate; no on-load migrations (ADR-0009)
   input/
     mod.rs           # Input dispatch by AppMode
     keymap.rs        # Generic Binding table + lookup + help_rows (ADR-0005)

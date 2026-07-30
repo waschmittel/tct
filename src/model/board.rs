@@ -22,17 +22,17 @@ pub struct BoardMeta {
     #[serde(skip)]
     pub id: BoardId,
     pub name: String,
-    pub description: String,
+    /// Fractional rank in the board selector. A Board owns its own place in
+    /// the collection for the same reason a Card owns its place in a List
+    /// (ADR-0006/0008) — the alternative, a central order file, states
+    /// membership twice and drifts.
+    #[serde(default)]
+    pub position: f64,
     /// Ordered List definitions (active and archived). Order in this Vec is
     /// the board's left-to-right List order; archived Lists are filtered out
     /// of the active view but kept here for restore.
     #[serde(default)]
     pub lists: Vec<ListMeta>,
-    /// Legacy field: pre-migration boards stored only an ordered list of List
-    /// ids and kept membership in separate `list-*.json` files. Read on load
-    /// to drive the one-time migration, then never written again.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub list_order: Vec<ListId>,
     #[serde(default)]
     pub labels: Vec<Label>,
     #[serde(default)]
@@ -49,9 +49,8 @@ impl BoardMeta {
         Self {
             id: BoardId::generate(),
             name,
-            description: String::new(),
+            position: 0.0,
             lists: Vec::new(),
-            list_order: Vec::new(),
             labels: Vec::new(),
             accent_color: LabelColor::default(),
             archived: false,

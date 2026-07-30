@@ -22,28 +22,24 @@ pub fn list_archived() -> anyhow::Result<Vec<BoardMeta>> {
 /// Create a Board with a pastel Accent Color differentiated from the
 /// existing boards, persist it, and append it to the display order.
 pub fn create(name: String) -> anyhow::Result<BoardMeta> {
-    let existing_colors: Vec<_> = board_store::list_boards()?
-        .iter()
-        .map(|b| b.accent_color)
-        .collect();
+    let existing = board_store::list_boards()?;
     let mut meta = BoardMeta::new(name);
-    meta.accent_color = LabelColor::generate_pastel(&existing_colors);
+    meta.accent_color =
+        LabelColor::generate_pastel(&existing.iter().map(|b| b.accent_color).collect::<Vec<_>>());
+    meta.position = crate::model::rank::after_last(existing.iter().map(|b| b.position));
     board_store::save_board(&meta)?;
-    board_store::append_to_order(&meta.id)?;
     Ok(meta)
 }
 
 pub fn archive(board_id: &BoardId) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
     editor.apply(Command::ArchiveBoard { board_id: board_id.clone() })?;
-    board_store::remove_from_order(board_id)?;
     Ok(())
 }
 
 pub fn restore(board_id: &BoardId) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
     editor.apply(Command::RestoreBoard { board_id: board_id.clone() })?;
-    board_store::append_to_order(board_id)?;
     Ok(())
 }
 
@@ -73,24 +69,30 @@ pub fn delete(board_id: &BoardId) -> anyhow::Result<()> {
     Ok(board_store::delete_board(board_id)?)
 }
 
-/// Swap two Boards in the persisted display order. `displayed` is the
-/// current on-screen order, used to backfill boards missing from the
-/// order file.
-pub fn swap_order(a: &BoardId, b: &BoardId, displayed: &[BoardId]) -> anyhow::Result<()> {
-    let mut order = board_store::load_board_order().unwrap_or_default();
-    if !order.contains(a) || !order.contains(b) {
-        for id in displayed {
-            if !order.contains(id) {
-                order.push(id.clone());
-            }
-        }
+/// Move the Board at `from` to index `to` within `displayed`, the current
+/// on-screen order, and persist the result.
+///
+/// Renumbers the whole (small) collection rather than taking the midpoint of
+/// the moved Board's new neighbours: Boards written before ranks existed all
+/// sit at 0.0, where a midpoint would not separate them. Each Board is
+/// re-read before its rank is written, so a concurrent edit elsewhere in the
+/// file is not clobbered, and only Boards whose rank actually changes are
+/// written.
+pub fn reorder(displayed: &[BoardMeta], from: usize, to: usize) -> anyhow::Result<()> {
+    if from >= displayed.len() || to >= displayed.len() {
+        return Ok(());
     }
-    if let (Some(pos_a), Some(pos_b)) = (
-        order.iter().position(|id| id == a),
-        order.iter().position(|id| id == b),
-    ) {
-        order.swap(pos_a, pos_b);
-        board_store::save_board_order(&order)?;
+    let mut order: Vec<&BoardMeta> = displayed.iter().collect();
+    let moved = order.remove(from);
+    order.insert(to, moved);
+
+    for (idx, meta) in order.iter().enumerate() {
+        let rank = (idx + 1) as f64;
+        if meta.position != rank {
+            let mut fresh = board_store::load_board(&meta.id)?;
+            fresh.position = rank;
+            board_store::save_board(&fresh)?;
+        }
     }
     Ok(())
 }
@@ -101,14 +103,15 @@ mod tests {
     use crate::test_support::with_temp_dir;
 
     #[test]
-    fn create_persists_and_appends_to_order() {
+    fn create_persists_and_ranks_after_the_last_board() {
         with_temp_dir(|| {
-            let meta = create("Fresh".into()).unwrap();
+            let first = create("First".into()).unwrap();
+            let second = create("Second".into()).unwrap();
+
             let listed = list().unwrap();
-            assert_eq!(listed.len(), 1);
-            assert_eq!(listed[0].name, "Fresh");
-            let order = board_store::load_board_order().unwrap();
-            assert_eq!(order, vec![meta.id]);
+
+            assert_eq!(listed.iter().map(|b| b.name.as_str()).collect::<Vec<_>>(), ["First", "Second"]);
+            assert!(second.position > first.position);
         });
     }
 
@@ -128,23 +131,46 @@ mod tests {
             archive(&meta.id).unwrap();
             assert!(list().unwrap().is_empty());
             assert_eq!(list_archived().unwrap().len(), 1);
-            assert!(board_store::load_board_order().unwrap().is_empty());
 
             restore(&meta.id).unwrap();
             assert_eq!(list().unwrap().len(), 1);
             assert!(list_archived().unwrap().is_empty());
-            assert_eq!(board_store::load_board_order().unwrap(), vec![meta.id]);
         });
     }
 
     #[test]
-    fn swap_order_persists() {
+    fn reorder_persists() {
         with_temp_dir(|| {
-            let a = create("A".into()).unwrap();
-            let b = create("B".into()).unwrap();
-            swap_order(&a.id, &b.id, &[a.id.clone(), b.id.clone()]).unwrap();
-            let order = board_store::load_board_order().unwrap();
-            assert_eq!(order, vec![b.id, a.id]);
+            create("A".into()).unwrap();
+            create("B".into()).unwrap();
+            create("C".into()).unwrap();
+            let displayed = list().unwrap();
+
+            reorder(&displayed, 2, 0).unwrap();
+
+            let names: Vec<_> = list().unwrap().iter().map(|b| b.name.clone()).collect();
+            assert_eq!(names, ["C", "A", "B"]);
+        });
+    }
+
+    /// Boards written before ranks existed all sit at 0.0; a midpoint would
+    /// not separate them, so the reorder has to renumber.
+    #[test]
+    fn reorder_separates_boards_that_all_share_a_rank() {
+        with_temp_dir(|| {
+            for name in ["A", "B", "C"] {
+                let mut meta = crate::model::board::BoardMeta::new(name.into());
+                meta.position = 0.0;
+                board_store::save_board(&meta).unwrap();
+            }
+            let displayed = list().unwrap();
+
+            reorder(&displayed, 0, 2).unwrap();
+
+            let ranks: Vec<_> = list().unwrap().iter().map(|b| b.position).collect();
+            assert_eq!(ranks, [1.0, 2.0, 3.0]);
+            let names: Vec<_> = list().unwrap().iter().map(|b| b.name.clone()).collect();
+            assert_eq!(names, ["B", "C", "A"]);
         });
     }
 

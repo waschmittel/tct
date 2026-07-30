@@ -16,8 +16,7 @@ use crate::app::{App, AppMode};
 use crate::model::card::{Card, ChecklistItem};
 use crate::model::id::BoardId;
 use crate::model::label::{Label, LabelColor};
-use crate::model::list::CardList;
-use crate::storage::{board_store, card_store, list_store};
+use crate::storage::board_store;
 use crate::test_support::with_temp_dir;
 
 const WIDTH: u16 = 100;
@@ -61,8 +60,8 @@ fn seed_demo_board() -> BoardId {
     // Create the board dir before any card/list writes land in it.
     board_store::save_board(&meta).unwrap();
 
-    let mut todo = CardList::new("To Do".into());
-    let mut done = CardList::new("Done".into());
+    let todo = crate::test_support::add_list(&mut meta, "To Do");
+    let done = crate::test_support::add_list(&mut meta, "Done");
 
     let mut c1 = Card::new("Fix login flow".into());
     c1.description = "Token expires too early.\n\n- check refresh\n- add test".into();
@@ -75,24 +74,16 @@ fn seed_demo_board() -> BoardId {
     let c2 = Card::new("Redesign dashboard".into());
     let c3 = Card::new("Ship release notes".into());
 
-    for c in [&c1, &c2, &c3] {
-        card_store::save_card(&meta.id, c).unwrap();
-    }
-    todo.card_ids = vec![c1.id.clone(), c2.id.clone()];
-    done.card_ids = vec![c3.id.clone()];
-    list_store::save_list(&meta.id, &todo).unwrap();
-    list_store::save_list(&meta.id, &done).unwrap();
-    meta.list_order = vec![todo.id.clone(), done.id.clone()];
-    board_store::save_board(&meta).unwrap();
-    board_store::append_to_order(&meta.id).unwrap();
+    crate::test_support::put_cards(&meta.id, &todo, &mut [c1, c2]);
+    crate::test_support::put_cards(&meta.id, &done, &mut [c3]);
     meta.id
 }
 
 fn seed_selector_boards() {
-    for name in ["Alpha", "Beta"] {
-        let meta = crate::model::board::BoardMeta::new(name.into());
+    for (idx, name) in ["Alpha", "Beta"].iter().enumerate() {
+        let mut meta = crate::model::board::BoardMeta::new((*name).into());
+        meta.position = (idx + 1) as f64;
         board_store::save_board(&meta).unwrap();
-        board_store::append_to_order(&meta.id).unwrap();
     }
 }
 
@@ -451,7 +442,6 @@ fn snapshot_board_view_empty() {
     with_temp_dir(|| {
         let meta = crate::model::board::BoardMeta::new("Empty".into());
         board_store::save_board(&meta).unwrap();
-        board_store::append_to_order(&meta.id).unwrap();
         let app = App::new(Some(meta.id.clone())).unwrap();
         insta::assert_snapshot!(render_to_string(&app));
     });

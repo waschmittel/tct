@@ -142,9 +142,11 @@ mod tests {
     fn seed_boards(names: &[&str]) -> Vec<BoardMeta> {
         names
             .iter()
-            .map(|n| {
-                let m = board_store::create_board((*n).to_string()).unwrap();
-                board_store::append_to_order(&m.id).unwrap();
+            .enumerate()
+            .map(|(idx, n)| {
+                let mut m = board_store::create_board((*n).to_string()).unwrap();
+                m.position = (idx + 1) as f64;
+                board_store::save_board(&m).unwrap();
                 m
             })
             .collect()
@@ -199,9 +201,9 @@ mod tests {
             assert_eq!(app.boards[1].name, "A");
             assert_eq!(app.selected_board_idx, 1);
             // Order on disk must reflect the swap.
-            let order = board_store::load_board_order().unwrap();
-            assert_eq!(order[0], boards[1].id);
-            assert_eq!(order[1], boards[0].id);
+            let stored = crate::board_directory::list().unwrap();
+            assert_eq!(stored[0].id, boards[1].id);
+            assert_eq!(stored[1].id, boards[0].id);
         });
     }
 
@@ -331,10 +333,7 @@ fn move_board(app: &mut App, direction: i32) -> anyhow::Result<()> {
     }
     let new_idx = new_idx as usize;
 
-    let a_id = app.boards[idx].id.clone();
-    let b_id = app.boards[new_idx].id.clone();
-    let displayed: Vec<_> = app.boards.iter().map(|b| b.id.clone()).collect();
-    board_directory::swap_order(&a_id, &b_id, &displayed)?;
+    board_directory::reorder(&app.boards, idx, new_idx)?;
     app.boards.swap(idx, new_idx);
     app.selected_board_idx = new_idx;
 

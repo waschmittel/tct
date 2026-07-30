@@ -1,5 +1,7 @@
 # Card-owned list membership
 
+> The "auto-migration on load" decision below is superseded by [ADR-0009](0009-versioned-format-no-migrations.md); the legacy `list-*.json` conversion no longer exists.
+
 A Card stores its own list membership and order: `card.list_id` names the List it belongs to, and `card.position` (a fractional rank) orders it within that List. Lists are defined inline in `board.json` as an ordered `lists: [ListMeta { id, name, archived }]`. There are no `list-*.json` files; a List's cards are derived by scanning `card-*.json` for matching `list_id` and sorting by `position` (`model/list.rs::build_lists`/`ordered_card_ids`).
 
 This supersedes the storage aspect of the layout described in [0001](0001-board-editor-aggregate.md), where each List lived in its own file carrying a `card_ids` array and `board.json` held a `list_order`.

@@ -90,9 +90,9 @@ This means:
 
 ```
 .tct/
-  board_order.json                 # Display order of boards (JSON array of IDs)
+  .version                         # Persistence format version (a single integer)
   boards/
-    a1b2c3d4/                      # One directory per board
+    a1b2c3d4/                      # One directory per board — the name is the board's ID
       board.json                   # Board metadata: name, inline lists, labels, accent color
       card-11223344.json           # Card: list_id, position, title, description, checklist, labels, due date
       card-55667788.json
@@ -102,8 +102,10 @@ This means:
 ```
 
 Lists are defined inline in `board.json`; there are no `list-*.json` files. A
-card owns its own list membership (`list_id`) and order (`position`). This is
-deliberate:
+card owns its own list membership (`list_id`) and order (`position`), and a
+board owns its own place in the selector (`position`). A record's ID is its
+path — the board's directory name, the card's file name — so it is not
+repeated inside the file. This is deliberate:
 
 - **Granular diffs** — changing one card produces a one-file diff, not a monolithic database change
 - **Conflict-friendly** — two people editing different cards never conflict, even without locking
@@ -650,9 +652,8 @@ Cmd key support requires a terminal that sends Super modifier events. Supported:
 
 ```json
 {
-  "id": "a1b2c3d4",
   "name": "Sprint 42",
-  "description": "",
+  "position": 1.0,
   "lists": [
     { "id": "e5f6a7b8", "name": "To Do", "archived": false },
     { "id": "c9d0e1f2", "name": "Done", "archived": false }
@@ -676,7 +677,6 @@ matches the list's `id`, ordered by ascending `position`.
 
 ```json
 {
-  "id": "55667788",
   "list_id": "e5f6a7b8",
   "position": 1.0,
   "title": "Fix login bug",
@@ -694,8 +694,15 @@ matches the list's `id`, ordered by ascending `position`.
 }
 ```
 
-### board_order.json
+Neither file carries an `id`: a board's ID is the directory it lives in and a
+card's is its file name, so renaming or moving the file re-IDs the record.
 
-```json
-["a1b2c3d4", "b2c3d4e5", "f7g8h9i0"]
+### .version
+
 ```
+1
+```
+
+The persistence format this directory uses. tct refuses to open a directory
+written by a newer version rather than reading it partially, and refuses an
+older format rather than converting it silently.

@@ -171,7 +171,7 @@ fn data_dir_display() -> String {
 
 impl App {
     pub fn new(open_board_id: Option<BoardId>) -> anyhow::Result<Self> {
-        board_store::ensure_base_dirs()?;
+        board_store::open_data_dir()?;
         let boards = board_store::list_boards()?;
         let mut app = Self {
             mode: AppMode::BoardSelector,
@@ -421,7 +421,8 @@ mod tests {
     use crate::model::card::Card;
     use crate::model::label::LabelColor;
     use crate::model::list::CardList;
-    use crate::storage::{card_store, list_store};
+    use crate::model::id::ListId;
+    use crate::storage::card_store;
     use crate::test_support::with_temp_dir;
 
     /// Build a `Card` with a fixed `id` for stable test assertions.
@@ -437,12 +438,7 @@ mod tests {
         let cards_map: HashMap<_, _> = cards.into_iter().map(|c| (c.id.clone(), c)).collect();
         LoadedBoard {
             meta: BoardMeta::new("X".into()),
-            lists: vec![CardList {
-                id: "l1".into(),
-                name: "L".into(),
-                card_ids,
-                archived: false,
-            }],
+            lists: vec![CardList { id: "l1".into(), name: "L".into(), card_ids }],
             cards: cards_map,
             selected_list: 0,
             selected_card: vec![0],
@@ -477,18 +473,12 @@ mod tests {
         }
     }
 
-    fn make_board_with_cards() -> (BoardMeta, CardList, Vec<Card>) {
+    fn make_board_with_cards() -> (BoardMeta, ListId, Vec<Card>) {
         let mut meta = board_store::create_board("Board".into()).unwrap();
-        let mut list = CardList::new("To Do".into());
-        let cards: Vec<Card> = (0..3).map(|i| Card::new(format!("Card {i}"))).collect();
-        for c in &cards {
-            card_store::save_card(&meta.id, c).unwrap();
-            list.card_ids.push(c.id.clone());
-        }
-        list_store::save_list(&meta.id, &list).unwrap();
-        meta.list_order = vec![list.id.clone()];
-        board_store::save_board(&meta).unwrap();
-        (meta, list, cards)
+        let list_id = crate::test_support::add_list(&mut meta, "To Do");
+        let mut cards: Vec<Card> = (0..3).map(|i| Card::new(format!("Card {i}"))).collect();
+        crate::test_support::put_cards(&meta.id, &list_id, &mut cards);
+        (meta, list_id, cards)
     }
 
     #[test]
@@ -594,15 +584,15 @@ mod tests {
     #[test]
     fn reload_picks_up_new_card() {
         with_temp_dir(|| {
-            let (meta, mut list, _cards) = make_board_with_cards();
+            let (meta, list, _cards) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
             assert_eq!(app.board().unwrap().lists[0].card_ids.len(), 3);
 
             // Add a new card on disk
-            let new_card = Card::new("Disk-added".into());
+            let mut new_card = Card::new("Disk-added".into());
+            new_card.list_id = list.clone();
+            new_card.position = 4.0;
             card_store::save_card(&meta.id, &new_card).unwrap();
-            list.card_ids.push(new_card.id.clone());
-            list_store::save_list(&meta.id, &list).unwrap();
 
             // Force reload
             app.reload_interval = Duration::from_millis(0);
@@ -639,13 +629,11 @@ mod tests {
     #[test]
     fn reload_clamps_selection_when_card_removed() {
         with_temp_dir(|| {
-            let (meta, mut list, cards) = make_board_with_cards();
+            let (meta, _list, cards) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
             app.board_mut().unwrap().selected_card[0] = 2; // points at last
 
             // Remove last card from disk
-            list.card_ids.retain(|id| id != &cards[2].id);
-            list_store::save_list(&meta.id, &list).unwrap();
             card_store::delete_card(&meta.id, &cards[2].id).unwrap();
 
             app.reload_interval = Duration::from_millis(0);
@@ -682,15 +670,15 @@ mod tests {
     #[test]
     fn reload_skipped_in_insert_mode() {
         with_temp_dir(|| {
-            let (meta, mut list, _) = make_board_with_cards();
+            let (meta, list, _) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
             app.start_insert(Box::new(crate::insert::line_editor::NewCardTitle::new()));
 
             // Add a card on disk
-            let new_card = Card::new("Should not appear".into());
+            let mut new_card = Card::new("Should not appear".into());
+            new_card.list_id = list.clone();
+            new_card.position = 4.0;
             card_store::save_card(&meta.id, &new_card).unwrap();
-            list.card_ids.push(new_card.id.clone());
-            list_store::save_list(&meta.id, &list).unwrap();
 
             app.reload_interval = Duration::from_millis(0);
             app.last_reload = Instant::now() - Duration::from_secs(1);
@@ -704,14 +692,14 @@ mod tests {
     #[test]
     fn reload_skipped_while_card_grabbed() {
         with_temp_dir(|| {
-            let (meta, mut list, _) = make_board_with_cards();
+            let (meta, list, _) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
             app.grab_active = true;
 
-            let new_card = Card::new("Disk".into());
+            let mut new_card = Card::new("Disk".into());
+            new_card.list_id = list.clone();
+            new_card.position = 4.0;
             card_store::save_card(&meta.id, &new_card).unwrap();
-            list.card_ids.push(new_card.id.clone());
-            list_store::save_list(&meta.id, &list).unwrap();
 
             app.reload_interval = Duration::from_millis(0);
             app.last_reload = Instant::now() - Duration::from_secs(1);
@@ -725,7 +713,7 @@ mod tests {
     #[test]
     fn reload_skipped_when_description_editor_active() {
         with_temp_dir(|| {
-            let (meta, mut list, _) = make_board_with_cards();
+            let (meta, list, _) = make_board_with_cards();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
             app.mode = AppMode::CardDetail;
             // Simulate active description edit
@@ -734,10 +722,10 @@ mod tests {
                 crate::insert::markdown_editor::MarkdownEditor::new(card_id, "initial"),
             ));
 
-            let new_card = Card::new("Disk".into());
+            let mut new_card = Card::new("Disk".into());
+            new_card.list_id = list.clone();
+            new_card.position = 4.0;
             card_store::save_card(&meta.id, &new_card).unwrap();
-            list.card_ids.push(new_card.id.clone());
-            list_store::save_list(&meta.id, &list).unwrap();
 
             app.reload_interval = Duration::from_millis(0);
             app.last_reload = Instant::now() - Duration::from_secs(1);

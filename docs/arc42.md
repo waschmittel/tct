@@ -190,7 +190,7 @@ graph TB
 
         subgraph "storage/"
             BOARD_S["board_store.rs<br>Board CRUD + ordering"]
-            MIGRATE_S["migrate.rs<br>legacy list-file migration"]
+            MIGRATE_S["version.rs<br>format version gate"]
             CARD_S["card_store.rs<br>Card CRUD + load_all_cards"]
             PATHS_S["paths.rs<br>Path resolution"]
             STORE_MOD["mod.rs<br>StorageError, atomic_write"]
@@ -276,9 +276,9 @@ path for board-collection operations (ADR-0001/0002/0004).
 | Module | Purpose |
 |--------|---------|
 | `paths.rs` | Resolves storage root: `TCT_DATA_DIR` > `.tct/` walk > `~/.tct/` |
-| `board_store.rs` | Board CRUD, board ordering (separate `board_order.json`); triggers `migrate` on load |
-| `migrate.rs` | One-time migration of legacy `list-*.json` boards to card-owned membership |
-| `card_store.rs` | Card CRUD, `load_all_cards` scan, archived listing, JSON schema migration |
+| `board_store.rs` | Board CRUD; display order from each Board's `position` (ADR-0008) |
+| `version.rs` | `.tct/.version` gate, checked once at startup (ADR-0009) |
+| `card_store.rs` | Card CRUD, `load_all_cards` scan, archived listing |
 | `mod.rs` | `StorageError` enum, `atomic_write` helper |
 
 #### input/ — Input Handling (Controller)
@@ -446,10 +446,10 @@ graph TB
             BOARD_DIR["<board-id>/"]
             BOARD_JSON["board.json<br>(incl. list defs)"]
             CARD_JSON["card-*.json"]
-            ORDER_JSON["board_order.json"]
+            VERSION[".version"]
 
             DATA_DIR --> BOARDS
-            DATA_DIR --> ORDER_JSON
+            DATA_DIR --> VERSION
             BOARDS --> BOARD_DIR
             BOARD_DIR --> BOARD_JSON
             BOARD_DIR --> CARD_JSON
@@ -483,10 +483,10 @@ flowchart TD
 
 ```
 .tct/                          # or ~/.tct/
-  board_order.json             # JSON array of board IDs (display order)
+  .version                     # Persistence format version (a single integer)
   boards/
-    a1b2c3d4/                  # Board directory (8-char ID)
-      board.json               # BoardMeta: name, lists[] (id/name/archived), labels, accent_color
+    a1b2c3d4/                  # Board directory (8-char ID) — the directory name IS the board id
+      board.json               # BoardMeta: name, position, lists[] (id/name/archived), labels, accent_color
       card-11223344.json       # Card: list_id, position, title, description, checklist, label_ids, due_date
       card-55667788.json
     b2c3d4e5/                  # Another board
@@ -568,16 +568,13 @@ flowchart TD
 
 `App::on_tick()` reloads board data from the filesystem every 15 seconds (configurable via `reload_interval`). Reload is skipped during editing, dialog, or grab modes to prevent data loss. Selection state (selected list, card index, scroll offset) is preserved across reloads.
 
-### 8.7 Data Migration
+### 8.7 Format Versioning
 
-`card_store::load_card()` includes runtime migration for legacy JSON schemas:
-
-| Migration | Old Format | New Format |
-|-----------|-----------|------------|
-| Checklist | `"checklists": [{title, items: [...]}]` | `"checklist": [ChecklistItem]` |
-| Labels | `"labels": [{name, color}]` | `"label_ids": [LabelId]` (board-level labels) |
-
-Migrated data is written back on load (lazy migration).
+`.tct/.version` holds a single integer, checked once at startup by
+`board_store::open_data_dir`. A directory newer than `version::CURRENT` is
+refused rather than half-read; an older one is refused rather than silently
+converted. There are no on-load migrations — the loaders parse exactly one
+shape (ADR-0009). Absent means "current", and is stamped.
 
 ---
 
@@ -618,7 +615,7 @@ mindmap
     Reliability
       Atomic writes
       Crash-safe storage
-      Lazy migration
+      Refuses unknown formats
     Usability
       Keyboard-only operation
       Modal input with hints
@@ -656,7 +653,7 @@ mindmap
 | **8-char ID collisions** | ~1 in 4 billion; collision means data overwrite | Acceptable for single-user; UUIDs could be extended if needed |
 | **No undo for destructive actions** | Deleted cards/lists are gone | Confirmation dialogs guard all destructive ops; archive as soft-delete |
 | **Synchronous I/O on main thread** | Large boards could cause frame drops | Local FS is fast; could move to async if networked storage needed |
-| **JSON schema evolution** | Old files may lack new fields | `serde(default)` on all optional fields + runtime migration in `card_store` |
+| **JSON schema evolution** | Old files may lack new fields | `serde(default)` on optional fields for forward compatibility; a `.version` gate refuses formats this binary cannot read (ADR-0009) |
 
 ---
 

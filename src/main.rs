@@ -89,8 +89,8 @@ mod tests {
     use crate::model::card::{Card, ChecklistItem};
     use crate::model::label::{Label, LabelColor};
     use crate::model::id::{CardId, ListId};
-    use crate::model::list::CardList;
-    use crate::storage::{board_store, card_store, list_store};
+    
+    use crate::storage::{board_store, card_store};
     #[allow(unused_imports)]
     use regex::Regex;
 
@@ -108,7 +108,7 @@ mod tests {
             let board = board_store::create_board("My Board".into()).unwrap();
             let loaded = board_store::load_board(&board.id).unwrap();
             assert_eq!(loaded.name, "My Board");
-            assert!(loaded.list_order.is_empty());
+            assert!(loaded.lists.is_empty());
 
             let boards = board_store::list_boards().unwrap();
             assert_eq!(boards.len(), 1);
@@ -127,14 +127,16 @@ mod tests {
     }
 
     #[test]
-    fn list_roundtrip() {
+    fn lists_persist_inline_in_the_board() {
         with_temp_dir(|| {
-            let board = board_store::create_board("Board".into()).unwrap();
-            let list = CardList::new("To Do".into());
-            list_store::save_list(&board.id, &list).unwrap();
-            let loaded = list_store::load_list(&board.id, &list.id).unwrap();
-            assert_eq!(loaded.name, "To Do");
-            assert!(loaded.card_ids.is_empty());
+            let mut board = board_store::create_board("Board".into()).unwrap();
+            let list_id = crate::test_support::add_list(&mut board, "To Do");
+
+            let loaded = board_store::load_board(&board.id).unwrap();
+
+            assert_eq!(loaded.lists.len(), 1);
+            assert_eq!(loaded.lists[0].id, list_id);
+            assert_eq!(loaded.lists[0].name, "To Do");
         });
     }
 
@@ -161,38 +163,25 @@ mod tests {
         });
     }
 
+    /// Moving a Card between Lists is one Card write; membership is derived
+    /// from `list_id`, never stored on the List (ADR-0006).
     #[test]
     fn full_lifecycle() {
         with_temp_dir(|| {
             let mut board = board_store::create_board("Project".into()).unwrap();
+            let todo = crate::test_support::add_list(&mut board, "To Do");
+            let done = crate::test_support::add_list(&mut board, "Done");
+            let mut cards = vec![Card::new("Task 1".into()), Card::new("Task 2".into())];
+            crate::test_support::put_cards(&board.id, &todo, &mut cards);
 
-            let mut todo = CardList::new("To Do".into());
-            let mut done = CardList::new("Done".into());
+            cards[1].list_id = done.clone();
+            cards[1].position = 1.0;
+            card_store::save_card(&board.id, &cards[1]).unwrap();
 
-            let card1 = Card::new("Task 1".into());
-            let card2 = Card::new("Task 2".into());
-
-            card_store::save_card(&board.id, &card1).unwrap();
-            card_store::save_card(&board.id, &card2).unwrap();
-
-            todo.card_ids.push(card1.id.clone());
-            todo.card_ids.push(card2.id.clone());
-
-            list_store::save_list(&board.id, &todo).unwrap();
-            list_store::save_list(&board.id, &done).unwrap();
-
-            board.list_order = vec![todo.id.clone(), done.id.clone()];
-            board_store::save_board(&board).unwrap();
-
-            todo.card_ids.retain(|id| id != &card2.id);
-            done.card_ids.push(card2.id.clone());
-            list_store::save_list(&board.id, &todo).unwrap();
-            list_store::save_list(&board.id, &done).unwrap();
-
-            let lists = list_store::load_all_lists(&board.id, &board.list_order).unwrap();
-            assert_eq!(lists[0].card_ids.len(), 1);
-            assert_eq!(lists[1].card_ids.len(), 1);
-            assert_eq!(lists[1].card_ids[0], card2.id);
+            let stored = card_store::load_all_cards(&board.id).unwrap();
+            let lists = crate::model::list::build_lists(&board, &stored, false);
+            assert_eq!(lists[0].card_ids, vec![cards[0].id.clone()]);
+            assert_eq!(lists[1].card_ids, vec![cards[1].id.clone()]);
         });
     }
 
@@ -203,17 +192,11 @@ mod tests {
         crate::cli::run(&args)
     }
 
-    fn setup_search_fixture() -> (
-        crate::model::board::BoardMeta,
-        CardList,
-        CardList,
-        Card,
-        Card,
-    ) {
+    fn setup_search_fixture() -> (crate::model::board::BoardMeta, Card, Card) {
         let mut board = board_store::create_board("Alpha".into()).unwrap();
 
-        let mut todo = CardList::new("To Do".into());
-        let mut done = CardList::new("Done".into());
+        let todo = crate::test_support::add_list(&mut board, "To Do");
+        let done = crate::test_support::add_list(&mut board, "Done");
 
         let mut card1 = Card::new("Fix login bug".into());
         card1.description = "Auth token expires too early".into();
@@ -223,19 +206,10 @@ mod tests {
         let mut card2 = Card::new("Redesign dashboard".into());
         card2.description = "New layout with login metrics".into();
 
-        card_store::save_card(&board.id, &card1).unwrap();
-        card_store::save_card(&board.id, &card2).unwrap();
+        crate::test_support::put_cards(&board.id, &todo, std::slice::from_mut(&mut card1));
+        crate::test_support::put_cards(&board.id, &done, std::slice::from_mut(&mut card2));
 
-        todo.card_ids.push(card1.id.clone());
-        done.card_ids.push(card2.id.clone());
-
-        list_store::save_list(&board.id, &todo).unwrap();
-        list_store::save_list(&board.id, &done).unwrap();
-
-        board.list_order = vec![todo.id.clone(), done.id.clone()];
-        board_store::save_board(&board).unwrap();
-
-        (board, todo, done, card1, card2)
+        (board, card1, card2)
     }
 
     #[test]
@@ -381,21 +355,11 @@ mod tests {
             let mut board1 = board_store::create_board("Alpha".into()).unwrap();
             let mut board2 = board_store::create_board("Beta".into()).unwrap();
 
-            let mut list1 = CardList::new("Work".into());
-            let card1 = Card::new("Shared query term".into());
-            card_store::save_card(&board1.id, &card1).unwrap();
-            list1.card_ids.push(card1.id.clone());
-            list_store::save_list(&board1.id, &list1).unwrap();
-            board1.list_order = vec![list1.id.clone()];
-            board_store::save_board(&board1).unwrap();
+            let list1 = crate::test_support::add_list(&mut board1, "Work");
+            crate::test_support::put_cards(&board1.id, &list1, &mut [Card::new("Shared query term".into())]);
 
-            let mut list2 = CardList::new("Tasks".into());
-            let card2 = Card::new("Another shared query term".into());
-            card_store::save_card(&board2.id, &card2).unwrap();
-            list2.card_ids.push(card2.id.clone());
-            list_store::save_list(&board2.id, &list2).unwrap();
-            board2.list_order = vec![list2.id.clone()];
-            board_store::save_board(&board2).unwrap();
+            let list2 = crate::test_support::add_list(&mut board2, "Tasks");
+            crate::test_support::put_cards(&board2.id, &list2, &mut [Card::new("Another shared query term".into())]);
 
             run_search(&["search", "shared query"]).unwrap();
         });
@@ -405,15 +369,10 @@ mod tests {
     fn search_archived_excluded_by_default() {
         with_temp_dir(|| {
             let mut board = board_store::create_board("Proj".into()).unwrap();
-            let mut list = CardList::new("To Do".into());
-
+            let list = crate::test_support::add_list(&mut board, "To Do");
             let mut card = Card::new("archived unique xyz987".into());
             card.archived = true;
-            card_store::save_card(&board.id, &card).unwrap();
-            list.card_ids.push(card.id.clone());
-            list_store::save_list(&board.id, &list).unwrap();
-            board.list_order = vec![list.id.clone()];
-            board_store::save_board(&board).unwrap();
+            crate::test_support::put_cards(&board.id, &list, std::slice::from_mut(&mut card));
 
             // Without --archived: no match (card is archived)
             run_search(&["search", "xyz987"]).unwrap();
@@ -424,15 +383,10 @@ mod tests {
     fn search_archived_included_with_flag() {
         with_temp_dir(|| {
             let mut board = board_store::create_board("Proj".into()).unwrap();
-            let mut list = CardList::new("To Do".into());
-
+            let list = crate::test_support::add_list(&mut board, "To Do");
             let mut card = Card::new("archived unique xyz987".into());
             card.archived = true;
-            card_store::save_card(&board.id, &card).unwrap();
-            list.card_ids.push(card.id.clone());
-            list_store::save_list(&board.id, &list).unwrap();
-            board.list_order = vec![list.id.clone()];
-            board_store::save_board(&board).unwrap();
+            crate::test_support::put_cards(&board.id, &list, std::slice::from_mut(&mut card));
 
             run_search(&["search", "xyz987", "--archived"]).unwrap();
         });
@@ -581,13 +535,9 @@ mod tests {
     fn due_date_cli_set_and_clear_via_none() {
         with_temp_dir(|| {
             let mut board = board_store::create_board("Board".into()).unwrap();
-            let mut list = CardList::new("To Do".into());
-            let card = Card::new("Deadline task".into());
-            card_store::save_card(&board.id, &card).unwrap();
-            list.card_ids.push(card.id.clone());
-            list_store::save_list(&board.id, &list).unwrap();
-            board.list_order = vec![list.id.clone()];
-            board_store::save_board(&board).unwrap();
+            let list = crate::test_support::add_list(&mut board, "To Do");
+            let mut card = Card::new("Deadline task".into());
+            crate::test_support::put_cards(&board.id, &list, std::slice::from_mut(&mut card));
 
             // Set due date via CLI
             crate::cli::run(&[

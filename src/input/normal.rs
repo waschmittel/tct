@@ -385,8 +385,8 @@ mod tests {
     use crate::app::App;
     use crate::model::board::BoardMeta;
     use crate::model::card::Card;
-    use crate::model::list::CardList;
-    use crate::storage::{board_store, card_store, list_store};
+    
+    use crate::storage::{board_store, card_store};
     use crate::test_support::with_temp_dir;
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
@@ -413,9 +413,7 @@ mod tests {
         let metas: Vec<BoardMeta> = ["A", "B", "C"]
             .iter()
             .map(|n| {
-                let m = board_store::create_board((*n).into()).unwrap();
-                board_store::append_to_order(&m.id).unwrap();
-                m
+                board_store::create_board((*n).into()).unwrap()
             })
             .collect();
         let app = App::new(Some(metas[0].id.clone())).unwrap();
@@ -429,39 +427,22 @@ mod tests {
     /// Build an App with a single list of cards with the given titles.
     fn single_list_fixture(titles: &[&str]) -> (App, BoardMeta) {
         let mut meta = board_store::create_board("Board".into()).unwrap();
-        let mut list = CardList::new("L".into());
-        for t in titles {
-            let c = Card::new((*t).into());
-            card_store::save_card(&meta.id, &c).unwrap();
-            list.card_ids.push(c.id.clone());
-        }
-        list_store::save_list(&meta.id, &list).unwrap();
-        meta.list_order = vec![list.id.clone()];
-        board_store::save_board(&meta).unwrap();
+        let list = crate::test_support::add_list(&mut meta, "L");
+        let mut cards: Vec<Card> = titles.iter().map(|t| Card::new((*t).into())).collect();
+        crate::test_support::put_cards(&meta.id, &list, &mut cards);
         (App::new(Some(meta.id.clone())).unwrap(), meta)
     }
 
     /// Build an App with a board having two lists; list 0 has 3 cards, list 1 has 1.
     fn fixture() -> (App, BoardMeta, Vec<Card>, Vec<Card>) {
         let mut meta = board_store::create_board("Board".into()).unwrap();
-        let mut list_a = CardList::new("A".into());
-        let mut list_b = CardList::new("B".into());
+        let list_a = crate::test_support::add_list(&mut meta, "A");
+        let list_b = crate::test_support::add_list(&mut meta, "B");
 
-        let a_cards: Vec<Card> = (0..3).map(|i| Card::new(format!("a{i}"))).collect();
-        let b_cards = vec![Card::new("b0".into())];
-
-        for c in &a_cards {
-            card_store::save_card(&meta.id, c).unwrap();
-            list_a.card_ids.push(c.id.clone());
-        }
-        for c in &b_cards {
-            card_store::save_card(&meta.id, c).unwrap();
-            list_b.card_ids.push(c.id.clone());
-        }
-        list_store::save_list(&meta.id, &list_a).unwrap();
-        list_store::save_list(&meta.id, &list_b).unwrap();
-        meta.list_order = vec![list_a.id.clone(), list_b.id.clone()];
-        board_store::save_board(&meta).unwrap();
+        let mut a_cards: Vec<Card> = (0..3).map(|i| Card::new(format!("a{i}"))).collect();
+        let mut b_cards = vec![Card::new("b0".into())];
+        crate::test_support::put_cards(&meta.id, &list_a, &mut a_cards);
+        crate::test_support::put_cards(&meta.id, &list_b, &mut b_cards);
 
         let app = App::new(Some(meta.id.clone())).unwrap();
         (app, meta, a_cards, b_cards)
@@ -707,20 +688,19 @@ mod tests {
     fn shift_up_moves_past_interleaved_archived_cards() {
         with_temp_dir(|| {
             let mut meta = board_store::create_board("Board".into()).unwrap();
-            let mut list = CardList::new("TODO".into());
+            let list = crate::test_support::add_list(&mut meta, "TODO");
             // top (visible), arch, arch, bottom (visible) — in card_ids order.
             let titles_archived = [("top", false), ("a1", true), ("a2", true), ("bottom", false)];
-            let mut ids = Vec::new();
-            for (t, archived) in titles_archived {
-                let mut c = Card::new(t.into());
-                c.archived = archived;
-                card_store::save_card(&meta.id, &c).unwrap();
-                list.card_ids.push(c.id.clone());
-                ids.push(c.id);
-            }
-            list_store::save_list(&meta.id, &list).unwrap();
-            meta.list_order = vec![list.id.clone()];
-            board_store::save_board(&meta).unwrap();
+            let mut cards: Vec<Card> = titles_archived
+                .iter()
+                .map(|(t, archived)| {
+                    let mut c = Card::new((*t).into());
+                    c.archived = *archived;
+                    c
+                })
+                .collect();
+            crate::test_support::put_cards(&meta.id, &list, &mut cards);
+            let ids: Vec<_> = cards.iter().map(|c| c.id.clone()).collect();
             let mut app = App::new(Some(meta.id.clone())).unwrap();
 
             // Select the bottom visible card, then move it up.
@@ -973,7 +953,6 @@ mod tests {
     fn j_k_are_noop_with_single_board() {
         with_temp_dir(|| {
             let m = board_store::create_board("Solo".into()).unwrap();
-            board_store::append_to_order(&m.id).unwrap();
             let mut app = App::new(Some(m.id.clone())).unwrap();
             handle(&mut app, key(KeyCode::Char('j'))).unwrap();
             assert_eq!(open_board_id(&app), m.id);

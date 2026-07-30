@@ -7,24 +7,12 @@ use crate::model::id::BoardId;
 use super::paths;
 use super::{atomic_write, Result, StorageError};
 
-pub fn ensure_base_dirs() -> Result<()> {
+/// Prepare the data directory for use: create it if new, then check its
+/// format version. Every entry point already called this before touching
+/// storage, so the version gate cannot be forgotten by a future one.
+pub fn open_data_dir() -> Result<()> {
     fs::create_dir_all(paths::boards_dir())?;
-    Ok(())
-}
-
-pub fn load_board_order() -> Result<Vec<BoardId>> {
-    let path = paths::board_order_path();
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-    let data = super::read_unlinked(&path)?;
-    serde_json::from_str(&data).map_err(|e| super::corrupt(&path, e))
-}
-
-pub fn save_board_order(order: &[BoardId]) -> Result<()> {
-    let json = serde_json::to_string_pretty(order)?;
-    atomic_write(&paths::board_order_path(), json.as_bytes())?;
-    Ok(())
+    super::version::ensure_compatible()
 }
 
 /// Read every `<board id>/board.json` under the boards directory. Entries that
@@ -76,25 +64,20 @@ pub(super) fn read_board_at(board_id: &BoardId) -> Result<BoardMeta> {
     Ok(meta)
 }
 
+/// Active Boards in display order: ascending `position`, ties broken by
+/// creation time then id so the order is total and stable. Boards written
+/// before positions existed all sit at 0.0 and fall back to creation order.
 pub fn list_boards() -> Result<Vec<BoardMeta>> {
-    let all_boards: Vec<BoardMeta> = read_all_boards()?
+    let mut boards: Vec<BoardMeta> = read_all_boards()?
         .into_iter()
         .filter(|meta| !meta.archived)
         .collect();
-
-    let order = load_board_order().unwrap_or_default();
-    let mut ordered: Vec<BoardMeta> = Vec::new();
-    let mut remaining: Vec<BoardMeta> = all_boards;
-
-    for id in &order {
-        if let Some(pos) = remaining.iter().position(|b| &b.id == id) {
-            ordered.push(remaining.remove(pos));
-        }
-    }
-    remaining.sort_by(|a, b| a.name.cmp(&b.name));
-    ordered.extend(remaining);
-
-    Ok(ordered)
+    boards.sort_by(|a, b| {
+        crate::model::rank::cmp(a.position, b.position)
+            .then(a.created_at.cmp(&b.created_at))
+            .then(a.id.cmp(&b.id))
+    });
+    Ok(boards)
 }
 
 pub fn list_archived_boards() -> Result<Vec<BoardMeta>> {
@@ -111,7 +94,6 @@ pub fn load_board(board_id: &BoardId) -> Result<BoardMeta> {
     if !path.exists() {
         return Err(StorageError::BoardNotFound(board_id.to_string()));
     }
-    super::migrate::migrate_if_needed(board_id)?;
     read_board_at(board_id)
 }
 
@@ -123,22 +105,6 @@ pub fn save_board(meta: &BoardMeta) -> Result<()> {
     fs::create_dir_all(&dir)?;
     let json = serde_json::to_string_pretty(meta)?;
     atomic_write(&paths::board_meta_path(&meta.id), json.as_bytes())?;
-    Ok(())
-}
-
-pub fn append_to_order(board_id: &BoardId) -> Result<()> {
-    let mut order = load_board_order().unwrap_or_default();
-    if !order.contains(board_id) {
-        order.push(board_id.clone());
-        save_board_order(&order)?;
-    }
-    Ok(())
-}
-
-pub fn remove_from_order(board_id: &BoardId) -> Result<()> {
-    let mut order = load_board_order().unwrap_or_default();
-    order.retain(|id| id != board_id);
-    save_board_order(&order)?;
     Ok(())
 }
 
@@ -196,79 +162,38 @@ mod tests {
     }
 
     #[test]
-    fn board_order_roundtrip() {
+    fn list_boards_orders_by_position() {
         with_temp_dir(|| {
-            let b1 = create_board("One".into()).unwrap();
-            let b2 = create_board("Two".into()).unwrap();
-            let order = vec![b2.id.clone(), b1.id.clone()];
-            save_board_order(&order).unwrap();
-            let loaded = load_board_order().unwrap();
-            assert_eq!(loaded, order);
-        });
-    }
+            for (name, position) in [("Alpha", 3.0), ("Beta", 1.0), ("Gamma", 2.0)] {
+                let mut meta = BoardMeta::new(name.into());
+                meta.position = position;
+                save_board(&meta).unwrap();
+            }
 
-    #[test]
-    fn list_boards_respects_order() {
-        with_temp_dir(|| {
-            let b1 = create_board("Alpha".into()).unwrap();
-            let b2 = create_board("Beta".into()).unwrap();
-            let b3 = create_board("Gamma".into()).unwrap();
-            save_board_order(&[b3.id.clone(), b1.id.clone(), b2.id.clone()]).unwrap();
             let listed = list_boards().unwrap();
-            assert_eq!(listed[0].name, "Gamma");
-            assert_eq!(listed[1].name, "Alpha");
-            assert_eq!(listed[2].name, "Beta");
+
+            let names: Vec<_> = listed.iter().map(|b| b.name.as_str()).collect();
+            assert_eq!(names, ["Beta", "Gamma", "Alpha"]);
         });
     }
 
+    /// Boards written before ranks existed all deserialize to 0.0, so the
+    /// order has to stay total and stable on its own.
     #[test]
-    fn unordered_boards_alphabetical_fallback() {
+    fn tied_positions_fall_back_to_creation_order() {
         with_temp_dir(|| {
-            // No saved order — fall back to alphabetical
-            let _ = create_board("Charlie".into()).unwrap();
-            let _ = create_board("Alpha".into()).unwrap();
-            let _ = create_board("Bravo".into()).unwrap();
+            let base = chrono::Utc::now();
+            for (name, minutes) in [("Third", 2), ("First", 0), ("Second", 1)] {
+                let mut meta = BoardMeta::new(name.into());
+                meta.position = 0.0;
+                meta.created_at = base + chrono::Duration::minutes(minutes);
+                save_board(&meta).unwrap();
+            }
+
             let listed = list_boards().unwrap();
-            assert_eq!(listed[0].name, "Alpha");
-            assert_eq!(listed[1].name, "Bravo");
-            assert_eq!(listed[2].name, "Charlie");
-        });
-    }
 
-    #[test]
-    fn append_to_order_no_duplicate() {
-        with_temp_dir(|| {
-            let b = create_board("X".into()).unwrap();
-            append_to_order(&b.id).unwrap();
-            append_to_order(&b.id).unwrap();
-            let order = load_board_order().unwrap();
-            assert_eq!(order.iter().filter(|id| **id == b.id).count(), 1);
-        });
-    }
-
-    #[test]
-    fn remove_from_order_works() {
-        with_temp_dir(|| {
-            let b1 = create_board("One".into()).unwrap();
-            let b2 = create_board("Two".into()).unwrap();
-            append_to_order(&b1.id).unwrap();
-            append_to_order(&b2.id).unwrap();
-            remove_from_order(&b1.id).unwrap();
-            let order = load_board_order().unwrap();
-            assert!(!order.contains(&b1.id));
-            assert!(order.contains(&b2.id));
-        });
-    }
-
-    #[test]
-    fn delete_board_refuses_the_empty_id() {
-        with_temp_dir(|| {
-            let real = create_board("Keep".into()).unwrap();
-
-            let err = delete_board(&BoardId::default()).unwrap_err();
-
-            assert!(matches!(err, StorageError::BoardNotFound(_)), "{err}");
-            assert!(paths::board_dir(&real.id).exists(), "other boards must survive");
+            let names: Vec<_> = listed.iter().map(|b| b.name.as_str()).collect();
+            assert_eq!(names, ["First", "Second", "Third"]);
         });
     }
 
