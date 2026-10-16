@@ -255,6 +255,30 @@ mod tests {
     }
 
     #[test]
+    fn date_stamp_needs_room_beside_the_corners() {
+        let at = chrono::Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
+        // " 2020-01-02 " is 12 wide; the frame needs two more for its corners.
+        assert!(date_stamp(at, Style::default(), 13).is_none());
+        assert!(date_stamp(at, Style::default(), 14).is_some());
+    }
+
+    #[test]
+    fn dimmed_card_stamps_are_dark_gray() {
+        let mut card = Card::new("Task".into());
+        card.created_at = chrono::Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(30, 5)).unwrap();
+        terminal
+            .draw(|f| {
+                render(
+                    f, f.area(), &card, false, true, &[], Color::Cyan, TermCaps::full(),
+                    DateStamps { created: true, updated: false },
+                )
+            })
+            .unwrap();
+        assert_eq!(terminal.backend().buffer()[(27, 4)].fg, Color::DarkGray);
+    }
+
+    #[test]
     fn selected_card_stamps_use_the_accent_color() {
         let mut card = Card::new("Task".into());
         card.created_at = chrono::Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();

@@ -215,6 +215,39 @@ mod tests {
     }
 
     #[test]
+    fn date_stamp_settings_persist_and_default_off() {
+        with_temp_dir(|| {
+            let mut meta = BoardMeta::new("Dates".into());
+            save_board(&meta).unwrap();
+            let loaded = load_board(&meta.id).unwrap();
+            assert!(!loaded.show_created_date && !loaded.show_updated_date);
+
+            meta.show_created_date = true;
+            meta.show_updated_date = true;
+            save_board(&meta).unwrap();
+            let loaded = load_board(&meta.id).unwrap();
+            assert!(loaded.show_created_date && loaded.show_updated_date);
+        });
+    }
+
+    #[test]
+    fn board_json_without_date_stamp_settings_loads_with_them_off() {
+        with_temp_dir(|| {
+            let meta = BoardMeta::new("Old".into());
+            save_board(&meta).unwrap();
+            let path = crate::storage::paths::board_dir(&meta.id).join("board.json");
+            let mut value: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            let obj = value.as_object_mut().unwrap();
+            obj.remove("show_created_date");
+            obj.remove("show_updated_date");
+            std::fs::write(&path, value.to_string()).unwrap();
+            let loaded = load_board(&meta.id).unwrap();
+            assert!(!loaded.show_created_date && !loaded.show_updated_date);
+        });
+    }
+
+    #[test]
     fn accent_color_persists() {
         with_temp_dir(|| {
             let mut meta = BoardMeta::new("Acc".into());

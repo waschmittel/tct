@@ -18,3 +18,6 @@ $TCT checklist Demo "Fix login flow" --add "Reproduce"
 $TCT checklist Demo "Fix login flow" --add "Write failing test"
 $TCT checklist Demo "Fix login flow" --toggle 1
 $TCT labels Demo --create urgent
+for i in $(seq -w 1 12); do
+    $TCT cards Demo --create "To Do" "Backlog item $i"
+done

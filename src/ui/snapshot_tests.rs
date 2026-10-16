@@ -582,3 +582,65 @@ fn snapshot_long_list_scrollbar_bottom() {
         insta::assert_snapshot!(render_to_string(&app));
     });
 }
+
+fn thumb_rows(text: &str) -> Vec<usize> {
+    text.lines()
+        .enumerate()
+        .filter(|(_, l)| l.contains('█'))
+        .map(|(y, _)| y)
+        .collect()
+}
+
+#[test]
+fn lists_that_fit_have_no_scroll_thumb() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let app = App::new(Some(id)).unwrap();
+        assert!(thumb_rows(&render_to_string(&app)).is_empty());
+    });
+}
+
+#[test]
+fn scroll_thumb_moves_down_with_the_scroll_offset() {
+    with_temp_dir(|| {
+        let id = seed_long_list_board();
+        let mut app = App::new(Some(id)).unwrap();
+        let at_top = thumb_rows(&render_to_string(&app));
+        press(&mut app, KeyCode::Char('G'));
+        let at_bottom = thumb_rows(&render_to_string(&app));
+        // Track: from under the list's top corner (row 1) to above its
+        // bottom corner (row HEIGHT - 2).
+        let (first_row, last_row) = (2, HEIGHT as usize - 3);
+        assert_eq!(at_top.first(), Some(&first_row));
+        assert!(at_top.last() < Some(&last_row));
+        assert!(at_bottom.first() > at_top.first());
+        assert_eq!(at_bottom.last(), Some(&last_row));
+    });
+}
+
+#[test]
+fn scroll_thumb_uses_accent_on_the_selected_list_and_gray_on_others() {
+    with_temp_dir(|| {
+        let mut meta = crate::model::board::BoardMeta::new("Two".into());
+        board_store::save_board(&meta).unwrap();
+        let long = crate::test_support::add_list(&mut meta, "Long");
+        let other = crate::test_support::add_list(&mut meta, "Other");
+        let mut cards: Vec<Card> = (1..=12).map(|i| Card::new(format!("Card {i:02}"))).collect();
+        crate::test_support::put_cards(&meta.id, &long, &mut cards);
+        let mut more: Vec<Card> = (1..=12).map(|i| Card::new(format!("Other {i:02}"))).collect();
+        crate::test_support::put_cards(&meta.id, &other, &mut more);
+
+        let app = App::new(Some(meta.id.clone())).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(WIDTH, HEIGHT)).unwrap();
+        terminal.draw(|f| crate::ui::render(f, &app)).unwrap();
+        let buf = terminal.backend().buffer();
+        let thumb_fg = |x0: u16, x1: u16| {
+            (0..HEIGHT)
+                .flat_map(|y| (x0..x1).map(move |x| (x, y)))
+                .find(|&(x, y)| buf[(x, y)].symbol() == "█")
+                .map(|(x, y)| buf[(x, y)].fg)
+        };
+        assert_eq!(thumb_fg(0, WIDTH / 2), Some(app.accent_color()));
+        assert_eq!(thumb_fg(WIDTH / 2, WIDTH), Some(ratatui::style::Color::Gray));
+    });
+}

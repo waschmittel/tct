@@ -1461,6 +1461,19 @@ mod tests {
     }
 
     #[test]
+    fn date_stamp_commands_set_independently_and_persist() {
+        with_temp_dir(|| {
+            let (mut ed, _, _) = editor_with_cards(&["t"]);
+            ed.apply(Command::SetShowCreatedDate { show: true }).unwrap();
+            assert!(ed.board().meta.show_created_date && !ed.board().meta.show_updated_date);
+            ed.apply(Command::SetShowUpdatedDate { show: true }).unwrap();
+            ed.apply(Command::SetShowCreatedDate { show: false }).unwrap();
+            ed.reload().unwrap();
+            assert!(!ed.board().meta.show_created_date && ed.board().meta.show_updated_date);
+        });
+    }
+
+    #[test]
     fn delete_history_entry_unknown_card_errors() {
         with_temp_dir(|| {
             let (mut ed, _, _) = editor_with_cards(&["t"]);

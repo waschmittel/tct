@@ -45,6 +45,12 @@ Sleep 500ms
 Left
 Sleep 700ms
 
+# Long lists show a scroll thumb on their right border: jump to the end and back
+Type "G"
+Sleep 1.2s
+Type "g"
+Sleep 1s
+
 # Create a card
 Type "n"
 Sleep 600ms
