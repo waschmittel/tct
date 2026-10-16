@@ -131,6 +131,10 @@ fn render_status_toast(frame: &mut Frame, area: ratatui::layout::Rect, app: &App
     frame.render_widget(toast, rect);
 }
 
+fn dialog_help_key_width(dh: &crate::dialog::DialogHelp) -> usize {
+    dh.rows.iter().map(|(k, _)| k.chars().count()).max().unwrap_or(0) + 2
+}
+
 fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     use ratatui::layout::{Constraint, Layout};
     use ratatui::style::{Color, Modifier, Style};
@@ -138,14 +142,6 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 
     let accent = app.accent_color();
-
-    let width = 90u16.min(area.width.saturating_sub(4)).max(40);
-    let height = 32u16.min(area.height.saturating_sub(4)).max(10);
-    let x = (area.width.saturating_sub(width)) / 2;
-    let y = (area.height.saturating_sub(height)) / 2;
-    let popup = ratatui::layout::Rect::new(x, y, width, height);
-
-    frame.render_widget(Clear, popup);
 
     let effective_mode = app.previous_mode.as_ref().unwrap_or(&app.mode);
 
@@ -162,6 +158,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     // Help opened from inside a dialog (`?` → `Follow::Help`): the dialog
     // declares its own reference rows via `Dialog::help()`.
     let dialog_help = app.dialog.as_ref().and_then(|d| d.help());
+
 
     // Help opened over a live insert handler (`?` → `InsertOutcome::Help`).
     // A dialog takes precedence: a dialog over insert (e.g. the discard
@@ -200,30 +197,9 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         " Help — Board View "
     };
 
-    let block = Block::default()
-        .title(title)
-        .title_bottom(Line::from(Span::styled(
-            " Esc:close ",
-            Style::default().fg(Color::DarkGray),
-        )))
-        .title_bottom(
-            Line::from(Span::styled(
-                format!(" {} ", app.version),
-                Style::default().fg(Color::DarkGray),
-            ))
-            .right_aligned(),
-        )
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(accent));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
-
-    let columns = Layout::horizontal([
-        Constraint::Percentage(50),
-        Constraint::Percentage(50),
-    ])
-    .spacing(2)
-    .split(inner);
+    // Keys column: fixed width on the mode pages (fits "Shift+Left/Right"), sized to the longest key
+    // on a dialog page so long key lists never crowd the description.
+    let key_width = dialog_help.as_ref().map(dialog_help_key_width).unwrap_or(18);
 
     let header = |s: &str| -> Line<'static> {
         Line::from(Span::styled(
@@ -235,7 +211,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         Line::from(vec![
             Span::raw("  "),
             Span::styled(
-                format!("{:<16}", key),
+                format!("{key:<key_width$}"),
                 Style::default().fg(Color::Yellow),
             ),
             Span::raw(action.to_string()),
@@ -342,6 +318,61 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 &row,
             ),
         )
+    };
+
+    // The popup hugs its content: as tall as the longer column; as wide as
+    // the widest row for a dialog page, a fixed two-column width otherwise.
+    let width = match &dialog_help {
+        // Widest row (indent + keys + description), widened if needed for
+        // the title and the bottom border text, plus the side borders.
+        Some(dh) => {
+            let rows = dh
+                .rows
+                .iter()
+                .map(|(_, d)| 2 + dialog_help_key_width(dh) + d.chars().count() + 1)
+                .max()
+                .unwrap_or(0);
+            let title = dh.title.chars().count();
+            let footer = " Esc:close ".len() + app.version.chars().count() + 2;
+            (rows.max(title).max(footer) + 2) as u16
+        }
+        None => 90,
+    }
+    .min(area.width.saturating_sub(4))
+    .max(20);
+    let height = (left.len().max(right.len()) as u16 + 2)
+        .min(area.height.saturating_sub(4))
+        .max(5);
+    let x = (area.width.saturating_sub(width)) / 2;
+    let y = (area.height.saturating_sub(height)) / 2;
+    let popup = ratatui::layout::Rect::new(x, y, width, height);
+
+    frame.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .title(title)
+        .title_bottom(Line::from(Span::styled(
+            " Esc:close ",
+            Style::default().fg(Color::DarkGray),
+        )))
+        .title_bottom(
+            Line::from(Span::styled(
+                format!(" {} ", app.version),
+                Style::default().fg(Color::DarkGray),
+            ))
+            .right_aligned(),
+        )
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(accent));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let columns = if dialog_help.is_some() {
+        Layout::horizontal([Constraint::Percentage(100), Constraint::Length(0)]).split(inner)
+    } else {
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .spacing(2)
+            .split(inner)
     };
 
     frame.render_widget(

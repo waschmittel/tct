@@ -446,3 +446,68 @@ fn snapshot_board_view_empty() {
         insta::assert_snapshot!(render_to_string(&app));
     });
 }
+
+/// Dialog help pages are one short list: sized to their rows, full width,
+/// key column sized to the longest key (card history has the longest).
+#[test]
+fn snapshot_help_card_history_dialog() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        app.version = "vTEST";
+        press(&mut app, KeyCode::Char('h'));
+        press(&mut app, KeyCode::Char('?'));
+        assert_eq!(app.mode, AppMode::Help);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// Every dialog's help page renders each row on one line, with a gap
+/// between keys and description, in a popup no taller than its rows.
+#[test]
+fn dialog_help_pages_are_compact_and_unwrapped() {
+    use crate::dialog::{
+        Dialog, archived_boards::ArchivedBoards, archived_cards::ArchivedCards,
+        archived_lists::ArchivedLists, card_history::CardHistory,
+        confirm_archive_card::ConfirmArchiveCard, confirm_archive_list::ConfirmArchiveList,
+        confirm_cancel_edit::ConfirmCancelEdit, confirm_clear_due_date::ConfirmClearDueDate,
+        label_manager::LabelManager, label_picker::LabelPicker,
+    };
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let dialogs: Vec<Box<dyn Dialog>> = vec![
+            Box::new(ConfirmArchiveCard),
+            Box::new(ConfirmArchiveList),
+            Box::new(ConfirmCancelEdit),
+            Box::new(ConfirmClearDueDate),
+            Box::new(CardHistory::new()),
+            Box::new(LabelPicker { selected_idx: 0 }),
+            Box::new(LabelManager { selected_idx: 0, from_picker: false }),
+            Box::new(ArchivedCards { cards: vec![], selected: 0 }),
+            Box::new(ArchivedLists { lists: vec![], selected: 0 }),
+            Box::new(ArchivedBoards { boards: vec![], selected: 0 }),
+        ];
+        for dialog in dialogs {
+            let help = dialog.help().expect("dialog has a help page");
+            let mut app = App::new(Some(id.clone())).unwrap();
+            app.version = "vTEST";
+            app.open_dialog(dialog);
+            press(&mut app, KeyCode::Char('?'));
+            assert_eq!(app.mode, AppMode::Help);
+            let text = render_to_string(&app);
+
+            for (keys, desc) in &help.rows {
+                let line = text
+                    .lines()
+                    .find(|l| l.contains(desc))
+                    .unwrap_or_else(|| panic!("{}: '{desc}' wrapped or missing\n{text}", help.title));
+                let k = line.find(keys).unwrap_or_else(|| panic!("{}: '{keys}' missing", help.title));
+                let gap = &line[k + keys.len()..line.find(desc).unwrap()];
+                assert!(gap.starts_with("  "), "{}: keys crowd '{desc}'\n{text}", help.title);
+            }
+            let top = text.lines().position(|l| l.contains(help.title)).unwrap();
+            let bottom = text.lines().position(|l| l.contains("Esc:close")).unwrap();
+            assert_eq!(bottom - top, help.rows.len() + 2, "{}: popup height", help.title);
+        }
+    });
+}

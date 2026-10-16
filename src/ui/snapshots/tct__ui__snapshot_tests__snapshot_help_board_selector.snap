@@ -4,31 +4,31 @@ expression: render_to_string(&app)
 ---
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
 │ TCT - Terminal Card Tracker                                                                      │
-└────┌ Help — Board Selector ─────────────────────────────────────────────────────────────────┐────┘
-┌ Boa│Navigation                                   Actions                                    │────┐
-│> Al│  Up / Down       Navigate boards              n               New board                │    │
-│  Be│  Shift+Up/Down   Reorder board                r               Rename board             │    │
-│    │  Enter           Open board                   c               Cycle accent color       │    │
-│    │                                               C               Pick accent color        │    │
-│    │                                               a               Archive board            │    │
-│    │                                               v               View archived            │    │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Boards ──────────────────────────────────────────────────────────────────────────────────────────┐
+│> Alpha                                                                                           │
+│  Beta                                                                                            │
+│                                                                                                  │
+│                                                                                                  │
+│    ┌ Help — Board Selector ─────────────────────────────────────────────────────────────────┐    │
+│    │Navigation                                   Actions                                    │    │
+│    │  Up / Down         Navigate boards            n                 New board              │    │
+│    │  Shift+Up/Down     Reorder board              r                 Rename board           │    │
+│    │  Enter             Open board                 c                 Cycle accent color     │    │
+│    │                                               C                 Pick accent color      │    │
+│    │                                               a                 Archive board          │    │
+│    │                                               v                 View archived          │    │
 │    │                                                                                        │    │
 │    │                                             App                                        │    │
-│    │                                               ?               Help                     │    │
-│    │                                               q               Quit                     │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
-│    │                                                                                        │    │
+│    │                                               ?                 Help                   │    │
+│    │                                               q                 Quit                   │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
  HELP                                                                                        ~/.tct
