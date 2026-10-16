@@ -4,7 +4,7 @@
 //! the styled markdown preview appears in the card detail view.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui_textarea::CursorMove;
+use tui_textarea::CursorMove;
 
 use super::line_input::has_ctrl_or_cmd;
 use super::text_area_input::TextAreaInput;
@@ -110,8 +110,8 @@ impl MarkdownEditor {
 
 // ── List autocontinue + nest/unnest + renumber helpers ───────────────
 
-pub(crate) fn handle_enter_in_list(textarea: &mut ratatui_textarea::TextArea<'static>) {
-    let ratatui_textarea::DataCursor(row, col) = textarea.cursor();
+pub(crate) fn handle_enter_in_list(textarea: &mut tui_textarea::TextArea<'static>) {
+    let (row, col) = textarea.cursor();
 
     if row == 0 && col == 0 {
         textarea.insert_newline();
@@ -170,8 +170,8 @@ pub(crate) fn handle_enter_in_list(textarea: &mut ratatui_textarea::TextArea<'st
     textarea.insert_newline();
 }
 
-pub(crate) fn handle_tab_nest(textarea: &mut ratatui_textarea::TextArea<'static>) -> bool {
-    let ratatui_textarea::DataCursor(row, col) = textarea.cursor();
+pub(crate) fn handle_tab_nest(textarea: &mut tui_textarea::TextArea<'static>) -> bool {
+    let (row, col) = textarea.cursor();
     let line = match textarea.lines().get(row) {
         Some(l) => l.clone(),
         None => return false,
@@ -212,8 +212,8 @@ pub(crate) fn handle_tab_nest(textarea: &mut ratatui_textarea::TextArea<'static>
     true
 }
 
-pub(crate) fn handle_shift_tab_unnest(textarea: &mut ratatui_textarea::TextArea<'static>) {
-    let ratatui_textarea::DataCursor(row, col) = textarea.cursor();
+pub(crate) fn handle_shift_tab_unnest(textarea: &mut tui_textarea::TextArea<'static>) {
+    let (row, col) = textarea.cursor();
     let line = match textarea.lines().get(row) {
         Some(l) => l.clone(),
         None => return,
@@ -247,7 +247,7 @@ pub(crate) fn handle_shift_tab_unnest(textarea: &mut ratatui_textarea::TextArea<
     textarea.move_cursor(CursorMove::Jump(row as u16, target_col as u16));
 }
 
-pub(crate) fn renumber_all(textarea: &mut ratatui_textarea::TextArea<'static>) {
+pub(crate) fn renumber_all(textarea: &mut tui_textarea::TextArea<'static>) {
     let lines = textarea.lines().to_vec();
     let saved = textarea.cursor();
 
@@ -301,12 +301,12 @@ pub(crate) fn renumber_all(textarea: &mut ratatui_textarea::TextArea<'static>) {
         }
     }
 
-    let ratatui_textarea::DataCursor(sr, sc) = saved;
+    let (sr, sc) = saved;
     textarea.move_cursor(CursorMove::Jump(sr as u16, sc as u16));
 }
 
 fn wrap_selection_or_insert(
-    textarea: &mut ratatui_textarea::TextArea<'static>,
+    textarea: &mut tui_textarea::TextArea<'static>,
     prefix: &str,
     suffix: &str,
 ) {
@@ -322,7 +322,7 @@ fn wrap_selection_or_insert(
     }
 }
 
-fn insert_at_line_start(textarea: &mut ratatui_textarea::TextArea<'static>, prefix: &str) {
+fn insert_at_line_start(textarea: &mut tui_textarea::TextArea<'static>, prefix: &str) {
     textarea.move_cursor(CursorMove::Head);
     textarea.insert_str(prefix);
 }
@@ -341,7 +341,7 @@ mod tests {
     }
 
     fn editor_cursor(e: &MarkdownEditor) -> (usize, usize) {
-        let ratatui_textarea::DataCursor(r, c) = e.input.textarea.cursor();
+        let (r, c) = e.input.textarea.cursor();
         (r, c)
     }
 

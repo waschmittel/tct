@@ -457,13 +457,15 @@ fn split_available(desc_full: u16, ck_full: u16, avail: u16) -> (u16, u16) {
 fn render_description_editor(
     frame: &mut Frame,
     area: Rect,
-    textarea: &ratatui_textarea::TextArea<'static>,
+    textarea: &tui_textarea::TextArea<'static>,
     accent: Color,
 ) {
     // Match the rendered description view's wrap width (inner width minus
     // padding); this also leaves the rightmost column for the scrollbar.
-    // The text sits one space off the left border.
-    let width = area.width.saturating_sub(PAD * 2);
+    // The text sits one space off the left border. The textarea keeps its
+    // last column free for the caret, so it gets one extra to wrap where
+    // the view does.
+    let width = area.width.saturating_sub(PAD * 2) + 1;
     let editor_area = Rect::new(area.x + LEFT_PAD, area.y, width, area.height);
     frame.render_widget(textarea, editor_area);
 
@@ -471,7 +473,7 @@ fn render_description_editor(
     // cursor in view, so this follows the viewport closely enough.
     let total = textarea.lines().len();
     if total > area.height as usize {
-        let ratatui_textarea::DataCursor(cursor_row, _) = textarea.cursor();
+        let (cursor_row, _) = textarea.cursor();
         render_scrollbar(frame, area, total, cursor_row, accent);
     }
 }
