@@ -42,7 +42,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Clear, popup);
 
     // Detect "editing description" via the active insert handler.
-    let editing_desc_handler = if matches!(app.mode, AppMode::Insert) {
+    let editing_desc_handler = if matches!(app.mode, AppMode::Insert | AppMode::Dialog | AppMode::Help) {
         app.insert.as_ref().and_then(|h| {
             h.as_any()
                 .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()

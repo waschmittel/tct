@@ -458,7 +458,10 @@ fn snapshot_help_card_history_dialog() {
         press(&mut app, KeyCode::Char('h'));
         press(&mut app, KeyCode::Char('?'));
         assert_eq!(app.mode, AppMode::Help);
-        insta::assert_snapshot!(render_to_string(&app));
+        // The history dialog stays visible underneath, with real timestamps.
+        let stamp = regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?").unwrap();
+        let text = render_to_string(&app);
+        insta::assert_snapshot!(stamp.replace_all(&text, "YYYY-MM-DD HH:MM"));
     });
 }
 
@@ -642,5 +645,70 @@ fn scroll_thumb_uses_accent_on_the_selected_list_and_gray_on_others() {
         };
         assert_eq!(thumb_fg(0, WIDTH / 2), Some(app.accent_color()));
         assert_eq!(thumb_fg(WIDTH / 2, WIDTH), Some(ratatui::style::Color::Gray));
+    });
+}
+
+/// Dialogs opened from the card detail pop over it instead of replacing it.
+#[test]
+fn dialogs_from_card_detail_keep_the_detail_visible() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        let card_id = app.board().unwrap().current_card_id().unwrap().clone();
+        app.board_mut().unwrap().cards.get_mut(&card_id).unwrap().due_date =
+            Some(chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap());
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+
+        // (The history dialog is large enough to cover the description.)
+        for (key, dialog_text) in [('U', "Clear due date of"), ('l', "Labels")] {
+            let shift = if key.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char(key), shift)).unwrap();
+            assert_eq!(app.mode, AppMode::Dialog, "{key}");
+            let text = render_to_string(&app);
+            assert!(text.contains(dialog_text), "{key}: dialog missing\n{text}");
+            assert!(text.contains("Token expires too early."), "{key}: detail hidden\n{text}");
+            press(&mut app, KeyCode::Esc);
+            assert_eq!(app.mode, AppMode::CardDetail);
+        }
+    });
+}
+
+/// From the board view the same dialogs sit over the board, not a detail.
+#[test]
+fn dialogs_from_board_view_do_not_open_the_detail() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('l'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        assert!(!render_to_string(&app).contains("Token expires too early."));
+    });
+}
+
+/// Help opened from the card detail, from a dialog over it, or from the
+/// description editor pops over them instead of replacing them.
+#[test]
+fn help_from_card_detail_keeps_the_detail_visible() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Enter);
+
+        press(&mut app, KeyCode::Char('?'));
+        assert_eq!(app.mode, AppMode::Help);
+        let text = render_to_string(&app);
+        assert!(text.contains("Help — Card Detail"), "{text}");
+        assert!(text.contains("Fix login flow"), "detail hidden\n{text}");
+        press(&mut app, KeyCode::Esc);
+        assert_eq!(app.mode, AppMode::CardDetail);
+
+        press(&mut app, KeyCode::Char('l'));
+        press(&mut app, KeyCode::Char('?'));
+        assert_eq!(app.mode, AppMode::Help);
+        let text = render_to_string(&app);
+        assert!(text.contains("Help —") && text.contains("Fix login flow"), "{text}");
+        assert!(text.contains("Labels"), "dialog hidden under its help\n{text}");
+
     });
 }

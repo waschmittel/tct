@@ -20,6 +20,14 @@ fn insert_surface(app: &App) -> Option<InsertSurface> {
     app.insert.as_ref().map(|h| h.surface())
 }
 
+/// Whether the active dialog was opened from the card detail: its return
+/// mode is the detail, or it sits over a live card-detail insert (the
+/// discard prompt over the description editor).
+fn dialog_over_card_detail(app: &App) -> bool {
+    matches!(app.previous_mode, Some(AppMode::CardDetail))
+        || matches!(insert_surface(app), Some(InsertSurface::CardDetail))
+}
+
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
 
@@ -54,6 +62,17 @@ pub fn render(frame: &mut Frame, app: &App) {
     // 2. Render Overlays
     match &app.mode {
         AppMode::Help => {
+            // Help pops over whatever it was opened from: the card detail
+            // (directly, over its editor, or under a dialog) and a live
+            // dialog stay visible underneath.
+            let over_card_detail = matches!(effective_mode, AppMode::CardDetail)
+                || dialog_over_card_detail(app);
+            if over_card_detail && !dialog_over_selector {
+                card_detail::render(frame, area, app);
+            }
+            if app.dialog.is_some() {
+                dialog::render(frame, area, app);
+            }
             render_help(frame, area, app);
         }
         AppMode::Command => {
@@ -72,19 +91,14 @@ pub fn render(frame: &mut Frame, app: &App) {
             // respective background views via consulting `app.insert`.
         }
         AppMode::Dialog => {
+            // A dialog opened from the card detail pops over it, like the
+            // date picker does.
+            if dialog_over_card_detail(app) && !dialog_over_selector {
+                card_detail::render(frame, area, app);
+            }
             dialog::render(frame, area, app);
         }
-        _ => {
-            // Help may need card-detail as an intermediate layer.
-            if let AppMode::Help = app.mode {
-                let prev_card_detail = matches!(effective_mode, AppMode::CardDetail);
-                let prev_insert_card_detail = matches!(effective_mode, AppMode::Insert)
-                    && matches!(insert_surface(app), Some(InsertSurface::CardDetail));
-                if prev_card_detail || prev_insert_card_detail {
-                    card_detail::render(frame, area, app);
-                }
-            }
-        }
+        _ => {}
     }
 
     // 3. Transient status toast, top-right, above everything. The top row
