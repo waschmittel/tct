@@ -19,7 +19,7 @@ impl TextAreaInput {
         let lines: Vec<String> = initial.split('\n').map(|s| s.to_string()).collect();
         let mut textarea = TextArea::new(lines);
         textarea.set_wrap_mode(WrapMode::WordOrGlyph);
-        textarea.set_cursor_line_style(Style::default().bg(Color::Rgb(30, 30, 40)));
+        textarea.set_cursor_line_style(Style::default());
         textarea.set_style(Style::default().fg(Color::White));
         Self {
             textarea,
@@ -80,5 +80,11 @@ mod tests {
     fn cursor_after_the_hanging_space_does_not_panic() {
         let rows = render_rows("0123456789 ", 10, true);
         assert_eq!(rows[0].trim_end(), "0123456789");
+    }
+
+    #[test]
+    fn current_line_has_no_highlight() {
+        let input = TextAreaInput::from_initial("first\nsecond");
+        assert_eq!(input.textarea.cursor_line_style(), Style::default());
     }
 }
