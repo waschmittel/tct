@@ -79,6 +79,16 @@ Sleep 500ms
 Ctrl+S
 Sleep 1s
 
+# Date stamps in the detail frame (also toggled from the board view later)
+Type "c"
+Sleep 600ms
+Type "d"
+Sleep 1.5s
+Type "c"
+Sleep 400ms
+Type "d"
+Sleep 600ms
+
 # Assign a label from the picker
 Type "l"
 Sleep 800ms
@@ -156,6 +166,16 @@ Type "v"
 Sleep 1s
 Enter
 Sleep 1.2s
+
+# Show the created and updated dates in the card frames, then hide them again
+Type "c"
+Sleep 800ms
+Type "d"
+Sleep 1.5s
+Type "c"
+Sleep 500ms
+Type "d"
+Sleep 800ms
 
 # Help overlay
 Type "?"

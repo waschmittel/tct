@@ -17,6 +17,7 @@ pub fn render(
     board_labels: &[Label],
     accent: Color,
     caps: TermCaps,
+    stamps: DateStamps,
 ) {
     if area.height < 2 {
         return;
@@ -52,6 +53,23 @@ pub fn render(
         });
     if selected && !dimmed {
         block = block.style(Style::default().bg(selection_bg));
+    }
+    let stamp_style = if dimmed {
+        Style::default().fg(Color::DarkGray)
+    } else if selected {
+        Style::default().fg(accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::Gray)
+    };
+    if stamps.updated
+        && let Some(line) = date_stamp(card.last_changed_at(), stamp_style, area.width)
+    {
+        block = block.title_top(line);
+    }
+    if stamps.created
+        && let Some(line) = date_stamp(card.created_at, stamp_style, area.width)
+    {
+        block = block.title_bottom(line);
     }
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -136,30 +154,62 @@ pub fn card_lines(
     lines
 }
 
-/// Due date as shown on the card: `mm-dd`, or `yyyy-mm-dd` when the year is
-/// not the current one, plus how far away it is when that is near or past.
-fn due_label(due: chrono::NaiveDate, today: chrono::NaiveDate) -> String {
+/// Which date stamps a card frame carries, per the board's settings.
+#[derive(Clone, Copy, Default)]
+pub struct DateStamps {
+    pub created: bool,
+    pub updated: bool,
+}
+
+/// A date for a frame corner (right-aligned title), or `None` when `frame_width`
+/// has no room for it beside the border corners.
+pub fn date_stamp(
+    at: chrono::DateTime<chrono::Utc>,
+    style: Style,
+    frame_width: u16,
+) -> Option<Line<'static>> {
+    let today = chrono::Local::now().date_naive();
+    let date = short_date(at.with_timezone(&chrono::Local).date_naive(), today);
+    let text = format!(" {date} ");
+    (text.chars().count() as u16 + 2 <= frame_width)
+        .then(|| Line::from(Span::styled(text, style)).right_aligned())
+}
+
+/// `mm-dd`, or `yyyy-mm-dd` when the year is not the current one.
+pub fn short_date(date: chrono::NaiveDate, today: chrono::NaiveDate) -> String {
     use chrono::Datelike;
-    let date = if due.year() == today.year() {
-        due.format("%m-%d")
+    if date.year() == today.year() {
+        date.format("%m-%d").to_string()
     } else {
-        due.format("%Y-%m-%d")
-    };
+        date.format("%Y-%m-%d").to_string()
+    }
+}
+
+/// Due date as shown on the card: [`short_date`] plus how far away it is
+/// when that is near or past.
+fn due_label(due: chrono::NaiveDate, today: chrono::NaiveDate) -> String {
+    let date = short_date(due, today);
     match (due - today).num_days() {
         days if days < 0 => format!("{date} (-{}d)", -days),
         0 => format!("{date} (today)"),
         days if days <= 3 => format!("{date} ({days}d)"),
-        _ => date.to_string(),
+        _ => date,
     }
 }
 
 #[cfg(test)]
 mod due_label_tests {
-    use super::due_label;
+    use super::{due_label, short_date};
     use chrono::NaiveDate;
 
     fn d(y: i32, m: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(y, m, day).unwrap()
+    }
+
+    #[test]
+    fn short_date_drops_only_the_current_year() {
+        assert_eq!(short_date(d(2026, 3, 4), d(2026, 10, 16)), "03-04");
+        assert_eq!(short_date(d(2025, 3, 4), d(2026, 10, 16)), "2025-03-04");
     }
 
     #[test]
@@ -185,6 +235,78 @@ mod tests {
     use super::*;
     use crate::model::card::ChecklistItem;
     use crate::model::label::LabelColor;
+    use chrono::TimeZone;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    /// Frame rows of a 30x5 card with fixed (past-year) dates.
+    fn frame_rows(stamps: DateStamps, width: u16) -> Vec<String> {
+        let mut card = Card::new("Task".into());
+        card.created_at = chrono::Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
+        card.log("Edited");
+        card.history.last_mut().unwrap().at = chrono::Utc.with_ymd_and_hms(2021, 3, 4, 12, 0, 0).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(width, 5)).unwrap();
+        terminal
+            .draw(|f| render(f, f.area(), &card, false, false, &[], Color::Cyan, TermCaps::full(), stamps))
+            .unwrap();
+        let buf = terminal.backend().buffer().clone();
+        (0..5)
+            .map(|y| (0..width).map(|x| buf[(x, y)].symbol().to_string()).collect::<String>())
+            .collect()
+    }
+
+    #[test]
+    fn selected_card_stamps_use_the_accent_color() {
+        let mut card = Card::new("Task".into());
+        card.created_at = chrono::Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
+        let accent = Color::Magenta;
+        let fg_of_stamp = |selected: bool| {
+            let mut terminal = Terminal::new(TestBackend::new(30, 5)).unwrap();
+            terminal
+                .draw(|f| {
+                    render(
+                        f, f.area(), &card, selected, false, &[], accent, TermCaps::full(),
+                        DateStamps { created: true, updated: false },
+                    )
+                })
+                .unwrap();
+            // The stamp's last digit, just left of " ┘".
+            terminal.backend().buffer()[(27, 4)].fg
+        };
+        assert_eq!(fg_of_stamp(true), accent);
+        assert_eq!(fg_of_stamp(false), Color::Gray);
+    }
+
+    #[test]
+    fn no_stamps_by_default() {
+        let rows = frame_rows(DateStamps::default(), 30);
+        assert!(rows.iter().all(|r| !r.contains("20")), "{rows:?}");
+    }
+
+    #[test]
+    fn updated_date_sits_in_the_top_right_of_the_frame() {
+        let rows = frame_rows(DateStamps { created: false, updated: true }, 30);
+        assert!(rows[0].trim_end().ends_with("┐") && rows[0].contains(" 2021-03-04 ┐"), "{rows:?}");
+        assert!(!rows[4].contains("2020"), "{rows:?}");
+    }
+
+    #[test]
+    fn created_date_sits_in_the_bottom_right_of_the_frame() {
+        let rows = frame_rows(DateStamps { created: true, updated: false }, 30);
+        assert!(rows[4].contains(" 2020-01-02 ┘"), "{rows:?}");
+        assert!(!rows[0].contains("2021"), "{rows:?}");
+    }
+
+    #[test]
+    fn both_stamps_together() {
+        let rows = frame_rows(DateStamps { created: true, updated: true }, 30);
+        assert!(rows[0].contains("2021-03-04") && rows[4].contains("2020-01-02"), "{rows:?}");
+    }
+
+    #[test]
+    fn stamps_are_skipped_when_the_card_is_too_narrow() {
+        let rows = frame_rows(DateStamps { created: true, updated: true }, 12);
+        assert!(rows.iter().all(|r| !r.contains("20")), "{rows:?}");
+    }
 
     fn lines_at(card: &Card, board_labels: &[Label], width: u16) -> Vec<Line<'static>> {
         card_lines(card, board_labels, width, Style::default(), false)
@@ -291,6 +413,7 @@ mod tests {
                             &board_labels,
                             Color::Cyan,
                             TermCaps::full(),
+                            DateStamps::default(),
                         );
                     })
                     .unwrap();

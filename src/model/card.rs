@@ -130,6 +130,12 @@ impl Card {
         !self.description.is_empty()
     }
 
+    /// When the Card last changed: its newest history entry, or its creation
+    /// when nothing has been recorded.
+    pub fn last_changed_at(&self) -> chrono::DateTime<Utc> {
+        self.history.last().map_or(self.created_at, |e| e.at)
+    }
+
     pub fn touch(&mut self) {
         self.updated_at = Utc::now();
     }
@@ -431,6 +437,15 @@ mod tests {
         let resolved = card.resolved_labels(&board_labels);
         assert_eq!(resolved[0].name, "second");
         assert_eq!(resolved[1].name, "first");
+    }
+
+    #[test]
+    fn last_changed_at_is_newest_history_entry_or_creation() {
+        let mut card = Card::new("Task".into());
+        assert_eq!(card.last_changed_at(), card.created_at);
+        card.log("a");
+        card.history[0].at = card.created_at + chrono::Duration::days(3);
+        assert_eq!(card.last_changed_at(), card.history[0].at);
     }
 
     #[test]

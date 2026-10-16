@@ -33,6 +33,8 @@ pub enum Action {
     ManageLabels,
     SetDueDate,
     ClearDueDate,
+    ToggleCreatedDate,
+    ToggleUpdatedDate,
     HistoryDialog,
     Help,
     Quit,
@@ -65,6 +67,9 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Char('L'), shift: None, action: Action::ManageLabels, keys: "L", help: "Manage labels", section: "Labels & Due" },
     Binding { code: KeyCode::Char('u'), shift: None, action: Action::SetDueDate, keys: "u", help: "Set due date", section: "Labels & Due" },
     Binding { code: KeyCode::Char('U'), shift: None, action: Action::ClearDueDate, keys: "U", help: "Clear due date", section: "Labels & Due" },
+    // View
+    Binding { code: KeyCode::Char('c'), shift: None, action: Action::ToggleCreatedDate, keys: "c", help: "Show/hide created date", section: "View" },
+    Binding { code: KeyCode::Char('d'), shift: None, action: Action::ToggleUpdatedDate, keys: "d", help: "Show/hide updated date", section: "View" },
     // App
     Binding { code: KeyCode::Esc, shift: None, action: Action::Close, keys: "Esc", help: "Close", section: "App" },
     Binding { code: KeyCode::Char('?'), shift: None, action: Action::Help, keys: "?", help: "Help", section: "App" },
@@ -224,6 +229,8 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                     app.start_insert(Box::new(DatePicker::new(card_id, &date_str, InsertSurface::CardDetail)));
                 }
         }
+        Action::ToggleCreatedDate => super::normal::toggle_created_date(app)?,
+        Action::ToggleUpdatedDate => super::normal::toggle_updated_date(app)?,
         Action::ClearDueDate => {
             if let Some(board) = app.board()
                 && board.current_card().is_some_and(|c| c.due_date.is_some())
@@ -452,6 +459,20 @@ mod tests {
             send(&mut app, 'y');
             assert!(matches!(app.mode, AppMode::Dialog));
             assert!(app.board().unwrap().current_card().unwrap().history.is_empty());
+        });
+    }
+
+    #[test]
+    fn c_and_d_toggle_the_date_stamps_in_card_detail() {
+        with_temp_dir(|| {
+            let mut app = setup_card_detail();
+            press(&mut app, KeyCode::Char('c'));
+            assert!(app.board().unwrap().meta.show_created_date);
+            press(&mut app, KeyCode::Char('d'));
+            assert!(app.board().unwrap().meta.show_updated_date);
+            press(&mut app, KeyCode::Char('c'));
+            assert!(!app.board().unwrap().meta.show_created_date);
+            assert!(matches!(app.mode, AppMode::CardDetail));
         });
     }
 

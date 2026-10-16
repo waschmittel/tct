@@ -4,15 +4,14 @@ expression: render_to_string(&app)
 ---
  Demo (2 lists)
 ┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
-│┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓││┌──────────────────────────────────────────────┐│
-│┃Fix┌ Help — Board View ─────────────────────────────────────────────────────────────────────┐   ││
-│┃[bu│Navigation                                   Lists                                      │───┘│
-│┃[1/│  Left / Right      Switch lists               N                 New list               │    │
-│┗━━━│  Up / Down         Navigate cards             r                 Rename list            │    │
-│┌───│  g / G             First / last card          A                 Archive list           │    │
-││Red│  j/k or ,/.        Prev / next board          V                 View archived lists    │    │
-│└───│  Enter             Open card detail           < / >             Reorder list           │    │
-│    │                                                                                        │    │
+│┏━━━┌ Help — Board View ─────────────────────────────────────────────────────────────────────┐───┐│
+│┃Fix│Navigation                                   Lists                                      │   ││
+│┃[bu│  Left / Right      Switch lists               N                 New list               │───┘│
+│┃[1/│  Up / Down         Navigate cards             r                 Rename list            │    │
+│┗━━━│  g / G             First / last card          A                 Archive list           │    │
+│┌───│  j/k or ,/.        Prev / next board          V                 View archived lists    │    │
+││Red│  Enter             Open card detail           < / >             Reorder list           │    │
+│└───│                                                                                        │    │
 │    │Card                                         Search & Filter                            │    │
 │    │  t                 Quick-edit title           /                 Search                 │    │
 │    │  e                 Edit description           f                 Filter by label        │    │
@@ -24,11 +23,12 @@ expression: render_to_string(&app)
 │    │                                               u                 Set due date           │    │
 │    │Move                                           U                 Clear due date         │    │
 │    │  Shift+Left/Right  Move to adjacent list                                               │    │
-│    │  Shift+Up/Down     Move within list         App                                        │    │
-│    │  m                 Grab/drop card (arrows)    b                 Back to selector       │    │
-│    │                                               ?                 Help                   │    │
-│    │                                               q                 Quit                   │    │
+│    │  Shift+Up/Down     Move within list         View                                       │    │
+│    │  m                 Grab/drop card (arrows)    c                 Show/hide created date │    │
+│    │                                               d                 Show/hide updated date │    │
+│    │                                                                                        │    │
+│    │                                             App                                        │    │
+│    │                                               b                 Back to selector       │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
-│                                                ││                                                │
 └────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
  HELP                                                                                        ~/.tct

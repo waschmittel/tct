@@ -511,3 +511,44 @@ fn dialog_help_pages_are_compact_and_unwrapped() {
         }
     });
 }
+
+/// The date stamps sit in the card-detail frame's top/bottom right corners
+/// in the accent color. Dates are pinned to a past year so the text is
+/// deterministic (no snapshot: fixtures must not carry timestamps).
+#[test]
+fn card_detail_shows_date_stamps_in_accent_color() {
+    use chrono::TimeZone;
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        let card_id = app.board().unwrap().current_card_id().unwrap().clone();
+        {
+            let card = app.board_mut().unwrap().cards.get_mut(&card_id).unwrap();
+            card.created_at = chrono::Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
+            card.history.clear();
+            card.log("Edited");
+            card.history[0].at = chrono::Utc.with_ymd_and_hms(2021, 3, 4, 12, 0, 0).unwrap();
+        }
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        assert!(!render_to_string(&app).contains("2020-01-02"));
+
+        press(&mut app, KeyCode::Char('c'));
+        press(&mut app, KeyCode::Char('d'));
+        let text = render_to_string(&app);
+        let rows: Vec<&str> = text.lines().collect();
+        let top = rows.iter().find(|r| r.contains("┌ Fix login flow")).expect("popup top");
+        assert!(top.contains("2021-03-04"), "{text}");
+        // The board card behind the popup carries a stamp too: the popup's is lowest.
+        let bottom = rows.iter().rev().find(|r| r.contains("2020-01-02")).expect("created stamp");
+        assert!(top.contains(" 2021-03-04 ┐") && bottom.contains(" 2020-01-02 ┘"), "{text}");
+
+        let backend = TestBackend::new(WIDTH, HEIGHT);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| crate::ui::render(frame, &app)).unwrap();
+        let buf = terminal.backend().buffer();
+        let y = rows.iter().rposition(|r| r.contains("2020-01-02")).unwrap() as u16;
+        let x = rows[y as usize].find("2020-01-02").map(|b| rows[y as usize][..b].chars().count()).unwrap() as u16;
+        assert_eq!(buf[(x, y)].fg, app.accent_color());
+    });
+}

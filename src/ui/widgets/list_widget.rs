@@ -174,6 +174,10 @@ pub fn render(
                 &board.meta.labels,
                 accent,
                 app.caps,
+                card_widget::DateStamps {
+                    created: board.meta.show_created_date,
+                    updated: board.meta.show_updated_date,
+                },
             );
 
             y_offset += ch;

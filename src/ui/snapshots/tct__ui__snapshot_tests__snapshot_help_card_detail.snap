@@ -15,14 +15,14 @@ expression: render_to_string(&app)
 │    │  PgUp/PgDn ←/→     Scroll description         u                 Set due date           │    │
 │    │  y                 Copy description           U                 Clear due date         │    │
 │    │  Y                 Copy checklist (md)                                                 │    │
-│    │  h                 View change history      App                                        │    │
-│    │                                               Esc               Close                  │    │
-│    │Checklist                                      ?                 Help                   │    │
-│    │  Up / Down         Navigate items             q                 Quit                   │    │
-│    │  Shift+Up/Down     Reorder item                                                        │    │
-│    │  Space             Toggle item                                                         │    │
-│    │  a                 Add item                                                            │    │
-│    │  Enter             Edit item                                                           │    │
+│    │  h                 View change history      View                                       │    │
+│    │                                               c                 Show/hide created date │    │
+│    │Checklist                                      d                 Show/hide updated date │    │
+│    │  Up / Down         Navigate items                                                      │    │
+│    │  Shift+Up/Down     Reorder item             App                                        │    │
+│    │  Space             Toggle item                Esc               Close                  │    │
+│    │  a                 Add item                   ?                 Help                   │    │
+│    │  Enter             Edit item                  q                 Quit                   │    │
 │    │  x                 Delete item                                                         │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
 │                                                ││                                                │

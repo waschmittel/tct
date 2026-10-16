@@ -53,6 +53,8 @@ pub enum Action {
     ManageLabels,
     SetDueDate,
     ClearDueDate,
+    ToggleCreatedDate,
+    ToggleUpdatedDate,
 }
 
 /// Board-view keymap. Single definition of key → action → help text; the
@@ -102,6 +104,9 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Char('L'), shift: None, action: Action::ManageLabels, keys: "L", help: "Manage labels", section: "Labels & Due" },
     Binding { code: KeyCode::Char('u'), shift: None, action: Action::SetDueDate, keys: "u", help: "Set due date", section: "Labels & Due" },
     Binding { code: KeyCode::Char('U'), shift: None, action: Action::ClearDueDate, keys: "U", help: "Clear due date", section: "Labels & Due" },
+    // View
+    Binding { code: KeyCode::Char('c'), shift: None, action: Action::ToggleCreatedDate, keys: "c", help: "Show/hide created date", section: "View" },
+    Binding { code: KeyCode::Char('d'), shift: None, action: Action::ToggleUpdatedDate, keys: "d", help: "Show/hide updated date", section: "View" },
     // App
     Binding { code: KeyCode::Char('b'), shift: None, action: Action::CloseBoard, keys: "b", help: "Back to selector", section: "App" },
     Binding { code: KeyCode::Char('?'), shift: None, action: Action::Help, keys: "?", help: "Help", section: "App" },
@@ -344,6 +349,8 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                     app.open_dialog(Box::new(CardHistory::new()));
                 }
         }
+        Action::ToggleCreatedDate => toggle_created_date(app)?,
+        Action::ToggleUpdatedDate => toggle_updated_date(app)?,
         Action::ClearDueDate => {
             if let Some(board) = app.board()
                 && board.current_card().is_some_and(|c| c.due_date.is_some())
@@ -351,6 +358,25 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                 app.open_dialog(Box::new(ConfirmClearDueDate));
             }
         }
+    }
+    Ok(())
+}
+
+/// Shared with the card-detail keymap: both views show the board's setting.
+pub(super) fn toggle_created_date(app: &mut App) -> anyhow::Result<()> {
+    if let Some(board) = app.board() {
+        let show = !board.meta.show_created_date;
+        app.apply(Command::SetShowCreatedDate { show })?;
+        app.set_status(format!("Created dates {}", if show { "shown" } else { "hidden" }));
+    }
+    Ok(())
+}
+
+pub(super) fn toggle_updated_date(app: &mut App) -> anyhow::Result<()> {
+    if let Some(board) = app.board() {
+        let show = !board.meta.show_updated_date;
+        app.apply(Command::SetShowUpdatedDate { show })?;
+        app.set_status(format!("Updated dates {}", if show { "shown" } else { "hidden" }));
     }
     Ok(())
 }
@@ -781,6 +807,25 @@ mod tests {
             assert!(!app.search_active);
             assert!(app.search_query.is_empty());
             assert!(app.label_filter.is_none());
+        });
+    }
+
+    #[test]
+    fn c_and_d_toggle_the_date_stamps_independently_and_persist() {
+        with_temp_dir(|| {
+            let (mut app, meta, _, _) = fixture();
+            let plain = |c| KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty());
+            handle(&mut app, plain('c')).unwrap();
+            let m = &app.board().unwrap().meta;
+            assert!(m.show_created_date && !m.show_updated_date);
+            handle(&mut app, plain('d')).unwrap();
+            let m = &app.board().unwrap().meta;
+            assert!(m.show_created_date && m.show_updated_date);
+            let on_disk = board_store::load_board(&meta.id).unwrap();
+            assert!(on_disk.show_created_date && on_disk.show_updated_date);
+            handle(&mut app, plain('c')).unwrap();
+            assert!(!app.board().unwrap().meta.show_created_date);
+            assert!(app.board().unwrap().meta.show_updated_date);
         });
     }
 

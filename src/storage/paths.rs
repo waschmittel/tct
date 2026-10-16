@@ -44,10 +44,16 @@ fn is_real_dir(path: &std::path::Path) -> bool {
 }
 
 /// Home-shortened display form of [`base_dir`], e.g. `~/.tct`.
+// Test builds pin the display in `app::data_dir_display`, so only the
+// non-test binary calls this.
+#[cfg_attr(test, allow(dead_code))]
 pub fn display_base_dir() -> String {
-    let dir = base_dir();
-    if let Some(home) = dirs::home_dir()
-        && let Ok(rest) = dir.strip_prefix(&home)
+    shorten_home(&base_dir(), dirs::home_dir().as_deref())
+}
+
+fn shorten_home(dir: &std::path::Path, home: Option<&std::path::Path>) -> String {
+    if let Some(home) = home
+        && let Ok(rest) = dir.strip_prefix(home)
     {
         return format!("~/{}", rest.display());
     }
@@ -91,6 +97,15 @@ mod tests {
             let expected = std::env::var("TCT_DATA_DIR").unwrap();
             assert_eq!(base_dir(), PathBuf::from(expected));
         });
+    }
+
+    #[test]
+    fn shorten_home_replaces_only_a_home_prefix() {
+        use std::path::Path;
+        let home = Path::new("/home/me");
+        assert_eq!(shorten_home(Path::new("/home/me/.tct"), Some(home)), "~/.tct");
+        assert_eq!(shorten_home(Path::new("/srv/data"), Some(home)), "/srv/data");
+        assert_eq!(shorten_home(Path::new("/home/me/.tct"), None), "/home/me/.tct");
     }
 
     #[test]

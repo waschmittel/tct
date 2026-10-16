@@ -741,6 +741,14 @@ impl BoardEditor {
                 self.board.meta.accent_color = color;
                 pending.push(PendingWrite::Board);
             }
+            Command::SetShowCreatedDate { show } => {
+                self.board.meta.show_created_date = show;
+                pending.push(PendingWrite::Board);
+            }
+            Command::SetShowUpdatedDate { show } => {
+                self.board.meta.show_updated_date = show;
+                pending.push(PendingWrite::Board);
+            }
             Command::DefineLabel { name, color } => {
                 let label = Label::new(name, color);
                 self.board.meta.labels.push(label);

@@ -299,7 +299,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         let map = crate::input::card_detail_input::KEYMAP;
         (
             keymap_column(map, &["Card", "Checklist"], &header, &row),
-            keymap_column(map, &["Labels & Due", "App"], &header, &row),
+            keymap_column(map, &["Labels & Due", "View", "App"], &header, &row),
         )
     } else if is_board_selector_base {
         let map = crate::input::board_selector_input::KEYMAP;
@@ -313,7 +313,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             keymap_column(map, &["Navigation", "Card", "Move"], &header, &row),
             keymap_column(
                 map,
-                &["Lists", "Search & Filter", "Labels & Due", "App"],
+                &["Lists", "Search & Filter", "Labels & Due", "View", "App"],
                 &header,
                 &row,
             ),
@@ -407,11 +407,11 @@ mod tests {
 
         let layouts: &[(&[&str], Vec<&'static str>)] = &[
             (
-                &["Navigation", "Card", "Move", "Lists", "Search & Filter", "Labels & Due", "App"],
+                &["Navigation", "Card", "Move", "Lists", "Search & Filter", "Labels & Due", "View", "App"],
                 sections(crate::input::normal::KEYMAP),
             ),
             (
-                &["Card", "Checklist", "Labels & Due", "App"],
+                &["Card", "Checklist", "Labels & Due", "View", "App"],
                 sections(crate::input::card_detail_input::KEYMAP),
             ),
             (

@@ -39,6 +39,12 @@ pub struct BoardMeta {
     pub accent_color: LabelColor,
     #[serde(default)]
     pub archived: bool,
+    /// Show each Card's creation date in its frame (bottom right).
+    #[serde(default)]
+    pub show_created_date: bool,
+    /// Show each Card's last-change date in its frame (top right).
+    #[serde(default)]
+    pub show_updated_date: bool,
     pub created_at: chrono::DateTime<Utc>,
     pub updated_at: chrono::DateTime<Utc>,
 }
@@ -54,6 +60,8 @@ impl BoardMeta {
             labels: Vec::new(),
             accent_color: LabelColor::default(),
             archived: false,
+            show_created_date: false,
+            show_updated_date: false,
             created_at: now,
             updated_at: now,
         }

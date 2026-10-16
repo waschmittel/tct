@@ -45,6 +45,8 @@ pub enum Command {
     RestoreBoard { board_id: BoardId },
     RenameBoard { name: String },
     SetAccentColor { color: LabelColor },
+    SetShowCreatedDate { show: bool },
+    SetShowUpdatedDate { show: bool },
 
     // Label commands
     DefineLabel { name: String, color: LabelColor },

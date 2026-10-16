@@ -8,6 +8,7 @@ use crate::app::{App, AppMode};
 use crate::insert::InsertSurface;
 
 use super::markdown;
+use super::widgets::card_widget;
 
 /// Horizontal padding between the popup border and the description text.
 const PAD: u16 = 2;
@@ -55,10 +56,21 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     } else {
         format!(" {} ", card.title)
     };
-    let block = Block::default()
+    let mut block = Block::default()
         .title(title_display)
         .borders(Borders::ALL)
         .border_style(Style::default().fg(accent));
+    let stamp_style = Style::default().fg(accent);
+    if board.meta.show_updated_date
+        && let Some(line) = card_widget::date_stamp(card.last_changed_at(), stamp_style, popup.width)
+    {
+        block = block.title_top(line);
+    }
+    if board.meta.show_created_date
+        && let Some(line) = card_widget::date_stamp(card.created_at, stamp_style, popup.width)
+    {
+        block = block.title_bottom(line);
+    }
     let inner = block.inner(popup);
     frame.render_widget(block, popup);
 
