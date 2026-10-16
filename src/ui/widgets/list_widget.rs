@@ -214,6 +214,31 @@ pub fn render(
         frame.render_widget(indicator, ind_area);
     }
 
+    // Scroll thumb drawn over the right border, between the corners.
+    if rendered_count < visible_cards.len() {
+        use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
+        // One position per scroll offset: the thumb reaches the bottom
+        // exactly when the last card is in view.
+        let positions = visible_cards.len() - rendered_count + 1;
+        let mut state = ScrollbarState::new(positions)
+            .position(scroll)
+            .viewport_content_length(rendered_count);
+        let thumb_style = if is_selected {
+            Style::default().fg(accent)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None)
+                .track_symbol(None)
+                .style(thumb_style),
+            area.inner(ratatui::layout::Margin::new(0, 1)),
+            &mut state,
+        );
+    }
+
     let _ = max_visible; // used in scroll adjustment above
 }
 

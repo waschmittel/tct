@@ -552,3 +552,33 @@ fn card_detail_shows_date_stamps_in_accent_color() {
         assert_eq!(buf[(x, y)].fg, app.accent_color());
     });
 }
+
+fn seed_long_list_board() -> BoardId {
+    let mut meta = crate::model::board::BoardMeta::new("Long".into());
+    board_store::save_board(&meta).unwrap();
+    let list = crate::test_support::add_list(&mut meta, "Backlog");
+    let mut cards: Vec<Card> = (1..=12).map(|i| Card::new(format!("Card {i:02}"))).collect();
+    crate::test_support::put_cards(&meta.id, &list, &mut cards);
+    meta.id
+}
+
+/// A list taller than the viewport carries a scroll thumb on its right
+/// border; scrolling to the end moves it to the bottom.
+#[test]
+fn snapshot_long_list_scrollbar_top() {
+    with_temp_dir(|| {
+        let id = seed_long_list_board();
+        let app = App::new(Some(id)).unwrap();
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_long_list_scrollbar_bottom() {
+    with_temp_dir(|| {
+        let id = seed_long_list_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('G'));
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
