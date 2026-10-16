@@ -341,7 +341,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         Action::CardHistoryDialog => {
             if let Some(board) = app.board()
                 && board.current_card_id().is_some() {
-                    app.open_dialog(Box::new(CardHistory { scroll: 0 }));
+                    app.open_dialog(Box::new(CardHistory::new()));
                 }
         }
         Action::ClearDueDate => {

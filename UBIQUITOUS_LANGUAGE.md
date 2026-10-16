@@ -13,7 +13,7 @@
 | **Checklist Item** | A single checkable line within a **Card**'s checklist                                       | Subtask, todo, step             |
 | **Label**     | Named, colored tag attached to **Cards**; defined per-**Board** in a label palette               | Tag, category                   |
 | **Label Color** | Pastel color value for a **Label** — either a named variant (Red…Cyan) or `Custom { r, g, b }` | Hue, swatch                     |
-| **History Entry** | A timestamped action recorded on a **Card** (capped at `HISTORY_LIMIT = 50`)                | Audit log, changelog            |
+| **History Entry** | A timestamped action on a **Card**, with the changed field and its old/new value (capped at `HISTORY_LIMIT = 50`)                | Audit log, changelog            |
 | **Accent Color** | Per-**Board** UI highlight color (`BoardMeta.accent_color`); replaces hardcoded Cyan         | Theme color, primary color      |
 
 ## State & lifecycle

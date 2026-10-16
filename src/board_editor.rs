@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use crate::app::LoadedBoard;
 use crate::command::{Command, MoveDir};
 use crate::model::board::{BoardMeta, ListMeta};
-use crate::model::card::{Card, ChecklistItem};
+use crate::model::card::{Card, ChecklistItem, HistoryField};
 use crate::model::id::{BoardId, CardId, LabelId, ListId};
 use crate::model::label::Label;
 use crate::model::list::CardList;
@@ -417,9 +417,10 @@ impl BoardEditor {
             Command::EditCardTitle { card_id, title } => {
                 let card = self.card_mut(&card_id)?;
                 let changed = card.title != title;
-                card.title = title;
+                let old = std::mem::replace(&mut card.title, title);
                 if changed {
-                    card.log("Edited title");
+                    let new = card.title.clone();
+                    card.log_change(HistoryField::Title, "Edited title", Some(old), Some(new));
                 } else {
                     card.touch();
                 }
@@ -428,9 +429,15 @@ impl BoardEditor {
             Command::EditCardDescription { card_id, body } => {
                 let card = self.card_mut(&card_id)?;
                 let changed = card.description != body;
-                card.description = body;
+                let old = std::mem::replace(&mut card.description, body);
                 if changed {
-                    card.log("Edited description");
+                    let new = card.description.clone();
+                    card.log_change(
+                        HistoryField::Description,
+                        "Edited description",
+                        Some(old),
+                        Some(new),
+                    );
                 } else {
                     card.touch();
                 }
@@ -441,7 +448,12 @@ impl BoardEditor {
                 let prev = card.due_date;
                 card.due_date = Some(date);
                 if prev != Some(date) {
-                    card.log(format!("Set due date to {date}"));
+                    card.log_change(
+                        HistoryField::DueDate,
+                        format!("Set due date to {date}"),
+                        prev.map(|d| d.to_string()),
+                        Some(date.to_string()),
+                    );
                 } else {
                     card.touch();
                 }
@@ -449,10 +461,14 @@ impl BoardEditor {
             }
             Command::ClearDueDate { card_id } => {
                 let card = self.card_mut(&card_id)?;
-                let was_set = card.due_date.is_some();
-                card.due_date = None;
-                if was_set {
-                    card.log("Cleared due date");
+                let prev = card.due_date.take();
+                if let Some(prev) = prev {
+                    card.log_change(
+                        HistoryField::DueDate,
+                        "Cleared due date",
+                        Some(prev.to_string()),
+                        None,
+                    );
                 } else {
                     card.touch();
                 }
@@ -461,8 +477,9 @@ impl BoardEditor {
             Command::AddChecklistItem { card_id, text } => {
                 let card = self.card_mut(&card_id)?;
                 let action = format!("Added checklist item '{text}'");
+                let old = card.checklist_as_markdown();
                 card.checklist.push(ChecklistItem { text, completed: false });
-                card.log(action);
+                card.log_checklist(action, old);
                 let last = card.checklist.len() - 1;
                 pending.push(PendingWrite::Card(card.clone()));
                 // Detail cursor follows the new item.
@@ -470,15 +487,20 @@ impl BoardEditor {
             }
             Command::EditChecklistItem { card_id, item_idx, text } => {
                 let card = self.card_mut(&card_id)?;
+                let old_checklist = card.checklist_as_markdown();
                 let item = card
                     .checklist
                     .get_mut(item_idx)
                     .ok_or(BoardEditorError::Invariant("checklist index out of range"))?;
                 let changed = item.text != text;
-                let old = std::mem::replace(&mut item.text, text);
-                let new = item.text.clone();
+                let old_text = std::mem::replace(&mut item.text, text);
+                let new_text = item.text.clone();
                 if changed {
-                    card.log(format!("Renamed checklist item '{old}' → '{new}'"));
+                    let was = old_checklist;
+                    card.log_checklist(
+                        format!("Renamed checklist item '{old_text}' → '{new_text}'"),
+                        was,
+                    );
                 } else {
                     card.touch();
                 }
@@ -486,6 +508,7 @@ impl BoardEditor {
             }
             Command::ToggleChecklistItem { card_id, item_idx } => {
                 let card = self.card_mut(&card_id)?;
+                let old = card.checklist_as_markdown();
                 let item = card
                     .checklist
                     .get_mut(item_idx)
@@ -496,7 +519,7 @@ impl BoardEditor {
                 } else {
                     format!("Uncompleted checklist item '{}'", item.text)
                 };
-                card.log(action);
+                card.log_checklist(action, old);
                 pending.push(PendingWrite::Card(card.clone()));
             }
             Command::RemoveChecklistItem { card_id, item_idx } => {
@@ -506,8 +529,9 @@ impl BoardEditor {
                         "checklist index out of range",
                     ));
                 }
+                let old = card.checklist_as_markdown();
                 let removed = card.checklist.remove(item_idx);
-                card.log(format!("Removed checklist item '{}'", removed.text));
+                card.log_checklist(format!("Removed checklist item '{}'", removed.text), old);
                 let len = card.checklist.len();
                 pending.push(PendingWrite::Card(card.clone()));
                 // Clamp detail cursor to the shrunk checklist.
@@ -524,10 +548,11 @@ impl BoardEditor {
                     ));
                 }
                 if from != to {
+                    let old = card.checklist_as_markdown();
                     let name = card.checklist[from].text.clone();
                     let item = card.checklist.remove(from);
                     card.checklist.insert(to, item);
-                    card.log(format!("Reordered checklist item '{name}'"));
+                    card.log_checklist(format!("Reordered checklist item '{name}'"), old);
                 } else {
                     card.touch();
                 }
@@ -547,7 +572,13 @@ impl BoardEditor {
                         kind: "label",
                         id: label_id.to_string(),
                     })?;
-                let card = self.card_mut(&card_id)?;
+                let board_labels = &self.board.meta.labels;
+                let card = self
+                    .board
+                    .cards
+                    .get_mut(&card_id)
+                    .ok_or(BoardEditorError::NotFound { kind: "card", id: card_id.to_string() })?;
+                let old = card.label_names_text(board_labels);
                 let action = if let Some(pos) = card.label_ids.iter().position(|id| *id == label_id) {
                     card.label_ids.remove(pos);
                     format!("Removed label '{label_name}'")
@@ -555,7 +586,17 @@ impl BoardEditor {
                     card.label_ids.push(label_id);
                     format!("Added label '{label_name}'")
                 };
-                card.log(action);
+                let new = card.label_names_text(board_labels);
+                card.log_change(HistoryField::Labels, action, Some(old), Some(new));
+                pending.push(PendingWrite::Card(card.clone()));
+            }
+            Command::DeleteHistoryEntry { card_id, index } => {
+                let card = self.card_mut(&card_id)?;
+                if index >= card.history.len() {
+                    return Err(BoardEditorError::Invariant("history index out of range"));
+                }
+                card.history.remove(index);
+                card.touch();
                 pending.push(PendingWrite::Card(card.clone()));
             }
             Command::AddCard { list_id, title } => {
@@ -1286,6 +1327,139 @@ mod tests {
             })
             .collect();
         (BoardEditor::load(&meta.id).unwrap(), lid, ids_v)
+    }
+
+    #[test]
+    fn history_records_field_with_old_and_new_values() {
+        with_temp_dir(|| {
+            let (mut ed, _, ids) = editor_with_cards(&["t"]);
+            let id = ids[0].clone();
+            ed.apply(Command::DefineLabel {
+                name: "foo".into(),
+                color: crate::model::label::LabelColor::generate_pastel(&[]),
+            })
+            .unwrap();
+            let label_id = ed.board().meta.labels[0].id.clone();
+            ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id }).unwrap();
+            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "u".into() }).unwrap();
+            ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: "x".into() }).unwrap();
+            ed.reload().unwrap();
+
+            let h = &ed.board().cards[&id].history;
+            assert_eq!(h[0].field, HistoryField::Labels);
+            assert_eq!(h[0].old.as_deref(), Some(""));
+            assert_eq!(h[0].new.as_deref(), Some("foo"));
+            assert_eq!(h[1].field, HistoryField::Title);
+            assert_eq!((h[1].old.as_deref(), h[1].new.as_deref()), (Some("t"), Some("u")));
+            assert_eq!(h[2].field, HistoryField::Checklist);
+            assert_eq!(h[2].old.as_deref(), Some(""));
+            assert_eq!(h[2].new.as_deref(), Some("- [ ] x"));
+        });
+    }
+
+    #[test]
+    fn delete_history_entry_removes_only_that_entry() {
+        with_temp_dir(|| {
+            let (mut ed, _, ids) = editor_with_cards(&["t"]);
+            let id = ids[0].clone();
+            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "a".into() }).unwrap();
+            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "b".into() }).unwrap();
+            ed.apply(Command::DeleteHistoryEntry { card_id: id.clone(), index: 0 }).unwrap();
+            ed.reload().unwrap();
+            let h = &ed.board().cards[&id].history;
+            assert_eq!(h.len(), 1);
+            assert_eq!(h[0].new.as_deref(), Some("b"));
+            assert!(ed
+                .apply(Command::DeleteHistoryEntry { card_id: id, index: 5 })
+                .is_err());
+        });
+    }
+
+    #[test]
+    fn history_records_description_and_due_date_changes() {
+        with_temp_dir(|| {
+            let (mut ed, _, ids) = editor_with_cards(&["t"]);
+            let id = ids[0].clone();
+            let d1 = chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap();
+            let d2 = chrono::NaiveDate::from_ymd_opt(2099, 2, 2).unwrap();
+            ed.apply(Command::EditCardDescription { card_id: id.clone(), body: "hi".into() }).unwrap();
+            ed.apply(Command::SetDueDate { card_id: id.clone(), date: d1 }).unwrap();
+            ed.apply(Command::SetDueDate { card_id: id.clone(), date: d2 }).unwrap();
+            ed.apply(Command::ClearDueDate { card_id: id.clone() }).unwrap();
+            let h = &ed.board().cards[&id].history;
+            assert_eq!(h.len(), 4);
+            assert_eq!(h[0].field, HistoryField::Description);
+            assert_eq!((h[0].old.as_deref(), h[0].new.as_deref()), (Some(""), Some("hi")));
+            assert_eq!((h[1].old.as_deref(), h[1].new.as_deref()), (None, Some("2099-01-01")));
+            assert_eq!((h[2].old.as_deref(), h[2].new.as_deref()), (Some("2099-01-01"), Some("2099-02-02")));
+            assert_eq!(h[3].field, HistoryField::DueDate);
+            assert_eq!((h[3].old.as_deref(), h[3].new.as_deref()), (Some("2099-02-02"), None));
+        });
+    }
+
+    #[test]
+    fn unchanged_values_add_no_history_entry() {
+        with_temp_dir(|| {
+            let (mut ed, _, ids) = editor_with_cards(&["t"]);
+            let id = ids[0].clone();
+            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "t".into() }).unwrap();
+            ed.apply(Command::EditCardDescription { card_id: id.clone(), body: String::new() }).unwrap();
+            ed.apply(Command::ClearDueDate { card_id: id.clone() }).unwrap();
+            assert!(ed.board().cards[&id].history.is_empty());
+        });
+    }
+
+    #[test]
+    fn history_records_every_checklist_mutation() {
+        with_temp_dir(|| {
+            let (mut ed, _, ids) = editor_with_cards(&["t"]);
+            let id = ids[0].clone();
+            for text in ["a", "b"] {
+                ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: text.into() }).unwrap();
+            }
+            ed.apply(Command::ToggleChecklistItem { card_id: id.clone(), item_idx: 0 }).unwrap();
+            ed.apply(Command::EditChecklistItem { card_id: id.clone(), item_idx: 1, text: "c".into() }).unwrap();
+            ed.apply(Command::ReorderChecklistItem { card_id: id.clone(), from: 1, to: 0 }).unwrap();
+            ed.apply(Command::RemoveChecklistItem { card_id: id.clone(), item_idx: 0 }).unwrap();
+            let h = &ed.board().cards[&id].history;
+            assert_eq!(h.len(), 6);
+            assert!(h.iter().all(|e| e.field == HistoryField::Checklist));
+            let pair = |i: usize| (h[i].old.clone().unwrap(), h[i].new.clone().unwrap());
+            assert_eq!(pair(2), ("- [ ] a\n- [ ] b".into(), "- [x] a\n- [ ] b".into()));
+            assert_eq!(pair(3), ("- [x] a\n- [ ] b".into(), "- [x] a\n- [ ] c".into()));
+            assert_eq!(pair(4), ("- [x] a\n- [ ] c".into(), "- [ ] c\n- [x] a".into()));
+            assert_eq!(pair(5), ("- [ ] c\n- [x] a".into(), "- [x] a".into()));
+        });
+    }
+
+    #[test]
+    fn untoggling_label_records_removal() {
+        with_temp_dir(|| {
+            let (mut ed, _, ids) = editor_with_cards(&["t"]);
+            let id = ids[0].clone();
+            ed.apply(Command::DefineLabel {
+                name: "foo".into(),
+                color: crate::model::label::LabelColor::generate_pastel(&[]),
+            })
+            .unwrap();
+            let label_id = ed.board().meta.labels[0].id.clone();
+            for _ in 0..2 {
+                ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id: label_id.clone() }).unwrap();
+            }
+            let h = &ed.board().cards[&id].history;
+            assert_eq!((h[1].old.as_deref(), h[1].new.as_deref()), (Some("foo"), Some("")));
+            assert_eq!(h[1].action, "Removed label 'foo'");
+        });
+    }
+
+    #[test]
+    fn delete_history_entry_unknown_card_errors() {
+        with_temp_dir(|| {
+            let (mut ed, _, _) = editor_with_cards(&["t"]);
+            assert!(ed
+                .apply(Command::DeleteHistoryEntry { card_id: "nope".into(), index: 0 })
+                .is_err());
+        });
     }
 
     #[test]

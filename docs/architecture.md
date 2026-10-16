@@ -13,6 +13,7 @@ src/
   event.rs           # Crossterm event polling (key + tick)
   term_caps.rs       # Terminal capability detection + color/glyph degradation
   term_out.rs        # outln!/errln! — control-char-safe output for the CLI surfaces
+  text_diff.rs       # Line diff for the history detail pane
   cli/
     mod.rs           # CLI dispatch, help text
     boards.rs        # `tct boards`
@@ -59,7 +60,7 @@ src/
     label_picker.rs  # Assign/remove labels on a card
     label_manager.rs # Board label CRUD
     archived_*.rs    # Archived boards/lists/cards browsers
-    card_history.rs  # Card history viewer
+    card_history.rs  # Card history: summary list + per-field diff, delete entries
     color_picker.rs  # Free HSL accent/label color picker
   ui/
     mod.rs           # Render dispatch + help overlay (reads keymap tables)

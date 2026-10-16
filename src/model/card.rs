@@ -43,7 +43,45 @@ pub struct ChecklistItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistoryEntry {
     pub at: chrono::DateTime<Utc>,
+    /// Human-readable summary, e.g. "Added label 'foo'".
     pub action: String,
+    /// Which part of the Card changed, kept apart from the summary text.
+    #[serde(default)]
+    pub field: HistoryField,
+    /// The field's value before the change, rendered as text. `None` when the
+    /// field had no value (or the entry records no field change).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub old: Option<String>,
+    /// The field's value after the change, rendered as text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub new: Option<String>,
+}
+
+/// The Card field a history entry is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HistoryField {
+    /// Lifecycle events without a value diff (created, archived, restored).
+    #[default]
+    General,
+    Title,
+    Description,
+    DueDate,
+    Labels,
+    Checklist,
+}
+
+impl HistoryField {
+    pub fn label(self) -> &'static str {
+        match self {
+            HistoryField::General => "General",
+            HistoryField::Title => "Title",
+            HistoryField::Description => "Description",
+            HistoryField::DueDate => "Due date",
+            HistoryField::Labels => "Labels",
+            HistoryField::Checklist => "Checklist",
+        }
+    }
 }
 
 pub const HISTORY_LIMIT: usize = 50;
@@ -99,13 +137,51 @@ impl Card {
     /// Record a change in history and bump `updated_at`. Caps history at
     /// HISTORY_LIMIT entries (FIFO eviction).
     pub fn log(&mut self, action: impl Into<String>) {
+        self.push_history(action.into(), HistoryField::General, None, None);
+    }
+
+    /// Like [`Card::log`], recording which field changed and its old and new
+    /// values.
+    pub fn log_change(
+        &mut self,
+        field: HistoryField,
+        action: impl Into<String>,
+        old: Option<String>,
+        new: Option<String>,
+    ) {
+        self.push_history(action.into(), field, old, new);
+    }
+
+    /// Log a checklist change; `old` is the markdown rendering from before it.
+    pub fn log_checklist(&mut self, action: impl Into<String>, old: String) {
+        let new = self.checklist_as_markdown();
+        self.push_history(action.into(), HistoryField::Checklist, Some(old), Some(new));
+    }
+
+    fn push_history(
+        &mut self,
+        action: String,
+        field: HistoryField,
+        old: Option<String>,
+        new: Option<String>,
+    ) {
         let now = Utc::now();
-        self.history.push(HistoryEntry { at: now, action: action.into() });
+        self.history.push(HistoryEntry { at: now, action, field, old, new });
         let len = self.history.len();
         if len > HISTORY_LIMIT {
             self.history.drain(..len - HISTORY_LIMIT);
         }
         self.updated_at = now;
+    }
+
+    /// Label names in card order, one per line — the value recorded in
+    /// history for [`HistoryField::Labels`].
+    pub fn label_names_text(&self, board_labels: &[Label]) -> String {
+        self.resolved_labels(board_labels)
+            .iter()
+            .map(|l| l.name.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     /// Render the full checklist as GitHub-flavored markdown task list.
@@ -355,5 +431,74 @@ mod tests {
         let resolved = card.resolved_labels(&board_labels);
         assert_eq!(resolved[0].name, "second");
         assert_eq!(resolved[1].name, "first");
+    }
+
+    #[test]
+    fn log_records_general_entry_without_values() {
+        let mut card = Card::new("Task".into());
+        card.log("Archived");
+        let e = &card.history[0];
+        assert_eq!(e.field, HistoryField::General);
+        assert!(e.old.is_none() && e.new.is_none());
+    }
+
+    #[test]
+    fn log_change_records_field_and_values() {
+        let mut card = Card::new("Task".into());
+        card.log_change(HistoryField::Title, "Edited title", Some("a".into()), Some("b".into()));
+        let e = &card.history[0];
+        assert_eq!(e.field, HistoryField::Title);
+        assert_eq!((e.old.as_deref(), e.new.as_deref()), (Some("a"), Some("b")));
+    }
+
+    #[test]
+    fn log_checklist_snapshots_old_and_current_markdown() {
+        let mut card = Card::new("Task".into());
+        let old = card.checklist_as_markdown();
+        card.checklist.push(ChecklistItem { text: "x".into(), completed: true });
+        card.log_checklist("Added", old);
+        let e = &card.history[0];
+        assert_eq!(e.field, HistoryField::Checklist);
+        assert_eq!(e.old.as_deref(), Some(""));
+        assert_eq!(e.new.as_deref(), Some("- [x] x"));
+    }
+
+    #[test]
+    fn label_names_text_lists_names_in_board_order() {
+        let l1 = Label::new("alpha".into(), LabelColor::Red);
+        let l2 = Label::new("beta".into(), LabelColor::Green);
+        let mut card = Card::new("Task".into());
+        card.label_ids = vec![l2.id.clone(), l1.id.clone()];
+        assert_eq!(card.label_names_text(&[l1, l2]), "alpha\nbeta");
+        assert_eq!(Card::new("x".into()).label_names_text(&[]), "");
+    }
+
+    #[test]
+    fn history_entry_without_field_values_loads_as_general() {
+        let json = r#"{"at":"2024-01-01T00:00:00Z","action":"Edited title"}"#;
+        let e: HistoryEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(e.field, HistoryField::General);
+        assert!(e.old.is_none() && e.new.is_none());
+    }
+
+    #[test]
+    fn history_entry_round_trips_and_omits_absent_values() {
+        let mut card = Card::new("Task".into());
+        card.log("Archived");
+        card.log_change(HistoryField::DueDate, "Set", None, Some("2099-01-01".into()));
+        let json = serde_json::to_string(&card.history).unwrap();
+        assert!(json.contains(r#""field":"due_date""#));
+        assert_eq!(json.matches("\"old\"").count(), 0);
+        let back: Vec<HistoryEntry> = serde_json::from_str(&json).unwrap();
+        assert_eq!(back[1].field, HistoryField::DueDate);
+        assert_eq!(back[1].new.as_deref(), Some("2099-01-01"));
+    }
+
+    #[test]
+    fn history_field_labels_are_distinct() {
+        use HistoryField::*;
+        let all = [General, Title, Description, DueDate, Labels, Checklist];
+        let names: std::collections::HashSet<_> = all.iter().map(|f| f.label()).collect();
+        assert_eq!(names.len(), all.len());
     }
 }

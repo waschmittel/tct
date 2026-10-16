@@ -29,6 +29,7 @@ pub enum Command {
     RemoveChecklistItem { card_id: CardId, item_idx: usize },
     ReorderChecklistItem { card_id: CardId, from: usize, to: usize },
     ToggleLabel { card_id: CardId, label_id: LabelId },
+    DeleteHistoryEntry { card_id: CardId, index: usize },
     AddCard { list_id: ListId, title: String },
     MoveCard { card_id: CardId, direction: MoveDir },
 

@@ -59,3 +59,38 @@ impl Dialog for ConfirmClearDueDate {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyModifiers;
+
+    fn key(c: KeyCode) -> KeyEvent {
+        KeyEvent::new(c, KeyModifiers::empty())
+    }
+
+    #[test]
+    fn n_and_esc_close_without_applying() {
+        for code in [KeyCode::Char('n'), KeyCode::Esc] {
+            let out = ConfirmClearDueDate.handle_key(key(code), None);
+            assert!(out.apply.is_none());
+            assert!(matches!(out.follow, super::super::Follow::Close));
+        }
+    }
+
+    #[test]
+    fn y_without_a_card_just_closes() {
+        let out = ConfirmClearDueDate.handle_key(key(KeyCode::Char('y')), None);
+        assert!(out.apply.is_none());
+        assert!(matches!(out.follow, super::super::Follow::Close));
+    }
+
+    #[test]
+    fn help_and_unrelated_keys() {
+        let out = ConfirmClearDueDate.handle_key(key(KeyCode::Char('?')), None);
+        assert!(matches!(out.follow, super::super::Follow::Help));
+        let out = ConfirmClearDueDate.handle_key(key(KeyCode::Char('z')), None);
+        assert!(matches!(out.follow, super::super::Follow::Stay));
+        assert!(ConfirmClearDueDate.help().is_some());
+    }
+}

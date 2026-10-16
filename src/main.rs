@@ -11,6 +11,7 @@ mod model;
 mod storage;
 mod term_caps;
 mod term_out;
+mod text_diff;
 mod ui;
 
 #[cfg(test)]

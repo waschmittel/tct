@@ -234,7 +234,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         Action::HistoryDialog => {
             if let Some(board) = app.board()
                 && board.current_card_id().is_some() {
-                    app.open_dialog(Box::new(CardHistory { scroll: 0 }));
+                    app.open_dialog(Box::new(CardHistory::new()));
                 }
         }
         Action::Help => {
@@ -434,6 +434,37 @@ mod tests {
                     .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
                     .is_some()
             );
+        });
+    }
+
+    #[test]
+    fn history_dialog_deletes_selected_entry_end_to_end() {
+        with_temp_dir(|| {
+            let mut app = setup_card_detail();
+            press_shift(&mut app, KeyCode::Char('U'));
+            let send = |app: &mut App, c| {
+                crate::input::handle_input(app, KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty())).unwrap()
+            };
+            send(&mut app, 'y');
+            assert_eq!(app.board().unwrap().current_card().unwrap().history.len(), 1);
+            send(&mut app, 'h');
+            send(&mut app, 'x');
+            send(&mut app, 'y');
+            assert!(matches!(app.mode, AppMode::Dialog));
+            assert!(app.board().unwrap().current_card().unwrap().history.is_empty());
+        });
+    }
+
+    #[test]
+    fn capital_u_without_due_date_opens_no_dialog() {
+        with_temp_dir(|| {
+            let mut app = setup_card_detail();
+            app.apply(Command::ClearDueDate {
+                card_id: app.board().unwrap().current_card_id().unwrap().clone(),
+            })
+            .unwrap();
+            press_shift(&mut app, KeyCode::Char('U'));
+            assert!(matches!(app.mode, AppMode::CardDetail));
         });
     }
 

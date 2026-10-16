@@ -79,9 +79,57 @@ Sleep 500ms
 Ctrl+S
 Sleep 1s
 
+# Assign a label from the picker
+Type "l"
+Sleep 800ms
+Down
+Sleep 500ms
+Space
+Sleep 800ms
+Escape
+Sleep 800ms
+
+# Set a due date in the date picker
+Type "u"
+Sleep 800ms
+Type "2099-12-31"
+Sleep 600ms
+Enter
+Sleep 1s
+
+# Clear it again; the confirmation dialog guards the removal
+Type "U"
+Sleep 1s
+Type "y"
+Sleep 1s
+
+# History: two panes, summary left and field diff right; delete an entry
+Type "h"
+Sleep 1.5s
+Down
+Sleep 900ms
+Down
+Sleep 900ms
+Down
+Sleep 900ms
+Type "x"
+Sleep 900ms
+Type "y"
+Sleep 1.2s
+Escape
+Sleep 800ms
+
 # Back to the board
 Escape
 Sleep 1s
+
+# Grab the card with m, move it with the arrows, drop it
+Type "m"
+Sleep 600ms
+Down
+Sleep 600ms
+Type "m"
+Sleep 800ms
 
 # Reorder lists
 Type ">"
