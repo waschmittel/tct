@@ -3,7 +3,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::app::{App, AppMode};
 use crate::command::Command;
 use crate::dialog::{
-    card_history::CardHistory, label_manager::LabelManager, label_picker::LabelPicker,
+    card_history::CardHistory, confirm_clear_due_date::ConfirmClearDueDate,
+    label_manager::LabelManager, label_picker::LabelPicker,
 };
 use crate::insert::{
     date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor, InsertSurface,
@@ -225,12 +226,9 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         }
         Action::ClearDueDate => {
             if let Some(board) = app.board()
-                && let Some((card_id, title)) = board
-                    .current_card()
-                    .map(|c| (c.id.clone(), c.title.clone()))
+                && board.current_card().is_some_and(|c| c.due_date.is_some())
             {
-                app.apply(Command::ClearDueDate { card_id })?;
-                app.set_status(format!("Cleared due date of '{title}'"));
+                app.open_dialog(Box::new(ConfirmClearDueDate));
             }
         }
         Action::HistoryDialog => {
@@ -370,10 +368,24 @@ mod tests {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
             press_shift(&mut app, KeyCode::Char('U'));
+            assert!(matches!(app.mode, AppMode::Dialog));
+            assert!(app.board().unwrap().current_card().unwrap().due_date.is_some());
+            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty())).unwrap();
             let card = app.board().unwrap().current_card().unwrap();
             assert!(card.due_date.is_none());
             // Card history should include "Cleared due date"
             assert!(card.history.iter().any(|h| h.action.contains("Cleared")));
+        });
+    }
+
+    #[test]
+    fn capital_u_then_n_keeps_due_date() {
+        with_temp_dir(|| {
+            let mut app = setup_card_detail();
+            press_shift(&mut app, KeyCode::Char('U'));
+            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty())).unwrap();
+            assert!(matches!(app.mode, AppMode::CardDetail));
+            assert!(app.board().unwrap().current_card().unwrap().due_date.is_some());
         });
     }
 

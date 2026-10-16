@@ -5,6 +5,7 @@ use crate::command::{Command, MoveDir};
 use crate::dialog::{
     archived_cards::ArchivedCards, archived_lists::ArchivedLists, card_history::CardHistory,
     confirm_archive_card::ConfirmArchiveCard, confirm_archive_list::ConfirmArchiveList,
+    confirm_clear_due_date::ConfirmClearDueDate,
     label_manager::LabelManager, label_picker::LabelPicker,
 };
 use crate::insert::{
@@ -345,12 +346,9 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         }
         Action::ClearDueDate => {
             if let Some(board) = app.board()
-                && let Some((card_id, title)) = board
-                    .current_card()
-                    .map(|c| (c.id.clone(), c.title.clone()))
+                && board.current_card().is_some_and(|c| c.due_date.is_some())
             {
-                app.apply(Command::ClearDueDate { card_id })?;
-                app.set_status(format!("Cleared due date of '{title}'"));
+                app.open_dialog(Box::new(ConfirmClearDueDate));
             }
         }
     }
@@ -799,6 +797,8 @@ mod tests {
                 card_store::save_card(&meta.id, card).unwrap();
             }
             handle(&mut app, shift_key(KeyCode::Char('U'))).unwrap();
+            assert!(app.board().unwrap().cards.get(&cid).unwrap().due_date.is_some());
+            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty())).unwrap();
             let board = app.board().unwrap();
             assert!(board.cards.get(&cid).unwrap().due_date.is_none());
             // Verify persisted
