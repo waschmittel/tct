@@ -104,15 +104,7 @@ pub fn card_lines(
         } else {
             Color::Green
         };
-        let label = if days < 0 {
-            format!("{} (-{}d)", due.format("%m-%d"), -days)
-        } else if days == 0 {
-            format!("{} (today)", due.format("%m-%d"))
-        } else if days <= 3 {
-            format!("{} ({}d)", due.format("%m-%d"), days)
-        } else {
-            due.format("%m-%d").to_string()
-        };
+        let label = due_label(*due, today);
         info.push(Span::styled(label, Style::default().fg(color)));
     }
     if let Some((done, total)) = card.checklist_progress() {
@@ -142,6 +134,50 @@ pub fn card_lines(
     }
 
     lines
+}
+
+/// Due date as shown on the card: `mm-dd`, or `yyyy-mm-dd` when the year is
+/// not the current one, plus how far away it is when that is near or past.
+fn due_label(due: chrono::NaiveDate, today: chrono::NaiveDate) -> String {
+    use chrono::Datelike;
+    let date = if due.year() == today.year() {
+        due.format("%m-%d")
+    } else {
+        due.format("%Y-%m-%d")
+    };
+    match (due - today).num_days() {
+        days if days < 0 => format!("{date} (-{}d)", -days),
+        0 => format!("{date} (today)"),
+        days if days <= 3 => format!("{date} ({days}d)"),
+        _ => date.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod due_label_tests {
+    use super::due_label;
+    use chrono::NaiveDate;
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).unwrap()
+    }
+
+    #[test]
+    fn current_year_omits_the_year() {
+        assert_eq!(due_label(d(2026, 12, 24), d(2026, 10, 16)), "12-24");
+    }
+
+    #[test]
+    fn other_years_show_the_year() {
+        assert_eq!(due_label(d(2027, 1, 5), d(2026, 10, 16)), "2027-01-05");
+        assert_eq!(due_label(d(2025, 12, 31), d(2026, 10, 16)), "2025-12-31 (-289d)");
+    }
+
+    #[test]
+    fn nearby_dates_keep_the_countdown_across_a_year_boundary() {
+        assert_eq!(due_label(d(2027, 1, 1), d(2026, 12, 30)), "2027-01-01 (2d)");
+        assert_eq!(due_label(d(2026, 10, 16), d(2026, 10, 16)), "10-16 (today)");
+    }
 }
 
 #[cfg(test)]
