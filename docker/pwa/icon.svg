@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#14141e"/>
+  <rect x="36" y="36" width="440" height="440" rx="64" fill="none" stroke="#5ec4ff" stroke-width="12"/>
+  <!-- Column 1 (To Do) -->
+  <rect x="68" y="80" width="112" height="28" rx="6" fill="#5ec4ff"/>
+  <rect x="68" y="128" width="112" height="76" rx="10" fill="#282837" stroke="#5ec4ff" stroke-width="6"/>
+  <rect x="84" y="148" width="80" height="10" rx="4" fill="#e0e0e8"/>
+  <rect x="84" y="170" width="52" height="10" rx="4" fill="#ff8fa3"/>
+  <rect x="68" y="220" width="112" height="76" rx="10" fill="#1e1e2c" stroke="#44445a" stroke-width="4"/>
+  <rect x="84" y="240" width="72" height="10" rx="4" fill="#a0a0b8"/>
+  <rect x="84" y="262" width="44" height="10" rx="4" fill="#8ce99a"/>
+  <!-- Column 2 (Doing) -->
+  <rect x="200" y="80" width="112" height="28" rx="6" fill="#b197fc"/>
+  <rect x="200" y="128" width="112" height="76" rx="10" fill="#1e1e2c" stroke="#44445a" stroke-width="4"/>
+  <rect x="216" y="148" width="80" height="10" rx="4" fill="#a0a0b8"/>
+  <rect x="216" y="170" width="60" height="10" rx="4" fill="#ffd43b"/>
+  <!-- Column 3 (Done) -->
+  <rect x="332" y="80" width="112" height="28" rx="6" fill="#8ce99a"/>
+  <rect x="332" y="128" width="112" height="76" rx="10" fill="#1e1e2c" stroke="#44445a" stroke-width="4"/>
+  <rect x="348" y="148" width="76" height="10" rx="4" fill="#a0a0b8"/>
+  <rect x="348" y="170" width="48" height="10" rx="4" fill="#8ce99a"/>
+  <rect x="332" y="220" width="112" height="76" rx="10" fill="#1e1e2c" stroke="#44445a" stroke-width="4"/>
+  <rect x="348" y="240" width="64" height="10" rx="4" fill="#a0a0b8"/>
+  <!-- Status bar -->
+  <rect x="68" y="408" width="88" height="28" rx="6" fill="#5ec4ff"/>
+  <rect x="172" y="416" width="140" height="12" rx="4" fill="#6c6c8a"/>
+</svg>

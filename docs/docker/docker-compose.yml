@@ -1,0 +1,44 @@
+services:
+  tct:
+    image: ghcr.io/waschmittel/tct:${TCT_IMAGE_TAG:-latest}
+    # Uncomment to build locally instead of pulling the release image:
+    # build:
+    #   context: ../..
+    #   dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      TCT_DATA_DIR: /data
+      TERM: xterm-256color
+      COLORTERM: truecolor
+      # Optional flags passed to `tct` (e.g., `--board "My Project"`)
+      TCT_ARGS: ${TCT_ARGS:-}
+    volumes:
+      # Bind-mount your synced tct directory from the host
+      - ${TCT_HOST_DATA_DIR:-./data}:/data
+    expose:
+      - "7681"
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.1
+    restart: unless-stopped
+    depends_on:
+      - tct
+    ports:
+      - "${TCT_PORT:-4180}:4180"
+    environment:
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_UPSTREAMS: http://tct:7681
+      OAUTH2_PROXY_PROXY_WEBSOCKETS: "true"
+      OAUTH2_PROXY_PASS_HOST_HEADER: "true"
+      OAUTH2_PROXY_EMAIL_DOMAINS: ${OAUTH2_PROXY_EMAIL_DOMAINS:-*}
+      OAUTH2_PROXY_PROVIDER: ${OAUTH2_PROXY_PROVIDER:-github}
+      OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_PROXY_CLIENT_ID:?Set OAUTH2_PROXY_CLIENT_ID in .env}
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET:?Set OAUTH2_PROXY_CLIENT_SECRET in .env}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET:?Set OAUTH2_PROXY_COOKIE_SECRET in .env}
+      OAUTH2_PROXY_COOKIE_SECURE: ${OAUTH2_PROXY_COOKIE_SECURE:-true}
+      OAUTH2_PROXY_REDIRECT_URL: ${OAUTH2_PROXY_REDIRECT_URL:-http://localhost:4180/oauth2/callback}
+      # Allow browsers/OS launchers to fetch static PWA metadata without a redirect
+      OAUTH2_PROXY_SKIP_AUTH_REGEX: '^/(manifest\.webmanifest|sw\.js|tct-pwa\.js|icon\.svg)$'
+      # Optional: restrict access to specific GitHub user(s) or OIDC issuer
+      OAUTH2_PROXY_GITHUB_USERS: ${OAUTH2_PROXY_GITHUB_USERS:-}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: ${OAUTH2_PROXY_OIDC_ISSUER_URL:-}

@@ -34,13 +34,13 @@ jobs:
             ext: ""
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Need tags so build.rs can stamp the version via git describe.
           fetch-depth: 0
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1, stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master (stable)
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
@@ -64,7 +64,7 @@ jobs:
         run: cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "tct-${{ steps.ver.outputs.version }}-${{ matrix.label }}${{ matrix.ext }}"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tct-${{ steps.ver.outputs.version }}-${{ matrix.label }}${{ matrix.ext }}
           path: tct-${{ steps.ver.outputs.version }}-${{ matrix.label }}${{ matrix.ext }}
@@ -78,12 +78,62 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
 
       - name: Create release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: artifacts/**/*
           generate_release_notes: true
+
+  docker:
+    name: Publish Docker Image (GHCR)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Compute image tags
+        id: meta
+        shell: bash
+        run: |
+          IMAGE="ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            v="${GITHUB_REF#refs/tags/}"
+            v_clean="${v#v}"
+            echo "tags=${IMAGE}:${v_clean},${IMAGE}:${v},${IMAGE}:latest" >> "$GITHUB_OUTPUT"
+          else
+            v="snap-$(date -u +%Y-%m-%d)"
+            echo "tags=${IMAGE}:${v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

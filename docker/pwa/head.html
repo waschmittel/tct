@@ -1,0 +1,24 @@
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="tct">
+<style>
+  html,
+  body,
+  #terminal-container,
+  .xterm,
+  .xterm-viewport,
+  .xterm-screen {
+    background-color: #000000 !important;
+  }
+  #terminal-container {
+    width: 100vw !important;
+    height: 100vh !important;
+  }
+  .xterm .xterm-viewport {
+    overflow-y: hidden !important;
+  }
+</style>
+<script src="/tct-pwa.js"></script>

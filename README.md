@@ -170,6 +170,7 @@ tct cards a1b2c3d4 --show e5f6a7b8 --by-id
 ## Documentation
 
 - **[User Guide](docs/user-guide.md)** — detailed usage, sync workflows, troubleshooting, data format reference
+- **[Self-Hosting & Browser PWA (Docker)](docs/docker/README.md)** — run `tct` in a browser as an installable PWA with Basic Auth or OAuth
 - **[Architecture (arc42)](docs/arc42.md)** — system context, building blocks, runtime views, ADRs, quality scenarios
 - **[Architecture (source tree)](docs/architecture.md)** — module layout and modal input dispatch overview
 

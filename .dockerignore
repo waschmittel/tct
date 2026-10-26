@@ -1,0 +1,5 @@
+target/
+.tct/
+data/
+.scratch/
+docs/vhs/*.gif
