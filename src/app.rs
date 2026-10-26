@@ -252,17 +252,41 @@ impl App {
 
     /// `what` names the copied content in the status message, e.g.
     /// "title 'Fix login flow'" or "description of 'Fix login flow'".
+    ///
+    /// Tries the native system clipboard (`arboard`) first. When unavailable
+    /// (e.g. inside a headless Docker container or remote SSH/ttyd session),
+    /// falls back to emitting an OSC 52 terminal escape sequence so browser
+    /// and remote terminals (`xterm.js`, iTerm2, kitty, WezTerm, Alacritty)
+    /// can copy directly to the client clipboard.
     pub fn copy_to_clipboard(&mut self, text: String, what: &str) {
-        match Clipboard::new() {
-            Ok(mut clipboard) => {
-                if let Err(e) = clipboard.set_text(text) {
-                    self.set_status(format!("Clipboard error: {}", e));
-                } else {
-                    self.set_status(format!("Copied {what} to clipboard"));
-                }
+        let native_res = Clipboard::new()
+            .and_then(|mut cb| cb.set_text(&text))
+            .map_err(|e| e.to_string());
+        self.copy_to_clipboard_with(
+            &text,
+            what,
+            native_res,
+            &mut std::io::stdout().lock(),
+        );
+    }
+
+    fn copy_to_clipboard_with(
+        &mut self,
+        text: &str,
+        what: &str,
+        native_result: Result<(), String>,
+        osc52_out: &mut dyn std::io::Write,
+    ) {
+        match native_result {
+            Ok(()) => {
+                self.set_status(format!("Copied {what} to clipboard"));
             }
             Err(e) => {
-                self.set_status(format!("Clipboard not available: {}", e));
+                if self.caps.rich_glyphs && write_osc52_to(text, osc52_out).is_ok() {
+                    self.set_status(format!("Copied {what} to clipboard using terminal"));
+                } else {
+                    self.set_status(format!("Clipboard not available: {}", e));
+                }
             }
         }
     }
@@ -413,6 +437,43 @@ impl App {
         editor.apply(cmd)?;
         Ok(editor.last_added_card_id().cloned())
     }
+}
+
+/// Format an OSC 52 clipboard escape sequence (`ESC ] 52 ; c ; <base64> BEL`).
+fn osc52_sequence(text: &str) -> String {
+    let encoded = base64_encode(text.as_bytes());
+    format!("\x1b]52;c;{encoded}\x07")
+}
+
+fn write_osc52_to(text: &str, out: &mut dyn std::io::Write) -> std::io::Result<()> {
+    let seq = osc52_sequence(text);
+    out.write_all(seq.as_bytes())?;
+    out.flush()
+}
+
+/// Standard RFC 4648 Base64 encoding for OSC 52 payloads.
+fn base64_encode(input: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
+    for chunk in input.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(TABLE[((n >> 18) & 0x3f) as usize] as char);
+        out.push(TABLE[((n >> 12) & 0x3f) as usize] as char);
+        if chunk.len() > 1 {
+            out.push(TABLE[((n >> 6) & 0x3f) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        if chunk.len() > 2 {
+            out.push(TABLE[(n & 0x3f) as usize] as char);
+        } else {
+            out.push('=');
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -750,5 +811,107 @@ mod tests {
             assert_eq!(h.line_cursor(), Some(5));
             assert!(matches!(app.mode, AppMode::Insert));
         });
+    }
+
+    #[test]
+    fn base64_rfc4648_vectors() {
+        assert_eq!(base64_encode(b""), "");
+        assert_eq!(base64_encode(b"f"), "Zg==");
+        assert_eq!(base64_encode(b"fo"), "Zm8=");
+        assert_eq!(base64_encode(b"foo"), "Zm9v");
+        assert_eq!(base64_encode(b"foob"), "Zm9vYg==");
+        assert_eq!(base64_encode(b"fooba"), "Zm9vYmE=");
+        assert_eq!(base64_encode(b"foobar"), "Zm9vYmFy");
+    }
+
+    #[test]
+    fn osc52_formats_escape_sequence() {
+        assert_eq!(
+            osc52_sequence("Fix login bug"),
+            "\x1b]52;c;Rml4IGxvZ2luIGJ1Zw==\x07"
+        );
+    }
+
+    #[test]
+    fn copy_to_clipboard_uses_native_when_available() {
+        let mut app = bare_app();
+        let mut osc_buf = Vec::new();
+        app.copy_to_clipboard_with(
+            "Fix login bug",
+            "title 'Fix login bug'",
+            Ok(()),
+            &mut osc_buf,
+        );
+        assert_eq!(
+            app.status_message.as_ref().map(|(m, _)| m.as_str()),
+            Some("Copied title 'Fix login bug' to clipboard")
+        );
+        assert!(osc_buf.is_empty(), "should not emit OSC 52 when native succeeds");
+    }
+
+    #[test]
+    fn copy_to_clipboard_falls_back_to_osc52_when_native_fails() {
+        let mut app = bare_app();
+        app.caps = crate::term_caps::TermCaps::full();
+        let mut osc_buf = Vec::new();
+        app.copy_to_clipboard_with(
+            "Fix login bug",
+            "title 'Fix login bug'",
+            Err("no display".into()),
+            &mut osc_buf,
+        );
+        assert_eq!(
+            app.status_message.as_ref().map(|(m, _)| m.as_str()),
+            Some("Copied title 'Fix login bug' to clipboard using terminal")
+        );
+        assert_eq!(
+            String::from_utf8(osc_buf).unwrap(),
+            "\x1b]52;c;Rml4IGxvZ2luIGJ1Zw==\x07"
+        );
+    }
+
+    #[test]
+    fn copy_to_clipboard_skips_osc52_on_linux_tty() {
+        let mut app = bare_app();
+        app.caps = crate::term_caps::TermCaps::linux_tty();
+        let mut osc_buf = Vec::new();
+        app.copy_to_clipboard_with(
+            "Fix login bug",
+            "title 'Fix login bug'",
+            Err("no display".into()),
+            &mut osc_buf,
+        );
+        assert_eq!(
+            app.status_message.as_ref().map(|(m, _)| m.as_str()),
+            Some("Clipboard not available: no display")
+        );
+        assert!(osc_buf.is_empty(), "should not emit OSC 52 on linux tty");
+    }
+
+    #[test]
+    fn copy_to_clipboard_reports_error_when_osc52_write_fails() {
+        struct FailingWriter;
+        impl std::io::Write for FailingWriter {
+            fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, "pipe closed"))
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut app = bare_app();
+        app.caps = crate::term_caps::TermCaps::full();
+        let mut writer = FailingWriter;
+        app.copy_to_clipboard_with(
+            "Fix login bug",
+            "title 'Fix login bug'",
+            Err("no display".into()),
+            &mut writer,
+        );
+        assert_eq!(
+            app.status_message.as_ref().map(|(m, _)| m.as_str()),
+            Some("Clipboard not available: no display")
+        );
     }
 }
