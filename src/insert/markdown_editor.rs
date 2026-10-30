@@ -194,82 +194,123 @@ fn split_line_for_new_item(textarea: &mut tui_textarea::TextArea<'static>, col: 
     textarea.insert_str(prefix);
 }
 
+/// Tab: nest the current list item one level deeper. Returns `false` (and
+/// does nothing) when the cursor line is not a list item.
 pub(crate) fn handle_tab_nest(textarea: &mut tui_textarea::TextArea<'static>) -> bool {
+    shift_list_item(textarea, true)
+}
+
+/// Shift+Tab: move the current list item one level up (no-op at top level or
+/// on non-list lines).
+pub(crate) fn handle_shift_tab_unnest(textarea: &mut tui_textarea::TextArea<'static>) {
+    shift_list_item(textarea, false);
+}
+
+/// Shared nest/unnest logic. Re-indents the item by `NEST_INDENT`, then makes
+/// it continue the list it lands in: if an item at the new indent exists
+/// (above, skipping deeper children), the bullet character / numbered scheme is
+/// copied from it; numbers are fixed up by `renumber_all`. The cursor stays on
+/// the same character. Returns whether the line was a (shiftable) list item.
+fn shift_list_item(textarea: &mut tui_textarea::TextArea<'static>, nest: bool) -> bool {
     let (row, col) = textarea.cursor();
-    let line = match textarea.lines().get(row) {
-        Some(l) => l.clone(),
-        None => return false,
+    let Some(line) = textarea.lines().get(row).cloned() else {
+        return false;
     };
     let trimmed = line.trim_start();
     let indent = line.len() - trimmed.len();
-
-    let numbered_prefix = trimmed
-        .find(". ")
-        .and_then(|p| trimmed[..p].parse::<u64>().ok().map(|_| p));
-    let is_unordered = trimmed.starts_with("- ") || trimmed.starts_with("* ");
-
-    if numbered_prefix.is_none() && !is_unordered {
+    let Some((current, old_marker_len)) = parse_marker(trimmed) else {
+        return false;
+    };
+    if !nest && indent < NEST_INDENT {
         return false;
     }
 
-    let pad = " ".repeat(NEST_INDENT);
     textarea.move_cursor(CursorMove::Jump(row as u16, 0));
-    textarea.insert_str(&pad);
+    let new_indent = if nest {
+        textarea.insert_str(" ".repeat(NEST_INDENT));
+        indent + NEST_INDENT
+    } else {
+        textarea.delete_str(NEST_INDENT);
+        indent - NEST_INDENT
+    };
 
-    if let Some(dot_pos) = numbered_prefix {
-        let old_num_str = &trimmed[..dot_pos];
-        let new_indent = indent + NEST_INDENT;
+    let sibling = sibling_marker(textarea.lines(), row, new_indent);
+    let replacement = match (current, sibling) {
+        (Marker::Bullet(c), Some(Marker::Bullet(p))) => (c != p).then(|| format!("{p} ")),
+        (Marker::Numbered, Some(Marker::Bullet(p))) => Some(format!("{p} ")),
+        (Marker::Bullet(_), Some(Marker::Numbered)) => Some("1. ".to_string()),
+        // A nested numbered item starts at 1 unless renumbering finds a run to continue.
+        (Marker::Numbered, _) => nest.then(|| "1. ".to_string()),
+        (Marker::Bullet(_), None) => None,
+    };
+    let mut new_marker_len = old_marker_len;
+    if let Some(marker) = replacement {
         textarea.move_cursor(CursorMove::Jump(row as u16, new_indent as u16));
-        textarea.delete_str(old_num_str.chars().count());
-        textarea.insert_str("1");
+        textarea.delete_str(old_marker_len);
+        new_marker_len = marker.chars().count();
+        textarea.insert_str(marker);
     }
 
+    let line_len = |textarea: &tui_textarea::TextArea<'static>| {
+        textarea.lines().get(row).map_or(0, |l| l.chars().count())
+    };
+    let len_before_renumber = line_len(textarea);
     renumber_all(textarea);
+    let new_line_len = line_len(textarea);
 
-    let new_line_len = textarea
-        .lines()
-        .get(row)
-        .map(|l| l.chars().count())
-        .unwrap_or(0);
-    let target_col = (col + NEST_INDENT).min(new_line_len);
+    // Keep the cursor on the same character: shift for the indent change, the
+    // marker rewrite (if the cursor was past the marker) and renumbering.
+    let indent_delta = new_indent as isize - indent as isize;
+    let target_col = if col >= indent + old_marker_len {
+        col as isize
+            + indent_delta
+            + (new_marker_len as isize - old_marker_len as isize)
+            + (new_line_len as isize - len_before_renumber as isize)
+    } else {
+        col as isize + indent_delta
+    };
+    let target_col = (target_col.max(0) as usize).min(new_line_len);
     textarea.move_cursor(CursorMove::Jump(row as u16, target_col as u16));
     true
 }
 
-pub(crate) fn handle_shift_tab_unnest(textarea: &mut tui_textarea::TextArea<'static>) {
-    let (row, col) = textarea.cursor();
-    let line = match textarea.lines().get(row) {
-        Some(l) => l.clone(),
-        None => return,
-    };
-    let trimmed = line.trim_start();
-    let indent = line.len() - trimmed.len();
-    if indent < NEST_INDENT {
-        return;
-    }
-
-    let is_numbered = trimmed
-        .find(". ")
-        .and_then(|p| trimmed[..p].parse::<u64>().ok())
-        .is_some();
-    let is_unordered = trimmed.starts_with("- ") || trimmed.starts_with("* ");
-    if !is_numbered && !is_unordered {
-        return;
-    }
-
-    textarea.move_cursor(CursorMove::Jump(row as u16, 0));
-    textarea.delete_str(NEST_INDENT);
-
-    renumber_all(textarea);
-
-    let new_line_len = textarea
-        .lines()
-        .get(row)
-        .map(|l| l.chars().count())
-        .unwrap_or(0);
-    let target_col = col.saturating_sub(NEST_INDENT).min(new_line_len);
-    textarea.move_cursor(CursorMove::Jump(row as u16, target_col as u16));
+#[derive(Clone, Copy)]
+enum Marker {
+    Bullet(char),
+    Numbered,
 }
+
+/// Parse a list marker at the start of `trimmed`: its kind and length in chars.
+fn parse_marker(trimmed: &str) -> Option<(Marker, usize)> {
+    if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+        return Some((Marker::Bullet(trimmed.chars().next()?), 2));
+    }
+    let dot = trimmed.find(". ")?;
+    trimmed[..dot].parse::<u64>().ok()?;
+    Some((Marker::Numbered, dot + 2))
+}
+
+/// Marker of the nearest list item above `row` at exactly `indent` (the list
+/// an item at that indent would continue), skipping deeper (child) lines and
+/// stopping at a blank, shallower or unrelated line.
+fn sibling_marker(lines: &[String], row: usize, indent: usize) -> Option<Marker> {
+    for line in lines[..row].iter().rev() {
+        if line.trim().is_empty() {
+            return None;
+        }
+        let trimmed = line.trim_start();
+        let line_indent = line.len() - trimmed.len();
+        if line_indent > indent {
+            continue;
+        }
+        if line_indent == indent {
+            return parse_marker(trimmed).map(|(m, _)| m);
+        }
+        return None;
+    }
+    None
+}
+
 
 pub(crate) fn renumber_all(textarea: &mut tui_textarea::TextArea<'static>) {
     let lines = textarea.lines().to_vec();
@@ -708,6 +749,152 @@ mod tests {
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::BackTab);
         assert_eq!(editor_lines(&e), vec!["1. a".to_string(), "2. b".to_string()]);
+    }
+
+    fn nest_at(initial: &str, row: usize, col: usize) -> MarkdownEditor {
+        let mut e = make_editor(initial);
+        e.input.textarea.move_cursor(CursorMove::Jump(row as u16, col as u16));
+        press(&mut e, KeyCode::Tab);
+        e
+    }
+
+    #[test]
+    fn tab_numbered_item_joins_existing_deeper_bullet_list() {
+        let e = nest_at("1. a\n   - x\n   - y\n2. b", 3, 4);
+        assert_eq!(
+            editor_lines(&e),
+            vec![
+                "1. a".to_string(),
+                "   - x".to_string(),
+                "   - y".to_string(),
+                "   - b".to_string()
+            ]
+        );
+        assert_eq!(editor_cursor(&e), (3, 6));
+    }
+
+    #[test]
+    fn tab_bullet_item_joins_existing_deeper_numbered_list_and_continues_numbers() {
+        let e = nest_at("- a\n   1. x\n   2. y\n- b", 3, 3);
+        assert_eq!(
+            editor_lines(&e),
+            vec![
+                "- a".to_string(),
+                "   1. x".to_string(),
+                "   2. y".to_string(),
+                "   3. b".to_string()
+            ]
+        );
+        assert_eq!(editor_cursor(&e), (3, 7));
+    }
+
+    #[test]
+    fn tab_adopts_bullet_char_of_existing_deeper_list() {
+        let e = nest_at("- a\n   * x\n- b", 2, 3);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["- a".to_string(), "   * x".to_string(), "   * b".to_string()]
+        );
+    }
+
+    #[test]
+    fn tab_cursor_follows_text_when_marker_is_rewritten() {
+        let e = nest_at("1. a\n   - x\n2. bee", 2, 6);
+        assert_eq!(editor_lines(&e)[2], "   - bee");
+        assert_eq!(editor_cursor(&e), (2, 8));
+    }
+
+    #[test]
+    fn tab_does_not_adopt_scheme_across_a_blank_line_or_without_deeper_list() {
+        let e = nest_at("1. a\n   - x\n\n2. b", 3, 4);
+        assert_eq!(editor_lines(&e)[3], "   1. b");
+        let e = nest_at("- a\n1. b", 1, 4);
+        assert_eq!(editor_lines(&e), vec!["- a".to_string(), "   1. b".to_string()]);
+    }
+
+    #[test]
+    fn tab_then_shift_tab_restores_the_item() {
+        let mut e = nest_at("- a\n   1. x\n- b", 2, 3);
+        assert_eq!(editor_lines(&e)[2], "   2. b");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["- a".to_string(), "   1. x".to_string(), "- b".to_string()]
+        );
+        assert_eq!(editor_cursor(&e), (2, 3));
+    }
+
+    fn unnest_at(initial: &str, row: usize, col: usize) -> MarkdownEditor {
+        let mut e = make_editor(initial);
+        e.input.textarea.move_cursor(CursorMove::Jump(row as u16, col as u16));
+        press(&mut e, KeyCode::BackTab);
+        e
+    }
+
+    #[test]
+    fn shift_tab_numbered_child_of_bullet_becomes_bullet() {
+        let e = unnest_at("- parent\n   1. child", 1, 12);
+        assert_eq!(editor_lines(&e), vec!["- parent".to_string(), "- child".to_string()]);
+        assert_eq!(editor_cursor(&e), (1, 7));
+    }
+
+    #[test]
+    fn shift_tab_bullet_child_of_numbered_continues_numbering() {
+        let e = unnest_at("1. a\n2. b\n   - c", 2, 8);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["1. a".to_string(), "2. b".to_string(), "3. c".to_string()]
+        );
+        assert_eq!(editor_cursor(&e), (2, 4));
+    }
+
+    #[test]
+    fn shift_tab_numbered_child_continues_parent_numbers_and_renumbers_below() {
+        let e = unnest_at("1. a\n   1. x\n   2. y\n2. b", 2, 7);
+        assert_eq!(
+            editor_lines(&e),
+            vec![
+                "1. a".to_string(),
+                "   1. x".to_string(),
+                "2. y".to_string(),
+                "3. b".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn shift_tab_adopts_parent_bullet_char() {
+        let e = unnest_at("* a\n   - b", 1, 5);
+        assert_eq!(editor_lines(&e), vec!["* a".to_string(), "* b".to_string()]);
+    }
+
+    #[test]
+    fn shift_tab_skips_deeper_lines_to_find_parent_scheme() {
+        let e = unnest_at("- a\n   1. x\n      - deep\n   2. y", 3, 7);
+        assert_eq!(
+            editor_lines(&e),
+            vec![
+                "- a".to_string(),
+                "   1. x".to_string(),
+                "      - deep".to_string(),
+                "- y".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn shift_tab_cursor_before_marker_only_loses_indent() {
+        let e = unnest_at("- a\n   1. x", 1, 3);
+        assert_eq!(editor_lines(&e), vec!["- a".to_string(), "- x".to_string()]);
+        assert_eq!(editor_cursor(&e), (1, 0));
+    }
+
+    #[test]
+    fn shift_tab_without_a_parent_item_keeps_scheme() {
+        let e = unnest_at("intro\n   - a", 1, 5);
+        assert_eq!(editor_lines(&e), vec!["intro".to_string(), "- a".to_string()]);
+        let e = unnest_at("\n   1. a", 1, 6);
+        assert_eq!(editor_lines(&e), vec!["".to_string(), "1. a".to_string()]);
     }
 
     #[test]
