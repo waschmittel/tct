@@ -1,0 +1,926 @@
+tui-textarea-2
+============
+[![crate][crates-io-badge]][crate]
+[![docs][doc-badge]][doc]
+[![Rust Test][test-badge]][test]
+[![Rust Clippy][clippy-badge]][clippy]
+[![coverage][codecov-badge]][codecov]
+
+- [API documentation][doc]
+- [Features](#features)
+- [Installation](#installation)
+- [Examples](#examples)
+- [Minimal usage](#minimal-usage)
+- [Basic usage](#basic-usage)
+- [Advanced usage](#advanced-usage)
+- [Contributing](#contributing-to-tui-textarea-2)
+
+[tui-textarea-2][crate] is a simple yet powerful text editor widget like `<textarea>` in HTML for [ratatui][]. A multi-line text editor can be easily added to your TUI application.
+
+For the complete API reference, see the [tui-textarea-2 documentation on docs.rs][doc].
+
+> Maintained fork notice: this repository is maintained under `srothgan/tui-textarea` to keep compatibility updates moving (including ratatui 0.30+ support and maintenance fixes).
+
+## Features
+
+- Multi-line editing with insertion, deletion, clearing, automatic scrolling, and whole-buffer replacement
+- Emacs-like shortcuts (`C-n`/`C-p`/`C-f`/`C-b`, `M-f`/`M-b`, `C-a`/`C-e`, `C-h`/`C-d`, `C-k`, `M-<`/`M->`, and more)
+- Backend-normalized keyboard input, including Shift+Tab (`BackTab`)
+- Undo and redo with optional word-sized coalescing for typing and backspace runs
+- Unicode-aware soft wrapping with word, glyph, and word-or-glyph modes plus visual-line cursor navigation
+- Dynamic row measurement for auto-sizing layouts
+- Line numbers, cursor-line styling, text selection, and custom highlighted ranges
+- Regular-expression search through the optional `search` feature
+- Plain or styled multiline placeholders and text masking
+- Atomic ranges for caller-owned mentions, tokens, placeholders, and other indivisible editing spans
+- Yank support for pasting text deleted with `C-k`, `C-j`, and related operations
+- Native terminal cursor integration while keeping backend-specific cursor shape control outside the widget
+- Mouse scrolling and high-level cursor hit testing through `TextArea::cursor_at_position`
+- Multiple textarea widgets on the same screen
+- Backend-agnostic Ratatui support for [crossterm][], [termion][], [termwiz][], and custom backends
+
+## Installation
+
+Add `tui-textarea` crate to dependencies in your `Cargo.toml`. This enables crossterm backend support by default.
+
+```toml
+[dependencies]
+ratatui = "*"
+tui-textarea = { package = "tui-textarea-2", version = "*" }
+```
+
+If you need text search with regular expressions, enable the `search` feature. It adds [regex crate][regex] as dependency.
+
+```toml
+[dependencies]
+ratatui = "*"
+tui-textarea = { package = "tui-textarea-2", version = "*", features = ["search"] }
+```
+
+If you're using ratatui with [termion][] or [termwiz][], enable the `termion` or `termwiz` feature instead of the `crossterm` feature.
+
+```toml
+[dependencies]
+
+# For termion
+ratatui = { version = "*", default-features = false, features = ["termion"] }
+tui-textarea = { package = "tui-textarea-2", version = "*", default-features = false, features = ["termion"] }
+
+# For termwiz
+ratatui = { version = "*", default-features = false, features = ["termwiz"] }
+tui-textarea = { package = "tui-textarea-2", version = "*", default-features = false, features = ["termwiz"] }
+```
+
+The following table shows feature names corresponding to the supported ratatui backend integrations.
+
+|         | crossterm                        | termion         | termwiz   | Your own backend   |
+|---------|----------------------------------|-----------------|-----------|--------------------|
+| ratatui | `crossterm` (enabled by default) | `termion`       | `termwiz` | `no-backend`       |
+
+In addition to the dependencies above, you also need to install [crossterm][], [termion][], or [termwiz][] to initialize your application and receive key inputs.
+
+## Examples
+
+Running `cargo run --example` in this repository can demonstrate usage of tui-textarea.
+
+The repository includes a [Docker-based recording workflow](./examples/RECORDING.md) that rebuilds every crossterm example GIF from scripted terminal interactions.
+
+### [`minimal`](./examples/minimal.rs)
+
+```sh
+cargo run --example minimal
+```
+
+Minimal usage with [crossterm][] support.
+
+<img src="./assets/minimal.gif" width=600 alt="minimal example">
+
+### [`editor`](./examples/editor.rs)
+
+```sh
+cargo run --example editor --features search file.txt
+```
+
+Simple text editor to edit multiple files.
+
+<img src="./assets/editor.gif" width=600 alt="editor example">
+
+### [`single_line`](./examples/single_line.rs)
+
+```sh
+cargo run --example single_line
+```
+
+Single-line input form with float number validation.
+
+<img src="./assets/single_line.gif" width=600 alt="single line example">
+
+### [`split`](./examples/split.rs)
+
+```sh
+cargo run --example split
+```
+
+Two split textareas in a screen and switch them. An example for multiple textarea instances.
+
+<img src="./assets/split.gif" width=600 alt="multiple textareas example">
+
+### [`variable`](./examples/variable.rs)
+
+```sh
+cargo run --example variable
+```
+
+Auto-sized textarea driven by `textarea.measure(width).preferred_rows` and bounded with minimum and maximum row settings.
+
+<img src="./assets/variable.gif" width=600 alt="auto-sized textarea example">
+
+### [`vim`](./examples/vim.rs)
+
+```sh
+cargo run --example vim
+```
+
+Vim-like modal text editor. Vim emulation is implemented as a state machine.
+
+<img src="./assets/vim.gif" width=600 alt="Vim emulation example">
+
+### [`popup_placeholder`](./examples/popup_placeholder.rs)
+
+```sh
+cargo run --example popup_placeholder
+```
+
+Popup textarea with a multiline placeholder whose spans use independent styles.
+
+<img src="./assets/popup_placeholder.gif" width=600 alt="popup textarea with styled placeholder example">
+
+### [`password`](./examples/password.rs)
+
+```sh
+cargo run --example password
+```
+
+Password input form with masking text with ●.
+
+<img src="./assets/password.gif" width=600 alt="password example">
+
+### [`wrap`](./examples/wrap.rs)
+
+```sh
+cargo run --example wrap
+```
+
+Interactive comparison of word, glyph, and word-or-glyph soft wrapping with Unicode text, tabs, long tokens, and visual-row cursor navigation.
+
+<img src="./assets/wrap.gif" width=600 alt="soft wrapping example">
+
+### [`undo_coalescing`](./examples/undo_coalescing.rs)
+
+```sh
+cargo run --example undo_coalescing
+```
+
+Time-based undo grouping that starts a new undo step after a pause of at least 500 milliseconds.
+
+<img src="./assets/undo_coalescing.gif" width=600 alt="timed undo coalescing example">
+
+### [`termion`](./examples/termion.rs)
+
+```sh
+cargo run --example termion --no-default-features --features=termion
+```
+
+Minimal usage with [termion][] support.
+
+### [`termwiz`](./examples/termwiz.rs)
+
+```sh
+cargo run --example termwiz --no-default-features --features=termwiz
+```
+
+Minimal usage with [termwiz][] support.
+
+## Minimal Usage
+
+```rust,ignore
+use tui_textarea::TextArea;
+use crossterm::event::{Event, read};
+
+let mut term = ratatui::Terminal::new(...);
+
+// Create an empty `TextArea` instance which manages the editor state
+let mut textarea = TextArea::default();
+
+// Event loop
+loop {
+    term.draw(|f| {
+        // Get `ratatui::layout::Rect` where the editor should be rendered
+        let rect = ...;
+        // Render the textarea in terminal screen
+        f.render_widget(&textarea, rect);
+    })?;
+
+    if let Event::Key(key) = read()? {
+        // Your own key mapping to break the event loop
+        if key.code == KeyCode::Esc {
+            break;
+        }
+        // `TextArea::input` can directly handle key events from backends and update the editor state
+        textarea.input(key);
+    }
+}
+
+// Get text lines as `&[String]`
+println!("Lines: {:?}", textarea.lines());
+```
+
+`TextArea` is an instance to manage the editor state. By default, it disables line numbers and highlights cursor line
+with underline.
+
+`&TextArea` reference implements ratatui's `Widget` trait. Render it on every tick of event loop.
+
+`TextArea::input()` receives inputs from tui backends. The method can take key events from backends such as
+`crossterm::event::KeyEvent` or `termion::event::Key` directly if the features are enabled. The method handles default
+key mappings as well.
+
+Default key mappings are as follows:
+
+| Mappings                                     | Description                               |
+|----------------------------------------------|-------------------------------------------|
+| `Ctrl+H`, `Backspace`                        | Delete one character before cursor        |
+| `Ctrl+D`, `Delete`                           | Delete one character next to cursor       |
+| `Ctrl+M`, `Enter`                            | Insert newline                            |
+| `Ctrl+K`                                     | Delete from cursor until the end of line  |
+| `Ctrl+J`                                     | Delete from cursor until the head of line |
+| `Ctrl+W`, `Alt+H`, `Alt+Backspace`           | Delete one word before cursor             |
+| `Alt+D`, `Alt+Delete`                        | Delete one word next to cursor            |
+| `Ctrl+U`                                     | Undo                                      |
+| `Ctrl+R`                                     | Redo                                      |
+| `Ctrl+C`, `Copy`                             | Copy selected text                        |
+| `Ctrl+X`, `Cut`                              | Cut selected text                         |
+| `Ctrl+Y`, `Paste`                            | Paste yanked text                         |
+| `Ctrl+F`, `→`                                | Move cursor forward by one character      |
+| `Ctrl+B`, `←`                                | Move cursor backward by one character     |
+| `Ctrl+P`, `↑`                                | Move cursor up by one line                |
+| `Ctrl+N`, `↓`                                | Move cursor down by one line              |
+| `Alt+F`, `Ctrl+→`                            | Move cursor forward by word               |
+| `Alt+B`, `Ctrl+←`                            | Move cursor backward by word              |
+| `Alt+]`, `Alt+P`, `Ctrl+↑`                   | Move cursor up by paragraph               |
+| `Alt+[`, `Alt+N`, `Ctrl+↓`                   | Move cursor down by paragraph             |
+| `Ctrl+E`, `End`, `Ctrl+Alt+F`, `Ctrl+Alt+→`  | Move cursor to the end of line            |
+| `Ctrl+A`, `Home`, `Ctrl+Alt+B`, `Ctrl+Alt+←` | Move cursor to the head of line           |
+| `Alt+<`, `Ctrl+Alt+P`, `Ctrl+Alt+↑`          | Move cursor to top of lines               |
+| `Alt+>`, `Ctrl+Alt+N`, `Ctrl+Alt+↓`          | Move cursor to bottom of lines            |
+| `Ctrl+V`, `PageDown`                         | Scroll down by page                       |
+| `Alt+V`, `PageUp`                            | Scroll up by page                         |
+
+Deleting multiple characters at once saves the deleted text to yank buffer. It can be pasted with `Ctrl+Y` later.
+
+If you don't want to use default key mappings, see the 'Advanced Usage' section.
+
+## Basic Usage
+
+### Create `TextArea` instance with text
+
+`TextArea` implements `Default` trait to create an editor instance with an empty text.
+
+```rust,ignore
+let mut textarea = TextArea::default();
+```
+
+`TextArea::new()` creates an editor instance with text lines passed as `Vec<String>`.
+
+```rust,ignore
+let mut lines: Vec<String> = ...;
+let mut textarea = TextArea::new(lines);
+```
+
+`TextArea` implements `From<impl Iterator<Item=impl Into<String>>>`. `TextArea::from()` can create an editor instance
+from any iterators whose elements can be converted to `String`.
+
+```rust,ignore
+// Create `TextArea` from from `[&str]`
+let mut textarea = TextArea::from([
+    "this is first line",
+    "this is second line",
+    "this is third line",
+]);
+
+// Create `TextArea` from `String`
+let mut text: String = ...;
+let mut textarea = TextArea::from(text.lines());
+```
+
+`TextArea` also implements `FromIterator<impl Into<String>>`. `Iterator::collect()` can collect strings as an editor
+instance. This allows to create `TextArea` reading lines from file efficiently using `io::BufReader`.
+
+```rust,ignore
+let file = fs::File::open(path)?;
+let mut textarea: TextArea = io::BufReader::new(file).lines().collect::<io::Result<_>>()?;
+```
+
+### Get text contents from `TextArea`
+
+`TextArea::lines()` returns text lines as `&[String]`. It borrows text contents temporarily.
+
+```rust,ignore
+let text: String = textarea.lines().join("\n");
+```
+
+`TextArea::into_lines()` moves `TextArea` instance into text lines as `Vec<String>`. This can retrieve the text contents
+without any copy.
+
+```rust,ignore
+let lines: Vec<String> = textarea.into_lines();
+```
+
+Note that `TextArea` always contains at least one line. For example, an empty text means one empty line. This is because
+any text file must end with newline.
+
+```rust,ignore
+let textarea = TextArea::default();
+assert_eq!(textarea.into_lines(), [""]);
+```
+
+### Replace all text while preserving configuration
+
+When you want to replace the whole buffer without rebuilding `TextArea` and reapplying styles/configuration, use
+`TextArea::set_lines()`.
+
+```rust,ignore
+let mut textarea = TextArea::default();
+
+textarea.set_placeholder_text("Type here");
+textarea.set_line_number_style(ratatui::style::Style::default());
+
+textarea.set_lines(
+    vec!["hello".to_string(), "world".to_string()],
+    (1, 5),
+);
+```
+
+`set_lines()` preserves widget configuration such as styles, wrapping, placeholder, and history capacity, while resetting
+content-specific state such as undo/redo contents, active selection, custom highlights, viewport scroll, and cached
+measurement results.
+
+### Show line number
+
+By default, `TextArea` does not show line numbers. To enable, set a style for rendering line numbers by
+`TextArea::set_line_number_style()`. For example, the following renders line numbers in dark gray background
+color.
+
+```rust,ignore
+use ratatui::style::{Style, Color};
+
+let style = Style::default().bg(Color::DarkGray);
+textarea.set_line_number_style(style);
+```
+
+### Configure cursor line style
+
+By default, `TextArea` renders the line at cursor with underline so that users can easily notice where the current line
+is. To change the style of cursor line, use `TextArea::set_cursor_line_style()`. For example, the following styles the
+cursor line with bold text.
+
+```rust,ignore
+use ratatui::style::{Style, Modifier};
+
+let style = Style::default().add_modifier(Modifier::BOLD);
+textarea.set_cursor_line_style(style);
+```
+
+To disable cursor line style, set the default style as follows:
+
+```rust,ignore
+use ratatui::style::{Style, Modifier};
+
+textarea.set_cursor_line_style(Style::default());
+```
+
+### Use a native terminal cursor
+
+By default, `TextArea` draws its cursor as a styled cell in the Ratatui buffer. This keeps existing rendering behavior
+unchanged. Applications that want a native terminal cursor, such as a blinking bar, can hide the drawn cursor and place
+the terminal cursor after rendering.
+
+```rust,ignore
+use tui_textarea::{CursorRenderMode, TextArea};
+
+textarea.set_cursor_render_mode(CursorRenderMode::Hidden);
+frame.render_widget(&textarea, area);
+
+if let Some(position) = textarea.rendered_cursor_position() {
+    frame.set_cursor_position(position);
+}
+```
+
+`tui-textarea-2` does not set backend-specific cursor shapes. Configure those in the application, for example with
+`crossterm::cursor::SetCursorStyle::BlinkingBar` during terminal setup and reset the shape during teardown.
+
+### Configure tab width
+
+The default tab width is 4. To change it, use `TextArea::set_tab_length()` method. The following sets 2 to tab width.
+Typing tab key inserts 2 spaces.
+
+```rust,ignore
+textarea.set_tab_length(2);
+```
+
+### Configure soft wrap mode
+
+By default, soft wrapping is disabled and long lines are handled by horizontal scrolling. To enable soft wrapping, set
+`TextArea::set_wrap_mode()` with one of the supported modes.
+
+```rust,ignore
+use tui_textarea::WrapMode;
+
+textarea.set_wrap_mode(WrapMode::WordOrGlyph);
+```
+
+Supported modes:
+
+- `WrapMode::None`: Disable soft wrap (default behavior).
+- `WrapMode::Word`: Prefer word boundaries and split oversized words at grapheme boundaries so text is never clipped.
+- `WrapMode::Glyph`: Wrap at grapheme boundaries.
+- `WrapMode::WordOrGlyph`: Compatibility name for `WrapMode::Word`, retained for existing source code and serialized values.
+
+When wrapping is enabled, the layout reserves a terminal cell for the caret and does not use horizontal scrolling. `CursorMove::Up` and `CursorMove::Down` follow visual rows instead of jumping only between logical lines. `WrapMode::None` continues to use the full width with horizontal scrolling.
+
+A wrapped textarea needs at least two editable terminal cells after borders and line numbers to display both a single-cell grapheme and the caret; wider graphemes require enough cells for their terminal display width.
+
+### Measure preferred height
+
+`TextArea::measure(width_cols)` returns a `TextAreaMeasure` with row counts for the current content and layout. This is
+useful when your textarea should grow and shrink with wrapped content.
+
+```rust,ignore
+use tui_textarea::{TextArea, WrapMode};
+
+let mut textarea = TextArea::from(["hello world"]);
+textarea.set_wrap_mode(WrapMode::WordOrGlyph);
+textarea.set_min_rows(3);
+textarea.set_max_rows(10);
+
+let measured = textarea.measure(12);
+let content_rows = measured.content_rows;
+let height = measured.preferred_rows;
+```
+
+`content_rows` counts the rows needed by the inner content area. `preferred_rows` includes block chrome such as borders
+and respects the configured `min_rows` and `max_rows`.
+
+### Add custom highlighted ranges
+
+You can draw your own highlighted ranges on top of the content with `TextArea::custom_highlight()`. This is useful for
+syntax annotations, diffs, or app-specific match highlighting.
+
+```rust,ignore
+use ratatui::style::{Color, Style};
+
+textarea.custom_highlight(
+    ((0, 0), (0, 5)),
+    Style::default().bg(Color::Yellow),
+    10,
+);
+```
+
+Call `TextArea::clear_custom_highlight()` to remove all custom highlighted ranges.
+
+### Configure atomic ranges
+
+Applications can mark caller-parsed text spans as atomic with `TextArea::set_atomic_ranges()`. Atomic ranges use row and
+character-column coordinates, remain separate from rendering, and are cleared after successful content mutations so the
+application can recompute them from the new text.
+
+```rust,ignore
+use ratatui::style::{Color, Style};
+use tui_textarea::{AtomicRange, TextArea};
+
+let mut textarea = TextArea::from(["Send [[image:cat.png]] now"]);
+textarea.set_atomic_ranges([AtomicRange {
+    row: 0,
+    start_col: 5,
+    end_col: 22,
+}]);
+
+textarea.custom_highlight(
+    ((0, 5), (0, 22)),
+    Style::default().fg(Color::Yellow),
+    10,
+);
+```
+
+See [`atomic_ranges` example](./examples/atomic_ranges.rs) for a small caller-owned parsing flow.
+
+### Configure max history size
+
+By default, past 50 modifications are stored as edit history. The history is used for undo/redo. To change how many past
+edits are remembered, use `TextArea::set_max_histories()` method. The following remembers past 1000 changes.
+
+```rust,ignore
+textarea.set_max_histories(1000);
+```
+
+Setting 0 disables undo/redo.
+
+```rust,ignore
+textarea.set_max_histories(0);
+```
+
+### Coalesce undo steps while typing
+
+By default, each inserted or deleted character is a separate undo step. To undo a word at a time instead, enable
+coalescing with `TextArea::set_undo_coalescing()`.
+
+```rust,ignore
+textarea.set_undo_coalescing(true);
+```
+
+A run covers characters of one class, so undo stops at the same boundaries as `TextArea::delete_word()` and
+`CursorMove::WordForward`. Typing `foo();bar()` undoes as `foo`, `();`, `bar`, `()`. Trailing whitespace joins the run
+that it ends, and consecutive spaces or tabs stay in that same run, so undo never stops on a dangling separator.
+
+A pause of 500 milliseconds or more also ends a run, so text typed in separate sittings stays separate. A newline, a
+cursor move, a paste, a range deletion, or a change between insertion and deletion ends a run as well.
+
+### Text search with regular expressions
+
+To search text in textarea, set a regular expression pattern with `TextArea::set_search_pattern()` and move cursor with
+`TextArea::search_forward()` for forward search or `TextArea::search_back()` backward search. The regular expression is
+handled by [`regex` crate][regex].
+
+Text search wraps around the textarea. When searching forward and no match found until the end of textarea, it searches
+the pattern from start of the file.
+
+Matches are highlighted in textarea. The text style to highlight matches can be changed with
+`TextArea::set_search_style()`. Setting an empty string to `TextArea::set_search_pattern()` stops the text search.
+
+```rust,ignore
+// Start text search matching to "hello" or "hi". This highlights matches in textarea but does not move cursor.
+// `regex::Error` is returned on invalid pattern.
+textarea.set_search_pattern("(hello|hi)").unwrap();
+
+textarea.search_forward(false); // Move cursor to the next match
+textarea.search_back(false);    // Move cursor to the previous match
+
+// Setting empty string stops the search
+textarea.set_search_pattern("").unwrap();
+```
+
+No UI is provided for text search. You need to provide your own UI to input search query. It is recommended to use
+another `TextArea` for search form. To build a single-line input form, see 'Single-line input like `<input>` in HTML' in
+'Advanced Usage' section below.
+
+[`editor` example](./examples/editor.rs) implements a text search with search form built on `TextArea`. See the
+implementation for working example.
+
+To use text search, `search` feature needs to be enabled in your `Cargo.toml`. It is disabled by default to avoid
+depending on `regex` crate until it is necessary.
+
+```toml
+tui-textarea = { package = "tui-textarea-2", version = "*", features = ["search"] }
+```
+
+## Advanced Usage
+
+### Single-line input like `<input>` in HTML
+
+To use `TextArea` for a single-line input widget like `<input>` in HTML, ignore all key mappings which inserts newline.
+
+```rust,ignore
+use crossterm::event::{Event, read};
+use tui_textarea::{Input, Key};
+
+let default_text: &str = ...;
+let default_text = default_text.replace(&['\n', '\r'], " "); // Ensure no new line is contained
+let mut textarea = TextArea::new(vec![default_text]);
+
+// Event loop
+loop {
+    // ...
+
+    // Using `Input` is not mandatory, but it's useful for pattern match
+    // Ignore Ctrl+m and Enter. Otherwise handle keys as usual
+    match read()?.into() {
+        Input { key: Key::Char('m'), ctrl: true, alt: false }
+        | Input { key: Key::Enter, .. } => continue,
+        input => {
+            textarea.input(input);
+        }
+    }
+}
+
+let text = textarea.into_lines().remove(0); // Get input text
+```
+
+See [`single_line` example](./examples/single_line.rs) for working example.
+
+### Define your own key mappings
+
+All editor operations are defined as public methods of `TextArea`. To move cursor, use `tui_textarea::CursorMove` to
+notify how to move the cursor.
+
+| Method                                               | Operation                                       |
+|------------------------------------------------------|-------------------------------------------------|
+| `textarea.delete_char()`                             | Delete one character before cursor              |
+| `textarea.delete_next_char()`                        | Delete one character next to cursor             |
+| `textarea.insert_newline()`                          | Insert newline                                  |
+| `textarea.delete_line_by_end()`                      | Delete from cursor until the end of line        |
+| `textarea.delete_line_by_head()`                     | Delete from cursor until the head of line       |
+| `textarea.delete_word()`                             | Delete one word before cursor                   |
+| `textarea.delete_next_word()`                        | Delete one word next to cursor                  |
+| `textarea.clear()`                                   | Clear all text                                  |
+| `textarea.undo()`                                    | Undo                                            |
+| `textarea.redo()`                                    | Redo                                            |
+| `textarea.set_undo_coalescing(enabled)`              | Group typing into word-sized undo steps         |
+| `textarea.undo_coalescing()`                         | Check whether undo coalescing is enabled        |
+| `textarea.copy()`                                    | Copy selected text                              |
+| `textarea.cut()`                                     | Cut selected text                               |
+| `textarea.paste()`                                   | Paste yanked text                               |
+| `textarea.insert_char(c)`                            | Insert one character                            |
+| `textarea.insert_str(text)`                          | Insert a string                                 |
+| `textarea.insert_tab()`                              | Insert indentation / tab text                   |
+| `textarea.delete_str(chars)`                         | Delete multiple characters                      |
+| `textarea.start_selection()`                         | Start text selection                            |
+| `textarea.cancel_selection()`                        | Cancel text selection                           |
+| `textarea.select_all()`                              | Select entire text                              |
+| `textarea.custom_highlight(range, style, priority)`  | Add a custom highlighted range                  |
+| `textarea.clear_custom_highlight()`                  | Clear all custom highlights                     |
+| `textarea.set_atomic_ranges(ranges)`                 | Set caller-owned indivisible text spans         |
+| `textarea.try_set_atomic_ranges(ranges)`             | Validate and set atomic ranges without panics   |
+| `textarea.clear_atomic_ranges()`                     | Clear all atomic ranges                         |
+| `textarea.atomic_ranges()`                           | Get configured atomic ranges                    |
+| `textarea.delete_atomic_range_at_cursor(direction)`  | Delete an atom at the cursor as one edit        |
+| `textarea.move_cursor(CursorMove::Forward)`          | Move cursor forward by one character            |
+| `textarea.move_cursor(CursorMove::Back)`             | Move cursor backward by one character           |
+| `textarea.move_cursor(CursorMove::Up)`               | Move cursor up by one line                      |
+| `textarea.move_cursor(CursorMove::Down)`             | Move cursor down by one line                    |
+| `textarea.move_cursor(CursorMove::WordForward)`      | Move cursor forward by word                     |
+| `textarea.move_cursor(CursorMove::WordEnd)`          | Move cursor to next end of word                 |
+| `textarea.move_cursor(CursorMove::WordBack)`         | Move cursor backward by word                    |
+| `textarea.move_cursor(CursorMove::ParagraphForward)` | Move cursor up by paragraph                     |
+| `textarea.move_cursor(CursorMove::ParagraphBack)`    | Move cursor down by paragraph                   |
+| `textarea.move_cursor(CursorMove::End)`              | Move cursor to the end of line                  |
+| `textarea.move_cursor(CursorMove::Head)`             | Move cursor to the head of line                 |
+| `textarea.move_cursor(CursorMove::Top)`              | Move cursor to top of lines                     |
+| `textarea.move_cursor(CursorMove::Bottom)`           | Move cursor to bottom of lines                  |
+| `textarea.move_cursor(CursorMove::Jump(row, col))`   | Move cursor to (row, col) position              |
+| `textarea.move_cursor(CursorMove::InViewport)`       | Move cursor to stay in the viewport             |
+| `textarea.set_search_pattern(pattern)`               | Set a pattern for text search                   |
+| `textarea.search_forward(match_cursor)`              | Move cursor to next match of text search        |
+| `textarea.search_back(match_cursor)`                 | Move cursor to previous match of text search    |
+| `textarea.scroll(Scrolling::PageDown)`               | Scroll down the viewport by page                |
+| `textarea.scroll(Scrolling::PageUp)`                 | Scroll up the viewport by page                  |
+| `textarea.scroll(Scrolling::HalfPageDown)`           | Scroll down the viewport by half-page           |
+| `textarea.scroll(Scrolling::HalfPageUp)`             | Scroll up the viewport by half-page             |
+| `textarea.scroll((row, col))`                        | Scroll down the viewport to (row, col) position |
+
+To define your own key mappings, simply call the above methods in your code instead of `TextArea::input()` method.
+
+Useful state/configuration helpers:
+
+| Method                                   | Purpose                                                     |
+|------------------------------------------|-------------------------------------------------------------|
+| `textarea.cursor()`                      | Get current `(row, col)` cursor position                    |
+| `textarea.selection_range()`             | Get the current selected range if selection is active       |
+| `textarea.is_selecting()`                | Check whether selection is active                           |
+| `textarea.lines()`                       | Borrow the current text lines                               |
+| `textarea.set_lines(lines, cursor)`      | Replace the entire buffer while preserving widget settings  |
+| `textarea.set_wrap_mode(mode)`           | Configure soft wrapping                                     |
+| `textarea.wrap_mode()`                   | Read the current wrap mode                                  |
+| `textarea.set_min_rows(rows)`            | Set the minimum preferred measured height                   |
+| `textarea.min_rows()`                    | Read the configured minimum preferred height                |
+| `textarea.set_max_rows(rows)`            | Set the maximum preferred measured height                   |
+| `textarea.max_rows()`                    | Read the configured maximum preferred height                |
+| `textarea.measure(width_cols)`           | Measure content and preferred outer height                  |
+| `textarea.set_block(block)`              | Configure block chrome used for rendering and measurement   |
+| `textarea.remove_block()`                | Remove block chrome                                         |
+| `textarea.set_line_number_style(style)`  | Enable or restyle line numbers                              |
+| `textarea.remove_line_number()`          | Disable line numbers                                        |
+| `textarea.set_cursor_render_mode(mode)`  | Draw or hide the textarea-owned cursor cell                 |
+| `textarea.cursor_render_mode()`          | Read the current cursor render mode                         |
+| `textarea.rendered_cursor_position()`    | Get the last rendered terminal cursor position              |
+| `textarea.set_placeholder_text(text)`    | Set or disable placeholder text                             |
+| `textarea.set_placeholder_style(style)`  | Change placeholder style                                    |
+| `textarea.set_mask_char(ch)`             | Enable character masking                                    |
+| `textarea.clear_mask_char()`             | Disable character masking                                   |
+| `textarea.clear()`                       | Clear the full buffer                                       |
+
+See the [`vim` example](./examples/vim.rs) for working example. It implements more Vim-like key modal mappings.
+
+If you don't want to use default key mappings, `TextArea::input_without_shortcuts()` method can be used instead of
+`TextArea::input()`. The method only handles very basic operations such as inserting/deleting single characters, tabs,
+newlines.
+
+```rust,ignore
+match read()?.into() {
+    // Handle your own key mappings here
+    // ...
+    input => textarea.input_without_shortcuts(input),
+}
+```
+
+### Use your own backend
+
+ratatui allows to make your own backend by implementing [`ratatui::backend::Backend`][ratatui-backend] trait.
+tui-textarea supports it as well. Please use the `no-backend` feature. It avoids adding backend crates (crossterm,
+termion, or termwiz) since you're using your own backend.
+
+```toml
+[dependencies]
+tui-textarea = { package = "tui-textarea-2", version = "*", default-features = false, features = ["no-backend"] }
+```
+
+`tui_textarea::Input` is a type for backend-agnostic key input. What you need to do is converting key event in your own
+backend into the `tui_textarea::Input` instance. Then `TextArea::input()` method can handle the input as other backend.
+
+In the following example, let's say `your_backend::KeyDown` is a key event type for your backend and
+`your_backend::read_next_key()` returns the next key event.
+
+```rust,ignore
+// In your backend implementation
+
+pub enum KeyDown {
+    Char(char),
+    BS,
+    Del,
+    Esc,
+    // ...
+}
+
+// Return tuple of (key, ctrlkey, altkey)
+pub fn read_next_key() -> (KeyDown, bool, bool) {
+    // ...
+}
+```
+
+Then you can implement the logic to convert `your_backend::KeyDown` value into `tui_textarea::Input` value.
+
+```rust,ignore
+use tui_textarea::{Input, Key};
+use your_backend::KeyDown;
+
+fn keydown_to_input(key: KeyDown, ctrl: bool, alt: bool) -> Input {
+    match key {
+        KeyDown::Char(c) => Input { key: Key::Char(c), ctrl, alt },
+        KeyDown::BS => Input { key: Key::Backspace, ctrl, alt },
+        KeyDown::Del => Input { key: Key::Delete, ctrl, alt },
+        KeyDown::Esc => Input { key: Key::Esc, ctrl, alt },
+        // ...
+        _ => Input::default(),
+    }
+}
+```
+
+For the keys which are not handled by tui-textarea, `tui_textarea::Input::default()` is available. It returns 'null'
+key. An editor will do nothing with the key.
+
+Finally, convert your own backend's key input type into `tui_textarea::Input` and pass it to `TextArea::input()`.
+
+```rust,ignore
+let mut textarea = ...;
+
+// Event loop
+loop {
+    // ...
+
+    let (key, ctrl, alt) = your_backend::read_next_key();
+    if key == your_backend::KeyDown::Esc {
+        break; // For example, quit your app on pressing Esc
+    }
+    textarea.input(keydown_to_input(key, ctrl, alt));
+}
+```
+
+### Put multiple `TextArea` instances in screen
+
+You don't need to do anything special. Create multiple `TextArea` instances and render widgets built from each instances.
+
+The following is an example to put two textarea widgets in application and manage the focus.
+
+```rust,ignore
+use tui_textarea::{TextArea, Input, Key};
+use crossterm::event::{Event, read};
+
+let editors = &mut [
+    TextArea::default(),
+    TextArea::default(),
+];
+
+let mut focused = 0;
+
+loop {
+    term.draw(|f| {
+        let rects = ...;
+
+        for (editor, rect) in editors.iter().zip(rects.into_iter()) {
+            f.render_widget(editor, rect);
+        }
+    })?;
+
+    match read()?.into() {
+        // Switch focused textarea by Ctrl+S
+        Input { key: Key::Char('s'), ctrl: true, .. } => focused = (focused + 1) % 2;
+        // Handle input by the focused editor
+        input => editors[focused].input(input),
+    }
+}
+```
+
+See [`split` example](./examples/split.rs) and [`editor` example](./examples/editor.rs) for working example.
+
+### Serialization/Deserialization support
+
+This crate optionally supports [serde][] crate by enabling `serde` feature.
+
+```toml
+[dependencies]
+tui-textarea = { package = "tui-textarea-2", version = "*", features = ["serde"] }
+```
+
+Values of the following types can be serialized/deserialized:
+
+- `Key`
+- `Input`
+- `CursorMove`
+- `Scrolling`
+- `WrapMode`
+- `AtomicRange`
+- `AtomicCursorBias`
+- `AtomicDeleteDirection`
+- `AtomicRangeError`
+- `RejectedAtomicRange`
+- `AtomicRangeRejectReason`
+
+Here is an example for deserializing key input from JSON using [serde_json][].
+
+```rust,ignore
+use tui_textarea::Input;
+
+let json = r#"
+    {
+        "key": { "Char": "a" },
+        "ctrl": true,
+        "alt": false,
+        "shift": true
+    }
+"#;
+
+let input: Input = serde_json::from_str(json).unwrap();
+println!("{input:?}");
+// Input {
+//     key: Key::Char('a'),
+//     ctrl: true,
+//     alt: false,
+//     shift: true,
+// }
+```
+
+## Minimum Supported Rust Version
+
+The minimum supported Rust version is 1.88.0 regardless of which supported Ratatui backend feature you enable.
+
+## Versioning
+
+This crate is not reaching v1.0.0 yet. There is no plan to bump the major version for now. Current versioning policy is
+as follows:
+
+- Major: Fixed to 0
+- Minor: Bump on breaking change
+- Patch: Bump on new feature or bug fix
+
+## Contributing to tui-textarea-2
+
+This project is developed [on GitHub][repo].
+
+For feature requests or bug reports, please [create an issue][new-issue]. For submitting patches, please [create a pull
+request][pulls].
+
+Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before reporting an issue or making a PR.
+
+## License
+
+tui-textarea-2 is distributed under [The MIT License](./LICENSE).
+
+[crates-io-badge]: https://img.shields.io/crates/v/tui-textarea-2.svg
+[crate]: https://crates.io/crates/tui-textarea-2
+[doc-badge]: https://docs.rs/tui-textarea-2/badge.svg
+[doc]: https://docs.rs/tui-textarea-2/latest/tui_textarea/
+[test-badge]: https://github.com/srothgan/tui-textarea/actions/workflows/test.yml/badge.svg?event=push
+[test]: https://github.com/srothgan/tui-textarea/actions/workflows/test.yml
+[clippy-badge]: https://github.com/srothgan/tui-textarea/actions/workflows/clippy.yml/badge.svg?event=push
+[clippy]: https://github.com/srothgan/tui-textarea/actions/workflows/clippy.yml
+[codecov-badge]: https://codecov.io/gh/srothgan/tui-textarea/graph/badge.svg
+[codecov]: https://codecov.io/gh/srothgan/tui-textarea
+[ratatui]: https://github.com/ratatui/ratatui
+[crossterm]: https://docs.rs/crossterm/latest/crossterm/
+[termion]: https://docs.rs/termion/latest/termion/
+[termwiz]: https://docs.rs/termwiz/latest/termwiz/
+[ratatui-backend]: https://docs.rs/ratatui/latest/ratatui/backend/trait.Backend.html
+[repo]: https://github.com/srothgan/tui-textarea
+[new-issue]: https://github.com/srothgan/tui-textarea/issues/new
+[pulls]: https://github.com/srothgan/tui-textarea/pulls
+[regex]: https://docs.rs/regex/latest/regex/
+[serde]: https://crates.io/crates/serde
+[serde_json]: https://crates.io/crates/serde_json

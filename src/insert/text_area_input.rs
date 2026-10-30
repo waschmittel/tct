@@ -19,6 +19,8 @@ impl TextAreaInput {
         let lines: Vec<String> = initial.split('\n').map(|s| s.to_string()).collect();
         let mut textarea = TextArea::new(lines);
         textarea.set_wrap_mode(WrapMode::WordOrGlyph);
+        // Same hanging indent as the markdown preview.
+        textarea.set_wrap_continuation_indent(Some(crate::ui::markdown::detect_list_indent));
         textarea.set_cursor_line_style(Style::default());
         textarea.set_style(Style::default().fg(Color::White));
         Self {
@@ -80,6 +82,42 @@ mod tests {
     fn cursor_after_the_hanging_space_does_not_panic() {
         let rows = render_rows("0123456789 ", 10, true);
         assert_eq!(rows[0].trim_end(), "0123456789");
+    }
+
+    #[test]
+    fn bullet_continuation_rows_are_indented_under_the_text() {
+        let rows = render_rows("- aaa bbb ccc ddd", 10, false);
+        assert_eq!(rows[0].trim_end(), "- aaa bbb");
+        assert_eq!(rows[1].trim_end(), "  ccc ddd");
+    }
+
+    #[test]
+    fn numbered_and_nested_continuation_rows_keep_the_hanging_indent() {
+        let rows = render_rows("10. aaa bbb ccc ddd", 10, false);
+        assert_eq!(rows[1].trim_end(), "    bbb");
+        let rows = render_rows("  - aaa bbb ccc ddd", 10, false);
+        assert_eq!(rows[1].trim_end(), "    bbb");
+    }
+
+    #[test]
+    fn plain_paragraph_continuation_rows_stay_flush_left() {
+        let rows = render_rows("aaa bbb ccc ddd", 8, false);
+        assert_eq!(rows[1].trim_end(), "ccc ddd");
+    }
+
+    #[test]
+    fn cursor_navigation_and_typing_work_on_indented_rows() {
+        let mut input = TextAreaInput::from_initial("- aaa bbb ccc ddd");
+        let mut terminal = Terminal::new(TestBackend::new(11, 4)).unwrap();
+        terminal.draw(|f| f.render_widget(&input.textarea, f.area())).unwrap();
+        // Cursor starts at (0,0); move down one visual row, then to its end.
+        input.textarea.move_cursor(tui_textarea::CursorMove::Down);
+        input.textarea.move_cursor(tui_textarea::CursorMove::End);
+        assert_eq!(input.textarea.cursor(), (0, 17));
+        input.textarea.move_cursor(tui_textarea::CursorMove::Up);
+        input.textarea.insert_char('X');
+        assert!(input.current_text().starts_with("- aaa bbb"));
+        assert_eq!(input.current_text().chars().filter(|c| *c == 'X').count(), 1);
     }
 
     #[test]

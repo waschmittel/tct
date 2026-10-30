@@ -1,0 +1,276 @@
+diff -ruN a/src/screen_map.rs b/src/screen_map.rs
+--- a/src/screen_map.rs	2026-10-30 10:00:38
++++ b/src/screen_map.rs	2026-10-30 10:00:38
+@@ -77,6 +77,7 @@
+                 end_col: line.chars().count(),
+                 first_in_row: true,
+                 last_in_row: true,
++                indent: 0,
+             })
+             .collect()
+     }
+@@ -88,7 +89,13 @@
+             .flatten();
+ 
+         let rows = match wrap_width {
+-            Some(width) => wrapped_rows(&self.lines, self.wrap_mode(), width, self.tab_length()),
++            Some(width) => wrapped_rows(
++                &self.lines,
++                self.wrap_mode(),
++                width,
++                self.tab_length(),
++                self.continuation_indent(),
++            ),
+             None => self.fallback_rows(),
+         };
+ 
+@@ -104,18 +111,20 @@
+ 
+             let fragment = &self.lines[wrapped.row][wrapped.start_byte..wrapped.end_byte];
+             let char_count = wrapped.end_col.saturating_sub(wrapped.start_col);
+-            let cursor_max_col = if wrapped.last_in_row {
+-                display_width(fragment, self.tab_length())
+-            } else {
+-                screen_col_for_char_offset(
+-                    fragment,
+-                    char_count.saturating_sub(1),
+-                    self.tab_length(),
+-                )
+-            };
++            let indent = wrapped.indent;
++            let cursor_max_col = indent
++                + if wrapped.last_in_row {
++                    display_width(fragment, self.tab_length())
++                } else {
++                    screen_col_for_char_offset(
++                        fragment,
++                        char_count.saturating_sub(1),
++                        self.tab_length(),
++                    )
++                };
+             screen_lines.push(ScreenLine {
+                 wrapped,
+-                screen_width: display_width(fragment, self.tab_length()),
++                screen_width: indent + display_width(fragment, self.tab_length()),
+                 cursor_max_col,
+             });
+         }
+@@ -148,7 +157,11 @@
+         let line = self.screen_line(screen.row);
+         let fragment =
+             &self.lines[line.wrapped.row][line.wrapped.start_byte..line.wrapped.end_byte];
+-        let char_offset = char_offset_for_screen_col(fragment, screen.col, self.tab_length());
++        let char_offset = char_offset_for_screen_col(
++            fragment,
++            screen.col.saturating_sub(line.wrapped.indent),
++            self.tab_length(),
++        );
+         DataCursor(line.wrapped.row, line.wrapped.start_col + char_offset)
+     }
+ 
+@@ -175,7 +188,8 @@
+         let line = screen_lines[screen_idx];
+         let fragment = &self.lines[data.0][line.wrapped.start_byte..line.wrapped.end_byte];
+         let char_offset = data.1.saturating_sub(line.wrapped.start_col);
+-        let col = screen_col_for_char_offset(fragment, char_offset, self.tab_length());
++        let col = line.wrapped.indent
++            + screen_col_for_char_offset(fragment, char_offset, self.tab_length());
+ 
+         ScreenCursor {
+             row: screen_idx,
+diff -ruN a/src/textarea.rs b/src/textarea.rs
+--- a/src/textarea.rs	2026-10-30 10:00:38
++++ b/src/textarea.rs	2026-10-30 10:00:38
+@@ -219,6 +219,7 @@
+     search: Search,
+     alignment: Alignment,
+     wrap_mode: WrapMode,
++    continuation_indent: Option<fn(&str) -> usize>,
+     min_rows: u16,
+     max_rows: u16,
+     pub(crate) placeholder: Text<'a>,
+@@ -339,6 +340,7 @@
+             search: Search::default(),
+             alignment: Alignment::Left,
+             wrap_mode: WrapMode::None,
++            continuation_indent: None,
+             min_rows: 1,
+             max_rows: u16::MAX,
+             placeholder: Text::default().style(Style::default().fg(Color::DarkGray)),
+@@ -2841,6 +2843,19 @@
+         self.wrap_mode
+     }
+ 
++    /// TCT patch: set a function returning the hanging indent (in display columns) that
++    /// soft-wrapped continuation rows of a logical line are indented by. `None` (the
++    /// default) starts continuation rows at the first column.
++    pub fn set_wrap_continuation_indent(&mut self, indent: Option<fn(&str) -> usize>) {
++        self.continuation_indent = indent;
++        self.refresh_screen_map();
++        self.reset_measure_cache();
++    }
++
++    pub(crate) fn continuation_indent(&self) -> Option<fn(&str) -> usize> {
++        self.continuation_indent
++    }
++
+     /// Set the minimum preferred height in rows.
+     ///
+     /// The value is applied to measured outer rows (content + block chrome). Setting 0 is
+@@ -2934,7 +2949,14 @@
+         }
+ 
+         let rows = if let Some(wrap_width) = self.layout_metrics(width_cols).wrap_width() {
+-            wrapped_rows(&self.lines, self.wrap_mode, wrap_width, self.tab_len).len()
++            wrapped_rows(
++                &self.lines,
++                self.wrap_mode,
++                wrap_width,
++                self.tab_len,
++                self.continuation_indent,
++            )
++            .len()
+         } else {
+             self.lines.len()
+         };
+diff -ruN a/src/widget.rs b/src/widget.rs
+--- a/src/widget.rs	2026-10-30 10:00:38
++++ b/src/widget.rs	2026-10-30 10:00:38
+@@ -105,7 +105,15 @@
+         let mut lines = Vec::with_capacity(bottom_row - top_row);
+         for row in &screen_lines[top_row..bottom_row] {
+             let line = &self.lines()[row.wrapped.row];
+-            lines.push(self.line_spans_segment(line, &row.wrapped, lnum_len));
++            let mut spans = self.line_spans_segment(line, &row.wrapped, lnum_len);
++            if row.wrapped.indent > 0 {
++                // TCT patch: hanging indent, after the line-number gutter (a single span).
++                let at = usize::from(self.line_number_style().is_some());
++                spans
++                    .spans
++                    .insert(at, Span::raw(" ".repeat(row.wrapped.indent)));
++            }
++            lines.push(spans);
+         }
+         Text::from(lines)
+     }
+diff -ruN a/src/wrap.rs b/src/wrap.rs
+--- a/src/wrap.rs	2026-10-30 10:00:38
++++ b/src/wrap.rs	2026-10-30 10:00:38
+@@ -31,8 +31,13 @@
+     pub end_col: usize,
+     pub first_in_row: bool,
+     pub last_in_row: bool,
++    /// TCT patch: display columns of hanging indent for continuation rows (0 on the first row).
++    pub indent: usize,
+ }
+ 
++/// TCT patch: computes the hanging indent (display columns) of a logical line's continuation rows.
++pub type ContinuationIndent = fn(&str) -> usize;
++
+ #[derive(Clone, Copy)]
+ struct WordWrapUnit {
+     start: usize,
+@@ -51,13 +56,14 @@
+     mode: WrapMode,
+     width: usize,
+     tab_len: u8,
++    continuation_indent: Option<ContinuationIndent>,
+ ) -> Vec<WrappedLine> {
+     let mut rows = Vec::new();
+ 
+     for (row, line) in lines.iter().enumerate() {
+-        let ranges = line_ranges(line, mode, width, tab_len);
++        let ranges = indented_line_ranges(line, mode, width, tab_len, continuation_indent);
+         let mut start_col = 0usize;
+-        for (i, (start_byte, end_byte)) in ranges.iter().copied().enumerate() {
++        for (i, (start_byte, end_byte, indent)) in ranges.iter().copied().enumerate() {
+             let end_col = start_col + line[start_byte..end_byte].chars().count();
+             rows.push(WrappedLine {
+                 row,
+@@ -67,6 +73,7 @@
+                 end_col,
+                 first_in_row: i == 0,
+                 last_in_row: i + 1 == ranges.len(),
++                indent,
+             });
+             start_col = end_col;
+         }
+@@ -75,6 +82,33 @@
+     rows
+ }
+ 
++/// TCT patch: like [`line_ranges`], but continuation rows are wrapped to `width - indent`
++/// and carry that indent as the third tuple element.
++fn indented_line_ranges(
++    line: &str,
++    mode: WrapMode,
++    width: usize,
++    tab_len: u8,
++    continuation_indent: Option<ContinuationIndent>,
++) -> Vec<(usize, usize, usize)> {
++    let first = line_ranges(line, mode, width, tab_len);
++    let plain = |ranges: Vec<(usize, usize)>| ranges.into_iter().map(|(s, e)| (s, e, 0)).collect();
++
++    let width = width.max(1);
++    let indent = continuation_indent.map_or(0, |f| f(line));
++    // Keep at least two cells for text on continuation rows; otherwise don't indent.
++    if first.len() < 2 || mode == WrapMode::None || width.saturating_sub(indent) < 2 {
++        return plain(first);
++    }
++
++    let head_end = first[0].1;
++    let mut out = vec![(first[0].0, head_end, 0)];
++    for (s, e) in line_ranges(&line[head_end..], mode, width - indent, tab_len) {
++        out.push((head_end + s, head_end + e, indent));
++    }
++    out
++}
++
+ pub(crate) fn line_ranges(
+     line: &str,
+     mode: WrapMode,
+@@ -311,5 +345,44 @@
+     fn tab_width_is_accounted_for_in_wrap() {
+         let have = segments("\tX", WrapMode::WordOrGlyph, 2);
+         assert_eq!(have, vec!["\t", "X"]);
++    }
++
++    fn list_indent(line: &str) -> usize {
++        line.len() - line.trim_start_matches(' ').len() + 2
++    }
++
++    fn indented(line: &str, width: usize) -> Vec<(&str, usize)> {
++        indented_line_ranges(line, WrapMode::WordOrGlyph, width, 4, Some(list_indent))
++            .into_iter()
++            .map(|(s, e, i)| (&line[s..e], i))
++            .collect()
++    }
++
++    #[test]
++    fn continuation_rows_wrap_to_reduced_width_and_carry_indent() {
++        let have = indented("- aaa bbb ccc ddd", 8);
++        assert_eq!(have, vec![("- aaa ", 0), ("bbb ", 2), ("ccc ", 2), ("ddd", 2)]);
++    }
++
++    #[test]
++    fn continuation_indent_is_skipped_when_it_leaves_no_room() {
++        let have = indented("- aaa bbb", 3);
++        assert!(have.iter().all(|(_, i)| *i == 0));
++    }
++
++    #[test]
++    fn unwrapped_line_has_no_indent() {
++        assert_eq!(indented("- short", 20), vec![("- short", 0)]);
++    }
++
++    #[test]
++    fn no_indent_fn_matches_plain_wrapping() {
++        let plain = segments("- aaa bbb ccc ddd", WrapMode::WordOrGlyph, 8);
++        let none: Vec<&str> =
++            indented_line_ranges("- aaa bbb ccc ddd", WrapMode::WordOrGlyph, 8, 4, None)
++                .into_iter()
++                .map(|(s, e, _)| &"- aaa bbb ccc ddd"[s..e])
++                .collect();
++        assert_eq!(plain, none);
+     }
+ }

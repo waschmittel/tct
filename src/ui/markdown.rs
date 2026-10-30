@@ -78,7 +78,7 @@ impl Rendered {
 
 /// Detect leading list-marker indent (bullet or numbered) so wrapped
 /// continuation lines line up under the first character of the item text.
-fn detect_list_indent(line: &str) -> usize {
+pub(crate) fn detect_list_indent(line: &str) -> usize {
     let trimmed = line.trim_start();
     let base_indent = line.len() - trimmed.len();
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
