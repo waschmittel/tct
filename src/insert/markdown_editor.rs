@@ -138,36 +138,60 @@ pub(crate) fn handle_enter_in_list(textarea: &mut tui_textarea::TextArea<'static
     }
 
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-        let indent = current_line.len() - trimmed.len();
+        let indent = current_line.chars().count() - trimmed.chars().count();
         let prefix_char = &trimmed[..2];
-        let indent_str = " ".repeat(indent);
-        textarea.move_cursor(CursorMove::End);
-        textarea.insert_newline();
-        textarea.insert_str(format!("{indent_str}{prefix_char}"));
+        let prefix = format!("{}{prefix_char}", " ".repeat(indent));
+        if col < prefix.chars().count() {
+            // Cursor sits inside the marker: just push the item down a line.
+            textarea.insert_newline();
+            return;
+        }
+        split_line_for_new_item(textarea, col, &prefix);
         return;
     }
 
     if let Some(dot_pos) = trimmed.find(". ") {
         let num_part = &trimmed[..dot_pos];
         if num_part.parse::<u64>().is_ok() {
-            let indent = current_line.len() - trimmed.len();
-            let indent_str = " ".repeat(indent);
-            textarea.move_cursor(CursorMove::End);
-            textarea.insert_newline();
-            textarea.insert_str(format!("{indent_str}1. "));
+            let indent = current_line.chars().count() - trimmed.chars().count();
+            let marker_len = indent + dot_pos + 2;
+            if col < marker_len {
+                textarea.insert_newline();
+                renumber_all(textarea);
+                return;
+            }
+            split_line_for_new_item(textarea, col, &format!("{}1. ", " ".repeat(indent)));
             renumber_all(textarea);
+            // Put the cursor right after the (possibly renumbered) marker of the new item.
             let new_row = row + 1;
-            let new_len = textarea
+            let new_col = textarea
                 .lines()
                 .get(new_row)
-                .map(|l| l.chars().count())
+                .and_then(|l| l.find(". ").map(|p| l[..p].chars().count() + 2))
                 .unwrap_or(0);
-            textarea.move_cursor(CursorMove::Jump(new_row as u16, new_len as u16));
+            textarea.move_cursor(CursorMove::Jump(new_row as u16, new_col as u16));
             return;
         }
     }
 
     textarea.insert_newline();
+}
+
+/// Break the current line at the cursor (`col`) and start the new line with
+/// `prefix`, moving the text after the cursor into the new list item. Spaces
+/// right after the cursor are dropped so the item text doesn't start with a gap.
+fn split_line_for_new_item(textarea: &mut tui_textarea::TextArea<'static>, col: usize, prefix: &str) {
+    let (row, _) = textarea.cursor();
+    let leading_spaces = textarea
+        .lines()
+        .get(row)
+        .map(|l| l.chars().skip(col).take_while(|c| *c == ' ').count())
+        .unwrap_or(0);
+    if leading_spaces > 0 {
+        textarea.delete_str(leading_spaces);
+    }
+    textarea.insert_newline();
+    textarea.insert_str(prefix);
 }
 
 pub(crate) fn handle_tab_nest(textarea: &mut tui_textarea::TextArea<'static>) -> bool {
@@ -385,7 +409,7 @@ mod tests {
     }
 
     #[test]
-    fn enter_at_col0_of_inner_list_line_still_continues_list() {
+    fn enter_at_col0_of_inner_list_line_pushes_the_item_down() {
         let mut e = make_editor("intro\n- first\n- second");
         e.input.textarea.move_cursor(CursorMove::Top);
         e.input.textarea.move_cursor(CursorMove::Down);
@@ -398,10 +422,77 @@ mod tests {
             editor_lines(&e),
             vec![
                 "intro".to_string(),
+                "".to_string(),
                 "- first".to_string(),
-                "- ".to_string(),
                 "- second".to_string()
             ]
+        );
+        assert_eq!(editor_cursor(&e), (2, 0));
+    }
+
+    fn cursor_at(e: &mut MarkdownEditor, row: usize, col: usize) {
+        e.input.textarea.move_cursor(CursorMove::Jump(row as u16, col as u16));
+    }
+
+    #[test]
+    fn enter_in_middle_of_bullet_item_splits_it() {
+        let mut e = make_editor("- hello world\n- next");
+        cursor_at(&mut e, 0, 7); // after "- hello"
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["- hello".to_string(), "- world".to_string(), "- next".to_string()]
+        );
+        assert_eq!(editor_cursor(&e), (1, 2));
+    }
+
+    #[test]
+    fn enter_mid_word_splits_the_word_and_keeps_text_after_cursor() {
+        let mut e = make_editor("* abcdef");
+        cursor_at(&mut e, 0, 5); // "* abc|def"
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(editor_lines(&e), vec!["* abc".to_string(), "* def".to_string()]);
+        assert_eq!(editor_cursor(&e), (1, 2));
+    }
+
+    #[test]
+    fn enter_at_start_of_item_text_leaves_empty_item_above() {
+        let mut e = make_editor("- text");
+        cursor_at(&mut e, 0, 2);
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(editor_lines(&e), vec!["- ".to_string(), "- text".to_string()]);
+        assert_eq!(editor_cursor(&e), (1, 2));
+    }
+
+    #[test]
+    fn enter_in_nested_bullet_keeps_indent_for_the_tail() {
+        let mut e = make_editor("   - one two");
+        cursor_at(&mut e, 0, 8); // "   - one| two"
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(editor_lines(&e), vec!["   - one".to_string(), "   - two".to_string()]);
+        assert_eq!(editor_cursor(&e), (1, 5));
+    }
+
+    #[test]
+    fn enter_in_middle_of_numbered_item_splits_and_renumbers() {
+        let mut e = make_editor("1. hello world\n2. next");
+        cursor_at(&mut e, 0, 8); // "1. hello| world"
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["1. hello".to_string(), "2. world".to_string(), "3. next".to_string()]
+        );
+        assert_eq!(editor_cursor(&e), (1, 3));
+    }
+
+    #[test]
+    fn enter_at_col0_of_numbered_item_pushes_it_down_without_new_item() {
+        let mut e = make_editor("intro\n1. a\n2. b");
+        cursor_at(&mut e, 1, 0);
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["intro".to_string(), "".to_string(), "1. a".to_string(), "2. b".to_string()]
         );
     }
 
