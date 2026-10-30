@@ -23,10 +23,10 @@ pub struct MarkdownEditor {
 
 impl MarkdownEditor {
     pub fn new(card_id: CardId, initial: &str) -> Self {
-        Self {
-            input: TextAreaInput::from_initial(initial),
-            card_id,
-        }
+        let mut input = TextAreaInput::from_initial(initial);
+        input.textarea.move_cursor(CursorMove::Bottom);
+        input.textarea.move_cursor(CursorMove::End);
+        Self { input, card_id }
     }
 }
 
@@ -347,6 +347,21 @@ mod tests {
 
     fn press(e: &mut MarkdownEditor, code: KeyCode) {
         e.handle_key(KeyEvent::new(code, KeyModifiers::empty()), None);
+    }
+
+    #[test]
+    fn new_editor_places_cursor_at_end_of_content() {
+        assert_eq!(editor_cursor(&make_editor("")), (0, 0));
+        assert_eq!(editor_cursor(&make_editor("hello")), (0, 5));
+        assert_eq!(editor_cursor(&make_editor("one\ntwo\nthree")), (2, 5));
+        assert_eq!(editor_cursor(&make_editor("one\n")), (1, 0));
+    }
+
+    #[test]
+    fn typing_after_entering_edit_mode_appends() {
+        let mut e = make_editor("abc\ndef");
+        press(&mut e, KeyCode::Char('X'));
+        assert_eq!(editor_lines(&e), vec!["abc".to_string(), "defX".to_string()]);
     }
 
     #[test]
