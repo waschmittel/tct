@@ -106,6 +106,17 @@ pub(super) fn wrap_spans_with_indent(
         return vec![Line::from(spans)];
     }
 
+    // Cap the hanging indent so continuation lines always keep room for text;
+    // an indent >= the width would otherwise never fit and overflow the view.
+    let indent = indent.min(max_width / 2);
+    let width_for = |first_line: bool| {
+        if first_line {
+            max_width
+        } else {
+            max_width - indent
+        }
+    };
+
     let mut result: Vec<Line<'static>> = Vec::new();
     let mut current_spans: Vec<Span<'static>> = Vec::new();
     let mut current_width: usize = 0;
@@ -116,13 +127,7 @@ pub(super) fn wrap_spans_with_indent(
         let text = span.content.to_string();
         let span_width = text.chars().count();
 
-        let effective_width = if is_first_line {
-            max_width
-        } else {
-            max_width.saturating_sub(indent)
-        };
-
-        if current_width + span_width <= effective_width {
+        if current_width + span_width <= width_for(is_first_line) {
             current_width += span_width;
             current_spans.push(Span::styled(text, style));
             continue;
@@ -130,18 +135,13 @@ pub(super) fn wrap_spans_with_indent(
 
         let mut remaining = text.as_str();
         while !remaining.is_empty() {
-            let budget = effective_width.saturating_sub(current_width);
+            // Recomputed every iteration: the first break inside a span moves
+            // us onto an indented continuation line with a narrower budget.
+            let budget = width_for(is_first_line).saturating_sub(current_width);
             if budget == 0 {
                 result.push(Line::from(std::mem::take(&mut current_spans)));
                 is_first_line = false;
                 current_width = 0;
-                // Re-calculate effective_width for the new line
-                let new_effective_width = max_width.saturating_sub(indent);
-                if new_effective_width == 0 {
-                    // Cannot wrap further
-                    current_spans.push(Span::styled(remaining.to_string(), style));
-                    break;
-                }
                 continue;
             }
 
@@ -164,7 +164,22 @@ pub(super) fn wrap_spans_with_indent(
             let slice = &remaining[..split_idx];
             let break_at = match slice.rfind(' ') {
                 Some(pos) if pos > 0 => pos,
-                _ => split_idx,
+                _ => {
+                    // No space to break at. If the line already has text and the
+                    // next word fits on a fresh line, move it there whole instead
+                    // of splitting it mid-word.
+                    let next_word = remaining.split(' ').next().unwrap_or("");
+                    if current_width > 0
+                        && !remaining.starts_with(' ')
+                        && next_word.chars().count() <= width_for(false)
+                    {
+                        result.push(Line::from(std::mem::take(&mut current_spans)));
+                        is_first_line = false;
+                        current_width = 0;
+                        continue;
+                    }
+                    split_idx
+                }
             };
 
             let (chunk, rest) = remaining.split_at(break_at);
@@ -563,5 +578,60 @@ mod tests {
         let wrapped2 = wrap_spans_with_indent(highlighted2, 10, 5);
         assert!(wrapped2.len() > 1);
         assert!(wrapped2[1].spans[0].content.starts_with("     "));
+    }
+
+    fn line_text(line: &Line<'_>) -> String {
+        line.spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    fn render_texts(text: &str, width: usize) -> Vec<String> {
+        MarkdownRenderer::new(text, width, Color::Cyan)
+            .render()
+            .lines
+            .iter()
+            .map(line_text)
+            .collect()
+    }
+
+    /// No rendered line may be wider than the wrap width, or the view clips it.
+    fn assert_fits(lines: &[String], width: usize) {
+        for l in lines {
+            assert!(l.chars().count() <= width, "line wider than {width}: {l:?}");
+        }
+    }
+
+    #[test]
+    fn deeply_indented_list_item_never_overflows_and_keeps_all_text() {
+        let words = "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima";
+        for indent in [0usize, 2, 8, 20, 30, 38, 39, 40, 41, 60] {
+            for width in [20usize, 30, 40, 80] {
+                let src = format!("{}- {words}", " ".repeat(indent));
+                let lines = render_texts(&src, width);
+                assert_fits(&lines, width);
+                let joined: String = lines.join(" ");
+                let got: Vec<&str> = joined.split_whitespace().collect();
+                let want: Vec<&str> = src.split_whitespace().collect();
+                assert_eq!(got, want, "text lost/changed (indent {indent}, width {width})");
+            }
+        }
+    }
+
+    #[test]
+    fn continuation_lines_after_first_break_in_a_span_are_indented_within_width() {
+        // A single long span breaks several times; every continuation line
+        // must use the reduced (width - indent) budget, not the full width.
+        let lines = render_texts("    - aaaa bbbb cccc dddd eeee ffff gggg hhhh", 20);
+        assert!(lines.len() > 2);
+        assert_fits(&lines, 20);
+        for l in &lines[1..] {
+            assert!(l.starts_with("      "), "continuation not indented: {l:?}");
+        }
+    }
+
+    #[test]
+    fn indent_wider_than_width_still_shows_the_last_words() {
+        let lines = render_texts("          - one two three four five six", 12);
+        assert_fits(&lines, 12);
+        assert!(lines.last().unwrap().contains("six"));
     }
 }
