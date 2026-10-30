@@ -446,38 +446,40 @@ mod tests {
     /// Smoke test: BoardSelector base when no board loaded.
     #[test]
     fn test_render_completeness() {
-        let mut app = App::new(None).unwrap();
-        app.mode = AppMode::Insert;
-        // No board loaded → always BoardSelector base.
-        assert!(app.editor.is_none());
+        crate::test_support::with_temp_dir(|| {
+            let mut app = App::new(None).unwrap();
+            app.mode = AppMode::Insert;
+            // No board loaded → always BoardSelector base.
+            assert!(app.editor.is_none());
 
-        // With board loaded, only board-name insert handlers force the
-        // selector background; other handlers use the BoardView.
-        let board_meta = crate::model::board::BoardMeta::new("Test".into());
-        app.editor = Some(crate::board_editor::BoardEditor::from_loaded(crate::app::LoadedBoard {
-            meta: board_meta,
-            lists: vec![],
-            cards: std::collections::HashMap::new(),
-            selected_list: 0,
-            selected_card: vec![],
-            scroll_offset: vec![],
-            detail_item_idx: 0,
-            detail_scroll: 0,
-            detail_max_scroll: std::cell::Cell::new(0),
-        }));
+            // With board loaded, only board-name insert handlers force the
+            // selector background; other handlers use the BoardView.
+            let board_meta = crate::model::board::BoardMeta::new("Test".into());
+            app.editor = Some(crate::board_editor::BoardEditor::from_loaded(crate::app::LoadedBoard {
+                meta: board_meta,
+                lists: vec![],
+                cards: std::collections::HashMap::new(),
+                selected_list: 0,
+                selected_card: vec![],
+                scroll_offset: vec![],
+                detail_item_idx: 0,
+                detail_scroll: 0,
+                detail_max_scroll: std::cell::Cell::new(0),
+            }));
 
-        // NewBoardName → BoardSelector surface
-        app.insert = Some(Box::new(crate::insert::line_editor::NewBoardName::new()));
-        assert_eq!(
-            app.insert.as_ref().unwrap().surface(),
-            InsertSurface::BoardSelector
-        );
+            // NewBoardName → BoardSelector surface
+            app.insert = Some(Box::new(crate::insert::line_editor::NewBoardName::new()));
+            assert_eq!(
+                app.insert.as_ref().unwrap().surface(),
+                InsertSurface::BoardSelector
+            );
 
-        // NewCardTitle → BoardView surface
-        app.insert = Some(Box::new(crate::insert::line_editor::NewCardTitle::new()));
-        assert_eq!(
-            app.insert.as_ref().unwrap().surface(),
-            InsertSurface::BoardView
-        );
+            // NewCardTitle → BoardView surface
+            app.insert = Some(Box::new(crate::insert::line_editor::NewCardTitle::new()));
+            assert_eq!(
+                app.insert.as_ref().unwrap().surface(),
+                InsertSurface::BoardView
+            );
+        });
     }
 }

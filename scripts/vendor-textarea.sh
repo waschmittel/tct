@@ -20,15 +20,20 @@ vendored_version() {
 }
 
 latest_version() {
-  curl -fsSL -A "tct-vendor-script" "https://crates.io/api/v1/crates/$CRATE" |
+  curl -fsSL -A "tct-vendor-script" "https://crates.io/api/v1/crates/$CRATE" 2>/dev/null |
     sed -n 's/.*"max_stable_version":"\([^"]*\)".*/\1/p'
 }
 
 # fetch_pristine VERSION DEST: unpack the untouched upstream crate into DEST.
 fetch_pristine() {
   mkdir -p "$2"
-  curl -fsSL -A "tct-vendor-script" "https://crates.io/api/v1/crates/$CRATE/$1/download" |
-    tar -xz -C "$2" --strip-components=1
+  cached="$(find "$HOME/.cargo/registry/cache" -name "$CRATE-$1.crate" 2>/dev/null | head -1)"
+  if [ -n "$cached" ] && [ -f "$cached" ]; then
+    tar -xzf "$cached" -C "$2" --strip-components=1
+  else
+    curl -fsSL -A "tct-vendor-script" "https://crates.io/api/v1/crates/$CRATE/$1/download" |
+      tar -xz -C "$2" --strip-components=1
+  fi
   rm -f "$2/.cargo-ok"
 }
 

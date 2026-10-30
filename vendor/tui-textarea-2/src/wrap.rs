@@ -192,24 +192,68 @@ fn wrap_words(line: &str, width: usize, tab_len: u8) -> Vec<(usize, usize)> {
     out
 }
 
+/// TCT patch: split into whitespace-delimited words (one unit per maximal run of
+/// non-whitespace) plus single-grapheme whitespace units. Upstream used Unicode
+/// word boundaries, which separate punctuation from the word it touches
+/// (`word,`, `"word`, `(word)`, `a.b`), allowing a wrap right before a comma,
+/// period or closing quote.
+/// Hyphens in the middle of words (e.g. `foo-bar`) are treated as valid wrap
+/// opportunities ending with the hyphen (`foo-` and `bar`).
 fn word_wrap_units(line: &str) -> Vec<WordWrapUnit> {
     let mut units = Vec::new();
-    for (start, text) in UnicodeSegmentation::split_word_bound_indices(line) {
-        if text.chars().all(char::is_whitespace) {
-            units.extend(UnicodeSegmentation::grapheme_indices(text, true).map(
-                |(grapheme_start, grapheme)| WordWrapUnit {
-                    start: start + grapheme_start,
-                    end: start + grapheme_start + grapheme.len(),
-                    kind: WordWrapUnitKind::Whitespace,
-                },
-            ));
-        } else {
+    let mut word_start: Option<usize> = None;
+
+    for (start, grapheme) in UnicodeSegmentation::grapheme_indices(line, true) {
+        if grapheme.chars().all(char::is_whitespace) {
+            if let Some(w_start) = word_start.take() {
+                units.push(WordWrapUnit {
+                    start: w_start,
+                    end: start,
+                    kind: WordWrapUnitKind::Content,
+                });
+            }
             units.push(WordWrapUnit {
                 start,
-                end: start + text.len(),
-                kind: WordWrapUnitKind::Content,
+                end: start + grapheme.len(),
+                kind: WordWrapUnitKind::Whitespace,
             });
+        } else {
+            let is_hyphen = grapheme == "-" || grapheme == "\u{2010}";
+            if is_hyphen {
+                if let Some(w_start) = word_start {
+                    if start > w_start {
+                        let prev_alnum = line[..start]
+                            .chars()
+                            .next_back()
+                            .map_or(false, char::is_alphanumeric);
+                        let after_idx = start + grapheme.len();
+                        let next_alnum = line[after_idx..]
+                            .chars()
+                            .next()
+                            .map_or(false, char::is_alphanumeric);
+                        if prev_alnum && next_alnum {
+                            units.push(WordWrapUnit {
+                                start: w_start,
+                                end: after_idx,
+                                kind: WordWrapUnitKind::Content,
+                            });
+                            word_start = Some(after_idx);
+                            continue;
+                        }
+                    }
+                }
+            }
+            if word_start.is_none() {
+                word_start = Some(start);
+            }
         }
+    }
+    if let Some(w_start) = word_start {
+        units.push(WordWrapUnit {
+            start: w_start,
+            end: line.len(),
+            kind: WordWrapUnitKind::Content,
+        });
     }
     units
 }
@@ -345,6 +389,41 @@ mod tests {
     fn tab_width_is_accounted_for_in_wrap() {
         let have = segments("\tX", WrapMode::WordOrGlyph, 2);
         assert_eq!(have, vec!["\t", "X"]);
+    }
+
+    #[test]
+    fn punctuation_stays_attached_to_its_word() {
+        // width 7: "aaaa bbb" would fit "aaaa bb" + "b," if punctuation split off.
+        assert_eq!(segments("aaaa bbbb, cc", WrapMode::Word, 7), vec!["aaaa ", "bbbb, ", "cc"]);
+        assert_eq!(segments("aaaa bbbb. cc", WrapMode::Word, 7), vec!["aaaa ", "bbbb. ", "cc"]);
+        assert_eq!(segments("aaaa \"bbbb\" cc", WrapMode::Word, 7), vec!["aaaa ", "\"bbbb\" ", "cc"]);
+        assert_eq!(segments("aaaa \"bbbb cc", WrapMode::Word, 7), vec!["aaaa ", "\"bbbb ", "cc"]);
+        assert_eq!(segments("aaaa (bbbb). cc", WrapMode::Word, 7), vec!["aaaa ", "(bbbb). ", "cc"]);
+        assert_eq!(segments("aaaa [bbbb] cc", WrapMode::Word, 7), vec!["aaaa ", "[bbbb] ", "cc"]);
+        assert_eq!(segments("aaaa bbbb! cc", WrapMode::Word, 7), vec!["aaaa ", "bbbb! ", "cc"]);
+        assert_eq!(segments("aaaa bbbb? cc", WrapMode::Word, 7), vec!["aaaa ", "bbbb? ", "cc"]);
+        assert_eq!(segments("aaaa bbbb: cc", WrapMode::Word, 7), vec!["aaaa ", "bbbb: ", "cc"]);
+        assert_eq!(segments("aaaa bbbb; cc", WrapMode::Word, 7), vec!["aaaa ", "bbbb; ", "cc"]);
+    }
+
+    #[test]
+    fn hyphen_in_middle_of_word_wraps_after_hyphen() {
+        // width 5: "foo-bar" splits into "foo-" and "bar"
+        assert_eq!(segments("foo-bar", WrapMode::Word, 5), vec!["foo-", "bar"]);
+        // width 7: "foo-bar" fits entirely, stays together
+        assert_eq!(segments("foo-bar", WrapMode::Word, 7), vec!["foo-bar"]);
+        // width 8: "aaa foo-bar" fits "aaa foo-" on line 1, wraps "bar" to line 2
+        assert_eq!(segments("aaa foo-bar", WrapMode::Word, 8), vec!["aaa foo-", "bar"]);
+        // multiple hyphens: "foo-bar-baz" on width 5 wraps to 3 lines
+        assert_eq!(segments("foo-bar-baz", WrapMode::Word, 5), vec!["foo-", "bar-", "baz"]);
+        // multiple hyphens: "foo-bar-baz" on width 9 wraps after second hyphen
+        assert_eq!(segments("foo-bar-baz", WrapMode::Word, 9), vec!["foo-bar-", "baz"]);
+        // hyphen with trailing comma: comma stays attached to second word
+        assert_eq!(segments("foo-bar,", WrapMode::Word, 5), vec!["foo-", "bar,"]);
+        // leading hyphen or double hyphen flag is not in the middle of a word
+        assert_eq!(segments("--flag-arg", WrapMode::Word, 7), vec!["--flag-", "arg"]);
+        assert_eq!(segments("--flag", WrapMode::Word, 5), vec!["--flag"]);
+        assert_eq!(segments("-item", WrapMode::Word, 5), vec!["-item"]);
     }
 
     fn list_indent(line: &str) -> usize {

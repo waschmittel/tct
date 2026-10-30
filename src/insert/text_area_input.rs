@@ -125,4 +125,95 @@ mod tests {
         let input = TextAreaInput::from_initial("first\nsecond");
         assert_eq!(input.textarea.cursor_line_style(), Style::default());
     }
+
+    #[test]
+    fn trailing_punctuation_and_quotes_stay_attached_on_wrap() {
+        // Trailing comma does not wrap independently onto next row
+        let rows = render_rows("aaa bbbb, cc", 8, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "bbbb, cc");
+
+        // Trailing period does not wrap independently onto next row
+        let rows = render_rows("aaa bbbb. cc", 8, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "bbbb. cc");
+
+        // Preceding quote does not stay trailing on current row
+        let rows = render_rows("aaa \"bbbb cc", 6, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "\"bbbb");
+        assert_eq!(rows[2].trim_end(), "cc");
+
+        let rows = render_rows("aaa \"bbbb cc", 8, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "\"bbbb cc");
+
+        // Quoted word stays together
+        let rows = render_rows("aaa \"bbbb\" cc", 9, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "\"bbbb\" cc");
+
+        // Parentheses stay together
+        let rows = render_rows("aaa (bbbb) cc", 9, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "(bbbb) cc");
+
+        // Brackets stay together
+        let rows = render_rows("aaa [bbbb] cc", 9, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "[bbbb] cc");
+
+        // Exclamation mark stays with word
+        let rows = render_rows("aaa bbbb! cc", 8, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "bbbb! cc");
+
+        // Question mark stays with word
+        let rows = render_rows("aaa bbbb? cc", 8, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "bbbb? cc");
+
+        // Colon stays with word
+        let rows = render_rows("aaa bbbb: cc", 8, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "bbbb: cc");
+
+        // Semicolon stays with word
+        let rows = render_rows("aaa bbbb; cc", 8, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "bbbb; cc");
+
+        // Markdown bold markup stays with word
+        let rows = render_rows("aaa **bbbb** cc", 11, false);
+        assert_eq!(rows[0].trim_end(), "aaa");
+        assert_eq!(rows[1].trim_end(), "**bbbb** cc");
+    }
+
+    #[test]
+    fn hyphen_in_middle_of_word_wraps_after_hyphen() {
+        // "foo-bar" wraps as "foo-" and "bar" when width is 5
+        let rows = render_rows("foo-bar", 5, false);
+        assert_eq!(rows[0].trim_end(), "foo-");
+        assert_eq!(rows[1].trim_end(), "bar");
+
+        // "foo-bar" fits completely when width is 7
+        let rows = render_rows("foo-bar", 7, false);
+        assert_eq!(rows[0].trim_end(), "foo-bar");
+
+        // "aaa foo-bar" with width 8 fits "aaa foo-" on line 1, wraps "bar" to line 2
+        let rows = render_rows("aaa foo-bar", 8, false);
+        assert_eq!(rows[0].trim_end(), "aaa foo-");
+        assert_eq!(rows[1].trim_end(), "bar");
+
+        // Multiple hyphens wrap at each hyphen boundary
+        let rows = render_rows("foo-bar-baz", 5, false);
+        assert_eq!(rows[0].trim_end(), "foo-");
+        assert_eq!(rows[1].trim_end(), "bar-");
+        assert_eq!(rows[2].trim_end(), "baz");
+
+        // Trailing punctuation on hyphenated word stays attached
+        let rows = render_rows("foo-bar,", 5, false);
+        assert_eq!(rows[0].trim_end(), "foo-");
+        assert_eq!(rows[1].trim_end(), "bar,");
+    }
 }
