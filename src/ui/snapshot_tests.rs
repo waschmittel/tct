@@ -120,6 +120,20 @@ fn snapshot_board_view_search_active() {
 }
 
 #[test]
+fn snapshot_board_view_search_typing() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('/'));
+        for ch in "token".chars() {
+            press(&mut app, KeyCode::Char(ch));
+        }
+        assert_eq!(app.mode, AppMode::Command);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
 fn snapshot_status_toast() {
     with_temp_dir(|| {
         let id = seed_demo_board();
@@ -297,11 +311,37 @@ fn snapshot_description_editor_scrollbar() {
     });
 }
 
+
 #[test]
 fn snapshot_description_editor() {
     with_temp_dir(|| {
         let id = seed_demo_board();
         let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        press(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.mode, AppMode::Insert);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_description_editor_wrapping() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        {
+            let board = app.board_mut().unwrap();
+            let card_id = board.current_card_id().cloned().unwrap();
+            let card = board.cards.get_mut(&card_id).unwrap();
+            card.description = [
+                "This is a long introductory paragraph that wraps over multiple lines in the description editor with trailing punctuation, such as commas, and trailing periods. Here is a hyphenated-word test: multi-layered-architecture and \"quoted-text\" near boundaries.",
+                "",
+                "- First bullet point with a long explanation that soft-wraps neatly onto the next line while preserving list layout.",
+                "  - Nested bullet point that demonstrates sub-item indentation and wrapping behavior with foo-bar-baz words.",
+                "1. Numbered item that also extends well past the wrap limit to verify numbered list wrapping in the editor.",
+            ].join("\n");
+        }
         press(&mut app, KeyCode::Enter);
         assert_eq!(app.mode, AppMode::CardDetail);
         press(&mut app, KeyCode::Char('e'));
@@ -462,6 +502,158 @@ fn snapshot_help_card_history_dialog() {
         let stamp = regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?").unwrap();
         let text = render_to_string(&app);
         insta::assert_snapshot!(stamp.replace_all(&text, "YYYY-MM-DD HH:MM"));
+    });
+}
+
+#[test]
+fn snapshot_card_history_dialog_empty() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('h'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        let stamp = regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?").unwrap();
+        let text = render_to_string(&app);
+        insta::assert_snapshot!(stamp.replace_all(&text, "YYYY-MM-DD HH:MM"));
+    });
+}
+
+#[test]
+fn snapshot_card_history_dialog() {
+    use crate::model::card::HistoryField;
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        {
+            let board = app.board_mut().unwrap();
+            let card_id = board.current_card_id().cloned().unwrap();
+            let card = board.cards.get_mut(&card_id).unwrap();
+            card.log_change(
+                HistoryField::Title,
+                "Edit title",
+                Some("Fix login".into()),
+                Some("Fix login flow".into()),
+            );
+            card.log_change(
+                HistoryField::Labels,
+                "Assign label 'bug'",
+                None,
+                Some("bug".into()),
+            );
+            card.log_change(
+                HistoryField::Description,
+                "Edit description",
+                Some("Token expires.\n\n- check refresh".into()),
+                Some("Token expires too early.\n\n- check refresh\n- add test".into()),
+            );
+        }
+        press(&mut app, KeyCode::Char('h'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        let stamp = regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?").unwrap();
+        let text = render_to_string(&app);
+        insta::assert_snapshot!(stamp.replace_all(&text, "YYYY-MM-DD HH:MM"));
+    });
+}
+
+fn seed_board_with_multiple_labels() -> BoardId {
+    let mut meta = crate::model::board::BoardMeta::new("Labeled".into());
+    let l_bug = Label::new("bug".into(), LabelColor::Red);
+    let l_feat = Label::new("feature".into(), LabelColor::Green);
+    let l_docs = Label::new("docs".into(), LabelColor::Blue);
+    let l_urg = Label::new("urgent".into(), LabelColor::Yellow);
+    let bug_id = l_bug.id.clone();
+    let urg_id = l_urg.id.clone();
+    meta.labels.extend([l_bug, l_feat, l_docs, l_urg]);
+    board_store::save_board(&meta).unwrap();
+
+    let todo = crate::test_support::add_list(&mut meta, "To Do");
+    let mut c1 = Card::new("Implement authentication".into());
+    c1.description = "Add OAuth2 and session handling.".into();
+    c1.label_ids = vec![bug_id, urg_id];
+    let c2 = Card::new("Write documentation".into());
+
+    crate::test_support::put_cards(&meta.id, &todo, &mut [c1, c2]);
+    meta.id
+}
+
+#[test]
+fn snapshot_label_picker() {
+    with_temp_dir(|| {
+        let id = seed_board_with_multiple_labels();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('l'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_label_picker_card_detail() {
+    with_temp_dir(|| {
+        let id = seed_board_with_multiple_labels();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        press(&mut app, KeyCode::Char('l'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_label_manager() {
+    with_temp_dir(|| {
+        let id = seed_board_with_multiple_labels();
+        let mut app = App::new(Some(id)).unwrap();
+        crate::input::handle_input(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('L'), KeyModifiers::SHIFT),
+        )
+        .unwrap();
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_confirm_cancel_edit() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        press(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.mode, AppMode::Insert);
+        press(&mut app, KeyCode::Char('x'));
+        press(&mut app, KeyCode::Esc);
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_confirm_archive_card() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('a'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_archived_cards_dialog() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('a'));
+        press(&mut app, KeyCode::Char('y'));
+        press(&mut app, KeyCode::Char('v'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        let date_re = regex::Regex::new(r"\d{4}-\d{2}-\d{2}").unwrap();
+        let text = render_to_string(&app);
+        insta::assert_snapshot!(date_re.replace_all(&text, "YYYY-MM-DD"));
     });
 }
 
