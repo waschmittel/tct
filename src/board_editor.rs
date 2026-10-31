@@ -283,6 +283,31 @@ impl BoardEditor {
         }
     }
 
+    /// Focus the card with id `card_id`, if it exists and is visible (non-archived).
+    /// If `search` is provided, the card must also match the active search.
+    /// Returns true if the card was found and focused, or false if not found.
+    pub fn focus_card(&mut self, card_id: &CardId, search: Option<&str>) -> bool {
+        for (li, list) in self.board.lists.iter().enumerate() {
+            let visible_all = self.board.visible_cards(li, None);
+            let Some(ord) = visible_all
+                .iter()
+                .position(|&raw| list.card_ids.get(raw) == Some(card_id))
+            else {
+                continue;
+            };
+            if let Some(q) = search {
+                if !self.board.visible_cards(li, Some(q)).contains(&visible_all[ord]) {
+                    continue;
+                }
+            }
+            self.board.selected_list = li;
+            self.board.selected_card[li] = ord;
+            self.board.clamp_selection();
+            return true;
+        }
+        false
+    }
+
     // ── Card Detail cursor verbs ───────────────────────────────────────────
 
     pub fn reset_detail_cursor(&mut self) {
@@ -1804,5 +1829,34 @@ mod tests {
             let err = editor.apply(Command::ArchiveCard { card_id: bogus }).unwrap_err();
             assert!(matches!(err, BoardEditorError::NotFound { kind: "card", .. }));
         });
+    }
+
+    #[test]
+    fn focus_card_selects_correct_list_and_card() {
+        let cards = vec![
+            fixed_card("c1", "first"),
+            fixed_card("c2", "second"),
+            fixed_card("c3", "third"),
+        ];
+        let mut editor = BoardEditor::from_loaded(loaded_board(cards));
+        assert_eq!(editor.board().current_card_id().unwrap(), "c1");
+
+        assert!(editor.focus_card(&"c2".into(), None));
+        assert_eq!(editor.board().selected_list, 0);
+        assert_eq!(editor.board().current_card_id().unwrap(), "c2");
+
+        // Non-existent card returns false and leaves current focus
+        assert!(!editor.focus_card(&"c999".into(), None));
+        assert_eq!(editor.board().current_card_id().unwrap(), "c2");
+    }
+
+    #[test]
+    fn focus_card_ignores_archived() {
+        let mut c1 = fixed_card("c1", "first");
+        c1.archived = true;
+        let c2 = fixed_card("c2", "second");
+        let mut editor = BoardEditor::from_loaded(loaded_board(vec![c1, c2]));
+        // c1 is archived, so focusing c1 must fail
+        assert!(!editor.focus_card(&"c1".into(), None));
     }
 }

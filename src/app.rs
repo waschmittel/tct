@@ -154,6 +154,8 @@ pub struct App {
     /// shift-free move path for terminals that don't report Shift+arrows
     /// (Linux console). Only `input/normal.rs` reads or clears it.
     pub grab_active: bool,
+    /// Remembers the focused card for each board across board switches in the current session.
+    pub focused_cards: HashMap<BoardId, CardId>,
 }
 
 /// Resolved once at startup; the data dir cannot change mid-session.
@@ -192,6 +194,7 @@ impl App {
             data_dir_display: data_dir_display(),
             caps: crate::term_caps::TermCaps::full(),
             grab_active: false,
+            focused_cards: HashMap::new(),
         };
         if let Some(board_id) = open_board_id {
             app.load_board(&board_id)?;
@@ -291,8 +294,23 @@ impl App {
         }
     }
 
+    fn remember_current_board_focus(&mut self) {
+        if let Some(board) = self.board() {
+            let board_id = board.meta.id.clone();
+            if let Some(card_id) = board.current_card_id().cloned() {
+                self.focused_cards.insert(board_id, card_id);
+            } else {
+                self.focused_cards.remove(&board_id);
+            }
+        }
+    }
+
     pub fn load_board(&mut self, board_id: &BoardId) -> anyhow::Result<()> {
-        let editor = BoardEditor::load(board_id)?;
+        self.remember_current_board_focus();
+        let mut editor = BoardEditor::load(board_id)?;
+        if let Some(card_id) = self.focused_cards.get(board_id) {
+            editor.focus_card(card_id, self.search());
+        }
         let repaired = editor.diagnostics.len();
         self.editor = Some(editor);
         self.mode = AppMode::Normal;
@@ -306,6 +324,7 @@ impl App {
 
     /// Close the open board and return to the Board Selector.
     pub fn close_board(&mut self) -> anyhow::Result<()> {
+        self.remember_current_board_focus();
         self.editor = None;
         self.reload_boards()?;
         self.mode = AppMode::BoardSelector;
@@ -531,6 +550,7 @@ mod tests {
             data_dir_display: data_dir_display(),
             caps: crate::term_caps::TermCaps::full(),
             grab_active: false,
+            focused_cards: HashMap::new(),
         }
     }
 

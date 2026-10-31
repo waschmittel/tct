@@ -1005,4 +1005,135 @@ mod tests {
             assert_eq!(open_board_id(&app), m.id);
         });
     }
+
+    #[test]
+    fn switching_boards_via_k_j_remembers_and_restores_focused_card() {
+        with_temp_dir(|| {
+            let mut meta_a = board_store::create_board("Board A".into()).unwrap();
+            let list_a = crate::test_support::add_list(&mut meta_a, "List A");
+            let mut cards_a = vec![Card::new("A1".into()), Card::new("A2".into())];
+            crate::test_support::put_cards(&meta_a.id, &list_a, &mut cards_a);
+
+            let mut meta_b = board_store::create_board("Board B".into()).unwrap();
+            let list_b = crate::test_support::add_list(&mut meta_b, "List B");
+            let mut cards_b = vec![
+                Card::new("B1".into()),
+                Card::new("B2".into()),
+                Card::new("B3".into()),
+            ];
+            crate::test_support::put_cards(&meta_b.id, &list_b, &mut cards_b);
+
+            let mut app = App::new(Some(meta_a.id.clone())).unwrap();
+            assert_eq!(open_board_id(&app), meta_a.id);
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[0].id);
+
+            // Move down to focus A2
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+
+            // Switch to Board B with 'k'
+            handle(&mut app, key(KeyCode::Char('k'))).unwrap();
+            assert_eq!(open_board_id(&app), meta_b.id);
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[0].id);
+
+            // Move down twice on Board B to focus B3
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[2].id);
+
+            // Switch back to Board A with 'j' — should restore A2 as focused
+            handle(&mut app, key(KeyCode::Char('j'))).unwrap();
+            assert_eq!(open_board_id(&app), meta_a.id);
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+
+            // Switch back to Board B with 'k' — should restore B3 as focused
+            handle(&mut app, key(KeyCode::Char('k'))).unwrap();
+            assert_eq!(open_board_id(&app), meta_b.id);
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[2].id);
+        });
+    }
+
+    #[test]
+    fn switching_boards_via_board_selector_remembers_and_restores_focused_card() {
+        with_temp_dir(|| {
+            let mut meta_a = board_store::create_board("Board A".into()).unwrap();
+            let list_a = crate::test_support::add_list(&mut meta_a, "List A");
+            let mut cards_a = vec![Card::new("A1".into()), Card::new("A2".into())];
+            crate::test_support::put_cards(&meta_a.id, &list_a, &mut cards_a);
+
+            let mut meta_b = board_store::create_board("Board B".into()).unwrap();
+            let list_b = crate::test_support::add_list(&mut meta_b, "List B");
+            let mut cards_b = vec![Card::new("B1".into()), Card::new("B2".into())];
+            crate::test_support::put_cards(&meta_b.id, &list_b, &mut cards_b);
+
+            let mut app = App::new(Some(meta_a.id.clone())).unwrap();
+            // Focus A2 on Board A
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+
+            // Close Board A to return to selector
+            handle(&mut app, key(KeyCode::Char('b'))).unwrap();
+            assert_eq!(app.mode, AppMode::BoardSelector);
+
+            // Select Board B and open it
+            app.selected_board_idx = 1;
+            crate::input::board_selector_input::handle(&mut app, key(KeyCode::Enter)).unwrap();
+            assert_eq!(open_board_id(&app), meta_b.id);
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[0].id);
+
+            // Focus B2 on Board B
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[1].id);
+
+            // Close Board B to selector
+            handle(&mut app, key(KeyCode::Char('b'))).unwrap();
+            assert_eq!(app.mode, AppMode::BoardSelector);
+
+            // Re-open Board A
+            app.selected_board_idx = 0;
+            crate::input::board_selector_input::handle(&mut app, key(KeyCode::Enter)).unwrap();
+            assert_eq!(open_board_id(&app), meta_a.id);
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+
+            // Close Board A and re-open Board B
+            handle(&mut app, key(KeyCode::Char('b'))).unwrap();
+            app.selected_board_idx = 1;
+            crate::input::board_selector_input::handle(&mut app, key(KeyCode::Enter)).unwrap();
+            assert_eq!(open_board_id(&app), meta_b.id);
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[1].id);
+        });
+    }
+
+    #[test]
+    fn restoring_focus_falls_back_when_remembered_card_deleted() {
+        with_temp_dir(|| {
+            let mut meta_a = board_store::create_board("Board A".into()).unwrap();
+            let list_a = crate::test_support::add_list(&mut meta_a, "List A");
+            let mut cards_a = vec![Card::new("A1".into()), Card::new("A2".into())];
+            crate::test_support::put_cards(&meta_a.id, &list_a, &mut cards_a);
+
+            let mut meta_b = board_store::create_board("Board B".into()).unwrap();
+            let list_b = crate::test_support::add_list(&mut meta_b, "List B");
+            let mut cards_b = vec![Card::new("B1".into())];
+            crate::test_support::put_cards(&meta_b.id, &list_b, &mut cards_b);
+
+            let mut app = App::new(Some(meta_a.id.clone())).unwrap();
+            // Focus A2
+            handle(&mut app, key(KeyCode::Down)).unwrap();
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+
+            // Switch to Board B
+            handle(&mut app, key(KeyCode::Char('k'))).unwrap();
+            assert_eq!(open_board_id(&app), meta_b.id);
+
+            // Delete card A2 from disk while on Board B
+            crate::storage::card_store::delete_card(&meta_a.id, &cards_a[1].id).unwrap();
+
+            // Switch back to Board A
+            handle(&mut app, key(KeyCode::Char('j'))).unwrap();
+            assert_eq!(open_board_id(&app), meta_a.id);
+            // Gracefully falls back to A1
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[0].id);
+        });
+    }
 }
