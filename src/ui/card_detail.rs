@@ -208,7 +208,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     };
 
     // --- Compute heights with caps for scrollable sections ---
-    // Fixed chrome: 1 (top blank) + 1 header per visible section
+    // Fixed chrome: 1 (top blank) + 1 header per visible section (except description)
     // + a 3-line divider between each pair of adjacent visible sections.
     let top_pad: u16 = 1;
     let header_h: u16 = 1;
@@ -227,7 +227,6 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let bottom_h = (if show_labels { header_h + labels_full } else { 0 })
         + (if show_due { header_h + due_full } else { 0 });
     let fixed_top = top_pad
-        + (if show_desc { header_h } else { 0 })
         + (if show_checklist { header_h } else { 0 });
     let available = inner.height.saturating_sub(fixed_top + div_total + bottom_h);
 
@@ -265,19 +264,6 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let mut divider: Option<&str> = None;
 
     if show_desc {
-        // Description header
-        if y < inner.y + inner.height {
-            let header_area = Rect::new(left, y, body_w, header_h);
-            frame.render_widget(
-                Paragraph::new(Line::from(Span::styled(
-                    "Description",
-                    Style::default().fg(accent).add_modifier(Modifier::BOLD),
-                ))),
-                header_area,
-            );
-            y += header_h;
-        }
-
         // Description body (scrollbar on the right when it overflows)
         if desc_h > 0 && y < inner.y + inner.height {
             let desc_area = Rect::new(inner.x + PAD, y, md_inner_width, desc_h);
