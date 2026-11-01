@@ -137,6 +137,29 @@ pub(crate) fn handle_enter_in_list(textarea: &mut tui_textarea::TextArea<'static
         return;
     }
 
+    if let Some(marker_len) = crate::ui::markdown::citation_marker_len(trimmed) {
+        if trimmed[marker_len..].trim().is_empty() {
+            textarea.move_cursor(CursorMove::Head);
+            textarea.delete_line_by_end();
+            textarea.insert_newline();
+            return;
+        }
+        let indent = current_line.chars().count() - trimmed.chars().count();
+        let marker = &trimmed[..marker_len];
+        let prefix = if marker.ends_with(' ') {
+            format!("{}{marker}", " ".repeat(indent))
+        } else {
+            format!("{}{} ", " ".repeat(indent), marker)
+        };
+        if col < indent + marker_len {
+            // Cursor sits inside the marker: just push the item down a line.
+            textarea.insert_newline();
+            return;
+        }
+        split_line_for_new_item(textarea, col, &prefix);
+        return;
+    }
+
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
         let indent = current_line.chars().count() - trimmed.chars().count();
         let prefix_char = &trimmed[..2];
@@ -545,6 +568,92 @@ mod tests {
         press(&mut e, KeyCode::Enter);
 
         assert_eq!(editor_lines(&e), vec!["- first".to_string(), "- ".to_string()]);
+    }
+
+    #[test]
+    fn enter_at_end_of_citation_continues_citation() {
+        let mut e = make_editor("> first quote");
+        e.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(editor_lines(&e), vec!["> first quote".to_string(), "> ".to_string()]);
+        assert_eq!(editor_cursor(&e), (1, 2));
+    }
+
+    #[test]
+    fn enter_on_empty_citation_clears_marker_and_exits() {
+        let mut e = make_editor("> ");
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(editor_lines(&e), vec!["".to_string(), "".to_string()]);
+        assert_eq!(editor_cursor(&e), (1, 0));
+
+        let mut e2 = make_editor(">");
+        press(&mut e2, KeyCode::Enter);
+        assert_eq!(editor_lines(&e2), vec!["".to_string(), "".to_string()]);
+        assert_eq!(editor_cursor(&e2), (1, 0));
+    }
+
+    #[test]
+    fn enter_in_middle_of_citation_splits_it() {
+        let mut e = make_editor("> hello world\n> next");
+        cursor_at(&mut e, 0, 7); // after "> hello"
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["> hello".to_string(), "> world".to_string(), "> next".to_string()]
+        );
+        assert_eq!(editor_cursor(&e), (1, 2));
+    }
+
+    #[test]
+    fn enter_in_indented_citation_keeps_indent() {
+        let mut e = make_editor("  > quote text");
+        e.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["  > quote text".to_string(), "  > ".to_string()]
+        );
+        assert_eq!(editor_cursor(&e), (1, 4));
+    }
+
+    #[test]
+    fn enter_in_nested_citation_continues_nested_markers() {
+        let mut e = make_editor(">> nested quote");
+        e.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e),
+            vec![">> nested quote".to_string(), ">> ".to_string()]
+        );
+        assert_eq!(editor_cursor(&e), (1, 3));
+
+        let mut e2 = make_editor("> > spaced quote");
+        e2.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e2, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e2),
+            vec!["> > spaced quote".to_string(), "> > ".to_string()]
+        );
+        assert_eq!(editor_cursor(&e2), (1, 4));
+    }
+
+    #[test]
+    fn enter_inside_citation_marker_pushes_the_item_down() {
+        let mut e = make_editor("intro\n> quote");
+        cursor_at(&mut e, 1, 0);
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["intro".to_string(), "".to_string(), "> quote".to_string()]
+        );
+
+        let mut e2 = make_editor("> quote");
+        cursor_at(&mut e2, 0, 0);
+        press(&mut e2, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e2),
+            vec!["".to_string(), "> quote".to_string()]
+        );
     }
 
     #[test]

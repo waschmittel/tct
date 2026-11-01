@@ -17,8 +17,8 @@ expression: render_to_string(&app)
 │         │     wrapping behavior with foo-bar-baz words.                                │         │
 │         │ 1. Numbered item that also extends well past the wrap limit to verify        │         │
 │         │    numbered list wrapping in the editor.                                     │         │
-│         │                                                                              │         │
-│         │                                                                              │         │
+│         │ > Markdown citation that also extends well past the wrap limit to verify     │         │
+│         │   citation indentation and wrapping in the editor.                           │         │
 │         │                                                                              │         │
 │         │                                                                              │         │
 │         │                                                                              │         │

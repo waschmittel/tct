@@ -381,10 +381,53 @@ fn snapshot_description_editor() {
     with_temp_dir(|| {
         let id = seed_demo_board();
         let mut app = App::new(Some(id)).unwrap();
+        {
+            let board = app.board_mut().unwrap();
+            let card_id = board.current_card_id().cloned().unwrap();
+            let card = board.cards.get_mut(&card_id).unwrap();
+            card.description = "Token expires too early.\n\n- check refresh\n- add test\n\n> Note: verify with backend team".into();
+        }
         press(&mut app, KeyCode::Enter);
         assert_eq!(app.mode, AppMode::CardDetail);
         press(&mut app, KeyCode::Char('e'));
         assert_eq!(app.mode, AppMode::Insert);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_description_editor_enter_citation() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        {
+            let board = app.board_mut().unwrap();
+            let card_id = board.current_card_id().cloned().unwrap();
+            let card = board.cards.get_mut(&card_id).unwrap();
+            card.description = "> First citation line".into();
+        }
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        press(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.mode, AppMode::Insert);
+        press(&mut app, KeyCode::Enter);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_card_detail_citation() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        {
+            let board = app.board_mut().unwrap();
+            let card_id = board.current_card_id().cloned().unwrap();
+            let card = board.cards.get_mut(&card_id).unwrap();
+            card.description = "Intro text.\n\n> Quoted block that is long enough to wrap across multiple lines and show hanging indentation in preview mode.".into();
+        }
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
         insta::assert_snapshot!(render_to_string(&app));
     });
 }
@@ -404,6 +447,7 @@ fn snapshot_description_editor_wrapping() {
                 "- First bullet point with a long explanation that soft-wraps neatly onto the next line while preserving list layout.",
                 "  - Nested bullet point that demonstrates sub-item indentation and wrapping behavior with foo-bar-baz words.",
                 "1. Numbered item that also extends well past the wrap limit to verify numbered list wrapping in the editor.",
+                "> Markdown citation that also extends well past the wrap limit to verify citation indentation and wrapping in the editor.",
             ].join("\n");
         }
         press(&mut app, KeyCode::Enter);

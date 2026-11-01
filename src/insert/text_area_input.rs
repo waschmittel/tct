@@ -92,6 +92,25 @@ mod tests {
     }
 
     #[test]
+    fn citation_continuation_rows_are_indented_under_the_text() {
+        let rows = render_rows("> aaa bbb ccc ddd", 10, false);
+        assert_eq!(rows[0].trim_end(), "> aaa bbb");
+        assert_eq!(rows[1].trim_end(), "  ccc ddd");
+    }
+
+    #[test]
+    fn nested_and_indented_citation_continuation_rows_keep_the_hanging_indent() {
+        let rows = render_rows("  > aaa bbb ccc ddd", 10, false);
+        assert_eq!(rows[1].trim_end(), "    bbb");
+
+        let rows = render_rows(">> aaa bbb ccc ddd", 10, false);
+        assert_eq!(rows[1].trim_end(), "   ccc ddd");
+
+        let rows = render_rows("> > aaa bbb ccc ddd", 10, false);
+        assert_eq!(rows[1].trim_end(), "    bbb");
+    }
+
+    #[test]
     fn numbered_and_nested_continuation_rows_keep_the_hanging_indent() {
         let rows = render_rows("10. aaa bbb ccc ddd", 10, false);
         assert_eq!(rows[1].trim_end(), "    bbb");
@@ -117,6 +136,20 @@ mod tests {
         input.textarea.move_cursor(tui_textarea::CursorMove::Up);
         input.textarea.insert_char('X');
         assert!(input.current_text().starts_with("- aaa bbb"));
+        assert_eq!(input.current_text().chars().filter(|c| *c == 'X').count(), 1);
+    }
+
+    #[test]
+    fn cursor_navigation_and_typing_work_on_citation_indented_rows() {
+        let mut input = TextAreaInput::from_initial("> aaa bbb ccc ddd");
+        let mut terminal = Terminal::new(TestBackend::new(11, 4)).unwrap();
+        terminal.draw(|f| f.render_widget(&input.textarea, f.area())).unwrap();
+        input.textarea.move_cursor(tui_textarea::CursorMove::Down);
+        input.textarea.move_cursor(tui_textarea::CursorMove::End);
+        assert_eq!(input.textarea.cursor(), (0, 17));
+        input.textarea.move_cursor(tui_textarea::CursorMove::Up);
+        input.textarea.insert_char('X');
+        assert!(input.current_text().starts_with("> aaa bbb"));
         assert_eq!(input.current_text().chars().filter(|c| *c == 'X').count(), 1);
     }
 

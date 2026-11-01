@@ -76,7 +76,7 @@ impl Rendered {
     }
 }
 
-/// Detect leading list-marker indent (bullet or numbered) so wrapped
+/// Detect leading list-marker (bullet or numbered) or citation indent so wrapped
 /// continuation lines line up under the first character of the item text.
 pub(crate) fn detect_list_indent(line: &str) -> usize {
     let trimmed = line.trim_start();
@@ -90,7 +90,36 @@ pub(crate) fn detect_list_indent(line: &str) -> usize {
             return base_indent + dot_pos + 2;
         }
     }
+    if let Some(marker_len) = citation_marker_len(trimmed) {
+        return base_indent + marker_len;
+    }
     0
+}
+
+/// Parse citation/blockquote marker length in `trimmed` (e.g. `> `, `>> `, `> > `).
+pub(crate) fn citation_marker_len(trimmed: &str) -> Option<usize> {
+    if !trimmed.starts_with('>') {
+        return None;
+    }
+    let mut len = 0;
+    let mut chars = trimmed.char_indices().peekable();
+    while let Some(&(i, c)) = chars.peek() {
+        if c == '>' {
+            chars.next();
+            len = i + 1;
+            while let Some(&(sp_i, ' ')) = chars.peek() {
+                chars.next();
+                len = sp_i + 1;
+            }
+        } else {
+            break;
+        }
+    }
+    if len > 0 && (len == trimmed.len() || trimmed[..len].ends_with(' ')) {
+        Some(len)
+    } else {
+        None
+    }
 }
 
 fn wrap_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Line<'static>> {
@@ -242,18 +271,24 @@ fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
         }
     }
 
-    if let Some(quoted) = owned.strip_prefix("> ") {
-        spans.push(Span::styled("> ".to_string(), Style::default().fg(Color::Yellow)));
+    let trimmed = owned.trim_start();
+    let indent = owned.len() - trimmed.len();
+    let indent_str = " ".repeat(indent);
+
+    if let Some(marker_len) = citation_marker_len(trimmed) {
+        if indent > 0 {
+            spans.push(Span::raw(indent_str));
+        }
         spans.push(Span::styled(
-            quoted.to_string(),
+            trimmed[..marker_len].to_string(),
+            Style::default().fg(Color::Yellow),
+        ));
+        spans.push(Span::styled(
+            trimmed[marker_len..].to_string(),
             Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC),
         ));
         return spans;
     }
-
-    let trimmed = owned.trim_start();
-    let indent = owned.len() - trimmed.len();
-    let indent_str = " ".repeat(indent);
 
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
         spans.push(Span::raw(indent_str));
@@ -578,6 +613,30 @@ mod tests {
         let wrapped2 = wrap_spans_with_indent(highlighted2, 10, 5);
         assert!(wrapped2.len() > 1);
         assert!(wrapped2[1].spans[0].content.starts_with("     "));
+    }
+
+    #[test]
+    fn test_detect_list_indent_citations() {
+        assert_eq!(detect_list_indent("> a citation"), 2);
+        assert_eq!(detect_list_indent("  > an indented citation"), 4);
+        assert_eq!(detect_list_indent(">> a nested citation"), 3);
+        assert_eq!(detect_list_indent("> > spaced nested citation"), 4);
+        assert_eq!(detect_list_indent("> "), 2);
+        assert_eq!(detect_list_indent(">"), 1);
+        assert_eq!(detect_list_indent(">= 5"), 0);
+        assert_eq!(detect_list_indent("plain text"), 0);
+    }
+
+    #[test]
+    fn test_citation_indentation_wrapping() {
+        let text = "> This is a very long citation that should be wrapped and indented correctly.";
+        let lines = render_texts(text, 25);
+        assert!(lines.len() > 1);
+        assert!(lines[0].starts_with("> "));
+        for l in &lines[1..] {
+            assert!(l.starts_with("  "), "citation continuation not indented: {l:?}");
+        }
+        assert_fits(&lines, 25);
     }
 
     fn line_text(line: &Line<'_>) -> String {
