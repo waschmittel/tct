@@ -16,7 +16,7 @@ use super::{Dialog, DialogOutcome};
 use crate::app::LoadedBoard;
 use crate::command::Command;
 use crate::model::card::{Card, HistoryField};
-use crate::text_diff::{DiffKind, diff_lines};
+use crate::text_diff::{DiffKind, diff_lines_collapsed};
 
 const SUMMARY_WIDTH: u16 = 40;
 
@@ -230,7 +230,7 @@ impl CardHistory {
         if old.is_none() && new.is_none() {
             lines.push(Line::from(Span::styled("No field values recorded.", dim)));
         } else {
-            for (kind, text) in diff_lines(old.unwrap_or(""), new.unwrap_or("")) {
+            for (kind, text) in diff_lines_collapsed(old.unwrap_or(""), new.unwrap_or("")) {
                 let (prefix, style) = match kind {
                     DiffKind::Same => ("  ", dim),
                     DiffKind::Added => ("+ ", Style::default().fg(Color::Green)),
@@ -347,6 +347,40 @@ mod tests {
             d.handle_key(key(KeyCode::Down), Some(board));
             let text = render_text(&d, board);
             assert!(text.contains("- old") && text.contains("+ new"), "{text}");
+        });
+    }
+
+    #[test]
+    fn detail_pane_collapses_long_unchanged_content() {
+        crate::test_support::with_temp_dir(|| {
+            let mut meta = crate::model::board::BoardMeta::new("Test".into());
+            let list = crate::test_support::add_list(&mut meta, "L");
+            let mut card = Card::new("Task".into());
+            let old = "line1\nline2\nline3\nline4\nline5\nold_mid\nline6\nline7\nline8\nline9\nline10";
+            let new = "line1\nline2\nline3\nline4\nline5\nnew_mid\nline6\nline7\nline8\nline9\nline10";
+            card.log_change(HistoryField::Description, "Edit description", Some(old.into()), Some(new.into()));
+            crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
+            let editor = crate::board_editor::BoardEditor::load(&meta.id).unwrap();
+            let board = editor.board();
+
+            let d = CardHistory::new();
+            let text = render_text(&d, board);
+
+            assert!(text.contains("  line1"), "missing first line of start run: {text}");
+            assert!(text.contains("  line5"), "missing last line of start run: {text}");
+            assert!(text.contains("- old_mid"), "missing removed line: {text}");
+            assert!(text.contains("+ new_mid"), "missing added line: {text}");
+            assert!(text.contains("  line6"), "missing first line of end run: {text}");
+            assert!(text.contains("  line10"), "missing last line of end run: {text}");
+            assert!(text.contains("  ..."), "missing collapsed ellipsis: {text}");
+
+            // The intermediate collapsed lines must not appear.
+            assert!(!text.contains("line2"), "line2 should have been collapsed: {text}");
+            assert!(!text.contains("line3"), "line3 should have been collapsed: {text}");
+            assert!(!text.contains("line4"), "line4 should have been collapsed: {text}");
+            assert!(!text.contains("line7"), "line7 should have been collapsed: {text}");
+            assert!(!text.contains("line8"), "line8 should have been collapsed: {text}");
+            assert!(!text.contains("line9"), "line9 should have been collapsed: {text}");
         });
     }
 

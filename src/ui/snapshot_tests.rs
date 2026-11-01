@@ -663,6 +663,33 @@ fn snapshot_card_history_dialog() {
     });
 }
 
+#[test]
+fn snapshot_card_history_dialog_collapsed_diff() {
+    use crate::model::card::HistoryField;
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        {
+            let board = app.board_mut().unwrap();
+            let card_id = board.current_card_id().cloned().unwrap();
+            let card = board.cards.get_mut(&card_id).unwrap();
+            let old = "line 01\nline 02\nline 03\nline 04\nline 05\nold target\nline 06\nline 07\nline 08\nline 09\nline 10";
+            let new = "line 01\nline 02\nline 03\nline 04\nline 05\nnew target\nline 06\nline 07\nline 08\nline 09\nline 10";
+            card.log_change(
+                HistoryField::Description,
+                "Edit description",
+                Some(old.into()),
+                Some(new.into()),
+            );
+        }
+        press(&mut app, KeyCode::Char('h'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        let stamp = regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?").unwrap();
+        let text = render_to_string(&app);
+        insta::assert_snapshot!(stamp.replace_all(&text, "YYYY-MM-DD HH:MM"));
+    });
+}
+
 fn set_long_history(app: &mut App) {
     use crate::model::card::HistoryField;
     let board = app.board_mut().unwrap();
