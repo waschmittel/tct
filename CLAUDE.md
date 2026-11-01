@@ -80,7 +80,7 @@ When changing keybindings or features, update:
 - The matching help page: `Dialog::help()` rows for dialogs, the date-picker/description-editor pages in `ui/mod.rs::render_help()` for insert handlers
 - This file if architectural patterns change
 
-The status bar carries a single `?:help` hint (plus the insert title); there are **no other inline shortcut hints** anywhere — all shortcuts live in the contextual help overlay only. Status messages never occupy the status bar; they toast top-right (see "Status messages" above).
+The status bar carries contextual help hints (`?:help`, or `F1 / Ctrl+H:help` for the description editor); the description editor modal bottom also hints `F1 / Ctrl+H:help`. There are **no other inline shortcut hints** anywhere — all shortcuts live in the contextual help overlay only. Status messages never occupy the status bar; they toast top-right (see "Status messages" above).
 
 Doc homes (don't duplicate elsewhere): keybindings → help overlay only; full CLI reference → `cli/mod.rs` `HELP`; module layout → `docs/architecture.md`; README keeps basic usage + one example workflow.
 

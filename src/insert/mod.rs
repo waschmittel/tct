@@ -57,9 +57,9 @@ pub enum InsertOutcome {
     /// expressible as `Command` since the board isn't loaded).
     ConfirmSideEffect(Box<InsertSideEffect>),
     /// Show the Help overlay while the handler stays alive on
-    /// `App.insert`; Esc in Help returns to Insert mode. Only handlers
-    /// whose input doesn't consume `?` as text (the date picker) emit
-    /// this.
+    /// `App.insert`; Esc in Help returns to Insert mode. Emitted by
+    /// handlers that offer help (`DatePicker` via `?`, `MarkdownEditor`
+    /// via `F1` / `Ctrl+H`).
     Help,
 }
 
@@ -88,6 +88,11 @@ pub trait InsertHandler {
         key: KeyEvent,
         board: Option<&LoadedBoard>,
     ) -> InsertOutcome;
+
+    /// Process a paste event (bracketed paste).
+    fn handle_paste(&mut self, _text: &str) -> InsertOutcome {
+        InsertOutcome::Stay
+    }
 
     /// What background surface this handler overlays.
     fn surface(&self) -> InsertSurface;

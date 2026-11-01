@@ -176,6 +176,39 @@ fn data_dir_display() -> String {
     "~/.tct".into()
 }
 
+use std::sync::Mutex;
+
+static INTERNAL_CLIPBOARD: Mutex<Option<String>> = Mutex::new(None);
+
+/// Store text in the internal application clipboard (in-memory fallback).
+pub fn set_internal_clipboard(text: String) {
+    if let Ok(mut lock) = INTERNAL_CLIPBOARD.lock() {
+        *lock = Some(text);
+    }
+}
+
+/// Retrieve text from the internal application clipboard.
+pub fn get_internal_clipboard() -> Option<String> {
+    INTERNAL_CLIPBOARD.lock().ok().and_then(|lock| lock.clone())
+}
+
+/// Write text to the system clipboard via `arboard`, and always save in the internal application clipboard.
+pub fn copy_to_system_clipboard(text: &str) {
+    set_internal_clipboard(text.to_string());
+    if let Ok(mut cb) = Clipboard::new() {
+        let _ = cb.set_text(text);
+    }
+}
+
+/// Read text from the system clipboard via `arboard`, falling back to the internal application clipboard.
+pub fn get_from_system_clipboard() -> Option<String> {
+    let system = Clipboard::new().ok().and_then(|mut cb| cb.get_text().ok());
+    match system {
+        Some(s) if !s.is_empty() => Some(s),
+        _ => get_internal_clipboard(),
+    }
+}
+
 impl App {
     pub fn new(open_board_id: Option<BoardId>) -> anyhow::Result<Self> {
         board_store::open_data_dir()?;
@@ -268,6 +301,7 @@ impl App {
     /// and remote terminals (`xterm.js`, iTerm2, kitty, WezTerm, Alacritty)
     /// can copy directly to the client clipboard.
     pub fn copy_to_clipboard(&mut self, text: String, what: &str) {
+        set_internal_clipboard(text.clone());
         let native_res = Clipboard::new()
             .and_then(|mut cb| cb.set_text(&text))
             .map_err(|e| e.to_string());

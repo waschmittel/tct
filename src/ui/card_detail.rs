@@ -66,6 +66,21 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     {
         block = block.title_top(line);
     }
+    if editing_desc_handler.is_some() && matches!(app.mode, AppMode::Insert | AppMode::Help) {
+        let hint_text = if popup.width >= 24 {
+            Some(" F1 / Ctrl+H:help ")
+        } else if popup.width >= 12 {
+            Some(" F1:help ")
+        } else {
+            None
+        };
+        if let Some(text) = hint_text {
+            block = block.title_bottom(Line::from(Span::styled(
+                text,
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+    }
     if board.meta.show_created_date
         && let Some(line) = card_widget::date_stamp(card.created_at, stamp_style, popup.width)
     {

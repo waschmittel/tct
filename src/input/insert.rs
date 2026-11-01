@@ -18,6 +18,20 @@ fn card_title(app: &App, card_id: &CardId) -> String {
         .unwrap_or_else(|| "card".into())
 }
 
+pub fn handle_paste(app: &mut App, text: &str) -> anyhow::Result<()> {
+    let mut handler = match app.insert.take() {
+        Some(h) => h,
+        None => return Ok(()),
+    };
+    let outcome = handler.handle_paste(text);
+    app.insert = Some(handler);
+    match outcome {
+        InsertOutcome::Stay => {}
+        _ => {}
+    }
+    Ok(())
+}
+
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     // Move the handler out so it can be `&mut` while we borrow `board`.
     let mut handler = match app.insert.take() {

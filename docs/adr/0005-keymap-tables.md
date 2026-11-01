@@ -9,7 +9,7 @@ A keybinding existed in four places: the input match arm, the help overlay rows,
 ## Considered and rejected
 
 - **Closures in the table instead of an `Action` enum.** Rejected — `&'static` tables can't hold capturing closures, and an enum keeps actions inspectable and testable without an `App`.
-- **Driving the description editor's keys from a table.** Rejected — its keys (Ctrl-chords, Tab nesting, auto-continue) live on the `MarkdownEditor` insert handler per ADR-0003 and are mostly modifier-based; its help section stays hand-written in `render_help`.
+- **Driving the description editor's keys from a table.** Rejected — its keys (Ctrl-chords, Tab nesting, auto-continue) live on the `MarkdownEditor` insert handler per ADR-0003 and are mostly modifier-based; its help section stays hand-written in `render_help` and is summoned via `InsertOutcome::Help` (`F1` / `Ctrl+H`) per ADR-0011.
 - **Generating the README keybinding tables.** Rejected for now — README is prose-formatted and edited rarely; a generator isn't earned yet. README stays a manual sync point.
 
 ## Consequences

@@ -201,7 +201,7 @@ graph TB
             KEYMAP_I["keymap.rs<br>Binding table + lookup + help_rows (ADR-0005)"]
             NORMAL_I["normal.rs<br>Board view keys"]
             DETAIL_I["card_detail_input.rs<br>Card detail keys"]
-            INSERT_I["insert.rs<br>Insert dispatch to active InsertHandler"]
+            INSERT_I["insert.rs<br>Insert dispatch to active InsertHandler + paste"]
             DIALOG_I["dialog_input.rs<br>Dialog dispatch + side effects"]
             BSEL_I["board_selector_input.rs<br>Board selector keys"]
             CMD_I["command.rs<br>Search command"]
@@ -210,7 +210,7 @@ graph TB
         subgraph "insert/ (ADR-0003)"
             INS_MOD["mod.rs<br>InsertHandler trait + InsertOutcome"]
             INS_LINE["line_editor.rs<br>single-line inputs"]
-            INS_MD["markdown_editor.rs<br>desc editor: autocontinue / nest"]
+            INS_MD["markdown_editor.rs<br>desc editor: copy/cut/paste / nest / help (ADR-0011)"]
             INS_DATE["date_picker.rs<br>due-date picker"]
         end
 
@@ -235,7 +235,7 @@ graph TB
             end
         end
 
-        EVENT["event.rs<br>EventHandler (crossterm polling)"]
+        EVENT["event.rs<br>EventHandler (key, paste, tick polling)"]
     end
 
     ENTRY --> CLI_MOD
@@ -289,7 +289,7 @@ path for board-collection operations (ADR-0001/0002/0004).
 | `normal.rs` | `Normal` (board view) |
 | `card_detail_input.rs` | `CardDetail` |
 | `keymap.rs` | Generic `Binding` table + `lookup`/`help_rows`, shared by the three table-driven modes (ADR-0005) |
-| `insert.rs` | `Insert` — dispatches keys to the active `Box<dyn InsertHandler>` (handlers live in `src/insert/`) |
+| `insert.rs` | `Insert` — dispatches keys and bracketed paste to the active `Box<dyn InsertHandler>` (handlers live in `src/insert/`) |
 | `dialog_input.rs` | `Dialog` — dispatches to the active `Box<dyn Dialog>` and applies side effects (dialogs live in `src/dialog/`) |
 | `command.rs` | `Command` (search bar) |
 
@@ -299,7 +299,7 @@ path for board-collection operations (ADR-0001/0002/0004).
 |--------|---------|
 | `board_selector.rs` | Board list with accent colors |
 | `board_view.rs` | Kanban columns layout |
-| `card_detail.rs` | Card detail overlay + description editor |
+| `card_detail.rs` | Card detail overlay + description editor (with bottom help hint) |
 | `dialog.rs` | Confirmation, label picker, label manager, archive dialogs |
 | `search_bar.rs` | Search input bar |
 | `status_bar.rs` | Mode indicators + keyboard hints |
@@ -320,7 +320,7 @@ sequenceDiagram
     participant Terminal as Terminal (crossterm)
     participant EventHandler
     participant Main as main::run_app
-    participant Input as input::handle_input
+    participant Input as input::handle_input / handle_paste
     participant App as App State
     participant UI as ui::render
     participant Storage as storage/*
@@ -339,6 +339,10 @@ sequenceDiagram
                 Input->>Storage: save_card / save_list / save_board
                 Storage-->>Input: Result<()>
             end
+        else Paste event (bracketed paste)
+            EventHandler-->>Main: AppEvent::Paste(text)
+            Main->>Input: handle_paste(app, text)
+            Input->>App: mutate active insert handler / search query
         else Tick (250ms)
             EventHandler-->>Main: AppEvent::Tick
             Main->>App: on_tick()
@@ -379,6 +383,7 @@ stateDiagram-v2
     BoardSelector --> Insert_NewBoardName: n (new board)
     BoardSelector --> Dialog_ConfirmArchiveBoard: a (archive board)
     BoardSelector --> Dialog_ArchivedBoards: v (view archived)
+    BoardSelector --> Help: ? (help)
 
     Insert_NewBoardName --> BoardSelector: Enter/Esc
 
@@ -403,10 +408,15 @@ stateDiagram-v2
     CardDetail --> Insert_EditDueDate: u (set due date)
     CardDetail --> Dialog_LabelPicker: l (label picker)
     CardDetail --> Dialog_LabelManager: L (label manager)
+    CardDetail --> Help: ? (help)
 
     Command --> Normal: Enter/Esc
 
-    Help --> Normal: Esc/q
+    Help --> Normal: Esc/q/?
+    Help --> CardDetail: Esc/q/?
+    Help --> BoardSelector: Esc/q/?
+    Help --> Insert_EditCardDescription: Esc/q/?/F1/Ctrl+H
+    Insert_EditCardDescription --> Help: F1 / Ctrl+H (help)
 
     Dialog_ConfirmArchiveList --> Normal: y/n
     Dialog_ConfirmArchiveCard --> Normal: y/n
@@ -586,6 +596,19 @@ either up or down (ADR-0010). Session navigation state (`App.focused_cards` and
 `App.scroll_offsets`) preserves cursor position and viewport scroll offsets across
 board switches.
 
+### 8.9 Clipboard Architecture and Bracketed Paste
+
+Clipboard access across terminal sessions follows a resilient multi-tier fallback architecture:
+1. **Application Fallback Buffer:** `app::INTERNAL_CLIPBOARD` maintains a thread-safe `Mutex<Option<String>>` storing the most recently copied or cut text. Any internal copy or cut updates this buffer immediately.
+2. **System Clipboard Synchronization:** Operations attempt to synchronize with the OS desktop clipboard via `arboard` (and terminal OSC 52 escape sequences where supported). If the system clipboard is unavailable (headless Linux, remote SSH, Docker, sandboxes), paste gracefully and transparently retrieves from the internal buffer.
+3. **Bracketed Paste Handling:** Terminal emulators wrapping external multi-line pastes in bracketed escape sequences emit `CrosstermEvent::Paste(text)`. The event loop maps this to `AppEvent::Paste` and routes it through `input::handle_paste` to the active `InsertHandler` (e.g. `MarkdownEditor`) or command search query, avoiding dropped pastes and bypassing single-keystroke interpretation (ADR-0011).
+
+### 8.10 Description Editor Shortcut Discoverability
+
+Card description editing operates over `MarkdownEditor` with rich formatting, nesting, selection, and clipboard capabilities. Because static keymap tables cannot cleanly capture full text-editing semantics (ADR-0005), editor shortcuts remain self-contained on the insert handler. Discoverability is provided without disrupting user editing context:
+- **Non-Destructive Help:** Pressing `F1` or `Ctrl+H` returns `InsertOutcome::Help`, transitioning to `AppMode::Help` while preserving editor text, cursor offset, and undo stack on `app.insert`. Closing help immediately returns to `AppMode::Insert`.
+- **Border and Status Bar Hints:** The bottom border of the card detail modal displays ` F1 / Ctrl+H:help ` during description editing, placing the shortcut hint directly beneath the editor viewport. The status bar similarly displays mode and help guidance (ADR-0011).
+
 ---
 
 ## 9. Architecture Decisions
@@ -604,6 +627,7 @@ The numbered, dated decision records live in [`docs/adr/`](adr/). Summary:
 | [0008](adr/0008-board-order-as-rank.md) | Board display order as fractional rank (`BoardMeta.position`) |
 | [0009](adr/0009-versioned-format-no-migrations.md) | Versioned data directory (`.tct/.version`) and no on-load migrations |
 | [0010](adr/0010-viewport-scroll-and-session-state.md) | Viewport scroll reconciliation via interior mutability and session navigation persistence |
+| [0011](adr/0011-editor-shortcuts-and-clipboard-fallback.md) | Multi-tier clipboard fallback, bracketed paste routing, and description editor shortcut discoverability |
 
 Foundational decisions not captured as ADRs:
 
@@ -691,3 +715,5 @@ mindmap
 | **Pastel generation** | HSL-based algorithm that picks maximally distant hue from existing colors. |
 | **Periodic reload** | `on_tick()` reloads board from filesystem every 15s for external-change detection. |
 | **Card archiving** | Soft-delete: card's `archived` flag set to true, removed from list but file kept. |
+| **Internal clipboard** | In-memory fallback buffer (`INTERNAL_CLIPBOARD`) enabling within-app copy/cut/paste even when system clipboard services are absent (ADR-0011). |
+| **Bracketed paste** | Terminal escape sequence capturing external multi-line pastes atomically into `AppEvent::Paste` (ADR-0011). |

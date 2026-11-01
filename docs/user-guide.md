@@ -326,12 +326,17 @@ A full Markdown editor with syntax highlighting. Supports headings, bold, italic
 
 | Key | Action |
 |-----|--------|
+| F1 / Ctrl+H | Show help / shortcut overview |
 | Ctrl+S | Save description |
 | Ctrl+Z | Undo |
 | Ctrl+Y | Redo |
-| Ctrl+B | Toggle bold (`**text**`) |
-| Ctrl+I | Toggle italic (`*text*`) |
-| Ctrl+K | Toggle inline code (`` `text` ``) |
+| Ctrl+C | Copy selected text |
+| Ctrl+X | Cut selected text |
+| Ctrl+V | Paste from clipboard |
+| Shift+Arrows | Highlight / select text (for formatting, cut, copy) |
+| Ctrl+B | Toggle bold (`**text**`, wraps selection) |
+| Ctrl+I | Toggle italic (`*text*`, wraps selection) |
+| Ctrl+K | Toggle inline code (`` `text` ``, wraps selection) |
 | Ctrl+L | Insert list item (`- `) |
 | Up / Down | Move by visual (wrapped) line |
 | Enter | Auto-continue bullet / numbered list items; renumbers numbered runs |

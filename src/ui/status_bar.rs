@@ -20,10 +20,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         AppMode::Help => "HELP",
     };
 
-    // The status bar carries exactly one hint: `?` for the contextual help
-    // overlay (the overlay itself documents everything else). Insert-mode
-    // handlers consume plain text keys, so only the date picker — which
-    // ignores `?` — offers it; the other handlers show just their title.
+    // The status bar carries contextual help hints (`?` for base modes and
+    // dialogs, chords for insert handlers that offer help). Handlers that
+    // consume plain text keys show their title plus their help chord (date
+    // picker has `?:help`, description editor has `F1 / Ctrl+H:help`);
+    // line editors show just their title.
     let insert_hint = if matches!(app.mode, AppMode::Insert) {
         app.insert.as_ref().map(|h| {
             let title = h.title();
@@ -32,6 +33,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 .is_some()
             {
                 format!("{title}  ?:help")
+            } else if h.as_any()
+                .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
+                .is_some()
+            {
+                format!("{title}  F1 / Ctrl+H:help")
             } else {
                 title.to_string()
             }

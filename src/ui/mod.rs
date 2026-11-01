@@ -264,10 +264,13 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         // mode keymap — documented here directly.
         (
             vec![
-                header("File"),
+                header("Edit"),
                 row("Ctrl+S", "Save"),
                 row("Esc", "Cancel"),
                 row("Ctrl+Z / Ctrl+Y", "Undo / redo"),
+                row("Ctrl+C", "Copy selection"),
+                row("Ctrl+X", "Cut selection"),
+                row("Ctrl+V", "Paste"),
                 Line::raw(""),
                 header("Format"),
                 row("Ctrl+B", "Bold (**text**)"),
@@ -276,6 +279,9 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 row("Ctrl+L", "Insert list item (- )"),
             ],
             vec![
+                header("Selection"),
+                row("Shift+Arrows", "Highlight text"),
+                Line::raw(""),
                 header("Lists"),
                 row("Enter", "Auto-continue list"),
                 row("Tab", "Nest item"),
@@ -283,6 +289,9 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 Line::raw(""),
                 header("Navigation"),
                 row("Up / Down", "Move by visual line"),
+                Line::raw(""),
+                header("App"),
+                row("F1 / Ctrl+H", "Help"),
             ],
         )
     } else if is_date_picker {

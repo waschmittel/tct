@@ -23,7 +23,14 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         AppMode::Command => command::handle(app, key),
         AppMode::Dialog => dialog_input::handle(app, key),
         AppMode::Help => {
-            if matches!(key.code, crossterm::event::KeyCode::Esc | crossterm::event::KeyCode::Char('q')) {
+            let dismiss = matches!(
+                key.code,
+                crossterm::event::KeyCode::Esc
+                    | crossterm::event::KeyCode::Char('q' | '?')
+                    | crossterm::event::KeyCode::F(1)
+            ) || (matches!(key.code, crossterm::event::KeyCode::Char('h'))
+                && crate::insert::line_input::has_ctrl_or_cmd(key.modifiers));
+            if dismiss {
                 // Help opened over a live dialog or insert handler
                 // returns to it; the recorded base return mode stays put
                 // for the overlay's own close.
@@ -40,6 +47,24 @@ pub fn handle_input(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     };
     app.enforce_mode_invariants();
     result
+}
+
+pub fn handle_paste(app: &mut App, text: String) -> anyhow::Result<()> {
+    if text.is_empty() {
+        return Ok(());
+    }
+    match &app.mode {
+        AppMode::Insert => {
+            insert::handle_paste(app, &text)?;
+        }
+        AppMode::Command => {
+            let clean = text.replace(['\r', '\n'], " ");
+            app.search_query.push_str(&clean);
+        }
+        _ => {}
+    }
+    app.enforce_mode_invariants();
+    Ok(())
 }
 
 #[cfg(test)]
@@ -131,6 +156,41 @@ mod tests {
             assert!(app.insert.is_some());
             press(&mut app, KeyCode::Esc); // cancel picker
             assert!(matches!(app.mode, AppMode::CardDetail));
+        });
+    }
+
+    /// `F1` inside the description editor shows Help and Esc returns to the
+    /// still-alive description editor, not to the base mode.
+    #[test]
+    fn help_over_description_editor_returns_to_insert() {
+        with_temp_dir(|| {
+            let mut app = app_in_card_detail();
+            press(&mut app, KeyCode::Char('e')); // description editor
+            assert!(matches!(app.mode, AppMode::Insert));
+            press(&mut app, KeyCode::F(1));
+            assert!(matches!(app.mode, AppMode::Help));
+            assert!(app.insert.is_some());
+            press(&mut app, KeyCode::Esc);
+            assert!(matches!(app.mode, AppMode::Insert));
+            assert!(app.insert.is_some());
+        });
+    }
+
+    #[test]
+    fn handle_paste_inserts_into_active_editor() {
+        with_temp_dir(|| {
+            let mut app = app_in_card_detail();
+            press(&mut app, KeyCode::Char('e'));
+            assert!(matches!(app.mode, AppMode::Insert));
+            super::handle_paste(&mut app, "pasted note".to_string()).unwrap();
+            let editor = app
+                .insert
+                .as_ref()
+                .unwrap()
+                .as_any()
+                .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
+                .unwrap();
+            assert!(editor.input.current_text().contains("pasted note"));
         });
     }
 

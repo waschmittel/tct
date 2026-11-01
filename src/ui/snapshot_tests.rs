@@ -493,6 +493,36 @@ fn snapshot_help_card_detail() {
     });
 }
 
+#[test]
+fn snapshot_help_description_editor() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        app.version = "vTEST";
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        press(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.mode, AppMode::Insert);
+        press(&mut app, KeyCode::F(1));
+        assert_eq!(app.mode, AppMode::Help);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_description_editor_paste() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        press(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.mode, AppMode::Insert);
+        crate::input::handle_paste(&mut app, "\n- pasted item".to_string()).unwrap();
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
 /// Widget-level golden for the date-picker popup (layout broke twice:
 /// oversized popup, off-center calendar). Rendered with a fixed date so
 /// the text is deterministic — the today-highlight is style-only and

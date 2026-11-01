@@ -35,12 +35,56 @@ impl InsertHandler for MarkdownEditor {
         self.dispatch_key(key)
     }
 
+    fn handle_paste(&mut self, text: &str) -> InsertOutcome {
+        self.paste_text(text);
+        InsertOutcome::Stay
+    }
+
     fn surface(&self) -> InsertSurface { InsertSurface::CardDetail }
     fn title(&self) -> &str { "Edit Description" }
     fn as_any(&self) -> &dyn std::any::Any { self }
 }
 
 impl MarkdownEditor {
+    pub fn copy_selection(&mut self) {
+        if self.input.textarea.is_selecting() {
+            self.input.textarea.copy();
+            let text = self.input.textarea.yank_text();
+            crate::app::copy_to_system_clipboard(&text);
+        }
+    }
+
+    pub fn cut_selection(&mut self) {
+        if self.input.textarea.is_selecting() {
+            self.input.textarea.cut();
+            let text = self.input.textarea.yank_text();
+            crate::app::copy_to_system_clipboard(&text);
+            renumber_all(&mut self.input.textarea);
+        }
+    }
+
+    pub fn paste_text(&mut self, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        self.input.textarea.set_yank_text(normalized);
+        self.input.textarea.paste();
+        renumber_all(&mut self.input.textarea);
+    }
+
+    pub fn paste_from_clipboard(&mut self) {
+        if let Some(text) = crate::app::get_from_system_clipboard() {
+            if !text.is_empty() {
+                self.paste_text(&text);
+                return;
+            }
+        }
+        // Fall back to internal yank buffer
+        self.input.textarea.paste();
+        renumber_all(&mut self.input.textarea);
+    }
+
     fn dispatch_key(&mut self, key: KeyEvent) -> InsertOutcome {
         match (key.code, key.modifiers) {
             (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
@@ -57,12 +101,47 @@ impl MarkdownEditor {
                     InsertOutcome::Cancel
                 }
             }
+            (KeyCode::F(1), _) => InsertOutcome::Help,
+            (KeyCode::Char('h'), m) if has_ctrl_or_cmd(m) => InsertOutcome::Help,
+            (KeyCode::Char('?' | '/'), m) if has_ctrl_or_cmd(m) => InsertOutcome::Help,
+            (KeyCode::Char('z'), m) if has_ctrl_or_cmd(m) && m.contains(KeyModifiers::SHIFT) => {
+                self.input.textarea.redo();
+                InsertOutcome::Stay
+            }
             (KeyCode::Char('z'), m) if has_ctrl_or_cmd(m) => {
                 self.input.textarea.undo();
                 InsertOutcome::Stay
             }
             (KeyCode::Char('y'), m) if has_ctrl_or_cmd(m) => {
                 self.input.textarea.redo();
+                InsertOutcome::Stay
+            }
+            (KeyCode::Char('c'), m) if has_ctrl_or_cmd(m) => {
+                self.copy_selection();
+                InsertOutcome::Stay
+            }
+            (KeyCode::Char('x'), m) if has_ctrl_or_cmd(m) => {
+                self.cut_selection();
+                InsertOutcome::Stay
+            }
+            (KeyCode::Char('v'), m) if has_ctrl_or_cmd(m) => {
+                self.paste_from_clipboard();
+                InsertOutcome::Stay
+            }
+            (KeyCode::Insert, m) if m.contains(KeyModifiers::SHIFT) => {
+                self.paste_from_clipboard();
+                InsertOutcome::Stay
+            }
+            (KeyCode::Insert, m) if has_ctrl_or_cmd(m) => {
+                self.copy_selection();
+                InsertOutcome::Stay
+            }
+            (KeyCode::Delete, m) if m.contains(KeyModifiers::SHIFT) => {
+                self.cut_selection();
+                InsertOutcome::Stay
+            }
+            (KeyCode::Char('a'), m) if m.contains(KeyModifiers::SUPER) => {
+                self.input.textarea.select_all();
                 InsertOutcome::Stay
             }
             (KeyCode::Char('b'), m) if has_ctrl_or_cmd(m) => {
@@ -495,6 +574,144 @@ mod tests {
         let mut e = make_editor("abc\ndef");
         press(&mut e, KeyCode::Char('X'));
         assert_eq!(editor_lines(&e), vec!["abc".to_string(), "defX".to_string()]);
+    }
+
+    #[test]
+    fn help_keys_return_help_outcome() {
+        let mut e = make_editor("hello");
+        assert!(matches!(
+            e.handle_key(KeyEvent::new(KeyCode::F(1), KeyModifiers::empty()), None),
+            InsertOutcome::Help
+        ));
+        assert!(matches!(
+            e.handle_key(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::CONTROL), None),
+            InsertOutcome::Help
+        ));
+        assert!(matches!(
+            e.handle_key(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::SUPER), None),
+            InsertOutcome::Help
+        ));
+        assert!(matches!(
+            e.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::CONTROL), None),
+            InsertOutcome::Help
+        ));
+        // Typing bare 'h' or '?' appends text into buffer
+        press(&mut e, KeyCode::Char('h'));
+        press(&mut e, KeyCode::Char('?'));
+        assert_eq!(editor_lines(&e), vec!["helloh?".to_string()]);
+    }
+
+    #[test]
+    fn test_copy_and_paste_with_selection() {
+        let mut e = make_editor("hello world");
+        e.input.textarea.move_cursor(CursorMove::Jump(0, 6));
+        for _ in 0..5 {
+            e.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT), None);
+        }
+        assert!(e.input.textarea.is_selecting());
+        // Copy with Ctrl+C
+        e.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL), None);
+        assert_eq!(e.input.textarea.yank_text(), "world");
+        assert_eq!(editor_lines(&e), vec!["hello world".to_string()]);
+
+        // Paste at end with Ctrl+V
+        e.input.textarea.move_cursor(CursorMove::End);
+        e.handle_key(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL), None);
+        assert_eq!(editor_lines(&e), vec!["hello worldworld".to_string()]);
+    }
+
+    #[test]
+    fn test_cut_and_paste_with_selection() {
+        let mut e = make_editor("hello world");
+        e.input.textarea.move_cursor(CursorMove::Jump(0, 5));
+        for _ in 0..6 {
+            e.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT), None);
+        }
+        assert!(e.input.textarea.is_selecting());
+        // Cut with Ctrl+X
+        e.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL), None);
+        assert_eq!(e.input.textarea.yank_text(), " world");
+        assert_eq!(editor_lines(&e), vec!["hello".to_string()]);
+
+        // Paste at end with Ctrl+V
+        e.input.textarea.move_cursor(CursorMove::End);
+        e.handle_key(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL), None);
+        assert_eq!(editor_lines(&e), vec!["hello world".to_string()]);
+    }
+
+    #[test]
+    fn test_paste_over_selection_replaces_it() {
+        let mut e = make_editor("hello world");
+        crate::app::copy_to_system_clipboard("everyone");
+        e.input.textarea.move_cursor(CursorMove::Jump(0, 6));
+        for _ in 0..5 {
+            e.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT), None);
+        }
+        assert!(e.input.textarea.is_selecting());
+        // Paste replaces selected "world"
+        e.paste_from_clipboard();
+        assert_eq!(editor_lines(&e), vec!["hello everyone".to_string()]);
+        assert!(!e.input.textarea.is_selecting());
+    }
+
+    #[test]
+    fn test_cut_copy_paste_keys_and_super_modifier() {
+        let mut e = make_editor("abc def");
+        // Cmd+C / Cmd+X without selection do not insert 'c' or 'x'
+        e.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::SUPER), None);
+        e.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::SUPER), None);
+        assert_eq!(editor_lines(&e), vec!["abc def".to_string()]);
+
+        // Select "def"
+        e.input.textarea.move_cursor(CursorMove::Jump(0, 4));
+        for _ in 0..3 {
+            e.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT), None);
+        }
+        // Cmd+C copies
+        e.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::SUPER), None);
+        assert_eq!(e.input.textarea.yank_text(), "def");
+
+        // Cmd+V pastes
+        e.input.textarea.move_cursor(CursorMove::End);
+        e.handle_key(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::SUPER), None);
+        assert_eq!(editor_lines(&e), vec!["abc defdef".to_string()]);
+    }
+
+    #[test]
+    fn test_internal_clipboard_fallback_across_instances() {
+        let mut e1 = make_editor("source text");
+        e1.input.textarea.move_cursor(CursorMove::Jump(0, 0));
+        for _ in 0..6 {
+            e1.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT), None);
+        }
+        e1.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL), None);
+
+        let mut e2 = make_editor("dest: ");
+        e2.paste_from_clipboard();
+        assert_eq!(editor_lines(&e2), vec!["dest: source".to_string()]);
+    }
+
+    #[test]
+    fn test_highlight_and_wrap_selection() {
+        let mut e = make_editor("format me please");
+        e.input.textarea.move_cursor(CursorMove::Jump(0, 7));
+        for _ in 0..2 {
+            e.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT), None);
+        }
+        assert!(e.input.textarea.is_selecting());
+        // Bold the selection
+        e.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL), None);
+        assert_eq!(editor_lines(&e), vec!["format **me** please".to_string()]);
+    }
+
+    #[test]
+    fn test_bracketed_paste() {
+        let mut e = make_editor("title\n");
+        e.handle_paste("- item 1\n- item 2");
+        assert_eq!(
+            editor_lines(&e),
+            vec!["title".to_string(), "- item 1".to_string(), "- item 2".to_string()]
+        );
     }
 
     #[test]

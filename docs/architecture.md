@@ -5,12 +5,12 @@ see the [arc42 document](arc42.md); for design decisions see [docs/adr/](adr/).
 
 ```
 src/
-  main.rs            # Entry point, CLI dispatch, TUI event loop
-  app.rs             # App state, AppMode, LoadedBoard, on_tick reload
+  main.rs            # Entry point, CLI dispatch, TUI event loop (bracketed paste)
+  app.rs             # App state, AppMode, LoadedBoard, internal clipboard buffer, on_tick reload
   board_editor.rs    # Aggregate root for the open board (ADR-0001/0002)
   board_directory.rs # Board collection: create/archive/rename/order (ADR-0004)
   command.rs         # Command enum — sole chokepoint for domain mutations (ADR-0002)
-  event.rs           # Crossterm event polling (key + tick)
+  event.rs           # Crossterm event polling (key, paste, tick)
   term_caps.rs       # Terminal capability detection + color/glyph degradation
   term_out.rs        # outln!/errln! — control-char-safe output for the CLI surfaces
   text_diff.rs       # Line diff for the history detail pane
@@ -38,18 +38,18 @@ src/
     card_store.rs    # Card CRUD + load_all_cards + archived listing
     version.rs       # .tct/.version gate; no on-load migrations (ADR-0009)
   input/
-    mod.rs           # Input dispatch by AppMode
+    mod.rs           # Input dispatch by AppMode, bracketed paste routing
     keymap.rs        # Generic Binding table + lookup + help_rows (ADR-0005)
     normal.rs        # Board view keybindings
     card_detail_input.rs   # Card detail keybindings
     board_selector_input.rs# Board selector keybindings
-    insert.rs        # Insert-mode dispatch over the active InsertHandler
+    insert.rs        # Insert-mode dispatch over the active InsertHandler, Help outcome
     dialog_input.rs  # Dialog-mode dispatch + side effects
     command.rs       # `:` / search command-mode input
   insert/            # InsertHandler trait, one struct per target (ADR-0003)
     mod.rs           # InsertHandler trait + InsertOutcome
     line_editor.rs   # Single-line text inputs (share LineInput)
-    markdown_editor.rs # Description editor (over TextAreaInput): autocontinue, nest
+    markdown_editor.rs # Description editor (over TextAreaInput): copy/cut/paste, selection, autocontinue, nest (ADR-0011)
     date_picker.rs   # Due-date picker
     line_input.rs    # Shared single-line buffer/cursor base
     text_area_input.rs # Shared multi-line buffer base
@@ -63,10 +63,10 @@ src/
     card_history.rs  # Card history: summary list + per-field diff, delete entries
     color_picker.rs  # Free HSL accent/label color picker
   ui/
-    mod.rs           # Render dispatch + help overlay (reads keymap tables)
+    mod.rs           # Render dispatch + help overlay (reads keymap tables + editor help)
     board_view.rs    # Board columns layout
     board_selector.rs# Board list screen
-    card_detail.rs   # Card detail overlay + description editor renderer
+    card_detail.rs   # Card detail overlay + description editor renderer (modal help hint)
     dialog.rs        # Dialog frame helpers
     search_bar.rs    # Search input bar
     status_bar.rs    # Mode + hints + status messages
@@ -82,4 +82,6 @@ src/
 Modal input dispatch: the `AppMode` enum (`app.rs`) selects the active input
 handler. `Insert` and `Dialog` are parameterless — the live handler is a
 `Box<dyn InsertHandler>` / `Box<dyn Dialog>` on `App` (ADR-0003). Other modes
-dispatch through per-mode keymap tables (ADR-0005).
+dispatch through per-mode keymap tables (ADR-0005). Description editing supports
+intra-app clipboard fallback, bracketed paste, and non-destructive shortcut
+help (ADR-0011).

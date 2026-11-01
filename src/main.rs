@@ -79,6 +79,7 @@ fn run_app(
         terminal.draw(|frame| ui::render(frame, app))?;
         match events.next()? {
             AppEvent::Key(key) => input::handle_input(app, key)?,
+            AppEvent::Paste(text) => input::handle_paste(app, text)?,
             AppEvent::Tick => app.on_tick(),
         }
     }

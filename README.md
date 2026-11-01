@@ -101,7 +101,7 @@ Team members who pull will see the board when they run `tct` from that project d
 
 For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs/user-guide.md).
 
-All keybindings are discoverable in the TUI via the `?` help overlay, which is contextual to the current mode.
+All keybindings are discoverable in the TUI via the `?` help overlay, which is contextual to the current mode (or `F1` / `Ctrl+H` when editing a description).
 
 ## CLI Usage
 
