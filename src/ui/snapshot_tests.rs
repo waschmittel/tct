@@ -48,6 +48,7 @@ fn render_to_string_sized(app: &App, width: u16, height: u16) -> String {
 
 fn press(app: &mut App, code: KeyCode) {
     crate::input::handle_input(app, KeyEvent::new(code, KeyModifiers::NONE)).unwrap();
+    let _ = render_to_string(app);
 }
 
 /// Seed a deterministic demo board: two lists, cards with labels,
@@ -1003,6 +1004,135 @@ fn snapshot_long_list_scrollbar_bottom() {
         let mut app = App::new(Some(id)).unwrap();
         press(&mut app, KeyCode::Char('G'));
         insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// Scrolling up from the bottom of a long list moves focus up within the visible
+/// window first without scrolling the viewport.
+#[test]
+fn snapshot_long_list_scroll_up_moves_focus_not_viewport() {
+    with_temp_dir(|| {
+        let id = seed_long_list_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('G'));
+        press(&mut app, KeyCode::Up);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// Continuing to scroll up moves focus up to the top of the visible window
+/// while the viewport still remains unchanged.
+#[test]
+fn snapshot_long_list_scroll_up_focus_at_top_of_window() {
+    with_temp_dir(|| {
+        let id = seed_long_list_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('G'));
+        for _ in 0..7 {
+            press(&mut app, KeyCode::Up);
+        }
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// Once focus reaches the top of the visible window, pressing Up scrolls the
+/// list up by one card.
+#[test]
+fn snapshot_long_list_scroll_up_scrolls_one_item() {
+    with_temp_dir(|| {
+        let id = seed_long_list_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('G'));
+        for _ in 0..8 {
+            press(&mut app, KeyCode::Up);
+        }
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// Scrolling down in a long list: focus moves to the bottom of the window first,
+/// then the list scrolls down one item.
+#[test]
+fn snapshot_long_list_scroll_down_one_item() {
+    with_temp_dir(|| {
+        let id = seed_long_list_board();
+        let mut app = App::new(Some(id)).unwrap();
+        for _ in 0..7 {
+            press(&mut app, KeyCode::Down);
+        }
+        press(&mut app, KeyCode::Down);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn long_list_scrolling_down_and_up_step_by_step() {
+    with_temp_dir(|| {
+        let id = seed_long_list_board();
+        let mut app = App::new(Some(id)).unwrap();
+        let _ = render_to_string(&app);
+
+        // Initially at top: selected card 0, scroll offset 0
+        assert_eq!(app.board().unwrap().selected_card[0], 0);
+        assert_eq!(app.board().unwrap().scroll_offset[0].get(), 0);
+
+        // Moving down 1..=7 moves focus only, scroll offset stays 0
+        for i in 1..=7 {
+            press(&mut app, KeyCode::Down);
+            assert_eq!(app.board().unwrap().selected_card[0], i);
+            assert_eq!(app.board().unwrap().scroll_offset[0].get(), 0);
+        }
+
+        // 8th down press scrolls down by 1: selected 8, scroll 1
+        press(&mut app, KeyCode::Down);
+        assert_eq!(app.board().unwrap().selected_card[0], 8);
+        assert_eq!(app.board().unwrap().scroll_offset[0].get(), 1);
+
+        // Continue scrolling down to the end (cards 9, 10, 11)
+        for (card_idx, expected_scroll) in [(9, 2), (10, 3), (11, 4)] {
+            press(&mut app, KeyCode::Down);
+            assert_eq!(app.board().unwrap().selected_card[0], card_idx);
+            assert_eq!(app.board().unwrap().scroll_offset[0].get(), expected_scroll);
+        }
+
+        // Further Down does not scroll past end
+        press(&mut app, KeyCode::Down);
+        assert_eq!(app.board().unwrap().selected_card[0], 11);
+        assert_eq!(app.board().unwrap().scroll_offset[0].get(), 4);
+
+        // Moving UP:
+        // Steps 1..=7 move focus up from 10 down to 4 (Card 05), scroll offset stays 4!
+        for expected_card in (4..=10).rev() {
+            press(&mut app, KeyCode::Up);
+            assert_eq!(
+                app.board().unwrap().selected_card[0],
+                expected_card,
+                "focus should move up"
+            );
+            assert_eq!(
+                app.board().unwrap().scroll_offset[0].get(),
+                4,
+                "viewport should not scroll while focus moves up within window"
+            );
+        }
+
+        // 8th Up press reaches beyond the visible window: selected becomes 3 (Card 04),
+        // scroll offset scrolls up to 3!
+        press(&mut app, KeyCode::Up);
+        assert_eq!(app.board().unwrap().selected_card[0], 3);
+        assert_eq!(app.board().unwrap().scroll_offset[0].get(), 3);
+
+        // Continuing Up scrolls one item at a time:
+        for (expected_card, expected_scroll) in [(2, 2), (1, 1), (0, 0)] {
+            press(&mut app, KeyCode::Up);
+            assert_eq!(app.board().unwrap().selected_card[0], expected_card);
+            assert_eq!(app.board().unwrap().scroll_offset[0].get(), expected_scroll);
+        }
+
+        // Further Up does not scroll past top
+        press(&mut app, KeyCode::Up);
+        assert_eq!(app.board().unwrap().selected_card[0], 0);
+        assert_eq!(app.board().unwrap().scroll_offset[0].get(), 0);
     });
 }
 

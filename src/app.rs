@@ -50,7 +50,10 @@ pub struct LoadedBoard {
     /// clamping, rendering, and `current_card_id` all index the visible
     /// sequence. Use `visible_cards(li, None)[ordinal]` to get the raw index.
     pub selected_card: Vec<usize>,
-    pub scroll_offset: Vec<usize>,
+    /// Per-list viewport scroll offset (index of the topmost visible card),
+    /// computed and updated by `list_widget::render` each frame based on list
+    /// layout and selection. Interior-mutable because rendering takes `&App`.
+    pub scroll_offset: Vec<std::cell::Cell<usize>>,
     pub detail_item_idx: usize,
     pub detail_scroll: usize,
     /// Effective max scroll of the description pane, reported by the
@@ -156,6 +159,8 @@ pub struct App {
     pub grab_active: bool,
     /// Remembers the focused card for each board across board switches in the current session.
     pub focused_cards: HashMap<BoardId, CardId>,
+    /// Remembers the scroll state of each list for each board across board switches in the current session.
+    pub scroll_offsets: HashMap<BoardId, Vec<usize>>,
 }
 
 /// Resolved once at startup; the data dir cannot change mid-session.
@@ -195,6 +200,7 @@ impl App {
             caps: crate::term_caps::TermCaps::full(),
             grab_active: false,
             focused_cards: HashMap::new(),
+            scroll_offsets: HashMap::new(),
         };
         if let Some(board_id) = open_board_id {
             app.load_board(&board_id)?;
@@ -295,14 +301,21 @@ impl App {
     }
 
     fn remember_current_board_focus(&mut self) {
-        if let Some(board) = self.board() {
-            let board_id = board.meta.id.clone();
-            if let Some(card_id) = board.current_card_id().cloned() {
-                self.focused_cards.insert(board_id, card_id);
-            } else {
-                self.focused_cards.remove(&board_id);
-            }
+        let Some((board_id, card_id, offsets)) = self.board().map(|b| {
+            (
+                b.meta.id.clone(),
+                b.current_card_id().cloned(),
+                b.scroll_offset.iter().map(|c| c.get()).collect::<Vec<usize>>(),
+            )
+        }) else {
+            return;
+        };
+        if let Some(card_id) = card_id {
+            self.focused_cards.insert(board_id.clone(), card_id);
+        } else {
+            self.focused_cards.remove(&board_id);
         }
+        self.scroll_offsets.insert(board_id, offsets);
     }
 
     pub fn load_board(&mut self, board_id: &BoardId) -> anyhow::Result<()> {
@@ -310,6 +323,13 @@ impl App {
         let mut editor = BoardEditor::load(board_id)?;
         if let Some(card_id) = self.focused_cards.get(board_id) {
             editor.focus_card(card_id, self.search());
+        }
+        if let Some(offsets) = self.scroll_offsets.get(board_id) {
+            for (i, &offset) in offsets.iter().enumerate() {
+                if let Some(cell) = editor.board().scroll_offset.get(i) {
+                    cell.set(offset);
+                }
+            }
         }
         let repaired = editor.diagnostics.len();
         self.editor = Some(editor);
@@ -522,7 +542,7 @@ mod tests {
             cards: cards_map,
             selected_list: 0,
             selected_card: vec![0],
-            scroll_offset: vec![0],
+            scroll_offset: vec![std::cell::Cell::new(0)],
             detail_item_idx: 0,
             detail_scroll: 0,
             detail_max_scroll: std::cell::Cell::new(0),
@@ -551,6 +571,7 @@ mod tests {
             caps: crate::term_caps::TermCaps::full(),
             grab_active: false,
             focused_cards: HashMap::new(),
+            scroll_offsets: HashMap::new(),
         }
     }
 

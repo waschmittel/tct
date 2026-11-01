@@ -85,6 +85,9 @@ pub fn render(
         .collect();
 
     if visible_cards.is_empty() {
+        if let Some(cell) = board.scroll_offset.get(list_index) {
+            cell.set(0);
+        }
         let empty = ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
             " (empty)",
             Style::default().fg(Color::DarkGray),
@@ -123,7 +126,11 @@ pub fn render(
         .and_then(|sid| visible_cards.iter().position(|&id| id == sid))
         .unwrap_or(0);
 
-    let mut scroll = board.scroll_offset.get(list_index).copied().unwrap_or(0);
+    let mut scroll = board
+        .scroll_offset
+        .get(list_index)
+        .map(|c| c.get())
+        .unwrap_or(0);
     scroll = scroll.min(visible_cards.len().saturating_sub(1));
 
     let mut max_visible = fitting_from(scroll);
@@ -145,6 +152,25 @@ pub fn render(
         }
         scroll = selected_pos_in_filtered.saturating_sub(count.saturating_sub(1));
         max_visible = fitting_from(scroll);
+    }
+
+    if scroll > 0 && scroll + max_visible == visible_cards.len() {
+        let mut used_h: u16 = (scroll..visible_cards.len())
+            .map(|ci| get_height(visible_cards[ci]))
+            .sum();
+        while scroll > 0 {
+            let prev_h = get_height(visible_cards[scroll - 1]);
+            if used_h + prev_h > inner.height {
+                break;
+            }
+            used_h += prev_h;
+            scroll -= 1;
+        }
+        max_visible = fitting_from(scroll);
+    }
+
+    if let Some(cell) = board.scroll_offset.get(list_index) {
+        cell.set(scroll);
     }
 
     let mut y_offset = 0u16;

@@ -576,6 +576,16 @@ refused rather than half-read; an older one is refused rather than silently
 converted. There are no on-load migrations — the loaders parse exactly one
 shape (ADR-0009). Absent means "current", and is stamped.
 
+### 8.8 Viewport Scrolling and Session Navigation
+
+Card heights and available column height depend on terminal dimensions and text
+wrapping known only at render time. The UI renderer reconciles and records
+per-list scroll offsets via interior mutability (`scroll_offset: Vec<Cell<usize>>`),
+ensuring focus moves through visible cards before scrolling begins when moving
+either up or down (ADR-0010). Session navigation state (`App.focused_cards` and
+`App.scroll_offsets`) preserves cursor position and viewport scroll offsets across
+board switches.
+
 ---
 
 ## 9. Architecture Decisions
@@ -590,6 +600,10 @@ The numbered, dated decision records live in [`docs/adr/`](adr/). Summary:
 | [0004](adr/0004-board-directory.md) | Board Directory owns board-collection operations |
 | [0005](adr/0005-keymap-tables.md) | Keymap tables drive both dispatch and the help overlay |
 | [0006](adr/0006-card-owned-list-membership.md) | Cards own their list membership (`list_id` + `position`); no `list-*.json` files |
+| [0007](adr/0007-paths-are-ids.md) | Path is the id: directories are BoardIds, file names are CardIds |
+| [0008](adr/0008-board-order-as-rank.md) | Board display order as fractional rank (`BoardMeta.position`) |
+| [0009](adr/0009-versioned-format-no-migrations.md) | Versioned data directory (`.tct/.version`) and no on-load migrations |
+| [0010](adr/0010-viewport-scroll-and-session-state.md) | Viewport scroll reconciliation via interior mutability and session navigation persistence |
 
 Foundational decisions not captured as ADRs:
 

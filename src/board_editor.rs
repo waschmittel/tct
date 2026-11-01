@@ -143,7 +143,7 @@ impl BoardEditor {
                 cards,
                 selected_list: 0,
                 selected_card: vec![0; num_lists],
-                scroll_offset: vec![0; num_lists],
+                scroll_offset: (0..num_lists).map(|_| std::cell::Cell::new(0)).collect(),
                 detail_item_idx: 0,
                 detail_scroll: 0,
                 detail_max_scroll: std::cell::Cell::new(0),
@@ -191,14 +191,16 @@ impl BoardEditor {
         self.board.lists = lists;
         self.board.cards = cards;
         self.board.selected_card = vec![0; num_lists];
-        self.board.scroll_offset = vec![0; num_lists];
+        self.board.scroll_offset = (0..num_lists)
+            .map(|i| {
+                let old = old_scroll_offset.get(i).map(|c| c.get()).unwrap_or(0);
+                std::cell::Cell::new(old)
+            })
+            .collect();
         self.board.selected_list = old_selected_list.min(num_lists.saturating_sub(1));
         for i in 0..num_lists {
             if i < old_selected_card.len() {
                 self.board.selected_card[i] = old_selected_card[i];
-            }
-            if i < old_scroll_offset.len() {
-                self.board.scroll_offset[i] = old_scroll_offset[i];
             }
         }
         self.board.clamp_selection();
@@ -664,7 +666,7 @@ impl BoardEditor {
                 });
                 self.board.meta.lists.push(meta);
                 self.board.selected_card.push(0);
-                self.board.scroll_offset.push(0);
+                self.board.scroll_offset.push(std::cell::Cell::new(0));
                 // Selection follows the new list.
                 self.board.selected_list = self.board.lists.len() - 1;
                 pending.push(PendingWrite::Board);
@@ -715,7 +717,7 @@ impl BoardEditor {
                     card_ids,
                 });
                 self.board.selected_card.push(0);
-                self.board.scroll_offset.push(0);
+                self.board.scroll_offset.push(std::cell::Cell::new(0));
                 pending.push(PendingWrite::Board);
             }
             Command::RenameList { list_id, name } => {
@@ -1717,7 +1719,7 @@ mod tests {
             cards: cards_map,
             selected_list: 0,
             selected_card: vec![0],
-            scroll_offset: vec![0],
+            scroll_offset: vec![std::cell::Cell::new(0)],
             detail_item_idx: 0,
             detail_scroll: 0,
             detail_max_scroll: std::cell::Cell::new(0),
@@ -1741,7 +1743,7 @@ mod tests {
             cards,
             selected_list: 0,
             selected_card: vec![0],
-            scroll_offset: vec![0],
+            scroll_offset: vec![std::cell::Cell::new(0)],
             detail_item_idx: 0,
             detail_scroll: 0,
             detail_max_scroll: std::cell::Cell::new(0),

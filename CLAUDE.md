@@ -34,6 +34,7 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 - **Status messages**: Transient feedback ("Card archived", …) renders as a yellow toast in the *top-right corner* (`ui/mod.rs::render_status_toast`) — not in the status bar, so the `?:help` hint stays visible. Set via `app.set_status(msg)`; cleared by `App::on_tick()` after 30s. The status bar (`ui/status_bar.rs`) carries only the mode chip, the single hint, and the data dir (right-aligned).
 - **Search**: When active, non-matching cards are hidden (not just dimmed). Navigation skips hidden cards. First match auto-selected on search confirm.
 - **Periodic reload**: `App::on_tick()` reloads board from filesystem every 15s (configurable via `reload_interval`). Skipped during editing/dialog/grab modes. Preserves selection state.
+- **Viewport scrolling and session state** (`LoadedBoard.scroll_offset: Vec<Cell<usize>>`, ADR-0010): Dynamic card heights and viewport bounds are known only at render time. The renderer reconciles and updates per-list scroll offsets via interior mutability so Up/Down navigation is symmetric: focus moves across visible cards before the viewport scrolls. `App` remembers `focused_cards` and `scroll_offsets` per board across board switches in the session.
 
 ## How to Add Things
 

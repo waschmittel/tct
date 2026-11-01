@@ -75,7 +75,7 @@ src/
     snapshot_tests.rs# Golden-screen tests (insta + TestBackend)
     widgets/
       card_widget.rs # Individual card rendering
-      list_widget.rs # List column rendering
+      list_widget.rs # List column rendering and viewport scroll reconciliation (ADR-0010)
       date_picker.rs # Calendar grid for the due-date picker
 ```
 

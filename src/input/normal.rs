@@ -1054,6 +1054,59 @@ mod tests {
     }
 
     #[test]
+    fn switching_boards_remembers_and_restores_scroll_offset() {
+        with_temp_dir(|| {
+            let mut meta_a = board_store::create_board("Board A".into()).unwrap();
+            let list_a = crate::test_support::add_list(&mut meta_a, "List A");
+            let mut cards_a: Vec<Card> = (1..=15).map(|i| Card::new(format!("A{i:02}"))).collect();
+            crate::test_support::put_cards(&meta_a.id, &list_a, &mut cards_a);
+
+            let mut meta_b = board_store::create_board("Board B".into()).unwrap();
+            let list_b = crate::test_support::add_list(&mut meta_b, "List B");
+            let mut cards_b = vec![Card::new("B1".into())];
+            crate::test_support::put_cards(&meta_b.id, &list_b, &mut cards_b);
+
+            let mut app = App::new(Some(meta_a.id.clone())).unwrap();
+            let backend = ratatui::backend::TestBackend::new(100, 30);
+            let mut terminal = ratatui::Terminal::new(backend).unwrap();
+
+            // Render Board A initially
+            terminal.draw(|f| crate::ui::render(f, &app)).unwrap();
+            assert_eq!(app.board().unwrap().scroll_offset[0].get(), 0);
+
+            // Navigate down to Card 15 (bottom)
+            handle(&mut app, key(KeyCode::Char('G'))).unwrap();
+            terminal.draw(|f| crate::ui::render(f, &app)).unwrap();
+            let scroll_a = app.board().unwrap().scroll_offset[0].get();
+            assert!(scroll_a > 0, "expected scrolled list, got {scroll_a}");
+
+            // Move up one card: focus on A14, scroll offset unchanged
+            handle(&mut app, key(KeyCode::Up)).unwrap();
+            terminal.draw(|f| crate::ui::render(f, &app)).unwrap();
+            assert_eq!(app.board().unwrap().scroll_offset[0].get(), scroll_a);
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[13].id);
+
+            // Switch to Board B with 'k'
+            handle(&mut app, key(KeyCode::Char('k'))).unwrap();
+            assert_eq!(open_board_id(&app), meta_b.id);
+            terminal.draw(|f| crate::ui::render(f, &app)).unwrap();
+            assert_eq!(app.board().unwrap().scroll_offset[0].get(), 0);
+
+            // Switch back to Board A with 'j'
+            handle(&mut app, key(KeyCode::Char('j'))).unwrap();
+            assert_eq!(open_board_id(&app), meta_a.id);
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[13].id);
+            assert_eq!(app.board().unwrap().scroll_offset[0].get(), scroll_a);
+
+            // Press Up on Board A: moves focus up, does not scroll viewport
+            handle(&mut app, key(KeyCode::Up)).unwrap();
+            terminal.draw(|f| crate::ui::render(f, &app)).unwrap();
+            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[12].id);
+            assert_eq!(app.board().unwrap().scroll_offset[0].get(), scroll_a);
+        });
+    }
+
+    #[test]
     fn switching_boards_via_board_selector_remembers_and_restores_focused_card() {
         with_temp_dir(|| {
             let mut meta_a = board_store::create_board("Board A".into()).unwrap();
