@@ -171,6 +171,8 @@ Sleep 1s
 Type "v"
 Sleep 1s
 Enter
+Sleep 800ms
+Type "y"
 Sleep 1.2s
 
 # Show the created and updated dates in the card frames, then hide them again

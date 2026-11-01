@@ -810,6 +810,21 @@ fn snapshot_confirm_archive_card() {
 }
 
 #[test]
+fn snapshot_confirm_restore_card() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('a'));
+        press(&mut app, KeyCode::Char('y'));
+        press(&mut app, KeyCode::Char('v'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
 fn snapshot_archived_cards_dialog() {
     with_temp_dir(|| {
         let id = seed_demo_board();
@@ -828,12 +843,16 @@ fn snapshot_archived_cards_dialog() {
 /// between keys and description, in a popup no taller than its rows.
 #[test]
 fn dialog_help_pages_are_compact_and_unwrapped() {
+    use crate::model::board::BoardMeta;
+    use crate::model::list::CardList;
     use crate::dialog::{
         Dialog, archived_boards::ArchivedBoards, archived_cards::ArchivedCards,
         archived_lists::ArchivedLists, card_history::CardHistory,
         confirm_archive_card::ConfirmArchiveCard, confirm_archive_list::ConfirmArchiveList,
         confirm_cancel_edit::ConfirmCancelEdit, confirm_clear_due_date::ConfirmClearDueDate,
-        label_manager::LabelManager, label_picker::LabelPicker,
+        confirm_restore_board::ConfirmRestoreBoard, confirm_restore_card::ConfirmRestoreCard,
+        confirm_restore_list::ConfirmRestoreList, label_manager::LabelManager,
+        label_picker::LabelPicker,
     };
     with_temp_dir(|| {
         let id = seed_demo_board();
@@ -842,6 +861,21 @@ fn dialog_help_pages_are_compact_and_unwrapped() {
             Box::new(ConfirmArchiveList),
             Box::new(ConfirmCancelEdit),
             Box::new(ConfirmClearDueDate),
+            Box::new(ConfirmRestoreCard {
+                card: Card::new("Test card".into()),
+                cards: vec![],
+                selected: 0,
+            }),
+            Box::new(ConfirmRestoreList {
+                list: CardList::new("Test list".into()),
+                lists: vec![],
+                selected: 0,
+            }),
+            Box::new(ConfirmRestoreBoard {
+                board: BoardMeta::new("Test board".into()),
+                boards: vec![],
+                selected: 0,
+            }),
             Box::new(CardHistory::new()),
             Box::new(LabelPicker { selected_idx: 0 }),
             Box::new(LabelManager { selected_idx: 0, from_picker: false }),

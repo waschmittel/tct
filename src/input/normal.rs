@@ -1136,4 +1136,70 @@ mod tests {
             assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[0].id);
         });
     }
+
+    #[test]
+    fn unarchive_card_requires_dialog_confirmation() {
+        with_temp_dir(|| {
+            let (mut app, _, a_cards, _) = fixture();
+            let card_id = a_cards[0].id.clone();
+
+            // Archive the first card: 'a' opens ConfirmArchiveCard, 'y' confirms
+            handle(&mut app, key(KeyCode::Char('a'))).unwrap();
+            assert!(app.dialog.is_some());
+            crate::input::handle_input(&mut app, key(KeyCode::Char('y'))).unwrap();
+            assert_eq!(app.mode, AppMode::Normal);
+            assert!(app.board().unwrap().cards.get(&card_id).unwrap().archived);
+
+            // Open archived cards dialog
+            handle(&mut app, key(KeyCode::Char('v'))).unwrap();
+            assert_eq!(app.mode, AppMode::Dialog);
+
+            // Press Enter to restore: should open confirmation dialog instead of restoring immediately
+            crate::input::handle_input(&mut app, key(KeyCode::Enter)).unwrap();
+            assert_eq!(app.mode, AppMode::Dialog);
+            // Cancel with 'n'
+            crate::input::handle_input(&mut app, key(KeyCode::Char('n'))).unwrap();
+            assert_eq!(app.mode, AppMode::Dialog);
+            assert!(app.board().unwrap().cards.get(&card_id).unwrap().archived);
+
+            // Press Enter then 'y' to confirm restore
+            crate::input::handle_input(&mut app, key(KeyCode::Enter)).unwrap();
+            crate::input::handle_input(&mut app, key(KeyCode::Char('y'))).unwrap();
+            assert_eq!(app.mode, AppMode::Normal);
+            assert!(!app.board().unwrap().cards.get(&card_id).unwrap().archived);
+        });
+    }
+
+    #[test]
+    fn unarchive_list_requires_dialog_confirmation() {
+        with_temp_dir(|| {
+            let (mut app, _, _, _) = fixture();
+            let list_id = app.board().unwrap().lists[0].id.clone();
+
+            // Archive the first list: 'A' opens ConfirmArchiveList, 'y' confirms
+            handle(&mut app, key(KeyCode::Char('A'))).unwrap();
+            assert!(app.dialog.is_some());
+            crate::input::handle_input(&mut app, key(KeyCode::Char('y'))).unwrap();
+            assert_eq!(app.mode, AppMode::Normal);
+            assert!(app.board().unwrap().lists.iter().all(|l| l.id != list_id));
+
+            // Open archived lists dialog
+            handle(&mut app, key(KeyCode::Char('V'))).unwrap();
+            assert_eq!(app.mode, AppMode::Dialog);
+
+            // Press Enter to restore: should open confirmation dialog instead of restoring immediately
+            crate::input::handle_input(&mut app, key(KeyCode::Enter)).unwrap();
+            assert_eq!(app.mode, AppMode::Dialog);
+            // Cancel with 'n'
+            crate::input::handle_input(&mut app, key(KeyCode::Char('n'))).unwrap();
+            assert_eq!(app.mode, AppMode::Dialog);
+            assert!(app.board().unwrap().lists.iter().all(|l| l.id != list_id));
+
+            // Press Enter then 'y' to confirm restore
+            crate::input::handle_input(&mut app, key(KeyCode::Enter)).unwrap();
+            crate::input::handle_input(&mut app, key(KeyCode::Char('y'))).unwrap();
+            assert_eq!(app.mode, AppMode::Normal);
+            assert!(app.board().unwrap().lists.iter().any(|l| l.id == list_id));
+        });
+    }
 }

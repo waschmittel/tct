@@ -300,6 +300,42 @@ mod tests {
     }
 
     #[test]
+    fn unarchive_board_requires_dialog_confirmation() {
+        with_temp_dir(|| {
+            let boards = seed_boards(&["Board to Archive"]);
+            let board_id = boards[0].id.clone();
+            let mut app = App::new(None).unwrap();
+
+            // Archive the board: 'a' opens ConfirmArchiveBoard, 'y' confirms
+            press(&mut app, KeyCode::Char('a'));
+            assert!(matches!(app.mode, AppMode::Dialog));
+            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty())).unwrap();
+            assert_eq!(app.mode, AppMode::BoardSelector);
+            assert!(app.boards.is_empty());
+
+            // Open archived boards dialog
+            press(&mut app, KeyCode::Char('v'));
+            assert_eq!(app.mode, AppMode::Dialog);
+
+            // Press Enter to restore: opens ConfirmRestoreBoard dialog
+            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+            assert_eq!(app.mode, AppMode::Dialog);
+
+            // Cancel with 'n'
+            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty())).unwrap();
+            assert_eq!(app.mode, AppMode::Dialog);
+            assert!(app.boards.is_empty());
+
+            // Press Enter then 'y' to confirm restore
+            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty())).unwrap();
+            assert_eq!(app.mode, AppMode::BoardSelector);
+            assert_eq!(app.boards.len(), 1);
+            assert_eq!(app.boards[0].id, board_id);
+        });
+    }
+
+    #[test]
     fn question_mark_opens_help_and_remembers_previous_mode() {
         with_temp_dir(|| {
             let mut app = App::new(None).unwrap();

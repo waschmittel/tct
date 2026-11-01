@@ -83,18 +83,12 @@ impl Dialog for ArchivedCards {
                 DialogOutcome::stay()
             }
             KeyCode::Enter if self.selected < self.cards.len() => {
-                let card = self.cards.remove(self.selected);
-                let title = card.title.clone();
-                if self.selected > 0 && self.selected >= self.cards.len() {
-                    self.selected = self.cards.len().saturating_sub(1);
-                }
-                let mut out =
-                    DialogOutcome::side_effect(DialogSideEffect::StageAndRestoreCard { card })
-                        .with_status(format!("Restored card '{title}'"));
-                if self.cards.is_empty() {
-                    out = out.with_close();
-                }
-                out
+                let card = self.cards[self.selected].clone();
+                DialogOutcome::open(Box::new(super::confirm_restore_card::ConfirmRestoreCard {
+                    card,
+                    cards: self.cards.clone(),
+                    selected: self.selected,
+                }))
             }
             KeyCode::Char('x') if self.selected < self.cards.len() => {
                 let card = self.cards.remove(self.selected);
@@ -127,5 +121,55 @@ impl Dialog for ArchivedCards {
                 ("Esc", "Close"),
             ],
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyModifiers;
+
+    fn key(c: KeyCode) -> KeyEvent {
+        KeyEvent::new(c, KeyModifiers::empty())
+    }
+
+    #[test]
+    fn enter_opens_confirm_restore_card() {
+        let card = Card::new("My Archived Card".into());
+        let mut dialog = ArchivedCards {
+            cards: vec![card.clone()],
+            selected: 0,
+        };
+        let out = dialog.handle_key(key(KeyCode::Enter), None);
+        assert!(matches!(out.follow, super::super::Follow::Open(_)));
+    }
+
+    #[test]
+    fn enter_on_empty_is_stay() {
+        let mut dialog = ArchivedCards {
+            cards: vec![],
+            selected: 0,
+        };
+        let out = dialog.handle_key(key(KeyCode::Enter), None);
+        assert!(matches!(out.follow, super::super::Follow::Stay));
+    }
+
+    #[test]
+    fn navigation_and_esc() {
+        let c1 = Card::new("Card 1".into());
+        let c2 = Card::new("Card 2".into());
+        let mut dialog = ArchivedCards {
+            cards: vec![c1, c2],
+            selected: 0,
+        };
+        dialog.handle_key(key(KeyCode::Down), None);
+        assert_eq!(dialog.selected, 1);
+        dialog.handle_key(key(KeyCode::Down), None);
+        assert_eq!(dialog.selected, 1);
+        dialog.handle_key(key(KeyCode::Up), None);
+        assert_eq!(dialog.selected, 0);
+
+        let out = dialog.handle_key(key(KeyCode::Esc), None);
+        assert!(matches!(out.follow, super::super::Follow::Close));
     }
 }

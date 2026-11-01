@@ -26,12 +26,15 @@ pub mod confirm_archive_list;
 pub mod confirm_cancel_edit;
 pub mod confirm_clear_due_date;
 pub mod confirm_delete_label;
+pub mod confirm_restore_board;
+pub mod confirm_restore_card;
+pub mod confirm_restore_list;
 pub mod label_manager;
 pub mod label_picker;
 
 /// What rendering layer a dialog overlays.
 ///
-/// `ArchiveBoard` / `ArchivedBoards` are board-level dialogs that need the
+/// `ConfirmArchiveBoard` / `ConfirmRestoreBoard` / `ArchivedBoards` are board-level dialogs that need the
 /// **Board Selector** as background. Everything else overlays the current
 /// view (whatever `App.previous_mode` resolves to).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

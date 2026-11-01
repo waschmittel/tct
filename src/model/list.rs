@@ -16,6 +16,17 @@ pub struct CardList {
     pub card_ids: Vec<CardId>,
 }
 
+impl CardList {
+    #[cfg(test)]
+    pub fn new(name: String) -> Self {
+        Self {
+            id: ListId::generate(),
+            name,
+            card_ids: Vec::new(),
+        }
+    }
+}
+
 /// Cards belonging to `list_id`, sorted ascending by `position` (ties broken by
 /// `created_at` then `id` for stable, deterministic ordering).
 pub fn ordered_card_ids(list_id: &ListId, cards: &HashMap<CardId, Card>) -> Vec<CardId> {

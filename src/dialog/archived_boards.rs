@@ -83,20 +83,12 @@ impl Dialog for ArchivedBoards {
                 DialogOutcome::stay()
             }
             KeyCode::Enter if self.selected < self.boards.len() => {
-                let board = self.boards.remove(self.selected);
-                let name = board.name.clone();
-                let board_id = board.id.clone();
-                if self.selected > 0 && self.selected >= self.boards.len() {
-                    self.selected = self.boards.len().saturating_sub(1);
-                }
-                let mut out = DialogOutcome::side_effect(
-                    DialogSideEffect::RestoreArchivedBoard { board_id },
-                )
-                .with_status(format!("Restored board '{name}'"));
-                if self.boards.is_empty() {
-                    out = out.with_close_to(crate::app::AppMode::BoardSelector);
-                }
-                out
+                let board = self.boards[self.selected].clone();
+                DialogOutcome::open(Box::new(super::confirm_restore_board::ConfirmRestoreBoard {
+                    board,
+                    boards: self.boards.clone(),
+                    selected: self.selected,
+                }))
             }
             KeyCode::Char('x') if self.selected < self.boards.len() => {
                 let board = self.boards.remove(self.selected);
@@ -135,5 +127,58 @@ impl Dialog for ArchivedBoards {
                 ("Esc", "Close"),
             ],
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyModifiers;
+
+    fn key(c: KeyCode) -> KeyEvent {
+        KeyEvent::new(c, KeyModifiers::empty())
+    }
+
+    #[test]
+    fn enter_opens_confirm_restore_board() {
+        let board = BoardMeta::new("My Archived Board".into());
+        let mut dialog = ArchivedBoards {
+            boards: vec![board.clone()],
+            selected: 0,
+        };
+        let out = dialog.handle_key(key(KeyCode::Enter), None);
+        assert!(matches!(out.follow, super::super::Follow::Open(_)));
+    }
+
+    #[test]
+    fn enter_on_empty_is_stay() {
+        let mut dialog = ArchivedBoards {
+            boards: vec![],
+            selected: 0,
+        };
+        let out = dialog.handle_key(key(KeyCode::Enter), None);
+        assert!(matches!(out.follow, super::super::Follow::Stay));
+    }
+
+    #[test]
+    fn navigation_and_esc() {
+        let b1 = BoardMeta::new("Board 1".into());
+        let b2 = BoardMeta::new("Board 2".into());
+        let mut dialog = ArchivedBoards {
+            boards: vec![b1, b2],
+            selected: 0,
+        };
+        dialog.handle_key(key(KeyCode::Down), None);
+        assert_eq!(dialog.selected, 1);
+        dialog.handle_key(key(KeyCode::Down), None);
+        assert_eq!(dialog.selected, 1);
+        dialog.handle_key(key(KeyCode::Up), None);
+        assert_eq!(dialog.selected, 0);
+
+        let out = dialog.handle_key(key(KeyCode::Esc), None);
+        assert!(matches!(
+            out.follow,
+            super::super::Follow::CloseTo(crate::app::AppMode::BoardSelector)
+        ));
     }
 }
