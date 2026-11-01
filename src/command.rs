@@ -45,6 +45,7 @@ pub enum Command {
     RestoreBoard { board_id: BoardId },
     RenameBoard { name: String },
     SetAccentColor { color: LabelColor },
+    SetNewCardPosition { position: crate::model::board::NewCardPosition },
     SetShowCreatedDate { show: bool },
     SetShowUpdatedDate { show: bool },
 

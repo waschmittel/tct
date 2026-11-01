@@ -220,6 +220,7 @@ The first screen you see. Lists all active boards.
 | n | Create new board |
 | r | Rename selected board |
 | c | Cycle board accent color |
+| C | Board configuration |
 | a | Archive board (with confirmation) |
 | v | View / restore archived boards |
 | ? | Help overlay |

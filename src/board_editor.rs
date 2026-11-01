@@ -636,22 +636,35 @@ impl BoardEditor {
                         kind: "list",
                         id: list_id.to_string(),
                     })?;
-                let pos = self.next_position(&list_id);
+                let pos = match self.board.meta.new_card_position {
+                    crate::model::board::NewCardPosition::Bottom => self.next_position(&list_id),
+                    crate::model::board::NewCardPosition::Top => self.first_position(&list_id),
+                };
                 let mut card = Card::new(title);
                 card.list_id = list_id.clone();
                 card.position = pos;
                 card.log("Created");
                 let new_id = card.id.clone();
-                self.board.lists[li].card_ids.push(card.id.clone());
                 self.board.cards.insert(card.id.clone(), card.clone());
+                self.rebuild_list(li);
                 pending.push(PendingWrite::Card(card));
                 self.last_added_card_id = Some(new_id);
-                // Selection follows the new card — it is non-archived and last
-                // in the list, so its visible ordinal is the last visible slot.
+                // Selection follows the new card — it is non-archived and last/first
+                // in the list, so its visible ordinal is the last/first visible slot.
                 self.board.selected_list = li;
-                let ord = self.board.visible_cards(li, None).len().saturating_sub(1);
+                let ord = match self.board.meta.new_card_position {
+                    crate::model::board::NewCardPosition::Bottom => {
+                        self.board.visible_cards(li, None).len().saturating_sub(1)
+                    }
+                    crate::model::board::NewCardPosition::Top => 0,
+                };
                 if let Some(slot) = self.board.selected_card.get_mut(li) {
                     *slot = ord;
+                }
+                if self.board.meta.new_card_position == crate::model::board::NewCardPosition::Top {
+                    if let Some(offset) = self.board.scroll_offset.get(li) {
+                        offset.set(0);
+                    }
                 }
             }
             Command::MoveCard { card_id, direction } => {
@@ -766,6 +779,10 @@ impl BoardEditor {
             }
             Command::SetAccentColor { color } => {
                 self.board.meta.accent_color = color;
+                pending.push(PendingWrite::Board);
+            }
+            Command::SetNewCardPosition { position } => {
+                self.board.meta.new_card_position = position;
                 pending.push(PendingWrite::Board);
             }
             Command::SetShowCreatedDate { show } => {
@@ -926,13 +943,24 @@ impl BoardEditor {
 
     /// Fractional rank one past the last Card currently in `list_id`.
     fn next_position(&self, list_id: &ListId) -> f64 {
-        self.board
-            .cards
-            .values()
-            .filter(|c| c.list_id == *list_id)
-            .map(|c| c.position)
-            .fold(0.0_f64, f64::max)
-            + 1.0
+        crate::model::rank::after_last(
+            self.board
+                .cards
+                .values()
+                .filter(|c| c.list_id == *list_id)
+                .map(|c| c.position),
+        )
+    }
+
+    /// Fractional rank one before the first Card currently in `list_id`.
+    fn first_position(&self, list_id: &ListId) -> f64 {
+        crate::model::rank::before_first(
+            self.board
+                .cards
+                .values()
+                .filter(|c| c.list_id == *list_id)
+                .map(|c| c.position),
+        )
     }
 
     /// `position` of the Card at raw `card_ids` index `idx` in list `list_idx`.
@@ -1507,6 +1535,47 @@ mod tests {
             assert!(ed
                 .apply(Command::DeleteHistoryEntry { card_id: "nope".into(), index: 0 })
                 .is_err());
+        });
+    }
+
+    #[test]
+    fn new_card_position_command_persists_across_reload() {
+        with_temp_dir(|| {
+            let (mut ed, _, _) = editor_with_cards(&["t"]);
+            assert_eq!(ed.board().meta.new_card_position, crate::model::board::NewCardPosition::Bottom);
+            ed.apply(Command::SetNewCardPosition {
+                position: crate::model::board::NewCardPosition::Top,
+            })
+            .unwrap();
+            assert_eq!(ed.board().meta.new_card_position, crate::model::board::NewCardPosition::Top);
+            ed.reload().unwrap();
+            assert_eq!(ed.board().meta.new_card_position, crate::model::board::NewCardPosition::Top);
+        });
+    }
+
+    #[test]
+    fn add_card_top_inserts_at_beginning_and_persists() {
+        with_temp_dir(|| {
+            let (mut ed, lid, _) = editor_with_cards(&["existing1", "existing2"]);
+            ed.apply(Command::SetNewCardPosition {
+                position: crate::model::board::NewCardPosition::Top,
+            })
+            .unwrap();
+            ed.apply(Command::AddCard { list_id: lid.clone(), title: "fresh_top".into() }).unwrap();
+            let new_id = ed.last_added_card_id().cloned().unwrap();
+            assert_eq!(ed.board().lists[0].card_ids.first(), Some(&new_id));
+            assert_eq!(ed.board().selected_card[0], 0);
+
+            ed.reload().unwrap();
+            assert_eq!(ed.board().cards[&new_id].title, "fresh_top");
+            assert_eq!(ed.board().lists[0].card_ids.first(), Some(&new_id));
+
+            // Add another one at top
+            ed.apply(Command::AddCard { list_id: lid.clone(), title: "even_newer".into() }).unwrap();
+            let newest_id = ed.last_added_card_id().cloned().unwrap();
+            assert_eq!(ed.board().lists[0].card_ids.first(), Some(&newest_id));
+            assert_eq!(ed.board().lists[0].card_ids[1], new_id);
+            assert_eq!(ed.board().selected_card[0], 0);
         });
     }
 

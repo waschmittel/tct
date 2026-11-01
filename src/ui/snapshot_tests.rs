@@ -841,6 +841,21 @@ fn snapshot_label_manager() {
 }
 
 #[test]
+fn snapshot_board_configuration_dialog() {
+    with_temp_dir(|| {
+        seed_selector_boards();
+        let mut app = App::new(None).unwrap();
+        crate::input::handle_input(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('C'), KeyModifiers::SHIFT),
+        )
+        .unwrap();
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
 fn snapshot_confirm_cancel_edit() {
     with_temp_dir(|| {
         let id = seed_demo_board();

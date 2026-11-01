@@ -20,7 +20,7 @@ pub enum Action {
     NewBoard,
     RenameBoard,
     CycleAccentColor,
-    PickAccentColor,
+    BoardConfiguration,
     ArchiveBoard,
     ViewArchived,
     Help,
@@ -40,7 +40,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Char('n'), shift: None, action: Action::NewBoard, keys: "n", help: "New board", section: "Actions" },
     Binding { code: KeyCode::Char('r'), shift: None, action: Action::RenameBoard, keys: "r", help: "Rename board", section: "Actions" },
     Binding { code: KeyCode::Char('c'), shift: None, action: Action::CycleAccentColor, keys: "c", help: "Cycle accent color", section: "Actions" },
-    Binding { code: KeyCode::Char('C'), shift: None, action: Action::PickAccentColor, keys: "C", help: "Pick accent color", section: "Actions" },
+    Binding { code: KeyCode::Char('C'), shift: None, action: Action::BoardConfiguration, keys: "C", help: "Board configuration", section: "Actions" },
     Binding { code: KeyCode::Char('a'), shift: None, action: Action::ArchiveBoard, keys: "a", help: "Archive board", section: "Actions" },
     Binding { code: KeyCode::Char('v'), shift: None, action: Action::ViewArchived, keys: "v", help: "View archived", section: "Actions" },
     // App
@@ -104,10 +104,11 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                 app.set_status(format!("Board color set to {}", next.display_name()));
             }
         }
-        Action::PickAccentColor => {
+        Action::BoardConfiguration => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let color = board.accent_color;
-                app.open_dialog(Box::new(ColorPicker::for_board(color)));
+                let new_card_position = board.new_card_position;
+                app.open_dialog(Box::new(ColorPicker::for_board(color, new_card_position)));
             }
         }
         Action::ArchiveBoard => {
@@ -257,13 +258,72 @@ mod tests {
     }
 
     #[test]
-    fn shift_c_opens_color_picker_dialog() {
+    fn shift_c_opens_board_configuration_dialog() {
         with_temp_dir(|| {
             seed_boards(&["A"]);
             let mut app = App::new(None).unwrap();
             press(&mut app, KeyCode::Char('C'));
             assert!(matches!(app.mode, AppMode::Dialog));
             assert!(app.dialog.is_some());
+        });
+    }
+
+    #[test]
+    fn board_configuration_dialog_configures_new_card_position_top() {
+        with_temp_dir(|| {
+            let _ = seed_boards(&["Work"]);
+            let mut app = App::new(None).unwrap();
+
+            let send = |app: &mut App, code: KeyCode| {
+                crate::input::handle_input(app, KeyEvent::new(code, KeyModifiers::empty())).unwrap();
+            };
+
+            // Press C to open Board Configuration
+            send(&mut app, KeyCode::Char('C'));
+            assert!(matches!(app.mode, AppMode::Dialog));
+
+            // Navigate down to field 3 ("New items")
+            send(&mut app, KeyCode::Down);
+            send(&mut app, KeyCode::Down);
+            send(&mut app, KeyCode::Down);
+
+            // Press Left to set to Top
+            send(&mut app, KeyCode::Left);
+
+            // Press Enter to confirm and save
+            send(&mut app, KeyCode::Enter);
+            assert!(matches!(app.mode, AppMode::BoardSelector));
+            assert_eq!(
+                app.status_message.as_ref().map(|(m, _)| m.as_str()),
+                Some("Board configuration saved")
+            );
+            assert_eq!(app.boards[0].new_card_position, crate::model::board::NewCardPosition::Top);
+
+            // Open the board
+            send(&mut app, KeyCode::Enter);
+            assert!(matches!(app.mode, AppMode::Normal));
+
+            // Verify loaded board has Top
+            assert_eq!(
+                app.board().unwrap().meta.new_card_position,
+                crate::model::board::NewCardPosition::Top
+            );
+
+            // Add a list
+            app.apply(crate::command::Command::AddList { name: "Todo".into() }).unwrap();
+            let list_id = app.board().unwrap().lists[0].id.clone();
+
+            // Add first card
+            app.apply(crate::command::Command::AddCard { list_id: list_id.clone(), title: "first".into() }).unwrap();
+
+            // Add second card
+            app.apply(crate::command::Command::AddCard { list_id, title: "second".into() }).unwrap();
+
+            // "second" should be at index 0, "first" at index 1
+            let board = app.board().unwrap();
+            let card_ids = &board.lists[0].card_ids;
+            assert_eq!(board.cards[&card_ids[0]].title, "second");
+            assert_eq!(board.cards[&card_ids[1]].title, "first");
         });
     }
 

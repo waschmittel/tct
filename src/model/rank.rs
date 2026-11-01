@@ -19,6 +19,11 @@ pub fn after_last(existing: impl IntoIterator<Item = f64>) -> f64 {
     between(existing.into_iter().reduce(f64::max), None)
 }
 
+/// The rank that places a record before everything in `existing`.
+pub fn before_first(existing: impl IntoIterator<Item = f64>) -> f64 {
+    between(None, existing.into_iter().reduce(f64::min))
+}
+
 /// Ascending rank order, with NaN treated as equal so a hand-edited file
 /// cannot panic the sort.
 pub fn cmp(a: f64, b: f64) -> std::cmp::Ordering {
@@ -50,6 +55,13 @@ mod tests {
     fn after_last_follows_the_maximum() {
         assert_eq!(after_last([1.0, 5.0, 3.0]), 6.0);
         assert_eq!(after_last([]), 1.0);
+    }
+
+    #[test]
+    fn before_first_precedes_the_minimum() {
+        assert_eq!(before_first([1.0, 5.0, 3.0]), 0.0);
+        assert_eq!(before_first([0.0]), -1.0);
+        assert_eq!(before_first([]), 1.0);
     }
 
     #[test]

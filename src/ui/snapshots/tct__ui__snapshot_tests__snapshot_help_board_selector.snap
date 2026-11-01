@@ -15,7 +15,7 @@ expression: render_to_string(&app)
 │    │  Up / Down         Navigate boards            n                 New board              │    │
 │    │  Shift+Up/Down     Reorder board              r                 Rename board           │    │
 │    │  Enter             Open board                 c                 Cycle accent color     │    │
-│    │                                               C                 Pick accent color      │    │
+│    │                                               C                 Board configuration    │    │
 │    │                                               a                 Archive board          │    │
 │    │                                               v                 View archived          │    │
 │    │                                                                                        │    │

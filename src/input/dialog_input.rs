@@ -80,12 +80,18 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
                 }
             }
         }
-        DialogSideEffect::SetSelectedBoardAccent { color } => {
+        DialogSideEffect::ConfigureSelectedBoard { color, new_card_position } => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let id = board.id.clone();
-                crate::board_directory::set_accent(&id, color)?;
+                crate::board_directory::configure_board(&id, color, new_card_position)?;
                 if let Some(b) = app.boards.get_mut(app.selected_board_idx) {
                     b.accent_color = color;
+                    b.new_card_position = new_card_position;
+                }
+                if let Some(editor) = &mut app.editor {
+                    if editor.board().meta.id == id {
+                        editor.reload()?;
+                    }
                 }
             }
         }

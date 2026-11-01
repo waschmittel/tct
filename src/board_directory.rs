@@ -58,9 +58,22 @@ pub fn cycle_accent(board_id: &BoardId) -> anyhow::Result<LabelColor> {
 }
 
 /// Set the Board's Accent Color to an explicit value and persist.
+#[allow(dead_code)]
 pub fn set_accent(board_id: &BoardId, color: LabelColor) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
     editor.apply(Command::SetAccentColor { color })?;
+    Ok(())
+}
+
+/// Set the Board's Accent Color and New Card Position and persist.
+pub fn configure_board(
+    board_id: &BoardId,
+    color: LabelColor,
+    new_card_position: crate::model::board::NewCardPosition,
+) -> anyhow::Result<()> {
+    let mut editor = BoardEditor::load(board_id)?;
+    editor.apply(Command::SetAccentColor { color })?;
+    editor.apply(Command::SetNewCardPosition { position: new_card_position })?;
     Ok(())
 }
 
@@ -121,6 +134,25 @@ mod tests {
             let a = create("A".into()).unwrap();
             let b = create("B".into()).unwrap();
             assert_ne!(a.accent_color, b.accent_color);
+        });
+    }
+
+    #[test]
+    fn configure_board_changes_and_persists() {
+        with_temp_dir(|| {
+            let meta = create("Board".into()).unwrap();
+            configure_board(
+                &meta.id,
+                LabelColor::Purple,
+                crate::model::board::NewCardPosition::Top,
+            )
+            .unwrap();
+            let reloaded = board_store::load_board(&meta.id).unwrap();
+            assert_eq!(reloaded.accent_color, LabelColor::Purple);
+            assert_eq!(
+                reloaded.new_card_position,
+                crate::model::board::NewCardPosition::Top
+            );
         });
     }
 
