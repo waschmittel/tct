@@ -215,6 +215,24 @@ fn snapshot_card_detail_scrollbar_at_bottom() {
     });
 }
 
+#[test]
+fn snapshot_card_detail_scrollbar_scroll_up_after_overshoot() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_long_description(&mut app);
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        let _ = render_to_string(&app);
+        for _ in 0..80 {
+            press(&mut app, KeyCode::PageDown);
+        }
+        // Pressing PageUp immediately drops 1 row from max scroll
+        press(&mut app, KeyCode::PageUp);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
 /// Give the selected card enough labels to wrap across several lines.
 fn add_many_labels(app: &mut App) {
     let board = app.board_mut().unwrap();
@@ -280,6 +298,52 @@ fn snapshot_card_detail_long_checklist_item_wraps() {
         }
         press(&mut app, KeyCode::Enter);
         assert_eq!(app.mode, AppMode::CardDetail);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+fn set_long_checklist(app: &mut App) {
+    let board = app.board_mut().unwrap();
+    let card_id = board.current_card_id().cloned().unwrap();
+    let card = board.cards.get_mut(&card_id).unwrap();
+    card.checklist = (1..=12)
+        .map(|i| ChecklistItem {
+            text: format!("Checklist step {i:02} of the workflow"),
+            completed: i % 2 == 0,
+        })
+        .collect();
+}
+
+#[test]
+fn snapshot_card_detail_long_checklist_scrolled_bottom() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_long_checklist(&mut app);
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        for _ in 0..15 {
+            press(&mut app, KeyCode::Down);
+        }
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_card_detail_long_checklist_scroll_up() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_long_checklist(&mut app);
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        for _ in 0..15 {
+            press(&mut app, KeyCode::Down);
+        }
+        // Navigate back up
+        for _ in 0..3 {
+            press(&mut app, KeyCode::Up);
+        }
         insta::assert_snapshot!(render_to_string(&app));
     });
 }
@@ -549,6 +613,65 @@ fn snapshot_card_history_dialog() {
         }
         press(&mut app, KeyCode::Char('h'));
         assert_eq!(app.mode, AppMode::Dialog);
+        let stamp = regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?").unwrap();
+        let text = render_to_string(&app);
+        insta::assert_snapshot!(stamp.replace_all(&text, "YYYY-MM-DD HH:MM"));
+    });
+}
+
+fn set_long_history(app: &mut App) {
+    use crate::model::card::HistoryField;
+    let board = app.board_mut().unwrap();
+    let card_id = board.current_card_id().cloned().unwrap();
+    let card = board.cards.get_mut(&card_id).unwrap();
+    let old_desc = (1..=25)
+        .map(|i| format!("old line {i:02}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let new_desc = (1..=25)
+        .map(|i| format!("new line {i:02}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    card.log_change(
+        HistoryField::Description,
+        "Update description",
+        Some(old_desc),
+        Some(new_desc),
+    );
+}
+
+#[test]
+fn snapshot_card_history_dialog_scroll_bottom() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_long_history(&mut app);
+        press(&mut app, KeyCode::Char('h'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        let _ = render_to_string(&app);
+        for _ in 0..20 {
+            press(&mut app, KeyCode::PageDown);
+        }
+        let stamp = regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?").unwrap();
+        let text = render_to_string(&app);
+        insta::assert_snapshot!(stamp.replace_all(&text, "YYYY-MM-DD HH:MM"));
+    });
+}
+
+#[test]
+fn snapshot_card_history_dialog_scroll_up() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_long_history(&mut app);
+        press(&mut app, KeyCode::Char('h'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        let _ = render_to_string(&app);
+        for _ in 0..20 {
+            press(&mut app, KeyCode::PageDown);
+        }
+        // Immediately scroll up
+        press(&mut app, KeyCode::PageUp);
         let stamp = regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?").unwrap();
         let text = render_to_string(&app);
         insta::assert_snapshot!(stamp.replace_all(&text, "YYYY-MM-DD HH:MM"));

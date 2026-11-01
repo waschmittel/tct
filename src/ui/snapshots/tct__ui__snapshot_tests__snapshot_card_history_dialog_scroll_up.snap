@@ -1,0 +1,34 @@
+---
+source: src/ui/snapshot_tests.rs
+expression: "stamp.replace_all(&text, \"YYYY-MM-DD HH:MM\")"
+---
+ Demo (2 lists)
+┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
+│┏┌ History — Fix login flow ────────────────────────────────────────────────────────────────────┐┐│
+│┃│» YYYY-MM-DD HH:MM Update description  │ - old line 23                                        │││
+│┃│  YYYY-MM-DD HH:MM Created             │ - old line 24                                        │┘│
+│┃│                                       │ - old line 25                                        │ │
+│┗│                                       │ + new line 01                                        │ │
+│┌│                                       │ + new line 02                                        │ │
+│││                                       │ + new line 03                                        │ │
+│└│                                       │ + new line 04                                        │ │
+│ │                                       │ + new line 05                                        │ │
+│ │                                       │ + new line 06                                        │ │
+│ │                                       │ + new line 07                                        │ │
+│ │                                       │ + new line 08                                        │ │
+│ │                                       │ + new line 09                                        │ │
+│ │                                       │ + new line 10                                        │ │
+│ │                                       │ + new line 11                                        │ │
+│ │                                       │ + new line 12                                        │ │
+│ │                                       │ + new line 13                                        │ │
+│ │                                       │ + new line 14                                        │ │
+│ │                                       │ + new line 15                                        │ │
+│ │                                       │ + new line 16                                        │ │
+│ │                                       │ + new line 17                                        │ │
+│ │                                       │ + new line 18                                        │ │
+│ │                                       │ + new line 19                                        │ │
+│ │                                       │ + new line 20                                        │ │
+│ │                                       │                                                      │ │
+│ └──────────────────────────────────────────────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
+ DIALOG  ?:help                                                                              ~/.tct

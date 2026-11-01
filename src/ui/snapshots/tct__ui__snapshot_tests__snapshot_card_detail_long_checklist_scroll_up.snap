@@ -1,0 +1,34 @@
+---
+source: src/ui/snapshot_tests.rs
+expression: render_to_string(&app)
+---
+ Demo (2 lists)
+┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
+│┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓││┌──────────────────────────────────────────────┐│
+│┃Fix logi┌ Fix login flow ──────────────────────────────────────────────────────────────┐        ││
+│┃[bug]   │                                                                              │────────┘│
+│┃[6/12] ≡│  Token expires too early.                                                    │         │
+│┗━━━━━━━━│                                                                              │         │
+│┌────────│  - check refresh                                                             │         │
+││Redesign│  - add test                                                                  │         │
+│└────────│                                                                              │         │
+│         │══════════════════════════════════════════════════════════════════════════════│         │
+│         │                                                                              │         │
+│         │ Checklist [6/12]  (4 hidden)                                                 │         │
+│         │   [✓] Checklist step 02 of the workflow                                      │         │
+│         │   [ ] Checklist step 03 of the workflow                                      │         │
+│         │   [✓] Checklist step 04 of the workflow                                      │         │
+│         │   [ ] Checklist step 05 of the workflow                                      │         │
+│         │   [✓] Checklist step 06 of the workflow                                      │         │
+│         │   [ ] Checklist step 07 of the workflow                                      │         │
+│         │   [✓] Checklist step 08 of the workflow                                      │         │
+│         │ » [ ] Checklist step 09 of the workflow                                      │         │
+│         │                                                                              │         │
+│         │──────────────────────────────────────────────────────────────────────────────│         │
+│         │                                                                              │         │
+│         │ Labels                                                                       │         │
+│         │ [bug]                                                                        │         │
+│         └──────────────────────────────────────────────────────────────────────────────┘         │
+│                                                ││                                                │
+└────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
+ DETAIL  ?:help                                                                              ~/.tct

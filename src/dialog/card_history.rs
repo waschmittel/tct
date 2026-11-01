@@ -2,6 +2,8 @@
 //! left, the diff of the selected entry's field on the right. Entries can be
 //! deleted (after confirmation).
 
+use std::cell::Cell;
+
 use chrono::{DateTime, Local, Utc};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::Frame;
@@ -25,6 +27,7 @@ pub struct CardHistory {
     selected: usize,
     detail_scroll: u16,
     confirming_delete: bool,
+    detail_max_scroll: Cell<Option<u16>>,
 }
 
 impl CardHistory {
@@ -45,8 +48,9 @@ impl CardHistory {
     fn select(&mut self, row: usize) {
         if row != self.selected {
             self.selected = row;
-            self.detail_scroll = 0;
         }
+        self.detail_scroll = 0;
+        self.detail_max_scroll.set(None);
     }
 }
 
@@ -129,11 +133,15 @@ impl Dialog for CardHistory {
                 DialogOutcome::stay()
             }
             KeyCode::PageDown => {
-                self.detail_scroll = self.detail_scroll.saturating_add(5);
+                let max = self.detail_max_scroll.get().unwrap_or(u16::MAX);
+                let current = self.detail_scroll.min(max);
+                self.detail_scroll = current.saturating_add(5).min(max);
                 DialogOutcome::stay()
             }
             KeyCode::PageUp => {
-                self.detail_scroll = self.detail_scroll.saturating_sub(5);
+                let max = self.detail_max_scroll.get().unwrap_or(u16::MAX);
+                let current = self.detail_scroll.min(max);
+                self.detail_scroll = current.saturating_sub(5);
                 DialogOutcome::stay()
             }
             KeyCode::Char('x') | KeyCode::Char('d') | KeyCode::Delete => {
@@ -232,7 +240,11 @@ impl CardHistory {
             }
         }
 
-        let scroll = self.detail_scroll.min(lines.len().saturating_sub(1) as u16);
+        let total_lines = visual_line_count(&lines, body.width);
+        let max_scroll = (total_lines as u16).saturating_sub(body.height);
+        self.detail_max_scroll.set(Some(max_scroll));
+
+        let scroll = self.detail_scroll.min(max_scroll);
         frame.render_widget(
             Paragraph::new(lines).wrap(Wrap { trim: false }).scroll((scroll, 0)),
             body,
@@ -251,6 +263,19 @@ impl CardHistory {
             );
         }
     }
+}
+
+fn visual_line_count(lines: &[Line], width: u16) -> usize {
+    if width == 0 {
+        return lines.len();
+    }
+    lines
+        .iter()
+        .map(|line| {
+            let w = line.width();
+            if w == 0 { 1 } else { w.div_ceil(width as usize) }
+        })
+        .sum()
 }
 
 fn short_stamp(at: DateTime<Utc>) -> String {
@@ -383,6 +408,79 @@ mod tests {
             d.handle_key(key(KeyCode::PageDown), Some(board));
             d.handle_key(key(KeyCode::Down), Some(board));
             assert_eq!(d.detail_scroll, 0);
+        });
+    }
+
+    #[test]
+    fn page_down_clamps_at_max_scroll_so_page_up_responds_immediately() {
+        crate::test_support::with_temp_dir(|| {
+            let mut meta = crate::model::board::BoardMeta::new("Test".into());
+            let list = crate::test_support::add_list(&mut meta, "L");
+            let mut card = Card::new("Task".into());
+            let old_desc = (1..=30).map(|i| format!("old line {i}")).collect::<Vec<_>>().join("\n");
+            let new_desc = (1..=30).map(|i| format!("new line {i}")).collect::<Vec<_>>().join("\n");
+            card.log_change(HistoryField::Description, "Edit description", Some(old_desc), Some(new_desc));
+            crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
+            let editor = crate::board_editor::BoardEditor::load(&meta.id).unwrap();
+            let board = editor.board();
+
+            let mut d = CardHistory::new();
+            // Render once so max_scroll is computed based on layout.
+            render_text(&d, board);
+            let max_scroll = d.detail_max_scroll.get().unwrap();
+            assert!(max_scroll > 10, "expected long diff with max_scroll > 10, got {max_scroll}");
+
+            // Scroll down well past the bottom.
+            for _ in 0..50 {
+                d.handle_key(key(KeyCode::PageDown), Some(board));
+            }
+            // Detail scroll must be clamped at max_scroll, NOT overshot to 250.
+            assert_eq!(d.detail_scroll, max_scroll);
+
+            // Pressing PageUp ONCE immediately scrolls up.
+            d.handle_key(key(KeyCode::PageUp), Some(board));
+            assert_eq!(d.detail_scroll, max_scroll.saturating_sub(5));
+        });
+    }
+
+    #[test]
+    fn short_history_detail_does_not_scroll() {
+        with_history_board(|board| {
+            let mut d = CardHistory::new();
+            // Selected entry is "Added label 'foo'", which only has 5 lines and fits in the viewport.
+            render_text(&d, board);
+            assert_eq!(d.detail_max_scroll.get(), Some(0));
+
+            d.handle_key(key(KeyCode::PageDown), Some(board));
+            assert_eq!(d.detail_scroll, 0);
+
+            d.handle_key(key(KeyCode::PageUp), Some(board));
+            assert_eq!(d.detail_scroll, 0);
+        });
+    }
+
+    #[test]
+    fn page_up_clamps_overshoot_before_decrementing() {
+        crate::test_support::with_temp_dir(|| {
+            let mut meta = crate::model::board::BoardMeta::new("Test".into());
+            let list = crate::test_support::add_list(&mut meta, "L");
+            let mut card = Card::new("Task".into());
+            let old_desc = (1..=20).map(|i| format!("old line {i}")).collect::<Vec<_>>().join("\n");
+            let new_desc = (1..=20).map(|i| format!("new line {i}")).collect::<Vec<_>>().join("\n");
+            card.log_change(HistoryField::Description, "Edit description", Some(old_desc), Some(new_desc));
+            crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
+            let editor = crate::board_editor::BoardEditor::load(&meta.id).unwrap();
+            let board = editor.board();
+
+            let mut d = CardHistory::new();
+            render_text(&d, board);
+            let max_scroll = d.detail_max_scroll.get().unwrap();
+
+            // Simulate an overshoot (e.g. from a window resize)
+            d.detail_scroll = max_scroll + 100;
+            // PageUp must immediately clamp to max_scroll and subtract 5
+            d.handle_key(key(KeyCode::PageUp), Some(board));
+            assert_eq!(d.detail_scroll, max_scroll.saturating_sub(5));
         });
     }
 
