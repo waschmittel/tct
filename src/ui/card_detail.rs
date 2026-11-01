@@ -95,7 +95,14 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
     // If editing description, render the editor instead.
     if let Some(handler) = editing_desc_handler {
-        render_description_editor(frame, inner, &handler.input.textarea, accent);
+        render_description_editor(
+            frame,
+            popup,
+            inner,
+            &handler.input.textarea,
+            accent,
+            app.caps.scrollbar_thumb(),
+        );
         return;
     }
 
@@ -286,7 +293,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 Paragraph::new(desc_lines.clone()).scroll((desc_scroll, 0));
             frame.render_widget(desc_paragraph, desc_area);
             if desc_full > desc_h {
-                let bar_area = Rect::new(inner.x, y, inner.width, desc_h);
+                let bar_area = Rect::new(popup.x, y, popup.width, desc_h);
                 // positions = max_scroll + 1 so the thumb reaches the track
                 // bottom at max scroll (ratatui puts it there only when
                 // position == content_length - 1).
@@ -296,6 +303,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                     (desc_max_scroll + 1) as usize,
                     desc_scroll as usize,
                     accent,
+                    app.caps.scrollbar_thumb(),
                 );
             }
             y += desc_h;
@@ -469,31 +477,47 @@ fn split_available(desc_full: u16, ck_full: u16, avail: u16) -> (u16, u16) {
 
 fn render_description_editor(
     frame: &mut Frame,
-    area: Rect,
+    popup: Rect,
+    inner: Rect,
     textarea: &tui_textarea::TextArea<'static>,
     accent: Color,
+    thumb_symbol: &str,
 ) {
     // Match the rendered description view's wrap width (inner width minus
-    // padding); this also leaves the rightmost column for the scrollbar.
-    // The text sits one space off the left border. The textarea keeps its
-    // last column free for the caret, so it gets one extra to wrap where
-    // the view does.
-    let width = area.width.saturating_sub(PAD * 2) + 1;
-    let editor_area = Rect::new(area.x + LEFT_PAD, area.y, width, area.height);
+    // padding). The text sits one space off the left border. The textarea
+    // keeps its last column free for the caret, so it gets one extra to
+    // wrap where the view does.
+    let width = inner.width.saturating_sub(PAD * 2) + 1;
+    let editor_area = Rect::new(inner.x + LEFT_PAD, inner.y, width, inner.height);
     frame.render_widget(textarea, editor_area);
 
     // Scrollbar tracks the cursor's data line — the textarea keeps the
     // cursor in view, so this follows the viewport closely enough.
+    // Thumb is drawn over the right border between the corners.
     let total = textarea.lines().len();
-    if total > area.height as usize {
+    if total > inner.height as usize {
         let (cursor_row, _) = textarea.cursor();
-        render_scrollbar(frame, area, total, cursor_row, accent);
+        render_scrollbar(
+            frame,
+            popup.inner(ratatui::layout::Margin::new(0, 1)),
+            total,
+            cursor_row,
+            accent,
+            thumb_symbol,
+        );
     }
 }
 
 /// `positions` is the number of thumb positions: the thumb sits at the track
 /// bottom when `position == positions - 1`.
-fn render_scrollbar(frame: &mut Frame, area: Rect, positions: usize, position: usize, accent: Color) {
+fn render_scrollbar(
+    frame: &mut Frame,
+    area: Rect,
+    positions: usize,
+    position: usize,
+    accent: Color,
+    thumb_symbol: &str,
+) {
     use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
     let mut state = ScrollbarState::new(positions)
         .position(position)
@@ -503,6 +527,7 @@ fn render_scrollbar(frame: &mut Frame, area: Rect, positions: usize, position: u
             .begin_symbol(None)
             .end_symbol(None)
             .track_symbol(None)
+            .thumb_symbol(thumb_symbol)
             .style(Style::default().fg(accent)),
         area,
         &mut state,

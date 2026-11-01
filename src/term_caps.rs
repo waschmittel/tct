@@ -85,6 +85,12 @@ impl TermCaps {
         if self.rich_glyphs { BorderType::Thick } else { BorderType::Double }
     }
 
+    /// Scrollbar thumb glyph. Left half block has a width between the full
+    /// block and the thick border line, keeping the outer frame flush.
+    pub fn scrollbar_thumb(&self) -> &'static str {
+        "▌"
+    }
+
     /// Checklist "done" marker.
     pub fn check_mark(&self) -> &'static str {
         if self.rich_glyphs { "✓" } else { "x" }
@@ -296,6 +302,8 @@ mod tests {
         assert_eq!(TermCaps::linux_tty().check_mark(), "x");
         assert_eq!(TermCaps::full().selected_border_type(), BorderType::Thick);
         assert_eq!(TermCaps::linux_tty().selected_border_type(), BorderType::Double);
+        assert_eq!(TermCaps::full().scrollbar_thumb(), "▌");
+        assert_eq!(TermCaps::linux_tty().scrollbar_thumb(), "▌");
     }
 
     #[test]

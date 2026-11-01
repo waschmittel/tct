@@ -1169,7 +1169,7 @@ fn long_list_scrolling_down_and_up_step_by_step() {
 fn thumb_rows(text: &str) -> Vec<usize> {
     text.lines()
         .enumerate()
-        .filter(|(_, l)| l.contains('█'))
+        .filter(|(_, l)| l.contains('▌'))
         .map(|(y, _)| y)
         .collect()
 }
@@ -1220,7 +1220,7 @@ fn scroll_thumb_uses_accent_on_the_selected_list_and_gray_on_others() {
         let thumb_fg = |x0: u16, x1: u16| {
             (0..HEIGHT)
                 .flat_map(|y| (x0..x1).map(move |x| (x, y)))
-                .find(|&(x, y)| buf[(x, y)].symbol() == "█")
+                .find(|&(x, y)| x == x1 - 1 && buf[(x, y)].symbol() == "▌")
                 .map(|(x, y)| buf[(x, y)].fg)
         };
         assert_eq!(thumb_fg(0, WIDTH / 2), Some(app.accent_color()));

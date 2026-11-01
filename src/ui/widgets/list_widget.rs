@@ -259,6 +259,7 @@ pub fn render(
                 .begin_symbol(None)
                 .end_symbol(None)
                 .track_symbol(None)
+                .thumb_symbol(app.caps.scrollbar_thumb())
                 .style(thumb_style),
             area.inner(ratatui::layout::Margin::new(0, 1)),
             &mut state,
