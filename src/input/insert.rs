@@ -49,6 +49,18 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         InsertOutcome::CancelWithStatus(msg) => {
             app.set_status(msg);
         }
+        InsertOutcome::Save(cmd) => {
+            let status = match &cmd {
+                crate::command::Command::EditCardDescription { card_id, .. } => {
+                    Some(format!("Saved description of '{}'", card_title(app, card_id)))
+                }
+                _ => None,
+            };
+            app.apply(cmd)?;
+            if let Some(s) = status {
+                app.set_status(s);
+            }
+        }
         InsertOutcome::Confirm(cmd) => {
             // Card title changes need a status update for the user.
             let status = match &cmd {
@@ -209,6 +221,52 @@ mod tests {
             // Regression guard: card detail still responds.
             press(&mut app, KeyCode::Esc);
             assert!(matches!(app.mode, AppMode::Normal));
+        });
+    }
+
+    #[test]
+    fn ctrl_s_saves_description_without_closing_editor() {
+        with_temp_dir(|| {
+            let mut app = app_editing_description();
+            handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
+            )
+            .unwrap();
+
+            // Editor remains open in Insert mode
+            assert!(matches!(app.mode, AppMode::Insert));
+            assert!(is_markdown_editor(&app));
+
+            // Card description on the board was updated
+            let card_id = app.board().unwrap().current_card().unwrap().id.clone();
+            assert_eq!(app.board().unwrap().cards[&card_id].description, "x");
+
+            // Since changes were saved, Esc should exit directly without discard prompt
+            press(&mut app, KeyCode::Esc);
+            assert!(matches!(app.mode, AppMode::CardDetail));
+            assert!(app.insert.is_none());
+            assert!(app.dialog.is_none());
+        });
+    }
+
+    #[test]
+    fn ctrl_q_saves_description_and_closes_editor() {
+        with_temp_dir(|| {
+            let mut app = app_editing_description();
+            handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+            )
+            .unwrap();
+
+            // Closes editor and returns to CardDetail
+            assert!(matches!(app.mode, AppMode::CardDetail));
+            assert!(app.insert.is_none());
+
+            // Card description on the board was updated
+            let card_id = app.board().unwrap().current_card().unwrap().id.clone();
+            assert_eq!(app.board().unwrap().cards[&card_id].description, "x");
         });
     }
 }

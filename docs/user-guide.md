@@ -198,7 +198,7 @@ flowchart LR
     BS -->|Enter| BV
     BV -->|Enter| CD
     CD -->|e| DE
-    DE -->|Ctrl+S / Esc| CD
+    DE -->|Ctrl+Q / Esc| CD
     CD -->|Esc| BV
     BV -->|b| BS
 
@@ -329,6 +329,7 @@ A full Markdown editor with syntax highlighting. Supports headings, bold, italic
 |-----|--------|
 | F1 / Ctrl+H | Show help / shortcut overview |
 | Ctrl+S | Save description |
+| Ctrl+Q | Save and close |
 | Ctrl+Z | Undo |
 | Ctrl+Y | Redo |
 | Ctrl+C | Copy selected text |

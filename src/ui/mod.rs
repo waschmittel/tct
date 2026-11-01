@@ -266,6 +266,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             vec![
                 header("Edit"),
                 row("Ctrl+S", "Save"),
+                row("Ctrl+Q", "Save and close"),
                 row("Esc", "Cancel"),
                 row("Ctrl+Z / Ctrl+Y", "Undo / redo"),
                 row("Ctrl+C", "Copy selection"),

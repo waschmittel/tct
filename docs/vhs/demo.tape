@@ -82,7 +82,7 @@ Type "e"
 Sleep 800ms
 Type "WIP: "
 Sleep 500ms
-Ctrl+S
+Ctrl+Q
 Sleep 1s
 
 # Date stamps in the detail frame (also toggled from the board view later)

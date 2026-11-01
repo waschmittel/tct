@@ -429,7 +429,7 @@ stateDiagram-v2
     Dialog_ConfirmDeleteLabel --> Dialog_LabelManager: y/n
 
     Insert_EditCardTitle --> CardDetail: Enter/Esc
-    Insert_EditCardDescription --> CardDetail: Ctrl+S/Esc
+    Insert_EditCardDescription --> CardDetail: Ctrl+Q/Esc
     Insert_NewChecklistItem --> CardDetail: Enter/Esc
     Insert_EditChecklistItem --> CardDetail: Enter/Esc
     Insert_EditDueDate --> CardDetail: Enter/Esc

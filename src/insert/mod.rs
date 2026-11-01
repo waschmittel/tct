@@ -40,6 +40,8 @@ pub enum InsertOutcome {
     Stay,
     /// Cancel insert; the dispatcher restores `previous_mode`.
     Cancel,
+    /// Apply this command and keep insert active.
+    Save(Command),
     /// Apply this command and close insert.
     Confirm(Command),
     /// Apply this command, close insert, then open a follow-up dialog.

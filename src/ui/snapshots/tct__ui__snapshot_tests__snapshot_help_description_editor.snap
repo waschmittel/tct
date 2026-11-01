@@ -12,19 +12,19 @@ expression: render_to_string(&app)
 │┌───┌ Help — Description Editor ─────────────────────────────────────────────────────────────┐    │
 ││Red│Edit                                         Selection                                  │    │
 │└───│  Ctrl+S            Save                       Shift+Arrows      Highlight text         │    │
-│    │  Esc               Cancel                                                              │    │
-│    │  Ctrl+Z / Ctrl+Y   Undo / redo              Lists                                      │    │
-│    │  Ctrl+C            Copy selection             Enter             Auto-continue list     │    │
-│    │  Ctrl+X            Cut selection              Tab               Nest item              │    │
-│    │  Ctrl+V            Paste                      Shift+Tab         Un-nest item           │    │
-│    │                                                                                        │    │
-│    │Format                                       Navigation                                 │    │
-│    │  Ctrl+B            Bold (**text**)            Up / Down         Move by visual line    │    │
-│    │  Ctrl+I            Italic (*text*)                                                     │    │
-│    │  Ctrl+K            Inline code (`text`)     App                                        │    │
-│    │  Ctrl+L            Insert list item (- )      F1 / Ctrl+H       Help                   │    │
+│    │  Ctrl+Q            Save and close                                                      │    │
+│    │  Esc               Cancel                   Lists                                      │    │
+│    │  Ctrl+Z / Ctrl+Y   Undo / redo                Enter             Auto-continue list     │    │
+│    │  Ctrl+C            Copy selection             Tab               Nest item              │    │
+│    │  Ctrl+X            Cut selection              Shift+Tab         Un-nest item           │    │
+│    │  Ctrl+V            Paste                                                               │    │
+│    │                                             Navigation                                 │    │
+│    │Format                                         Up / Down         Move by visual line    │    │
+│    │  Ctrl+B            Bold (**text**)                                                     │    │
+│    │  Ctrl+I            Italic (*text*)          App                                        │    │
+│    │  Ctrl+K            Inline code (`text`)       F1 / Ctrl+H       Help                   │    │
+│    │  Ctrl+L            Insert list item (- )                                               │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
-│         │                                                                              │         │
 │         │                                                                              │         │
 │         │                                                                              │         │
 │         │                                                                              │         │

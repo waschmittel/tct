@@ -89,6 +89,14 @@ impl MarkdownEditor {
         match (key.code, key.modifiers) {
             (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
                 let body = self.input.current_text();
+                self.input.original = body.clone();
+                InsertOutcome::Save(Command::EditCardDescription {
+                    card_id: self.card_id.clone(),
+                    body,
+                })
+            }
+            (KeyCode::Char('q'), m) if has_ctrl_or_cmd(m) => {
+                let body = self.input.current_text();
                 InsertOutcome::Confirm(Command::EditCardDescription {
                     card_id: self.card_id.clone(),
                     body,
@@ -1424,5 +1432,50 @@ mod tests {
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::Char('x'));
         assert_eq!(editor_lines(&e), vec!["1. ax".to_string(), "5. b".to_string()]);
+    }
+
+    #[test]
+    fn ctrl_s_returns_save_and_resets_is_modified() {
+        let mut e = make_editor("initial");
+        press(&mut e, KeyCode::Char('!'));
+        assert!(e.input.is_modified());
+
+        let out = e.handle_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL), None);
+        match out {
+            InsertOutcome::Save(Command::EditCardDescription { card_id, body }) => {
+                assert_eq!(card_id, "card1");
+                assert_eq!(body, "initial!");
+            }
+            _ => panic!("expected InsertOutcome::Save"),
+        }
+        // After Ctrl+S, is_modified is reset
+        assert!(!e.input.is_modified());
+
+        // Subsequent Esc should now cancel directly, not prompt
+        let esc_out = e.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()), None);
+        assert!(matches!(esc_out, InsertOutcome::Cancel));
+    }
+
+    #[test]
+    fn ctrl_q_returns_confirm() {
+        let mut e = make_editor("initial");
+        press(&mut e, KeyCode::Char('!'));
+
+        let out = e.handle_key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL), None);
+        match out {
+            InsertOutcome::Confirm(Command::EditCardDescription { card_id, body }) => {
+                assert_eq!(card_id, "card1");
+                assert_eq!(body, "initial!");
+            }
+            _ => panic!("expected InsertOutcome::Confirm"),
+        }
+    }
+
+    #[test]
+    fn typing_bare_s_and_q_inserts_characters() {
+        let mut e = make_editor("hello ");
+        press(&mut e, KeyCode::Char('s'));
+        press(&mut e, KeyCode::Char('q'));
+        assert_eq!(editor_lines(&e), vec!["hello sq".to_string()]);
     }
 }
