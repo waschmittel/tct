@@ -192,7 +192,7 @@ fn due_label(due: chrono::NaiveDate, today: chrono::NaiveDate) -> String {
     match (due - today).num_days() {
         days if days < 0 => format!("{date} (-{}d)", -days),
         0 => format!("{date} (today)"),
-        days if days <= 3 => format!("{date} ({days}d)"),
+        days if days <= 9 => format!("{date} ({days}d)"),
         _ => date,
     }
 }
@@ -227,6 +227,14 @@ mod due_label_tests {
     fn nearby_dates_keep_the_countdown_across_a_year_boundary() {
         assert_eq!(due_label(d(2027, 1, 1), d(2026, 12, 30)), "2027-01-01 (2d)");
         assert_eq!(due_label(d(2026, 10, 16), d(2026, 10, 16)), "10-16 (today)");
+    }
+
+    #[test]
+    fn remaining_days_suffixed_up_to_nine_days() {
+        assert_eq!(due_label(d(2026, 10, 19), d(2026, 10, 16)), "10-19 (3d)");
+        assert_eq!(due_label(d(2026, 10, 20), d(2026, 10, 16)), "10-20 (4d)");
+        assert_eq!(due_label(d(2026, 10, 25), d(2026, 10, 16)), "10-25 (9d)");
+        assert_eq!(due_label(d(2026, 10, 26), d(2026, 10, 16)), "10-26");
     }
 }
 
