@@ -26,12 +26,10 @@ Enter
 Sleep 3s
 Show
 
-# Board selector
+# Board selector: open the Demo board
 Type "./tct"
 Enter
 Sleep 2s
-
-# Open the Demo board
 Enter
 Sleep 1.5s
 
@@ -45,11 +43,31 @@ Sleep 500ms
 Left
 Sleep 700ms
 
-# Long lists show a scroll thumb on their right border: jump to the end and back
-Type "G"
-Sleep 1.2s
+# Long lists scroll: navigate down so the viewport scrolls and card is focused
+Down
+Sleep 400ms
+Down
+Sleep 400ms
+Down
+Sleep 400ms
+Down
+Sleep 400ms
+Down
+Sleep 400ms
+Down
+Sleep 800ms
+
+# Switch boards (k/j or ./,): selection and list scroll offset are remembered
+Type "k"
+Sleep 1.5s
+Down
+Sleep 600ms
+Type "j"
+Sleep 1.5s
+Up
+Sleep 600ms
 Type "g"
-Sleep 1s
+Sleep 800ms
 
 # Create a card
 Type "n"
@@ -77,13 +95,72 @@ Sleep 300ms
 Enter
 Sleep 1s
 
-# Edit the description in the markdown editor
+# Edit description in markdown editor
 Type "e"
 Sleep 800ms
-Type "WIP: "
+
+# Contextual help overlay: inspect editor shortcuts
+Ctrl+H
+Sleep 2s
+Escape
+Sleep 800ms
+
+# Citations with auto-continuation
+Type " "
+Enter
+Type "> Root cause analysis:"
+Sleep 600ms
+Enter
 Sleep 500ms
+Type "Auth token expires after 15 min."
+Sleep 800ms
+Enter
+Sleep 400ms
+Enter
+Sleep 400ms
+
+# Numbered list with auto-numbering, indentation (Tab), and un-indentation (Shift+Tab)
+Type "1. Check token expiration"
+Sleep 600ms
+Enter
+Sleep 600ms
+Type "Inspect refresh handler"
+Sleep 600ms
+Tab
+Sleep 800ms
+Enter
+Sleep 600ms
+Type "Add regression test"
+Sleep 600ms
+Shift+Tab
+Sleep 800ms
+
+# Markdown formatting shortcuts: list bullet, bold, and inline code
+Enter
+Sleep 400ms
+Enter
+Sleep 400ms
+Ctrl+L
+Sleep 500ms
+Ctrl+B
+Sleep 400ms
+Type "Fix"
+Sleep 400ms
+Right 2
+Type " in "
+Sleep 300ms
+Ctrl+K
+Sleep 400ms
+Type "auth.rs"
+Sleep 400ms
+Right
+Sleep 800ms
+
+# Save without closing (Ctrl+S), then save and close (Ctrl+Q)
+Ctrl+S
+Sleep 1.2s
 Ctrl+Q
-Sleep 1s
+Sleep 1.5s
 
 # Date stamps in the detail frame (also toggled from the board view later)
 Type "c"
@@ -119,9 +196,13 @@ Sleep 1s
 Type "y"
 Sleep 1s
 
-# History: two panes, summary left and field diff right; delete an entry
+# History: two panes, summary left and field diff right; scroll diff and inspect entries
 Type "h"
 Sleep 1.5s
+PageDown
+Sleep 1s
+PageUp
+Sleep 800ms
 Down
 Sleep 900ms
 Down

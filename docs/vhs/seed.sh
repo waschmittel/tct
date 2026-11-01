@@ -21,3 +21,9 @@ $TCT labels Demo --create urgent
 for i in $(seq -w 1 12); do
     $TCT cards Demo --create "To Do" "Backlog item $i"
 done
+$TCT boards --create Roadmap
+$TCT lists Roadmap --create "Q1"
+$TCT lists Roadmap --create "Q2"
+$TCT cards Roadmap --create "Q1" "Security audit"
+$TCT cards Roadmap --create "Q2" "Mobile app"
+
