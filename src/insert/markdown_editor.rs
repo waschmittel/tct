@@ -217,23 +217,25 @@ fn split_line_for_new_item(textarea: &mut tui_textarea::TextArea<'static>, col: 
     textarea.insert_str(prefix);
 }
 
-/// Tab: nest the current list item one level deeper. Returns `false` (and
-/// does nothing) when the cursor line is not a list item.
+/// Tab: nest the current list item or citation one level deeper. Returns `false` (and
+/// does nothing) when the cursor line is not a list item or citation.
 pub(crate) fn handle_tab_nest(textarea: &mut tui_textarea::TextArea<'static>) -> bool {
     shift_list_item(textarea, true)
 }
 
-/// Shift+Tab: move the current list item one level up (no-op at top level or
-/// on non-list lines).
+/// Shift+Tab: move the current list item or citation one level up. Un-indenting a
+/// top-level list item or citation converts it to a regular line.
 pub(crate) fn handle_shift_tab_unnest(textarea: &mut tui_textarea::TextArea<'static>) {
     shift_list_item(textarea, false);
 }
 
-/// Shared nest/unnest logic. Re-indents the item by `NEST_INDENT`, then makes
-/// it continue the list it lands in: if an item at the new indent exists
-/// (above, skipping deeper children), the bullet character / numbered scheme is
-/// copied from it; numbers are fixed up by `renumber_all`. The cursor stays on
-/// the same character. Returns whether the line was a (shiftable) list item.
+/// Shared nest/unnest logic. Re-indents the item to a proper multiple of
+/// `NEST_INDENT` (never landing in between), then makes it continue the list it
+/// lands in: if an item at the new indent exists (above, skipping deeper children),
+/// the bullet character / numbered scheme is copied from it; numbers are fixed up
+/// by `renumber_all`. Un-indenting a top-level list item or citation removes the
+/// marker so the line is no longer a list item or citation.
+/// The cursor stays on the same character. Returns whether the line was shiftable.
 fn shift_list_item(textarea: &mut tui_textarea::TextArea<'static>, nest: bool) -> bool {
     let (row, col) = textarea.cursor();
     let Some(line) = textarea.lines().get(row).cloned() else {
@@ -244,18 +246,46 @@ fn shift_list_item(textarea: &mut tui_textarea::TextArea<'static>, nest: bool) -
     let Some((current, old_marker_len)) = parse_marker(trimmed) else {
         return false;
     };
-    if !nest && indent < NEST_INDENT {
-        return false;
+
+    if !nest && indent == 0 {
+        if current == Marker::Citation {
+            let marker = &trimmed[..old_marker_len];
+            let num_arrows = marker.chars().filter(|&c| c == '>').count();
+            if num_arrows > 1 {
+                // Nested citation like ">> " or "> > ": drop one citation level.
+                let chars_to_remove = if marker.starts_with("> ") { 2 } else { 1 };
+                textarea.move_cursor(CursorMove::Jump(row as u16, 0));
+                textarea.delete_str(chars_to_remove);
+                let new_line_len = textarea.lines().get(row).map_or(0, |l| l.chars().count());
+                let target_col = col.saturating_sub(chars_to_remove).min(new_line_len);
+                textarea.move_cursor(CursorMove::Jump(row as u16, target_col as u16));
+                return true;
+            }
+        }
+
+        // Top-level item: remove the marker completely so it is no longer a list item or citation.
+        textarea.move_cursor(CursorMove::Jump(row as u16, 0));
+        textarea.delete_str(old_marker_len);
+        renumber_all(textarea);
+        let new_line_len = textarea.lines().get(row).map_or(0, |l| l.chars().count());
+        let target_col = col.saturating_sub(old_marker_len).min(new_line_len);
+        textarea.move_cursor(CursorMove::Jump(row as u16, target_col as u16));
+        return true;
     }
 
-    textarea.move_cursor(CursorMove::Jump(row as u16, 0));
     let new_indent = if nest {
-        textarea.insert_str(" ".repeat(NEST_INDENT));
-        indent + NEST_INDENT
+        (indent / NEST_INDENT + 1) * NEST_INDENT
     } else {
-        textarea.delete_str(NEST_INDENT);
-        indent - NEST_INDENT
+        (indent.saturating_sub(1) / NEST_INDENT) * NEST_INDENT
     };
+
+    textarea.move_cursor(CursorMove::Jump(row as u16, 0));
+    if indent > 0 {
+        textarea.delete_str(indent);
+    }
+    if new_indent > 0 {
+        textarea.insert_str(" ".repeat(new_indent));
+    }
 
     let sibling = sibling_marker(textarea.lines(), row, new_indent);
     let replacement = match (current, sibling) {
@@ -264,7 +294,7 @@ fn shift_list_item(textarea: &mut tui_textarea::TextArea<'static>, nest: bool) -
         (Marker::Bullet(_), Some(Marker::Numbered)) => Some("1. ".to_string()),
         // A nested numbered item starts at 1 unless renumbering finds a run to continue.
         (Marker::Numbered, _) => nest.then(|| "1. ".to_string()),
-        (Marker::Bullet(_), None) => None,
+        _ => None,
     };
     let mut new_marker_len = old_marker_len;
     if let Some(marker) = replacement {
@@ -289,28 +319,43 @@ fn shift_list_item(textarea: &mut tui_textarea::TextArea<'static>, nest: bool) -
             + indent_delta
             + (new_marker_len as isize - old_marker_len as isize)
             + (new_line_len as isize - len_before_renumber as isize)
+    } else if col >= indent {
+        new_indent as isize + (col as isize - indent as isize)
     } else {
-        col as isize + indent_delta
+        (col as isize + indent_delta).max(0)
     };
     let target_col = (target_col.max(0) as usize).min(new_line_len);
     textarea.move_cursor(CursorMove::Jump(row as u16, target_col as u16));
     true
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Marker {
     Bullet(char),
     Numbered,
+    Citation,
 }
 
-/// Parse a list marker at the start of `trimmed`: its kind and length in chars.
+/// Parse a list or citation marker at the start of `trimmed`: its kind and length in chars.
 fn parse_marker(trimmed: &str) -> Option<(Marker, usize)> {
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
         return Some((Marker::Bullet(trimmed.chars().next()?), 2));
     }
-    let dot = trimmed.find(". ")?;
-    trimmed[..dot].parse::<u64>().ok()?;
-    Some((Marker::Numbered, dot + 2))
+    if trimmed == "-" || trimmed == "*" {
+        return Some((Marker::Bullet(trimmed.chars().next()?), 1));
+    }
+    if let Some(dot) = trimmed.find(". ") {
+        if trimmed[..dot].parse::<u64>().is_ok() {
+            return Some((Marker::Numbered, dot + 2));
+        }
+    }
+    if let Some(num_str) = trimmed.strip_suffix('.').filter(|s| s.parse::<u64>().is_ok()) {
+        return Some((Marker::Numbered, num_str.chars().count() + 1));
+    }
+    if let Some(marker_len) = crate::ui::markdown::citation_marker_len(trimmed) {
+        return Some((Marker::Citation, marker_len));
+    }
+    None
 }
 
 /// Marker of the nearest list item above `row` at exactly `indent` (the list
@@ -852,12 +897,138 @@ mod tests {
     }
 
     #[test]
-    fn shift_tab_on_top_level_list_item_is_noop() {
+    fn shift_tab_on_top_level_list_item_removes_marker() {
         let mut e = make_editor("1. a\n2. b");
         e.input.textarea.move_cursor(CursorMove::Bottom);
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::BackTab);
-        assert_eq!(editor_lines(&e), vec!["1. a".to_string(), "2. b".to_string()]);
+        assert_eq!(editor_lines(&e), vec!["1. a".to_string(), "b".to_string()]);
+        assert_eq!(editor_cursor(&e), (1, 1));
+
+        let mut e2 = make_editor("1. a\n2. b");
+        e2.input.textarea.move_cursor(CursorMove::Top);
+        e2.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e2, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e2), vec!["a".to_string(), "2. b".to_string()]);
+        assert_eq!(editor_cursor(&e2), (0, 1));
+
+        let mut e3 = make_editor("- first\n- second");
+        e3.input.textarea.move_cursor(CursorMove::Bottom);
+        e3.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e3, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e3), vec!["- first".to_string(), "second".to_string()]);
+        assert_eq!(editor_cursor(&e3), (1, 6));
+    }
+
+    #[test]
+    fn shift_tab_on_top_level_citation_removes_marker() {
+        let mut e = make_editor("> quote");
+        e.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["quote".to_string()]);
+        assert_eq!(editor_cursor(&e), (0, 5));
+
+        let mut e2 = make_editor("> ");
+        press(&mut e2, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e2), vec!["".to_string()]);
+        assert_eq!(editor_cursor(&e2), (0, 0));
+    }
+
+    #[test]
+    fn shift_tab_on_nested_citation_decrements_quote_level() {
+        let mut e = make_editor(">> quote");
+        e.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["> quote".to_string()]);
+        assert_eq!(editor_cursor(&e), (0, 7));
+
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["quote".to_string()]);
+        assert_eq!(editor_cursor(&e), (0, 5));
+
+        let mut e2 = make_editor("> > spaced quote");
+        e2.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e2, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e2), vec!["> spaced quote".to_string()]);
+        assert_eq!(editor_cursor(&e2), (0, 14));
+
+        press(&mut e2, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e2), vec!["spaced quote".to_string()]);
+        assert_eq!(editor_cursor(&e2), (0, 12));
+    }
+
+    #[test]
+    fn indenting_and_unindenting_snaps_to_proper_levels() {
+        // Tab from irregular spaces rounds up to next multiple of 3
+        let mut e = make_editor(" - bullet");
+        press(&mut e, KeyCode::Tab);
+        assert_eq!(editor_lines(&e), vec!["   - bullet".to_string()]);
+
+        let mut e = make_editor("  - bullet");
+        press(&mut e, KeyCode::Tab);
+        assert_eq!(editor_lines(&e), vec!["   - bullet".to_string()]);
+
+        let mut e = make_editor("   - bullet");
+        press(&mut e, KeyCode::Tab);
+        assert_eq!(editor_lines(&e), vec!["      - bullet".to_string()]);
+
+        let mut e = make_editor("    - bullet");
+        press(&mut e, KeyCode::Tab);
+        assert_eq!(editor_lines(&e), vec!["      - bullet".to_string()]);
+
+        let mut e = make_editor("     - bullet");
+        press(&mut e, KeyCode::Tab);
+        assert_eq!(editor_lines(&e), vec!["      - bullet".to_string()]);
+
+        // Shift+Tab from irregular spaces rounds down to previous multiple of 3
+        let mut e = make_editor("     - bullet");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["   - bullet".to_string()]);
+
+        let mut e = make_editor("    - bullet");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["   - bullet".to_string()]);
+
+        let mut e = make_editor("   - bullet");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["- bullet".to_string()]);
+
+        let mut e = make_editor("  - bullet");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["- bullet".to_string()]);
+
+        let mut e = make_editor(" - bullet");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["- bullet".to_string()]);
+
+        // Citations also snap to proper levels
+        let mut e = make_editor("> quote");
+        press(&mut e, KeyCode::Tab);
+        assert_eq!(editor_lines(&e), vec!["   > quote".to_string()]);
+
+        let mut e = make_editor("  > quote");
+        press(&mut e, KeyCode::Tab);
+        assert_eq!(editor_lines(&e), vec!["   > quote".to_string()]);
+
+        let mut e = make_editor("    > quote");
+        press(&mut e, KeyCode::Tab);
+        assert_eq!(editor_lines(&e), vec!["      > quote".to_string()]);
+
+        let mut e = make_editor("      > quote");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["   > quote".to_string()]);
+
+        let mut e = make_editor("    > quote");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["   > quote".to_string()]);
+
+        let mut e = make_editor("   > quote");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["> quote".to_string()]);
+
+        let mut e = make_editor("  > quote");
+        press(&mut e, KeyCode::BackTab);
+        assert_eq!(editor_lines(&e), vec!["> quote".to_string()]);
     }
 
     fn nest_at(initial: &str, row: usize, col: usize) -> MarkdownEditor {
