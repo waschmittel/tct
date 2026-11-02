@@ -37,6 +37,14 @@ tct stores everything as **plain JSON files** — one file per board and one per
 
 ## Installation
 
+### Homebrew (macOS Apple Silicon, Linux x86_64)
+
+```sh
+brew install waschmittel/tct/tct
+```
+
+### Prebuilt binary
+
 Download a prebuilt binary for your platform from the
 [GitHub releases page](https://github.com/waschmittel/tct/releases), then put it
 on your `PATH`:

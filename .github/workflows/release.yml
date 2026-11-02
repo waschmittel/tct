@@ -88,6 +88,75 @@ jobs:
           files: artifacts/**/*
           generate_release_notes: true
 
+  homebrew:
+    name: Update Homebrew tap
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+
+      - name: Rewrite formula and push to tap
+        shell: bash
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF#refs/tags/}"
+          v="${tag#v}"
+          mac="artifacts/tct-$v-macos-aarch64/tct-$v-macos-aarch64"
+          lin="artifacts/tct-$v-linux-amd64/tct-$v-linux-amd64"
+          mac_sha=$(sha256sum "$mac" | cut -d' ' -f1)
+          lin_sha=$(sha256sum "$lin" | cut -d' ' -f1)
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/$tag"
+
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/homebrew-tct.git" tap
+          cat > tap/Formula/tct.rb <<EOF
+          class Tct < Formula
+            desc "Terminal Card Tracker - a keyboard-driven TUI Trello clone"
+            homepage "https://github.com/${GITHUB_REPOSITORY}"
+            version "$v"
+
+            on_macos do
+              on_arm do
+                url "$base/tct-$v-macos-aarch64"
+                sha256 "$mac_sha"
+              end
+            end
+
+            on_linux do
+              on_intel do
+                url "$base/tct-$v-linux-amd64"
+                sha256 "$lin_sha"
+              end
+            end
+
+            def install
+              bin.install Dir["tct-*"].first => "tct"
+            end
+
+            test do
+              assert_predicate bin/"tct", :executable?
+              system bin/"tct", "--help"
+            end
+          end
+          EOF
+
+          cd tap
+          if git diff --quiet; then
+            echo "Formula already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Update tct to $v"
+          git push
+
   docker:
     name: Publish Docker Image (GHCR)
     runs-on: ubuntu-latest
