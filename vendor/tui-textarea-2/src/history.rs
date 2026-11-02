@@ -120,6 +120,8 @@ pub struct Edit {
     kind: EditKind,
     before: Pos,
     after: Pos,
+    // TCT patch: edits sharing a non-zero group id undo and redo as one step
+    group: u32,
 }
 
 impl Edit {
@@ -128,6 +130,7 @@ impl Edit {
             kind,
             before,
             after,
+            group: 0,
         }
     }
 
@@ -196,6 +199,11 @@ pub struct History {
     edits: VecDeque<Edit>,
     run_open: bool,
     last_edit_at: Option<Instant>,
+    // TCT patch: bookkeeping for `group_since`
+    next_group: u32,
+    group_key: Option<u64>,
+    group_end: usize,
+    group_at: Option<Instant>,
 }
 
 impl History {
@@ -206,6 +214,10 @@ impl History {
             edits: VecDeque::new(),
             run_open: false,
             last_edit_at: None,
+            next_group: 0,
+            group_key: None,
+            group_end: usize::MAX,
+            group_at: None,
         }
     }
 
@@ -256,18 +268,72 @@ impl History {
             return None;
         }
         self.run_open = false;
-        let edit = &self.edits[self.index];
-        edit.redo(lines);
-        self.index += 1;
-        Some(edit.cursor_after())
+        self.group_key = None;
+        let group = self.edits[self.index].group;
+        loop {
+            let edit = &self.edits[self.index];
+            edit.redo(lines);
+            self.index += 1;
+            let in_group = group != 0
+                && self.edits.get(self.index).is_some_and(|next| next.group == group);
+            if !in_group {
+                return Some(edit.cursor_after());
+            }
+        }
     }
 
     pub fn undo(&mut self, lines: &mut Vec<String>) -> Option<(usize, usize)> {
         self.index = self.index.checked_sub(1)?;
         self.run_open = false;
-        let edit = &self.edits[self.index];
-        edit.undo(lines);
-        Some(edit.cursor_before())
+        self.group_key = None;
+        let group = self.edits[self.index].group;
+        loop {
+            let edit = &self.edits[self.index];
+            edit.undo(lines);
+            let in_group = group != 0
+                && self.index > 0
+                && self.edits[self.index - 1].group == group;
+            if !in_group {
+                return Some(edit.cursor_before());
+            }
+            self.index -= 1;
+        }
+    }
+
+    // TCT patch: number of edits applied so far, to pass to `group_since` later
+    pub fn mark(&self) -> usize {
+        self.index
+    }
+
+    // TCT patch: make every edit pushed since `mark` one undo step. With a `key`, the
+    // step also absorbs the previous grouped step when it had the same key, nothing
+    // was pushed in between and the pause was short, so repeated edits of one kind
+    // (typing in a table cell) undo together like an ordinary typing run.
+    pub fn group_since(&mut self, mark: usize, key: Option<u64>, now: Instant) {
+        self.run_open = false;
+        if mark >= self.index || self.index > self.edits.len() {
+            return;
+        }
+        let reuse = key.is_some()
+            && self.group_key == key
+            && self.group_end == mark
+            && mark > 0
+            && self.edits[mark - 1].group != 0
+            && self
+                .group_at
+                .is_some_and(|at| now.duration_since(at) < GROUP_INTERVAL);
+        let group = if reuse {
+            self.edits[mark - 1].group
+        } else {
+            self.next_group += 1;
+            self.next_group
+        };
+        for edit in self.edits.range_mut(mark..self.index) {
+            edit.group = group;
+        }
+        self.group_key = key;
+        self.group_end = self.index;
+        self.group_at = Some(now);
     }
 
     pub fn max_items(&self) -> usize {
@@ -334,6 +400,53 @@ mod tests {
         history.push(typed('b', 1), false, start + Duration::from_secs(10));
 
         assert_eq!(history.edits.len(), 2);
+    }
+
+    // TCT patch
+    fn pushed(history: &mut History, c: char, col: usize, at: Instant) {
+        history.push(typed(c, col), false, at);
+    }
+
+    #[test]
+    fn a_group_undoes_and_redoes_as_one_step() {
+        let start = Instant::now();
+        let mut history = History::new(50);
+        let mut lines = vec![String::from("abc")];
+
+        pushed(&mut history, 'a', 0, start);
+        let mark = history.mark();
+        pushed(&mut history, 'b', 1, start);
+        pushed(&mut history, 'c', 2, start);
+        history.group_since(mark, None, start);
+        lines[0] = "abc".into();
+
+        history.undo(&mut lines);
+        assert_eq!(lines[0], "a");
+        history.undo(&mut lines);
+        assert_eq!(lines[0], "");
+        history.redo(&mut lines);
+        assert_eq!(lines[0], "a");
+        history.redo(&mut lines);
+        assert_eq!(lines[0], "abc");
+    }
+
+    #[test]
+    fn keyed_groups_in_quick_succession_join_but_unkeyed_or_slow_ones_do_not() {
+        let start = Instant::now();
+        let mut history = History::new(50);
+        let mut lines = vec![String::from("abc")];
+
+        for (i, (c, at)) in [('a', 0), ('b', 100), ('c', 700)].into_iter().enumerate() {
+            let at = start + Duration::from_millis(at);
+            let mark = history.mark();
+            pushed(&mut history, c, i, at);
+            history.group_since(mark, Some(7), at);
+        }
+
+        history.undo(&mut lines);
+        assert_eq!(lines[0], "ab");
+        history.undo(&mut lines);
+        assert_eq!(lines[0], "");
     }
 
     #[test]

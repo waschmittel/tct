@@ -2023,6 +2023,22 @@ impl<'a> TextArea<'a> {
         }
     }
 
+    /// TCT patch: marker for [`TextArea::undo_group_since`].
+    pub fn undo_mark(&self) -> usize {
+        self.history.mark()
+    }
+
+    /// TCT patch: make every edit made since `mark` (from [`TextArea::undo_mark`]) a single
+    /// undo step. Edits with the same `key`, made in quick succession, join one step.
+    pub fn undo_group_since(&mut self, mark: usize, key: Option<u64>) {
+        self.history.group_since(mark, key, Instant::now());
+    }
+
+    /// TCT patch: end the current typing run, so the next edit starts a new undo step.
+    pub fn break_undo_run(&mut self) {
+        self.history.break_run();
+    }
+
     /// Redo the last undo change. This method returns if the redo modified text contents or not in the textarea.
     /// ```
     /// use tui_textarea::{TextArea, CursorMove};

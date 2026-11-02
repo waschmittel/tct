@@ -7,6 +7,8 @@ Upstream `tui-textarea-2` has no hanging indent for soft-wrapped lines. Our fork
 logical line wrap to `width - indent` and render/navigate with that indent (used by the
 description editor so list items wrap like the markdown preview).
 
+It also adds undo grouping: `TextArea::undo_mark()` / `undo_group_since(mark, key)` make the edits since `mark` one undo/redo step (equal keys in quick succession join), and `break_undo_run()` ends a typing run. The description editor uses it so table and list operations undo as one step.
+
 The fork is **upstream + one patch**: `vendor/patches/tui-textarea-2.patch`
 (touches `wrap.rs`, `screen_map.rs`, `widget.rs`, `textarea.rs`; all additions are marked
 `TCT patch`). Never edit `vendor/tui-textarea-2` without regenerating the patch.

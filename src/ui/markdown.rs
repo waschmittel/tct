@@ -1,5 +1,8 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
+use unicode_width::UnicodeWidthStr;
+
+use crate::insert::table::{Table, delimiter_aligns, is_table_line};
 
 pub const WRAP_WIDTH: usize = 80;
 
@@ -37,7 +40,10 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut in_code_block = false;
 
-    for &line_text in source_lines {
+    let mut idx = 0;
+    while idx < source_lines.len() {
+        let line_text = source_lines[idx];
+        idx += 1;
         // Code fence / code block lines: no inline highlighting, no wrapping.
         if line_text.starts_with("```") {
             in_code_block = !in_code_block;
@@ -56,6 +62,14 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
             continue;
         }
 
+        if is_table_line(line_text)
+            && let Some(len) = table_block_len(&source_lines[idx - 1..])
+        {
+            lines.extend(render_table(&source_lines[idx - 1..idx - 1 + len], accent));
+            idx += len - 1;
+            continue;
+        }
+
         let list_indent = detect_list_indent(line_text);
         let highlighted = highlight_line(line_text, accent);
         let wrapped = if list_indent > 0 {
@@ -68,6 +82,86 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
     }
 
     Rendered { lines }
+}
+
+/// Number of lines of the pipe table starting at the first line (header,
+/// delimiter row, body rows), or `None` when no table starts there.
+fn table_block_len(lines: &[&str]) -> Option<usize> {
+    lines.get(1).filter(|l| delimiter_aligns(l).is_some())?;
+    Some(lines.iter().take_while(|l| is_table_line(l)).count())
+}
+
+/// Display width of the widest pipe-table line, so the detail popup can grow to fit it.
+pub fn widest_table_line<'a>(lines: impl IntoIterator<Item = &'a str>) -> usize {
+    lines
+        .into_iter()
+        .filter(|l| is_table_line(l))
+        .map(UnicodeWidthStr::width)
+        .max()
+        .unwrap_or(0)
+}
+
+/// A pipe table drawn with box-drawing pipes: re-aligned to its cells, never
+/// wrapped, and no extra rows — the delimiter row becomes the rule under the header.
+fn render_table(block: &[&str], accent: Color) -> Vec<Line<'static>> {
+    let owned: Vec<String> = block.iter().map(|l| l.to_string()).collect();
+    let Some(table) = Table::parse(&owned) else {
+        return block.iter().map(|l| Line::from(highlight_line(l, accent))).collect();
+    };
+    table
+        .render()
+        .lines
+        .iter()
+        .enumerate()
+        .map(|(i, line)| match i {
+            1 => rule_line(line),
+            _ => row_line(line, i == 0, accent),
+        })
+        .collect()
+}
+
+fn border_style() -> Style {
+    Style::default().fg(Color::DarkGray)
+}
+
+fn row_line(line: &str, header: bool, accent: Color) -> Line<'static> {
+    let mut spans = Vec::new();
+    for span in highlight_line(line, accent) {
+        let style = if header { span.style.add_modifier(Modifier::BOLD) } else { span.style };
+        let mut text = String::new();
+        let mut escaped = false;
+        for c in span.content.chars() {
+            if c == '|' && !escaped {
+                if !text.is_empty() {
+                    spans.push(Span::styled(std::mem::take(&mut text), style));
+                }
+                spans.push(Span::styled("│", border_style()));
+            } else {
+                text.push(c);
+            }
+            escaped = c == '\\' && !escaped;
+        }
+        if !text.is_empty() {
+            spans.push(Span::styled(text, style));
+        }
+    }
+    Line::from(spans)
+}
+
+fn rule_line(line: &str) -> Line<'static> {
+    let first = line.find('|');
+    let last = line.rfind('|');
+    let text: String = line
+        .char_indices()
+        .map(|(i, c)| match c {
+            '|' if Some(i) == first => '├',
+            '|' if Some(i) == last => '┤',
+            '|' => '┼',
+            ' ' if first.is_none_or(|f| i < f) => ' ',
+            _ => '─',
+        })
+        .collect();
+    Line::from(Span::styled(text, border_style()))
 }
 
 impl Rendered {
@@ -413,6 +507,42 @@ mod tests {
 
     fn render(text: &str, accent: Color, width: usize) -> Rendered {
         MarkdownRenderer::new(text, width, accent).render()
+    }
+
+    fn text(line: &Line) -> String {
+        line.spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    #[test]
+    fn tables_are_aligned_and_drawn_with_box_pipes_without_extra_rows() {
+        let r = render("| a | bb |\n|:-|-:|\n| ccc | d |", Color::Cyan, 10);
+        let rows: Vec<String> = r.lines().iter().map(text).collect();
+        assert_eq!(rows, ["│ a   │  bb │", "├─────┼─────┤", "│ ccc │   d │"]);
+    }
+
+    #[test]
+    fn table_rows_are_never_wrapped() {
+        let r = render("| aaaaaaaaaa | bbbbbbbbbb |\n| - | - |\n| c | d |", Color::Cyan, 8);
+        assert_eq!(r.lines().len(), 3);
+        assert_eq!(text(&r.lines()[0]), "│ aaaaaaaaaa │ bbbbbbbbbb │");
+    }
+
+    #[test]
+    fn pipes_without_a_delimiter_row_stay_plain_text() {
+        let r = render("| a | b |\n| c | d |", Color::Cyan, 40);
+        assert_eq!(text(&r.lines()[0]), "| a | b |");
+    }
+
+    #[test]
+    fn pipes_in_code_blocks_are_left_alone() {
+        let r = render("```\n| a |\n| - |\n```", Color::Cyan, 40);
+        assert_eq!(text(&r.lines()[1]), "  | a |");
+    }
+
+    #[test]
+    fn widest_table_line_measures_display_width() {
+        assert_eq!(widest_table_line(["text", "| 日本 | b |", "| a |"]), 12);
+        assert_eq!(widest_table_line(["no table"]), 0);
     }
 
     #[test]

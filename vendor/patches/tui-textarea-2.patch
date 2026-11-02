@@ -1,6 +1,185 @@
+diff -ruN --exclude=.cargo-ok a/src/history.rs b/src/history.rs
+--- a/src/history.rs	2006-07-24 03:21:28
++++ b/src/history.rs	2026-11-02 16:34:14
+@@ -120,6 +120,8 @@
+     kind: EditKind,
+     before: Pos,
+     after: Pos,
++    // TCT patch: edits sharing a non-zero group id undo and redo as one step
++    group: u32,
+ }
+ 
+ impl Edit {
+@@ -128,6 +130,7 @@
+             kind,
+             before,
+             after,
++            group: 0,
+         }
+     }
+ 
+@@ -196,6 +199,11 @@
+     edits: VecDeque<Edit>,
+     run_open: bool,
+     last_edit_at: Option<Instant>,
++    // TCT patch: bookkeeping for `group_since`
++    next_group: u32,
++    group_key: Option<u64>,
++    group_end: usize,
++    group_at: Option<Instant>,
+ }
+ 
+ impl History {
+@@ -206,6 +214,10 @@
+             edits: VecDeque::new(),
+             run_open: false,
+             last_edit_at: None,
++            next_group: 0,
++            group_key: None,
++            group_end: usize::MAX,
++            group_at: None,
+         }
+     }
+ 
+@@ -256,20 +268,74 @@
+             return None;
+         }
+         self.run_open = false;
+-        let edit = &self.edits[self.index];
+-        edit.redo(lines);
+-        self.index += 1;
+-        Some(edit.cursor_after())
++        self.group_key = None;
++        let group = self.edits[self.index].group;
++        loop {
++            let edit = &self.edits[self.index];
++            edit.redo(lines);
++            self.index += 1;
++            let in_group = group != 0
++                && self.edits.get(self.index).is_some_and(|next| next.group == group);
++            if !in_group {
++                return Some(edit.cursor_after());
++            }
++        }
+     }
+ 
+     pub fn undo(&mut self, lines: &mut Vec<String>) -> Option<(usize, usize)> {
+         self.index = self.index.checked_sub(1)?;
+         self.run_open = false;
+-        let edit = &self.edits[self.index];
+-        edit.undo(lines);
+-        Some(edit.cursor_before())
++        self.group_key = None;
++        let group = self.edits[self.index].group;
++        loop {
++            let edit = &self.edits[self.index];
++            edit.undo(lines);
++            let in_group = group != 0
++                && self.index > 0
++                && self.edits[self.index - 1].group == group;
++            if !in_group {
++                return Some(edit.cursor_before());
++            }
++            self.index -= 1;
++        }
+     }
+ 
++    // TCT patch: number of edits applied so far, to pass to `group_since` later
++    pub fn mark(&self) -> usize {
++        self.index
++    }
++
++    // TCT patch: make every edit pushed since `mark` one undo step. With a `key`, the
++    // step also absorbs the previous grouped step when it had the same key, nothing
++    // was pushed in between and the pause was short, so repeated edits of one kind
++    // (typing in a table cell) undo together like an ordinary typing run.
++    pub fn group_since(&mut self, mark: usize, key: Option<u64>, now: Instant) {
++        self.run_open = false;
++        if mark >= self.index || self.index > self.edits.len() {
++            return;
++        }
++        let reuse = key.is_some()
++            && self.group_key == key
++            && self.group_end == mark
++            && mark > 0
++            && self.edits[mark - 1].group != 0
++            && self
++                .group_at
++                .is_some_and(|at| now.duration_since(at) < GROUP_INTERVAL);
++        let group = if reuse {
++            self.edits[mark - 1].group
++        } else {
++            self.next_group += 1;
++            self.next_group
++        };
++        for edit in self.edits.range_mut(mark..self.index) {
++            edit.group = group;
++        }
++        self.group_key = key;
++        self.group_end = self.index;
++        self.group_at = Some(now);
++    }
++
+     pub fn max_items(&self) -> usize {
+         self.max_items
+     }
+@@ -334,6 +400,53 @@
+         history.push(typed('b', 1), false, start + Duration::from_secs(10));
+ 
+         assert_eq!(history.edits.len(), 2);
++    }
++
++    // TCT patch
++    fn pushed(history: &mut History, c: char, col: usize, at: Instant) {
++        history.push(typed(c, col), false, at);
++    }
++
++    #[test]
++    fn a_group_undoes_and_redoes_as_one_step() {
++        let start = Instant::now();
++        let mut history = History::new(50);
++        let mut lines = vec![String::from("abc")];
++
++        pushed(&mut history, 'a', 0, start);
++        let mark = history.mark();
++        pushed(&mut history, 'b', 1, start);
++        pushed(&mut history, 'c', 2, start);
++        history.group_since(mark, None, start);
++        lines[0] = "abc".into();
++
++        history.undo(&mut lines);
++        assert_eq!(lines[0], "a");
++        history.undo(&mut lines);
++        assert_eq!(lines[0], "");
++        history.redo(&mut lines);
++        assert_eq!(lines[0], "a");
++        history.redo(&mut lines);
++        assert_eq!(lines[0], "abc");
++    }
++
++    #[test]
++    fn keyed_groups_in_quick_succession_join_but_unkeyed_or_slow_ones_do_not() {
++        let start = Instant::now();
++        let mut history = History::new(50);
++        let mut lines = vec![String::from("abc")];
++
++        for (i, (c, at)) in [('a', 0), ('b', 100), ('c', 700)].into_iter().enumerate() {
++            let at = start + Duration::from_millis(at);
++            let mark = history.mark();
++            pushed(&mut history, c, i, at);
++            history.group_since(mark, Some(7), at);
++        }
++
++        history.undo(&mut lines);
++        assert_eq!(lines[0], "ab");
++        history.undo(&mut lines);
++        assert_eq!(lines[0], "");
+     }
+ 
+     #[test]
 diff -ruN --exclude=.cargo-ok a/src/screen_map.rs b/src/screen_map.rs
 --- a/src/screen_map.rs	2006-07-24 03:21:28
-+++ b/src/screen_map.rs	2026-10-30 23:43:59
++++ b/src/screen_map.rs	2026-11-02 16:34:14
 @@ -77,6 +77,7 @@
                  end_col: line.chars().count(),
                  first_in_row: true,
@@ -80,7 +259,7 @@ diff -ruN --exclude=.cargo-ok a/src/screen_map.rs b/src/screen_map.rs
              row: screen_idx,
 diff -ruN --exclude=.cargo-ok a/src/textarea.rs b/src/textarea.rs
 --- a/src/textarea.rs	2006-07-24 03:21:28
-+++ b/src/textarea.rs	2026-10-30 23:43:59
++++ b/src/textarea.rs	2026-11-02 16:34:14
 @@ -219,6 +219,7 @@
      search: Search,
      alignment: Alignment,
@@ -97,7 +276,30 @@ diff -ruN --exclude=.cargo-ok a/src/textarea.rs b/src/textarea.rs
              min_rows: 1,
              max_rows: u16::MAX,
              placeholder: Text::default().style(Style::default().fg(Color::DarkGray)),
-@@ -2841,6 +2843,19 @@
+@@ -2021,6 +2023,22 @@
+         }
+     }
+ 
++    /// TCT patch: marker for [`TextArea::undo_group_since`].
++    pub fn undo_mark(&self) -> usize {
++        self.history.mark()
++    }
++
++    /// TCT patch: make every edit made since `mark` (from [`TextArea::undo_mark`]) a single
++    /// undo step. Edits with the same `key`, made in quick succession, join one step.
++    pub fn undo_group_since(&mut self, mark: usize, key: Option<u64>) {
++        self.history.group_since(mark, key, Instant::now());
++    }
++
++    /// TCT patch: end the current typing run, so the next edit starts a new undo step.
++    pub fn break_undo_run(&mut self) {
++        self.history.break_run();
++    }
++
+     /// Redo the last undo change. This method returns if the redo modified text contents or not in the textarea.
+     /// ```
+     /// use tui_textarea::{TextArea, CursorMove};
+@@ -2841,6 +2859,19 @@
          self.wrap_mode
      }
  
@@ -117,7 +319,7 @@ diff -ruN --exclude=.cargo-ok a/src/textarea.rs b/src/textarea.rs
      /// Set the minimum preferred height in rows.
      ///
      /// The value is applied to measured outer rows (content + block chrome). Setting 0 is
-@@ -2934,7 +2949,14 @@
+@@ -2934,7 +2965,14 @@
          }
  
          let rows = if let Some(wrap_width) = self.layout_metrics(width_cols).wrap_width() {
@@ -135,7 +337,7 @@ diff -ruN --exclude=.cargo-ok a/src/textarea.rs b/src/textarea.rs
          };
 diff -ruN --exclude=.cargo-ok a/src/widget.rs b/src/widget.rs
 --- a/src/widget.rs	2006-07-24 03:21:28
-+++ b/src/widget.rs	2026-10-30 23:43:59
++++ b/src/widget.rs	2026-11-02 16:34:14
 @@ -105,7 +105,15 @@
          let mut lines = Vec::with_capacity(bottom_row - top_row);
          for row in &screen_lines[top_row..bottom_row] {
@@ -155,7 +357,7 @@ diff -ruN --exclude=.cargo-ok a/src/widget.rs b/src/widget.rs
      }
 diff -ruN --exclude=.cargo-ok a/src/wrap.rs b/src/wrap.rs
 --- a/src/wrap.rs	2006-07-24 03:21:28
-+++ b/src/wrap.rs	2026-10-30 23:43:59
++++ b/src/wrap.rs	2026-11-02 16:34:14
 @@ -31,8 +31,13 @@
      pub end_col: usize,
      pub first_in_row: bool,

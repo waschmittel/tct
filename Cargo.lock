@@ -1778,6 +1778,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tui-textarea-2",
+ "unicode-width",
  "uuid",
 ]
 

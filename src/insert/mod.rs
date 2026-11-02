@@ -20,6 +20,8 @@ pub mod date_picker;
 pub mod line_editor;
 pub mod line_input;
 pub mod markdown_editor;
+pub mod table;
+pub mod table_edit;
 pub mod text_area_input;
 
 /// Where in the UI an insert handler renders (drives background layer
@@ -38,6 +40,8 @@ pub enum InsertSurface {
 pub enum InsertOutcome {
     /// Handler stays open with possibly updated state.
     Stay,
+    /// Like `Stay`, and sets (`Some`) or clears (`None`) the status toast.
+    StayWithStatus(Option<String>),
     /// Cancel insert; the dispatcher restores `previous_mode`.
     Cancel,
     /// Apply this command and keep insert active.

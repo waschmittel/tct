@@ -43,6 +43,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 
     match outcome {
         InsertOutcome::Stay => {}
+        InsertOutcome::StayWithStatus(status) => match status {
+            Some(msg) => app.set_status(msg),
+            None => app.status_message = None,
+        },
         InsertOutcome::Cancel => {
             app.cancel_insert();
         }

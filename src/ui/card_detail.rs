@@ -30,10 +30,20 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // Text wraps at WRAP_WIDTH, so a wider popup is wasted space:
     // cap at wrap width + horizontal padding + borders.
     let max_width = markdown::WRAP_WIDTH as u16 + 2 * PAD + 2;
+    let editing_text = app.insert.as_ref().and_then(|h| {
+        h.as_any()
+            .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
+            .map(|e| e.input.textarea.lines().join("\n"))
+    });
+    let description = editing_text.as_deref().unwrap_or(&card.description);
+    // Tables are never wrapped: the popup grows to fit the widest one, up to the terminal.
+    let table_width = markdown::widest_table_line(description.lines()) as u16 + 2 * PAD + 2;
+    let screen_max = area.width.saturating_sub(2);
     let width = (area.width * 80 / 100)
         .max(40)
         .min(max_width)
-        .min(area.width.saturating_sub(2));
+        .max(table_width.min(screen_max))
+        .min(screen_max);
     let height = (area.height * 80 / 100).max(20).min(area.height.saturating_sub(2));
     let x = (area.width.saturating_sub(width)) / 2;
     let y = (area.height.saturating_sub(height)) / 2;

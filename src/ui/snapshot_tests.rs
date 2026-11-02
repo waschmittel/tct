@@ -416,6 +416,59 @@ fn snapshot_description_editor_enter_citation() {
     });
 }
 
+const TABLE_DESCRIPTION: &str = "Plan:\n\n| Item | Qty | Note |\n|:-|-:|:-:|\n| Apples | 3 | fresh |\n| **Pears** | 12 | `ripe` |";
+
+fn set_description(app: &mut App, text: &str) {
+    let board = app.board_mut().unwrap();
+    let card_id = board.current_card_id().cloned().unwrap();
+    board.cards.get_mut(&card_id).unwrap().description = text.into();
+}
+
+/// Tables render with box-drawing pipes in place: no extra rows, columns
+/// re-aligned, header bold.
+#[test]
+fn snapshot_card_detail_table() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_description(&mut app, TABLE_DESCRIPTION);
+        press(&mut app, KeyCode::Enter);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// The popup grows past the wrap width to fit a wide table (never past the terminal).
+#[test]
+fn snapshot_card_detail_wide_table_widens_popup() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        let cells = |c: &str| format!("| {} | {} | {} |", c.repeat(30), c.repeat(30), c.repeat(30));
+        let table = format!("{}\n| - | - | - |\n{}", cells("h"), cells("x"));
+        set_description(&mut app, &table);
+        press(&mut app, KeyCode::Enter);
+        insta::assert_snapshot!(render_to_string_sized(&app, 160, 30));
+    });
+}
+
+/// Editing keeps the table aligned while typing, and Tab moves to the next cell.
+#[test]
+fn snapshot_description_editor_table() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_description(&mut app, TABLE_DESCRIPTION);
+        press(&mut app, KeyCode::Enter);
+        press(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.mode, AppMode::Insert);
+        for c in " list".chars() {
+            press(&mut app, KeyCode::Char(c));
+        }
+        press(&mut app, KeyCode::Tab);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
 #[test]
 fn snapshot_card_detail_citation() {
     with_temp_dir(|| {

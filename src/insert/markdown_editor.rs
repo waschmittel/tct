@@ -7,6 +7,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui_textarea::CursorMove;
 
 use super::line_input::has_ctrl_or_cmd;
+use super::table_edit::{self, grouped};
 use super::text_area_input::TextAreaInput;
 use super::{InsertHandler, InsertOutcome, InsertSurface};
 use crate::app::LoadedBoard;
@@ -19,6 +20,8 @@ const NEST_INDENT: usize = 3;
 pub struct MarkdownEditor {
     pub input: TextAreaInput,
     pub card_id: CardId,
+    /// `Ctrl+T` was pressed inside a table; the next key picks the table edit.
+    table_chord: bool,
 }
 
 impl MarkdownEditor {
@@ -26,7 +29,7 @@ impl MarkdownEditor {
         let mut input = TextAreaInput::from_initial(initial);
         input.textarea.move_cursor(CursorMove::Bottom);
         input.textarea.move_cursor(CursorMove::End);
-        Self { input, card_id }
+        Self { input, card_id, table_chord: false }
     }
 }
 
@@ -56,10 +59,13 @@ impl MarkdownEditor {
 
     pub fn cut_selection(&mut self) {
         if self.input.textarea.is_selecting() {
-            self.input.textarea.cut();
+            grouped(&mut self.input.textarea, None, |ta| {
+                ta.cut();
+                renumber_all(ta);
+                table_edit::reformat_at_cursor(ta);
+            });
             let text = self.input.textarea.yank_text();
             crate::app::copy_to_system_clipboard(&text);
-            renumber_all(&mut self.input.textarea);
         }
     }
 
@@ -68,9 +74,12 @@ impl MarkdownEditor {
             return;
         }
         let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
-        self.input.textarea.set_yank_text(normalized);
-        self.input.textarea.paste();
-        renumber_all(&mut self.input.textarea);
+        grouped(&mut self.input.textarea, None, |ta| {
+            ta.set_yank_text(normalized);
+            ta.paste();
+            renumber_all(ta);
+            table_edit::reformat_at_cursor(ta);
+        });
     }
 
     pub fn paste_from_clipboard(&mut self) {
@@ -80,12 +89,29 @@ impl MarkdownEditor {
                 return;
             }
         }
-        // Fall back to internal yank buffer
-        self.input.textarea.paste();
-        renumber_all(&mut self.input.textarea);
+        grouped(&mut self.input.textarea, None, |ta| {
+            ta.paste();
+            renumber_all(ta);
+            table_edit::reformat_at_cursor(ta);
+        });
+    }
+
+    fn table_chord_key(&mut self, key: KeyEvent) -> InsertOutcome {
+        let refused = table_edit::chord_op(key)
+            .and_then(|op| table_edit::run_op(&mut self.input.textarea, op));
+        InsertOutcome::StayWithStatus(refused)
     }
 
     fn dispatch_key(&mut self, key: KeyEvent) -> InsertOutcome {
+        if std::mem::take(&mut self.table_chord) {
+            return self.table_chord_key(key);
+        }
+        if let Some(op) = table_edit::alt_op(key)
+            && table_edit::in_table(&self.input.textarea)
+        {
+            let refused = table_edit::run_op(&mut self.input.textarea, op);
+            return InsertOutcome::StayWithStatus(refused);
+        }
         match (key.code, key.modifiers) {
             (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
                 let body = self.input.current_text();
@@ -153,44 +179,84 @@ impl MarkdownEditor {
                 InsertOutcome::Stay
             }
             (KeyCode::Char('b'), m) if has_ctrl_or_cmd(m) => {
-                wrap_selection_or_insert(&mut self.input.textarea, "**", "**");
+                grouped(&mut self.input.textarea, None, |ta| wrap_selection_or_insert(ta, "**", "**"));
                 InsertOutcome::Stay
             }
             (KeyCode::Char('i'), m) if has_ctrl_or_cmd(m) => {
-                wrap_selection_or_insert(&mut self.input.textarea, "*", "*");
+                grouped(&mut self.input.textarea, None, |ta| wrap_selection_or_insert(ta, "*", "*"));
                 InsertOutcome::Stay
             }
             (KeyCode::Char('k'), m) if has_ctrl_or_cmd(m) => {
-                wrap_selection_or_insert(&mut self.input.textarea, "`", "`");
+                grouped(&mut self.input.textarea, None, |ta| wrap_selection_or_insert(ta, "`", "`"));
                 InsertOutcome::Stay
             }
             (KeyCode::Char('l'), m) if has_ctrl_or_cmd(m) => {
                 insert_at_line_start(&mut self.input.textarea, "- ");
                 InsertOutcome::Stay
             }
+            (KeyCode::Char('t'), m) if has_ctrl_or_cmd(m) => {
+                if table_edit::in_table(&self.input.textarea) {
+                    self.table_chord = true;
+                    return InsertOutcome::StayWithStatus(Some(table_edit::CHORD_HINT.into()));
+                }
+                table_edit::insert_skeleton(&mut self.input.textarea);
+                InsertOutcome::Stay
+            }
             (KeyCode::Enter, _) => {
-                handle_enter_in_list(&mut self.input.textarea);
+                let ta = &mut self.input.textarea;
+                if !table_edit::enter(ta) {
+                    grouped(ta, None, handle_enter_in_list);
+                }
                 InsertOutcome::Stay
             }
             (KeyCode::Tab, m) if !m.contains(KeyModifiers::SHIFT) => {
-                if !handle_tab_nest(&mut self.input.textarea) {
-                    self.input.textarea.input(key);
+                let ta = &mut self.input.textarea;
+                if !table_edit::tab(ta, false) && !grouped(ta, None, handle_tab_nest) {
+                    ta.input(key);
                 }
                 InsertOutcome::Stay
             }
             (KeyCode::BackTab, _) | (KeyCode::Tab, _) => {
-                handle_shift_tab_unnest(&mut self.input.textarea);
-                InsertOutcome::Stay
-            }
-            _ => {
-                let before = self.input.textarea.lines().len();
-                self.input.textarea.input(key);
-                let after = self.input.textarea.lines().len();
-                if after != before {
-                    renumber_all(&mut self.input.textarea);
+                let ta = &mut self.input.textarea;
+                if !table_edit::tab(ta, true) {
+                    grouped(ta, None, handle_shift_tab_unnest);
                 }
                 InsertOutcome::Stay
             }
+            _ => {
+                self.type_key(key);
+                InsertOutcome::Stay
+            }
+        }
+    }
+}
+
+impl MarkdownEditor {
+    /// An ordinary editing key. Edits inside a table reflow it; edits that add or
+    /// remove lines renumber lists. Both join the key's edit into one undo step.
+    fn type_key(&mut self, key: KeyEvent) {
+        let ta = &mut self.input.textarea;
+        if matches!(key.code, KeyCode::Char(_))
+            && !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        {
+            table_edit::snap_into_row(ta);
+        }
+        let cell_key = table_edit::cell_key(ta);
+        if cell_key.is_some() {
+            ta.break_undo_run();
+        }
+        let mark = ta.undo_mark();
+        let lines_before = ta.lines().len();
+        if !ta.input(key) {
+            return;
+        }
+        let reformatted = table_edit::reformat_at_cursor(ta);
+        let lines_changed = ta.lines().len() != lines_before;
+        if lines_changed {
+            renumber_all(ta);
+        }
+        if reformatted || lines_changed {
+            ta.undo_group_since(mark, cell_key);
         }
     }
 }

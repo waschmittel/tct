@@ -156,6 +156,48 @@ Sleep 400ms
 Right
 Sleep 800ms
 
+# Tables: Ctrl+T inserts one; typing reflows it, Tab walks the cells (and appends
+# a row from the last cell), Ctrl+T then c/a adds a column and cycles alignment,
+# Enter below the last row leaves the table
+Enter
+Enter
+Ctrl+T
+Sleep 600ms
+Type "Check"
+Tab
+Type "Result"
+Sleep 400ms
+Ctrl+T
+Sleep 800ms
+Type "c"
+Sleep 400ms
+Type "Notes"
+Sleep 400ms
+Ctrl+T
+Type "a"
+Ctrl+T
+Type "a"
+Sleep 800ms
+Tab
+Type "Refresh"
+Tab
+Type "ok"
+Tab
+Type "ttl fixed"
+Sleep 400ms
+Tab
+Sleep 400ms
+Type "Expiry"
+Tab
+Type "15 min"
+Tab
+Type "n/a"
+Sleep 1s
+Enter
+Sleep 500ms
+Type "Table rows stay aligned."
+Sleep 1s
+
 # Save without closing (Ctrl+S), then save and close (Ctrl+Q)
 Ctrl+S
 Sleep 1.2s

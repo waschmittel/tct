@@ -49,6 +49,8 @@ src/
   insert/            # InsertHandler trait, one struct per target (ADR-0003)
     mod.rs           # InsertHandler trait + InsertOutcome
     line_editor.rs   # Single-line text inputs (share LineInput)
+    table.rs           # Pipe-table model: parse / render / row+column edits (pure)
+    table_edit.rs      # Table editing glue on the textarea: live reformat, Tab/Enter, Ctrl+T chord, Alt ops
     markdown_editor.rs # Description editor (over TextAreaInput): copy/cut/paste, selection, autocontinue, nest (ADR-0011)
     date_picker.rs   # Due-date picker
     line_input.rs    # Shared single-line buffer/cursor base
