@@ -6,6 +6,25 @@ tct stores everything as **plain JSON files** — one file per board and one per
 
 ![demo](docs/vhs/demo.gif)
 
+## Installation
+
+### Homebrew (macOS Apple Silicon, Linux x86_64)
+
+```sh
+brew install waschmittel/tct/tct
+```
+
+### Prebuilt binary
+
+Download a prebuilt binary for your platform from the
+[GitHub releases page](https://github.com/waschmittel/tct/releases), then put it
+on your `PATH`:
+
+```sh
+chmod +x tct
+mv tct /usr/local/bin/
+```
+
 ## Why tct?
 
 - **Files are the API** — every board and card is a standalone JSON file. Human-readable, git-friendly, scriptable.
@@ -35,26 +54,7 @@ tct stores everything as **plain JSON files** — one file per board and one per
 - Periodic filesystem reload (every 15s) for background sync support
 - Full CLI interface for scripting and AI agent use (`tct --help`)
 
-## Installation
-
-### Homebrew (macOS Apple Silicon, Linux x86_64)
-
-```sh
-brew install waschmittel/tct/tct
-```
-
-### Prebuilt binary
-
-Download a prebuilt binary for your platform from the
-[GitHub releases page](https://github.com/waschmittel/tct/releases), then put it
-on your `PATH`:
-
-```sh
-chmod +x tct
-mv tct /usr/local/bin/
-```
-
-### Build from source
+## Build from source
 
 Requires a Rust toolchain.
 
