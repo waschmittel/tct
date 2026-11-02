@@ -166,7 +166,6 @@ pub fn render(
             used_h += prev_h;
             scroll -= 1;
         }
-        max_visible = fitting_from(scroll);
     }
 
     if let Some(cell) = board.scroll_offset.get(list_index) {
@@ -178,7 +177,7 @@ pub fn render(
 
     for &card_id in visible_cards.iter().skip(scroll) {
         if let Some(card) = board.cards.get(card_id) {
-            let ch = card_height(card, &board.meta.labels, card_inner_width);
+            let ch = get_height(card_id);
             if y_offset + ch > inner.height {
                 break;
             }
@@ -265,8 +264,6 @@ pub fn render(
             &mut state,
         );
     }
-
-    let _ = max_visible; // used in scroll adjustment above
 }
 
 #[cfg(test)]
