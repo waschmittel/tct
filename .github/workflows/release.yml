@@ -68,10 +68,16 @@ jobs:
             artifact_name: tct.exe
             label: windows-amd64
             ext: ".exe"
-          - target: x86_64-unknown-linux-gnu
+          # Static musl builds (cross-compiled with zig): no glibc dependency, run on any Linux.
+          - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             artifact_name: tct
             label: linux-amd64
+            ext: ""
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact_name: tct
+            label: linux-arm64
             ext: ""
 
     steps:
@@ -86,6 +92,11 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.target }}
 
+      # zig is the C cross-compiler (psm builds a little C); the PyPI wheel bundles it.
+      - name: Install cargo-zigbuild
+        if: contains(matrix.target, 'linux-musl')
+        run: pip3 install cargo-zigbuild
+
       - name: Compute version
         id: ver
         shell: bash
@@ -98,7 +109,7 @@ jobs:
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: ${{ contains(matrix.target, 'linux-musl') && 'cargo zigbuild' || 'cargo build' }} --release --target ${{ matrix.target }}
 
       - name: Rename binary
         shell: bash
@@ -154,6 +165,8 @@ jobs:
           lin="artifacts/tct-$v-linux-amd64/tct-$v-linux-amd64"
           mac_sha=$(sha256sum "$mac" | cut -d' ' -f1)
           lin_sha=$(sha256sum "$lin" | cut -d' ' -f1)
+          lin_arm="artifacts/tct-$v-linux-arm64/tct-$v-linux-arm64"
+          lin_arm_sha=$(sha256sum "$lin_arm" | cut -d' ' -f1)
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/$tag"
 
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/homebrew-tct.git" tap
@@ -174,6 +187,10 @@ jobs:
               on_intel do
                 url "$base/tct-$v-linux-amd64"
                 sha256 "$lin_sha"
+              end
+              on_arm do
+                url "$base/tct-$v-linux-arm64"
+                sha256 "$lin_arm_sha"
               end
             end
 
