@@ -44,7 +44,7 @@ jobs:
         run: cargo test -- --test-threads=1
 
       - name: Browser (PWA) script tests
-        run: node --test docker/pwa
+        run: node --test docker/pwa/tct-pwa.test.js
 
       - name: Vendored tui-textarea-2 matches upstream + patch
         if: runner.os == 'Linux'

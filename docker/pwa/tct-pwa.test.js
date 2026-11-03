@@ -1,4 +1,4 @@
-// Run with: node --test docker/pwa
+// Run with: node --test docker/pwa/tct-pwa.test.js
 // Pins the PDF transfer format against src/export/web.rs.
 'use strict';
 const test = require('node:test');
