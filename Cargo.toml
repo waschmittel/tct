@@ -3,6 +3,7 @@ name = "tct"
 version = "0.1.0"
 edition = "2024"
 description = "Terminal Card Tracker - a keyboard-driven TUI Trello clone"
+license = "MIT"
 
 [dependencies]
 ratatui = "0.30"

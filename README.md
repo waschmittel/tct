@@ -211,4 +211,4 @@ in [docs/export-examples](docs/export-examples/).
 
 ## License
 
-MIT
+[MIT](LICENSE). Third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
