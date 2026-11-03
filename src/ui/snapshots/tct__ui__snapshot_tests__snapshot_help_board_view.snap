@@ -20,13 +20,13 @@ expression: render_to_string(&app)
 │    │  a                 Archive card             Labels & Due                               │    │
 │    │  v                 View archived cards        l                 Assign / remove labels │    │
 │    │  h                 View change history        L                 Manage labels          │    │
-│    │  p                 Export card as PDF         u                 Set due date           │    │
-│    │                                               U                 Clear due date         │    │
-│    │Move                                                                                    │    │
-│    │  Shift+Left/Right  Move to adjacent list    View                                       │    │
-│    │  Shift+Up/Down     Move within list           c                 Show/hide created date │    │
-│    │  m                 Grab/drop card (arrows)    d                 Show/hide updated date │    │
+│    │  p                 Export as PDF              u                 Set due date           │    │
+│    │  P                 Export as color PDF        U                 Clear due date         │    │
 │    │                                                                                        │    │
+│    │Move                                         View                                       │    │
+│    │  Shift+Left/Right  Move to adjacent list      c                 Show/hide created date │    │
+│    │  Shift+Up/Down     Move within list           d                 Show/hide updated date │    │
+│    │  m                 Grab/drop card (arrows)                                             │    │
 │    │                                             App                                        │    │
 │    │                                               b                 Back to selector       │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │

@@ -51,13 +51,18 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let board = find_board(board_partial, by_id)?;
         let (lists, all_cards) = lists_and_cards(&board);
         let (list, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
+        let theme = match flag_value(args, "--style") {
+            None => export::Theme::default(),
+            Some(name) => export::Theme::parse(name)
+                .with_context(|| format!("unknown style '{name}' (use mono or color)"))?,
+        };
         let cwd = std::env::current_dir().context("cannot read the current directory")?;
         let path = export::path::resolve(
             flag_value(args, "--out").unwrap_or(""),
             &cwd,
             &export::path::default_file_name(&card.title),
         );
-        let pdf = export::card_pdf(&board, &list.name, &card)?;
+        let pdf = export::card_pdf(&board, &list.name, &card, theme)?;
         std::fs::write(&path, pdf).with_context(|| format!("cannot write {}", path.display()))?;
         outln!("Exported '{}' to {}", card.title, path.display());
     } else if let Some(list_partial) = flag_value(args, "--list") {

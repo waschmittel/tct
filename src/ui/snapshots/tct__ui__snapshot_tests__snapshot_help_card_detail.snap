@@ -7,22 +7,22 @@ expression: render_to_string(&app)
 │┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓││┌──────────────────────────────────────────────┐│
 │┃Fix logi┌ Fix login flow ──────────────────────────────────────────────────────────────┐        ││
 │┃[bug]   │                                                                              │────────┘│
-│┃[1/3] ≡ │  Token expires too early.                                                    │         │
-│┗━━━┌ Help — Card Detail ────────────────────────────────────────────────────────────────────┐    │
-│┌───│Card                                         Labels & Due                               │    │
-││Red│  t                 Edit title                 l                 Assign / remove labels │    │
-│└───│  e                 Edit description           L                 Manage labels          │    │
-│    │  PgUp/PgDn ←/→     Scroll description         u                 Set due date           │    │
+│┃[1/┌ Help — Card Detail ────────────────────────────────────────────────────────────────────┐    │
+│┗━━━│Card                                         Labels & Due                               │    │
+│┌───│  t                 Edit title                 l                 Assign / remove labels │    │
+││Red│  e                 Edit description           L                 Manage labels          │    │
+│└───│  PgUp/PgDn ←/→     Scroll description         u                 Set due date           │    │
 │    │  y                 Copy description           U                 Clear due date         │    │
 │    │  Y                 Copy checklist (md)                                                 │    │
 │    │  h                 View change history      View                                       │    │
 │    │  p                 Export as PDF              c                 Show/hide created date │    │
-│    │                                               d                 Show/hide updated date │    │
-│    │Checklist                                                                               │    │
-│    │  Up / Down         Navigate items           App                                        │    │
-│    │  Shift+Up/Down     Reorder item               Esc               Close                  │    │
-│    │  Space             Toggle item                ?                 Help                   │    │
-│    │  a                 Add item                   q                 Quit                   │    │
+│    │  P                 Export as color PDF        d                 Show/hide updated date │    │
+│    │                                                                                        │    │
+│    │Checklist                                    App                                        │    │
+│    │  Up / Down         Navigate items             Esc               Close                  │    │
+│    │  Shift+Up/Down     Reorder item               ?                 Help                   │    │
+│    │  Space             Toggle item                q                 Quit                   │    │
+│    │  a                 Add item                                                            │    │
 │    │  Enter             Edit item                                                           │    │
 │    │  x                 Delete item                                                         │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │

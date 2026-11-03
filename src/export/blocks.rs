@@ -82,12 +82,11 @@ fn parse_line(line: &str) -> Block {
 
     if let Some(marker_len) = citation_marker_len(trimmed) {
         let quote_depth = trimmed[..marker_len].matches('>').count();
-        let style = Style { italic: true, ..Style::default() };
         return Block::Text {
             level: 0,
             marker: None,
             quote_depth,
-            runs: inline(&trimmed[marker_len..], style),
+            runs: inline(&trimmed[marker_len..], Style::default()),
         };
     }
     if let Some(rest) = trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* ")) {

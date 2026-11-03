@@ -884,6 +884,7 @@ impl BoardEditor {
     /// decision, `DeleteLabel` leaves dead refs on cards until their next save,
     /// and `resolved_labels`/`matches_search` ignore unknown ids — tolerated
     /// state, not corruption (`repair_references` strips them on load).
+    #[cfg(any(debug_assertions, test))]
     fn check_invariants(&self) -> Result<(), String> {
         let b = &self.board;
         let valid_lists: HashSet<&ListId> = b.meta.lists.iter().map(|l| &l.id).collect();

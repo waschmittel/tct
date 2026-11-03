@@ -452,12 +452,12 @@ impl App {
     /// Open a modal **Dialog**, remembering the current mode so the
     /// dispatcher can restore it on `Close`.
     /// Ask where to save the PDF of the selected card.
-    pub fn open_export_dialog(&mut self) {
+    pub fn open_export_dialog(&mut self, theme: crate::export::Theme) {
         let Some(card) = self.board().and_then(|b| b.current_card()) else { return };
         let (card_id, title) = (card.id.clone(), card.title.clone());
         let cwd = std::env::current_dir().unwrap_or_default();
         let start = self.export_dir.clone().unwrap_or_else(|| cwd.clone());
-        self.open_dialog(Box::new(crate::dialog::export_pdf::ExportPdf::new(card_id, title, &start, cwd)));
+        self.open_dialog(Box::new(crate::dialog::export_pdf::ExportPdf::new(card_id, title, theme, &start, cwd)));
     }
 
     pub fn open_dialog(&mut self, dialog: Box<dyn crate::dialog::Dialog>) {

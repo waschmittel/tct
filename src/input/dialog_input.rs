@@ -52,7 +52,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 }
 
 /// Export failures are shown as a toast; they are not worth crashing the TUI for.
-fn export_card_pdf(app: &mut App, card_id: &crate::model::id::CardId, path: &std::path::Path) {
+fn export_card_pdf(app: &mut App, card_id: &crate::model::id::CardId, path: &std::path::Path, theme: crate::export::Theme) {
     let Some(board) = app.board() else { return };
     let Some(card) = board.cards.get(card_id) else { return };
     let list = board
@@ -60,7 +60,7 @@ fn export_card_pdf(app: &mut App, card_id: &crate::model::id::CardId, path: &std
         .iter()
         .find(|l| l.id == card.list_id)
         .map_or("", |l| l.name.as_str());
-    let written = crate::export::card_pdf(&board.meta, list, card)
+    let written = crate::export::card_pdf(&board.meta, list, card, theme)
         .and_then(|pdf| std::fs::write(path, pdf).map_err(Into::into));
     match written {
         Ok(()) => {
@@ -81,7 +81,7 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
                 editor.delete_archived_list(&list_id, &card_ids)?;
             }
         }
-        DialogSideEffect::ExportCardPdf { card_id, path } => export_card_pdf(app, &card_id, &path),
+        DialogSideEffect::ExportCardPdf { card_id, path, theme } => export_card_pdf(app, &card_id, &path, theme),
         DialogSideEffect::DeleteArchivedCard { card_id } => {
             if let Some(editor) = &mut app.editor {
                 editor.delete_archived_card(&card_id)?;
@@ -204,6 +204,62 @@ mod tests {
             assert_eq!(app.export_dir.as_deref(), Some(out.path()));
             let status = &app.status_message.as_ref().unwrap().0;
             assert!(status.starts_with("Exported PDF to "), "{status}");
+        });
+    }
+
+    fn dialog_title(app: &App) -> String {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        terminal.draw(|frame| crate::ui::render(frame, app)).unwrap();
+        terminal.backend().buffer().content().iter().map(|c| c.symbol()).collect()
+    }
+
+    fn shift(app: &mut App, c: char) {
+        handle_input(app, KeyEvent::new(KeyCode::Char(c), KeyModifiers::SHIFT)).unwrap();
+    }
+
+    #[test]
+    fn p_is_monochrome_and_capital_p_is_color_in_both_board_view_and_card_detail() {
+        with_temp_dir(|| {
+            let mut app = app_with_card("Card");
+            for in_detail in [false, true] {
+                if in_detail {
+                    press(&mut app, KeyCode::Enter);
+                    assert_eq!(app.mode, AppMode::CardDetail);
+                }
+                press(&mut app, KeyCode::Char('p'));
+                assert!(dialog_title(&app).contains("Export PDF (mono)"));
+                press(&mut app, KeyCode::Esc);
+                assert_ne!(app.mode, AppMode::Dialog);
+
+                shift(&mut app, 'P');
+                assert_eq!(app.mode, AppMode::Dialog);
+                assert!(dialog_title(&app).contains("Export PDF (color)"));
+                press(&mut app, KeyCode::Esc);
+            }
+        });
+    }
+
+    #[test]
+    fn both_styles_get_the_same_default_file_name() {
+        with_temp_dir(|| {
+            let out = tempfile::tempdir().unwrap();
+            let mut app = app_with_card("Same name");
+            app.export_dir = Some(out.path().to_path_buf());
+            press(&mut app, KeyCode::Char('p'));
+            press(&mut app, KeyCode::Enter);
+            let file = out.path().join("same-name.pdf");
+            let mono = std::fs::read(&file).unwrap();
+
+            shift(&mut app, 'P');
+            press(&mut app, KeyCode::Enter);
+            assert_eq!(app.mode, AppMode::Dialog, "the existing file asks before overwriting");
+            press(&mut app, KeyCode::Enter);
+            assert_eq!(app.mode, AppMode::Normal);
+            assert_ne!(std::fs::read(&file).unwrap(), mono, "overwritten with the color export");
+            let names: Vec<_> = std::fs::read_dir(out.path()).unwrap().flatten().collect();
+            assert_eq!(names.len(), 1, "no second file");
         });
     }
 

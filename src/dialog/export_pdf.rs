@@ -13,6 +13,7 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 use super::{Dialog, DialogHelp, DialogOutcome, DialogSideEffect};
 use crate::app::LoadedBoard;
+use crate::export::Theme;
 use crate::export::path::{self, Entry};
 use crate::insert::line_input::{LineInput, LineKey};
 use crate::model::id::CardId;
@@ -23,6 +24,7 @@ const WIDTH: u16 = 72;
 pub struct ExportPdf {
     card_id: CardId,
     card_title: String,
+    theme: Theme,
     file_name: String,
     /// Relative input is taken relative to this directory.
     cwd: PathBuf,
@@ -36,11 +38,12 @@ pub struct ExportPdf {
 
 impl ExportPdf {
     /// `start_dir` is where the input begins (last export folder, else `cwd`).
-    pub fn new(card_id: CardId, card_title: String, start_dir: &Path, cwd: PathBuf) -> Self {
+    pub fn new(card_id: CardId, card_title: String, theme: Theme, start_dir: &Path, cwd: PathBuf) -> Self {
         let file_name = path::default_file_name(&card_title);
         let mut dialog = Self {
             card_id,
             card_title,
+            theme,
             file_name,
             cwd,
             input: LineInput::with_initial(&path::display_dir(start_dir)),
@@ -114,6 +117,7 @@ impl ExportPdf {
         DialogOutcome::side_effect(DialogSideEffect::ExportCardPdf {
             card_id: self.card_id.clone(),
             path: target,
+            theme: self.theme,
         })
         .with_close()
     }
@@ -145,7 +149,7 @@ impl Dialog for ExportPdf {
 
         let title: String = self.card_title.chars().take(width.saturating_sub(18) as usize).collect();
         let block = Block::default()
-            .title(format!(" Export PDF — {title} "))
+            .title(format!(" Export PDF{} — {title} ", if self.theme == Theme::Mono { " (mono)" } else { " (color)" }))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(accent));
         let inner = block.inner(popup);
@@ -274,7 +278,7 @@ mod tests {
     }
 
     fn dialog(dir: &Path) -> ExportPdf {
-        ExportPdf::new(CardId::generate(), "My Card".into(), dir, dir.to_path_buf())
+        ExportPdf::new(CardId::generate(), "My Card".into(), Theme::Mono, dir, dir.to_path_buf())
     }
 
     fn type_text(d: &mut ExportPdf, text: &str) {
@@ -297,6 +301,28 @@ mod tests {
         let out = d.handle_key(key(KeyCode::Enter), None);
         assert!(matches!(out.follow, Follow::Close));
         assert_eq!(exported(out), Some(tmp.path().join("my-card.pdf")));
+    }
+
+    #[test]
+    fn the_dialog_passes_the_theme_on_and_names_the_file_after_the_card() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut d = ExportPdf::new(CardId::generate(), "My Card".into(), Theme::Mono, tmp.path(), tmp.path().to_path_buf());
+        let out = d.handle_key(key(KeyCode::Enter), None);
+        match out.side_effect {
+            Some(DialogSideEffect::ExportCardPdf { path, theme, .. }) => {
+                assert_eq!(path, tmp.path().join("my-card.pdf"));
+                assert_eq!(theme, Theme::Mono);
+            }
+            _ => panic!("expected an export"),
+        }
+        let mut d = ExportPdf::new(CardId::generate(), "My Card".into(), Theme::Color, tmp.path(), tmp.path().to_path_buf());
+        match d.handle_key(key(KeyCode::Enter), None).side_effect {
+            Some(DialogSideEffect::ExportCardPdf { path, theme, .. }) => {
+                assert_eq!(path, tmp.path().join("my-card.pdf"));
+                assert_eq!(theme, Theme::Color);
+            }
+            _ => panic!("expected an export"),
+        }
     }
 
     #[test]
@@ -408,7 +434,7 @@ mod tests {
             .chunks(90)
             .map(|row| row.iter().map(|c| c.symbol()).collect::<String>() + "\n")
             .collect();
-        assert!(text.contains("Export PDF — My Card"), "{text}");
+        assert!(text.contains("Export PDF (mono) — My Card"), "{text}");
         assert!(text.contains("» docs/"), "selected folder missing:\n{text}");
         assert!(text.contains("old.pdf"), "{text}");
     }
@@ -418,7 +444,7 @@ mod tests {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
-        let d = ExportPdf::new(CardId::generate(), "My Card".into(), Path::new("/"), PathBuf::from("/"));
+        let d = ExportPdf::new(CardId::generate(), "My Card".into(), Theme::Color, Path::new("/"), PathBuf::from("/"));
         let mut terminal = Terminal::new(TestBackend::new(90, 20)).unwrap();
         terminal
             .draw(|f| d.render(f, f.area(), None, Color::Cyan))

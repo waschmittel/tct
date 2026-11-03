@@ -52,6 +52,7 @@ mv tct /usr/local/bin/
 - Auto-continuing lists in editor
 - Per-board configurable accent color (pastel palette cycle with 'c', or free HSL color picker with 'C')
 - Periodic filesystem reload (every 15s) for background sync support
+- PDF export of a card (PDF/A, fonts embedded, nothing to install) — black-and-white for monochrome printers by default, or in color; long descriptions break across pages sensibly (see below)
 - Full CLI interface for scripting and AI agent use (`tct --help`)
 
 ## Build from source
@@ -174,6 +175,29 @@ tct boards
 tct lists a1b2c3d4 --by-id
 tct cards a1b2c3d4 --show e5f6a7b8 --by-id
 ```
+
+## PDF export
+
+Export the selected card — title, labels, due date, markdown description (tables
+included) and checklist — as a PDF/A document. The fonts are built into the
+binary, so it works the same on any machine.
+
+- In the TUI press `p` for a **black-and-white** PDF (the default, made for
+  monochrome printers) or `P` for a **color** one, from the board view or the
+  card detail. A small dialog asks where to save: type a path or browse folders
+  with Up/Down and Tab. It starts in the folder you last exported to and
+  suggests the card title as the file name.
+- From the command line:
+
+```sh
+tct cards "My Project" --export "Fix login"                  # ./fix-login-bug.pdf, black and white
+tct cards "My Project" --export "Fix login" --style color    # same file name, in color
+tct cards "My Project" --export "Fix login" --out ~/Desktop  # into a folder, or give a file name
+```
+
+Sections, tables, code blocks and the checklist are kept together on a page where
+they fit; long tables repeat their header row. Sample output for awkward inputs is
+in [docs/export-examples](docs/export-examples/).
 
 ## Documentation
 

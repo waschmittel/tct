@@ -60,6 +60,7 @@ COMMANDS:
   cards <board> --show <card>         Show full card detail
   cards <board> --export <card>       Export a card as PDF/A to <card-title>.pdf in the current directory
     --out <path>                        File, or directory to put the file in (default: current directory)
+    --style <mono|color>                Pure black-and-white for monochrome printers (default) or color
   cards <board> --create <list> <title>  Create a card in a list
   cards <board> --edit <card>         Edit card fields
     --title <text>                      New title

@@ -165,7 +165,7 @@ pub enum DialogSideEffect {
     },
     /// Write the PDF of a card to `path` and remember its folder for the
     /// next export.
-    ExportCardPdf { card_id: crate::model::id::CardId, path: std::path::PathBuf },
+    ExportCardPdf { card_id: crate::model::id::CardId, path: std::path::PathBuf, theme: crate::export::Theme },
     /// Hard-delete an archived card.
     DeleteArchivedCard { card_id: crate::model::id::CardId },
     /// Restore an archived board: apply the RestoreBoard command via a

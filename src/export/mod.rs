@@ -7,3 +7,22 @@ pub mod path;
 mod pdf;
 
 pub use pdf::render as card_pdf;
+
+/// How the PDF looks: pure black on white for monochrome printers (the
+/// default), or the same layout in color.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Theme {
+    #[default]
+    Mono,
+    Color,
+}
+
+impl Theme {
+    pub fn parse(name: &str) -> Option<Theme> {
+        match name.to_lowercase().as_str() {
+            "mono" | "monochrome" => Some(Theme::Mono),
+            "color" | "colour" => Some(Theme::Color),
+            _ => None,
+        }
+    }
+}

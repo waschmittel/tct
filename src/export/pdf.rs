@@ -19,6 +19,7 @@ use skrifa::instance::{LocationRef, Size};
 use skrifa::metrics::GlyphMetrics;
 use skrifa::{FontRef, MetadataProvider};
 
+use super::Theme;
 use super::blocks::{self, Block, Run, Style};
 use crate::insert::table::{Align, Table};
 use crate::model::board::BoardMeta;
@@ -42,6 +43,7 @@ const INK: Rgb = (33, 37, 41);
 const MUTED: Rgb = (110, 117, 125);
 const RULE: Rgb = (206, 212, 218);
 const TINT: Rgb = (241, 243, 245);
+const BLACK: Rgb = (0, 0, 0);
 const HEAVY_RULE: f32 = 1.0;
 const MIDRULE: f32 = 0.5;
 
@@ -93,6 +95,7 @@ impl Face {
 }
 
 struct Fonts {
+    theme: Theme,
     sans: Face,
     bold: Face,
     oblique: Face,
@@ -100,13 +103,23 @@ struct Fonts {
 }
 
 impl Fonts {
+    #[cfg(test)]
     fn load() -> anyhow::Result<Self> {
+        Self::load_for(Theme::Color)
+    }
+
+    fn load_for(theme: Theme) -> anyhow::Result<Self> {
         Ok(Self {
+            theme,
             sans: Face::new(SANS)?,
             bold: Face::new(BOLD)?,
             oblique: Face::new(OBLIQUE)?,
             mono: Face::new(MONO)?,
         })
+    }
+
+    fn mono_theme(&self) -> bool {
+        self.theme == Theme::Mono
     }
 
     fn face(&self, style: Style) -> &Face {
@@ -154,11 +167,29 @@ struct Flow<'f> {
     y: f32,
     /// A throw-away flow used to measure content; it skips page-break planning.
     measuring: bool,
+    /// Bottom edge of the last code row drawn, for closing a frame at a page break.
+    last_code_bottom: f32,
 }
 
 impl<'f> Flow<'f> {
+    fn mono(&self) -> bool {
+        self.fonts.mono_theme()
+    }
+
+    fn ink(&self) -> Rgb {
+        if self.mono() { BLACK } else { INK }
+    }
+
+    fn muted(&self) -> Rgb {
+        if self.mono() { BLACK } else { MUTED }
+    }
+
+    fn rule_color(&self) -> Rgb {
+        if self.mono() { BLACK } else { RULE }
+    }
+
     fn new(fonts: &'f Fonts) -> Self {
-        Self { fonts, pages: vec![Vec::new()], y: MARGIN, measuring: false }
+        Self { fonts, pages: vec![Vec::new()], y: MARGIN, measuring: false, last_code_bottom: MARGIN }
     }
 
     /// Start a new page unless `build`'s output fits on one page but not on
@@ -281,8 +312,8 @@ impl<'f> Flow<'f> {
                     y: top + height * 0.08,
                     w: seg.w + 2.0,
                     h: height * 0.86,
-                    fill: Some(TINT),
-                    stroke: None,
+                    fill: (!self.mono()).then_some(TINT),
+                    stroke: self.mono().then_some(BLACK),
                 });
             }
             self.push(Op::Text {
@@ -318,9 +349,10 @@ impl<'f> Flow<'f> {
         self.need(40.0);
         self.y += 14.0;
         let runs = [Run { text: title.to_uppercase(), style: Style { bold: true, ..Style::default() } }];
-        self.paragraph(&runs, 9.0, MARGIN, CONTENT_W, MUTED);
+        let thickness = if self.mono() { 0.8 } else { 0.6 };
+        self.paragraph(&runs, 9.0, MARGIN, CONTENT_W, self.muted());
         self.y += 1.0;
-        self.rule(RULE, 0.6);
+        self.rule(self.rule_color(), thickness);
         self.y += 8.0;
     }
 
@@ -358,7 +390,7 @@ impl<'f> Flow<'f> {
                     }
                     self.need(size * LEADING + 2.0 * BODY * LEADING);
                     self.y += size * 0.4;
-                    self.paragraph(&bold, size, MARGIN, CONTENT_W, INK);
+                    self.paragraph(&bold, size, MARGIN, CONTENT_W, self.ink());
                     self.y += size * 0.15;
                 }
                 Block::Text { .. } => {
@@ -380,13 +412,21 @@ impl<'f> Flow<'f> {
         }
     }
 
+    /// Quotes are set in italics (the terminal style shows `>` instead).
+    fn quoted(&self, runs: &[Run], quote_depth: usize) -> Vec<Run> {
+        let italic = quote_depth > 0;
+        runs.iter()
+            .map(|r| Run { style: Style { italic: italic || r.style.italic, ..r.style }, ..r.clone() })
+            .collect()
+    }
+
     fn text_blocks(&mut self, blocks: &[Block]) {
         let counts: Vec<usize> = blocks
             .iter()
             .map(|b| match b {
                 Block::Text { level, marker, quote_depth, runs } => {
                     let (_, _, width) = self.text_geometry(*level, marker.as_deref(), *quote_depth);
-                    self.wrap(runs, BODY, width).len()
+                    self.wrap(&self.quoted(runs, *quote_depth), BODY, width).len()
                 }
                 _ => 0,
             })
@@ -418,16 +458,16 @@ impl<'f> Flow<'f> {
         place: (usize, usize),
     ) {
         let (indent, x, width) = self.text_geometry(level, marker, quote_depth);
-        let color = if quote_depth > 0 { MUTED } else { INK };
+        let color = if quote_depth > 0 { self.muted() } else { self.ink() };
         let height = BODY * LEADING;
-        let lines = self.wrap(runs, BODY, width);
+        let lines = self.wrap(&self.quoted(runs, quote_depth), BODY, width);
         for (i, line) in lines.iter().enumerate() {
             self.need(Self::lines_to_keep(place.0 + i, place.1) as f32 * height);
             if quote_depth > 0 {
                 for d in 0..quote_depth {
                     let bx = MARGIN + d as f32 * 12.0 + 3.0;
                     let y = self.y;
-                    self.push(Op::Line { x1: bx, y1: y, x2: bx, y2: y + height, color: RULE, width: 1.5 });
+                    self.push(Op::Line { x1: bx, y1: y, x2: bx, y2: y + height, color: self.rule_color(), width: 1.5 });
                 }
             }
             if i == 0
@@ -437,7 +477,7 @@ impl<'f> Flow<'f> {
                 let w = self.fonts.face(face_style).width(marker, BODY);
                 let seg = Seg { text: marker.to_string(), style: face_style, x: 0.0, w };
                 let y = self.y;
-                self.draw_line(&[seg], MARGIN + indent, y, BODY, MUTED, 0.0);
+                self.draw_line(&[seg], MARGIN + indent, y, BODY, self.muted(), 0.0);
             }
             self.draw_line(line, x, self.y, BODY, color, 0.0);
             self.y += height;
@@ -451,16 +491,19 @@ impl<'f> Flow<'f> {
     }
 
     /// Code keeps its line structure; lines wider than the block are broken
-    /// at the margin rather than clipped, so no content is lost.
+    /// at the margin rather than clipped, so no content is lost. The
+    /// monochrome theme outlines the block instead of tinting it.
     fn code_block(&mut self, lines: &[String]) {
-        let height = CODE * LEADING;
+        let framed = self.mono();
+        let size = CODE;
+        let height = size * LEADING;
         let mono = &self.fonts.mono;
         let room = CONTENT_W - 12.0;
         let mut rows: Vec<String> = Vec::new();
         for line in lines {
             let mut row = String::new();
             for c in mono.clean(line).chars() {
-                if mono.width(&row, CODE) + mono.advance(c, CODE) > room {
+                if mono.width(&row, size) + mono.advance(c, size) > room {
                     rows.push(std::mem::take(&mut row));
                 }
                 row.push(c);
@@ -468,21 +511,48 @@ impl<'f> Flow<'f> {
             rows.push(row);
         }
         self.y += 2.0;
+        let mut open = false;
         for (i, text) in rows.iter().enumerate() {
+            let before = self.pages.len();
             self.need(Self::lines_to_keep(i, rows.len()) as f32 * height);
+            if framed && open && self.pages.len() != before {
+                self.code_frame_edge(before - 1, self.last_code_bottom);
+                open = false;
+            }
             let y = self.y;
-            self.push(Op::Rect { x: MARGIN, y, w: CONTENT_W, h: height, fill: Some(TINT), stroke: None });
+            if !framed {
+                self.push(Op::Rect { x: MARGIN, y, w: CONTENT_W, h: height, fill: Some(TINT), stroke: None });
+            }
+            if framed {
+                if !open {
+                    self.push(Op::Line { x1: MARGIN, y1: y, x2: MARGIN + CONTENT_W, y2: y, color: BLACK, width: 0.8 });
+                    open = true;
+                }
+                for x in [MARGIN, MARGIN + CONTENT_W] {
+                    self.push(Op::Line { x1: x, y1: y, x2: x, y2: y + height, color: BLACK, width: 0.8 });
+                }
+            }
             self.push(Op::Text {
                 x: MARGIN + 6.0,
-                y: y + CODE * 1.05,
+                y: y + size * 1.05,
                 text: text.clone(),
                 style: Style { code: true, ..Style::default() },
-                size: CODE,
-                color: INK,
+                size,
+                color: self.ink(),
             });
             self.y += height;
+            self.last_code_bottom = self.y;
+        }
+        if framed && open {
+            let y = self.y;
+            self.push(Op::Line { x1: MARGIN, y1: y, x2: MARGIN + CONTENT_W, y2: y, color: BLACK, width: 0.8 });
         }
         self.y += 2.0;
+    }
+
+    /// Close a framed code block with a bottom edge on page `page`.
+    fn code_frame_edge(&mut self, page: usize, y: f32) {
+        self.pages[page].push(Op::Line { x1: MARGIN, y1: y, x2: MARGIN + CONTENT_W, y2: y, color: BLACK, width: 0.8 });
     }
 
     /// Column widths: the full text where it fits; otherwise every column
@@ -520,7 +590,7 @@ impl<'f> Flow<'f> {
     }
 
     fn rule_across(&mut self, y: f32, x: f32, width: f32, thickness: f32) {
-        self.push(Op::Line { x1: x, y1: y, x2: x + width, y2: y, color: INK, width: thickness });
+        self.push(Op::Line { x1: x, y1: y, x2: x + width, y2: y, color: self.ink(), width: thickness });
     }
 
     /// LaTeX booktabs style: heavy rules above and below, a light rule under
@@ -600,7 +670,7 @@ impl<'f> Flow<'f> {
                     _ => 0.0,
                 };
                 let ly = top + t.pad.1 + l as f32 * t.size * LEADING;
-                self.draw_line(line, x + t.pad.0, ly, t.size, INK, shift.max(0.0));
+                self.draw_line(line, x + t.pad.0, ly, t.size, self.ink(), shift.max(0.0));
             }
             x += t.widths[c];
         }
@@ -621,10 +691,11 @@ impl<'f> Flow<'f> {
             }
             self.need(H);
             let y = self.y;
-            self.push(Op::Rect { x, y, w, h: H, fill: Some(*color), stroke: None });
+            let (fill, stroke) = if self.mono() { (None, Some(BLACK)) } else { (Some(*color), None) };
+            self.push(Op::Rect { x, y, w, h: H, fill, stroke });
             let segs = self.wrap(&plain(&text), SIZE, w);
             if let Some(line) = segs.first() {
-                self.draw_line(line, x + 5.0, y + (H - SIZE * LEADING) / 2.0, SIZE, INK, 0.0);
+                self.draw_line(line, x + 5.0, y + (H - SIZE * LEADING) / 2.0, SIZE, self.ink(), 0.0);
             }
             x += w + 4.0;
         }
@@ -636,16 +707,16 @@ impl<'f> Flow<'f> {
         let x = MARGIN + 18.0;
         for item in &card.checklist {
             let runs = blocks::inline(&item.text, Style::default());
-            let color = if item.completed { MUTED } else { INK };
+            let color = if item.completed { self.muted() } else { self.ink() };
             for (i, line) in self.wrap(&runs, BODY, CONTENT_W - 18.0).iter().enumerate() {
                 self.need(height);
                 let top = self.y;
                 if i == 0 {
                     let (bx, by) = (MARGIN + 2.0, top + 2.5);
-                    self.push(Op::Rect { x: bx, y: by, w: 8.0, h: 8.0, fill: None, stroke: Some(MUTED) });
+                    self.push(Op::Rect { x: bx, y: by, w: 8.0, h: 8.0, fill: None, stroke: Some(self.muted()) });
                     if item.completed {
-                        self.push(Op::Line { x1: bx + 1.8, y1: by + 4.2, x2: bx + 3.4, y2: by + 6.0, color: INK, width: 1.1 });
-                        self.push(Op::Line { x1: bx + 3.4, y1: by + 6.0, x2: bx + 6.4, y2: by + 1.6, color: INK, width: 1.1 });
+                        self.push(Op::Line { x1: bx + 1.8, y1: by + 4.2, x2: bx + 3.4, y2: by + 6.0, color: self.ink(), width: 1.1 });
+                        self.push(Op::Line { x1: bx + 3.4, y1: by + 6.0, x2: bx + 6.4, y2: by + 1.6, color: self.ink(), width: 1.1 });
                     }
                 }
                 self.draw_line(line, x, top, BODY, color, 0.0);
@@ -685,13 +756,14 @@ fn stamp(t: chrono::DateTime<chrono::Utc>) -> String {
 
 /// Running header (from the second page on) and footer of page `n` of `total`.
 fn page_chrome(fonts: &Fonts, card: &Card, location: &str, created: &str, n: usize, total: usize) -> Vec<Op> {
+    let (muted, rule) = if fonts.mono_theme() { (BLACK, BLACK) } else { (MUTED, RULE) };
     let small = |x: f32, y: f32, text: String| Op::Text {
         x,
         y,
         text,
         style: Style::default(),
         size: 8.0,
-        color: MUTED,
+        color: muted,
     };
     let right_aligned = |text: &str| PAGE_W - MARGIN - fonts.sans.width(text, 8.0);
     let mut chrome = Vec::new();
@@ -705,7 +777,7 @@ fn page_chrome(fonts: &Fonts, card: &Card, location: &str, created: &str, n: usi
             y1: HEADER_BASELINE + 5.0,
             x2: PAGE_W - MARGIN,
             y2: HEADER_BASELINE + 5.0,
-            color: RULE,
+            color: rule,
             width: 0.6,
         });
     }
@@ -823,9 +895,9 @@ fn layout<'f>(
     let mut flow = Flow::new(fonts);
 
     let title = [Run { text: card.title.clone(), style: Style { bold: true, ..Style::default() } }];
-    flow.paragraph(&title, 20.0, MARGIN, CONTENT_W, INK);
+    flow.paragraph(&title, 20.0, MARGIN, CONTENT_W, flow.ink());
     flow.y += 4.0;
-    let accent = board.accent_color.to_rgb();
+    let accent = if flow.mono() { BLACK } else { board.accent_color.to_rgb() };
     flow.rule(accent, 2.0);
     flow.y += 8.0;
 
@@ -837,14 +909,14 @@ fn layout<'f>(
     if let Some((done, total)) = card.checklist_progress() {
         facts.push(format!("Checklist {done}/{total}"));
     }
-    flow.paragraph(&muted(facts.join("   ·   ")), 9.0, MARGIN, CONTENT_W, MUTED);
+    flow.paragraph(&muted(facts.join("   ·   ")), 9.0, MARGIN, CONTENT_W, flow.muted());
     let dates = format!(
         "Created {}   ·   Updated {}   ·   Status {}",
         stamp(card.created_at),
         stamp(card.updated_at),
         stamp(now)
     );
-    flow.paragraph(&muted(dates), 9.0, MARGIN, CONTENT_W, MUTED);
+    flow.paragraph(&muted(dates), 9.0, MARGIN, CONTENT_W, flow.muted());
     flow.y += 6.0;
 
     let chips: Vec<(String, Rgb)> = card
@@ -873,9 +945,9 @@ fn layout<'f>(
     (flow.pages, label_names)
 }
 
-/// Render `card` (from `list` of `board`) as a PDF/A-2b document.
-pub fn render(board: &BoardMeta, list: &str, card: &Card) -> anyhow::Result<Vec<u8>> {
-    let fonts = Fonts::load()?;
+/// Render `card` (from `list` of `board`) as a PDF/A-2b document in the given theme.
+pub fn render(board: &BoardMeta, list: &str, card: &Card, theme: Theme) -> anyhow::Result<Vec<u8>> {
+    let fonts = Fonts::load_for(theme)?;
     let now = chrono::Utc::now();
     let (pages, labels) = layout(&fonts, board, list, card, now);
     emit(&pages, &fonts, board, list, card, &labels, now)
@@ -885,6 +957,8 @@ pub fn render(board: &BoardMeta, list: &str, card: &Card) -> anyhow::Result<Vec<
 mod tests {
     use super::*;
     use crate::model::card::ChecklistItem;
+
+    const THEMES: [Theme; 2] = [Theme::Color, Theme::Mono];
 
     fn board() -> BoardMeta {
         BoardMeta::new("Projekt Ä".into())
@@ -898,7 +972,7 @@ mod tests {
             ChecklistItem { text: "offen".into(), completed: false },
             ChecklistItem { text: "erledigt".into(), completed: true },
         ];
-        let pdf = render(&board(), "To Do", &card).unwrap();
+        let pdf = render(&board(), "To Do", &card, Theme::Color).unwrap();
         assert!(pdf.starts_with(b"%PDF-"));
         let text = String::from_utf8_lossy(&pdf);
         assert!(text.contains("pdfaid:part"), "XMP must declare the PDF/A part");
@@ -918,7 +992,7 @@ mod tests {
     fn unbreakable_words_and_wide_tables_do_not_overflow() {
         let mut card = Card::new("x".repeat(400));
         card.description = format!("{}\n\n| {} | b |\n|---|---|\n| c | d |", "y".repeat(500), "z".repeat(300));
-        render(&board(), "L", &card).unwrap();
+        render(&board(), "L", &card, Theme::Color).unwrap();
     }
 
     #[test]
@@ -1109,9 +1183,84 @@ mod tests {
         assert!(x_of("hundred").unwrap() >= marker_end + 3.0);
     }
 
+    fn mono_layout(card: &Card) -> Vec<Vec<Op>> {
+        let fonts = Fonts::load_for(Theme::Mono).unwrap();
+        layout(&fonts, &board(), "L", card, chrono::Utc::now()).0
+    }
+
+    #[test]
+    fn mono_draws_nothing_but_black_lines_and_text_and_no_fills() {
+        let fonts = Fonts::load_for(Theme::Mono).unwrap();
+        for (name, meta, card) in corner_cases() {
+            let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
+            for (n, page) in pages.iter().enumerate() {
+                let chrome = page_chrome(&fonts, &card, "B › L", "Status 2026-01-01 00:00", n, pages.len());
+                for op in page.iter().chain(&chrome) {
+                    match op {
+                        Op::Text { color, .. } | Op::Line { color, .. } => assert_eq!(*color, BLACK, "{name} p{n}"),
+                        Op::Rect { fill, stroke, .. } => {
+                            assert!(fill.is_none(), "{name} p{n}: filled rectangle");
+                            assert!(stroke.is_none_or(|c| c == BLACK), "{name} p{n}: coloured outline");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn mono_keeps_the_modern_layout_so_only_colour_differs() {
+        let modern = Fonts::load_for(Theme::Color).unwrap();
+        let mono = Fonts::load_for(Theme::Mono).unwrap();
+        for (name, meta, card) in corner_cases() {
+            let now = chrono::Utc::now();
+            let place = |fonts: &Fonts| -> Vec<(usize, String, i32, i32)> {
+                layout(fonts, &meta, "L", &card, now)
+                    .0
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(n, page)| {
+                        page.iter().filter_map(move |op| match op {
+                            Op::Text { text, x, y, .. } => Some((n, text.clone(), (*x * 10.0) as i32, (*y * 10.0) as i32)),
+                            _ => None,
+                        })
+                    })
+                    .collect()
+            };
+            assert_eq!(place(&modern), place(&mono), "{name}: text moved");
+        }
+    }
+
+    #[test]
+    fn mono_outlines_labels_and_code_instead_of_tinting() {
+        let mut card = Card::new("T".into());
+        card.description = "`inline`\n\n```\none\n```".into();
+        let mut meta = board();
+        meta.labels.push(crate::model::label::Label::new("urgent".into(), crate::model::label::LabelColor::Red));
+        card.label_ids.push(meta.labels[0].id.clone());
+        let fonts = Fonts::load_for(Theme::Mono).unwrap();
+        let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
+        let outlined = pages[0].iter().filter(|op| matches!(op, Op::Rect { stroke: Some(_), fill: None, .. })).count();
+        assert_eq!(outlined, 2, "the label chip and the inline code");
+        let frame_lines = pages[0].iter().filter(|op| matches!(op, Op::Line { x1, x2, y1, y2, width, .. } if (x1 == x2 || y1 == y2) && *width == 0.8)).count();
+        assert!(frame_lines >= 4, "top, bottom, left and right of the code frame: {frame_lines}");
+    }
+
+    #[test]
+    fn mono_code_frames_are_closed_at_page_breaks() {
+        let mut card = Card::new("T".into());
+        card.description = format!("```\n{}\n```", lines("row", 120));
+        let pages = mono_layout(&card);
+        assert!(pages.len() >= 2);
+        for (n, page) in pages.iter().enumerate() {
+            let caps = page.iter().filter(|op| matches!(op, Op::Line { y1, y2, x1, x2, width, .. } if y1 == y2 && (x2 - x1) >= CONTENT_W - 1.0 && *width == 0.8)).count();
+            assert!(caps >= 2, "page {n} has {caps} frame caps");
+        }
+    }
+
     #[test]
     fn empty_card_renders() {
-        render(&board(), "L", &Card::new(String::new())).unwrap();
+        render(&board(), "L", &Card::new(String::new()), Theme::Color).unwrap();
     }
 
     /// Awkward inputs, each rendered as an example PDF and checked for
@@ -1229,16 +1378,20 @@ mod tests {
 
     #[test]
     fn corner_cases_render_as_valid_pdf_a() {
-        for (name, meta, card) in corner_cases() {
-            let pdf = render(&meta, "List", &card).unwrap_or_else(|e| panic!("{name}: {e:#}"));
-            assert!(pdf.starts_with(b"%PDF-"), "{name}");
+        for theme in THEMES {
+            for (name, meta, card) in corner_cases() {
+                let pdf = render(&meta, "List", &card, theme).unwrap_or_else(|e| panic!("{name} {theme:?}: {e:#}"));
+                assert!(pdf.starts_with(b"%PDF-"), "{name} {theme:?}");
+            }
         }
     }
 
     #[test]
     fn corner_cases_stay_inside_the_page() {
-        let fonts = Fonts::load().unwrap();
+        for theme in THEMES {
+        let fonts = Fonts::load_for(theme).unwrap();
         for (name, meta, card) in corner_cases() {
+            let name = format!("{name} {theme:?}");
             let (pages, _) = layout(&fonts, &meta, "List", &card, chrono::Utc::now());
             for (n, page) in pages.iter().enumerate() {
                 for op in page {
@@ -1260,16 +1413,19 @@ mod tests {
                 }
             }
         }
+        }
     }
 
     #[test]
     fn corner_cases_never_produce_blank_pages() {
-        let fonts = Fonts::load().unwrap();
+        for theme in THEMES {
+        let fonts = Fonts::load_for(theme).unwrap();
         for (name, meta, card) in corner_cases() {
             let (pages, _) = layout(&fonts, &meta, "List", &card, chrono::Utc::now());
             for (n, page) in pages.iter().enumerate() {
                 assert!(!page.is_empty(), "{name}: page {n} is blank");
             }
+        }
         }
     }
 
@@ -1278,11 +1434,13 @@ mod tests {
     #[test]
     #[ignore = "writes files into docs/"]
     fn write_example_pdfs() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/export-examples");
-        std::fs::create_dir_all(&dir).unwrap();
-        for (name, meta, card) in corner_cases() {
-            let pdf = render(&meta, "To Do", &card).unwrap();
-            std::fs::write(dir.join(format!("{name}.pdf")), pdf).unwrap();
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/export-examples");
+        for (theme, dir) in [(Theme::Mono, root.clone()), (Theme::Color, root.join("color"))] {
+            std::fs::create_dir_all(&dir).unwrap();
+            for (name, meta, card) in corner_cases() {
+                let pdf = render(&meta, "To Do", &card, theme).unwrap();
+                std::fs::write(dir.join(format!("{name}.pdf")), pdf).unwrap();
+            }
         }
     }
 }

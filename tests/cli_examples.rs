@@ -749,3 +749,24 @@ fn cards_export_writes_a_pdf_into_the_chosen_folder() {
     ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", named.to_str().unwrap()]);
     assert!(out.path().join("custom.pdf").exists());
 }
+
+#[test]
+fn cards_export_defaults_to_mono_and_accepts_color_under_the_same_name() {
+    let tmp = TempDir::new().unwrap();
+    let out = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Work"]);
+    ok(&tmp, &["lists", "Work", "--create", "To Do"]);
+    ok(&tmp, &["cards", "Work", "--create", "To Do", "Plan the Release"]);
+
+    let dir = out.path().to_str().unwrap();
+    let default = ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", dir]);
+    assert!(default.contains("plan-the-release.pdf"), "{default}");
+    let explicit = ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", dir, "--style", "mono"]);
+    assert!(explicit.contains("plan-the-release.pdf"), "{explicit}");
+    let color = ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", dir, "--style", "color"]);
+    assert!(color.contains("plan-the-release.pdf"), "{color}");
+    assert_eq!(std::fs::read_dir(out.path()).unwrap().count(), 1);
+
+    let err = fail(&tmp, &["cards", "Work", "--export", "Plan", "--out", dir, "--style", "neon"]);
+    assert!(err.contains("unknown style 'neon'") && err.contains("mono or color"), "{err}");
+}

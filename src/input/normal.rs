@@ -41,6 +41,7 @@ pub enum Action {
     ViewArchivedCards,
     CardHistoryDialog,
     ExportPdf,
+    ExportPdfColor,
     NewList,
     RenameList,
     ArchiveList,
@@ -81,7 +82,8 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Char('a'), shift: None, action: Action::ArchiveCard, keys: "a", help: "Archive card", section: "Card" },
     Binding { code: KeyCode::Char('v'), shift: None, action: Action::ViewArchivedCards, keys: "v", help: "View archived cards", section: "Card" },
     Binding { code: KeyCode::Char('h'), shift: None, action: Action::CardHistoryDialog, keys: "h", help: "View change history", section: "Card" },
-    Binding { code: KeyCode::Char('p'), shift: None, action: Action::ExportPdf, keys: "p", help: "Export card as PDF", section: "Card" },
+    Binding { code: KeyCode::Char('p'), shift: None, action: Action::ExportPdf, keys: "p", help: "Export as PDF", section: "Card" },
+    Binding { code: KeyCode::Char('P'), shift: None, action: Action::ExportPdfColor, keys: "P", help: "Export as color PDF", section: "Card" },
     // Move. Grab mode exists because the Linux console (and vhs) never
     // transmits modifiers on arrow keys — Shift+arrows can't be the only
     // way to move cards.
@@ -351,7 +353,8 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                     app.open_dialog(Box::new(CardHistory::new()));
                 }
         }
-        Action::ExportPdf => app.open_export_dialog(),
+        Action::ExportPdf => app.open_export_dialog(crate::export::Theme::Mono),
+        Action::ExportPdfColor => app.open_export_dialog(crate::export::Theme::Color),
         Action::ToggleCreatedDate => toggle_created_date(app)?,
         Action::ToggleUpdatedDate => toggle_updated_date(app)?,
         Action::ClearDueDate => {
