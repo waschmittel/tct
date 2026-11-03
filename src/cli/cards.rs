@@ -10,6 +10,7 @@ use super::util::{
 use crate::outln;
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
+use crate::export;
 use crate::storage::card_store;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
@@ -17,7 +18,7 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         .first()
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "Usage: tct cards <board> [--show|--create|--edit|--archive|--restore|--delete|--list|--archived ...]"
+                "Usage: tct cards <board> [--show|--export|--create|--edit|--archive|--restore|--delete|--list|--archived ...]"
             )
         })?
         .as_str();
@@ -46,6 +47,19 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let (lists, all_cards) = lists_and_cards(&board);
         let (list, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
         print_card_detail(&card, &board, &list);
+    } else if let Some(card_partial) = flag_value(args, "--export") {
+        let board = find_board(board_partial, by_id)?;
+        let (lists, all_cards) = lists_and_cards(&board);
+        let (list, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
+        let cwd = std::env::current_dir().context("cannot read the current directory")?;
+        let path = export::path::resolve(
+            flag_value(args, "--out").unwrap_or(""),
+            &cwd,
+            &export::path::default_file_name(&card.title),
+        );
+        let pdf = export::card_pdf(&board, &list.name, &card)?;
+        std::fs::write(&path, pdf).with_context(|| format!("cannot write {}", path.display()))?;
+        outln!("Exported '{}' to {}", card.title, path.display());
     } else if let Some(list_partial) = flag_value(args, "--list") {
         let board = find_board(board_partial, by_id)?;
         let (lists, all_cards) = lists_and_cards(&board);

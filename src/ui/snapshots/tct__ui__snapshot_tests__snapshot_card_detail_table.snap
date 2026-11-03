@@ -9,7 +9,7 @@ expression: render_to_string(&app)
 │┃[bug]   │                                                                              │────────┘│
 │┃[1/3] ≡ │  Plan:                                                                       │         │
 │┗━━━━━━━━│                                                                              │         │
-│┌────────│  │ Item      │ Qty │  Note  │                                                │         │
+│┌────────│  │   Item    │ Qty │  Note  │                                                │         │
 ││Redesign│  ├───────────┼─────┼────────┤                                                │         │
 │└────────│  │ Apples    │   3 │ fresh  │                                                │         │
 │         │  │ **Pears** │  12 │ `ripe` │                                                │         │

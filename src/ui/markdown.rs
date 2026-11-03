@@ -86,7 +86,7 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
 
 /// Number of lines of the pipe table starting at the first line (header,
 /// delimiter row, body rows), or `None` when no table starts there.
-fn table_block_len(lines: &[&str]) -> Option<usize> {
+pub(crate) fn table_block_len(lines: &[&str]) -> Option<usize> {
     lines.get(1).filter(|l| delimiter_aligns(l).is_some())?;
     Some(lines.iter().take_while(|l| is_table_line(l)).count())
 }
@@ -517,7 +517,7 @@ mod tests {
     fn tables_are_aligned_and_drawn_with_box_pipes_without_extra_rows() {
         let r = render("| a | bb |\n|:-|-:|\n| ccc | d |", Color::Cyan, 10);
         let rows: Vec<String> = r.lines().iter().map(text).collect();
-        assert_eq!(rows, ["│ a   │  bb │", "├─────┼─────┤", "│ ccc │   d │"]);
+        assert_eq!(rows, ["│  a  │ bb  │", "├─────┼─────┤", "│ ccc │   d │"]);
     }
 
     #[test]

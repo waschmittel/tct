@@ -58,6 +58,8 @@ COMMANDS:
   cards <board> --archived            List archived cards
   cards <board> --list <list>         List active cards in a specific list
   cards <board> --show <card>         Show full card detail
+  cards <board> --export <card>       Export a card as PDF/A to <card-title>.pdf in the current directory
+    --out <path>                        File, or directory to put the file in (default: current directory)
   cards <board> --create <list> <title>  Create a card in a list
   cards <board> --edit <card>         Edit card fields
     --title <text>                      New title

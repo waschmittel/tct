@@ -14,6 +14,11 @@ src/
   term_caps.rs       # Terminal capability detection + color/glyph degradation
   term_out.rs        # outln!/errln! — control-char-safe output for the CLI surfaces
   text_diff.rs       # Line diff for the history detail pane
+  export/
+    mod.rs           # Card export entry point (`card_pdf`)
+    blocks.rs        # Description markdown -> blocks/runs for the PDF layout
+    pdf.rs           # Layout + PDF/A-2b emission (krilla, bundled DejaVu fonts)
+    path.rs          # Default file name, typed-path resolution, directory suggestions
   cli/
     mod.rs           # CLI dispatch, help text
     boards.rs        # `tct boards`
@@ -62,6 +67,7 @@ src/
     label_picker.rs  # Assign/remove labels on a card
     label_manager.rs # Board label CRUD
     archived_*.rs    # Archived boards/lists/cards browsers
+    export_pdf.rs    # Save-path input + directory browser for the PDF export
     card_history.rs  # Card history: summary list + per-field diff, delete entries
     color_picker.rs  # Free HSL accent/label color picker
   ui/

@@ -40,6 +40,7 @@ pub enum Action {
     ArchiveCard,
     ViewArchivedCards,
     CardHistoryDialog,
+    ExportPdf,
     NewList,
     RenameList,
     ArchiveList,
@@ -80,6 +81,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Char('a'), shift: None, action: Action::ArchiveCard, keys: "a", help: "Archive card", section: "Card" },
     Binding { code: KeyCode::Char('v'), shift: None, action: Action::ViewArchivedCards, keys: "v", help: "View archived cards", section: "Card" },
     Binding { code: KeyCode::Char('h'), shift: None, action: Action::CardHistoryDialog, keys: "h", help: "View change history", section: "Card" },
+    Binding { code: KeyCode::Char('p'), shift: None, action: Action::ExportPdf, keys: "p", help: "Export card as PDF", section: "Card" },
     // Move. Grab mode exists because the Linux console (and vhs) never
     // transmits modifiers on arrow keys — Shift+arrows can't be the only
     // way to move cards.
@@ -349,6 +351,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                     app.open_dialog(Box::new(CardHistory::new()));
                 }
         }
+        Action::ExportPdf => app.open_export_dialog(),
         Action::ToggleCreatedDate => toggle_created_date(app)?,
         Action::ToggleUpdatedDate => toggle_updated_date(app)?,
         Action::ClearDueDate => {

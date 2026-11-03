@@ -19,6 +19,9 @@ tui-textarea-2 = { path = "vendor/tui-textarea-2" }
 regex = "1"
 arboard = "3.4"
 unicode-width = "0.2"
+# PDF/A export (embedded DejaVu fonts, validated at finish)
+krilla = { version = "0.8", default-features = false, features = ["simple-text"] }
+skrifa = "0.42"
 
 [build-dependencies]
 chrono = "0.4"

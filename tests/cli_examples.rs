@@ -730,3 +730,22 @@ fn local_tct_dir_discovery() {
         ".tct/boards should exist inside the local dir"
     );
 }
+
+
+#[test]
+fn cards_export_writes_a_pdf_into_the_chosen_folder() {
+    let tmp = TempDir::new().unwrap();
+    let out = TempDir::new().unwrap();
+    ok(&tmp, &["boards", "--create", "Work"]);
+    ok(&tmp, &["lists", "Work", "--create", "To Do"]);
+    ok(&tmp, &["cards", "Work", "--create", "To Do", "Plan the Release"]);
+
+    let stdout = ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", out.path().to_str().unwrap()]);
+    assert!(stdout.contains("plan-the-release.pdf"), "{stdout}");
+    let pdf = std::fs::read(out.path().join("plan-the-release.pdf")).unwrap();
+    assert!(pdf.starts_with(b"%PDF-"));
+
+    let named = out.path().join("custom");
+    ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", named.to_str().unwrap()]);
+    assert!(out.path().join("custom.pdf").exists());
+}

@@ -36,6 +36,7 @@ pub enum Action {
     ToggleCreatedDate,
     ToggleUpdatedDate,
     HistoryDialog,
+    ExportPdf,
     Help,
     Quit,
 }
@@ -53,6 +54,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
     Binding { code: KeyCode::Char('y'), shift: None, action: Action::CopyDescription, keys: "y", help: "Copy description", section: "Card" },
     Binding { code: KeyCode::Char('Y'), shift: None, action: Action::CopyChecklist, keys: "Y", help: "Copy checklist (md)", section: "Card" },
     Binding { code: KeyCode::Char('h'), shift: None, action: Action::HistoryDialog, keys: "h", help: "View change history", section: "Card" },
+    Binding { code: KeyCode::Char('p'), shift: None, action: Action::ExportPdf, keys: "p", help: "Export as PDF", section: "Card" },
     // Checklist
     Binding { code: KeyCode::Up, shift: Some(false), action: Action::ItemUp, keys: "Up / Down", help: "Navigate items", section: "Checklist" },
     Binding { code: KeyCode::Down, shift: Some(false), action: Action::ItemDown, keys: "Up / Down", help: "Navigate items", section: "Checklist" },
@@ -244,6 +246,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
                     app.open_dialog(Box::new(CardHistory::new()));
                 }
         }
+        Action::ExportPdf => app.open_export_dialog(),
         Action::Help => {
             app.remember_return_mode();
             app.mode = AppMode::Help;

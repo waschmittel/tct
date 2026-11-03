@@ -510,7 +510,7 @@ mod tests {
         type_str(&mut e, "bcdef");
         assert_eq!(
             lines(&e),
-            ["| abcdef | b   |", "| ------ | --- |", "| 1      | 2   |"]
+            ["| abcdef |  b  |", "| ------ | --- |", "| 1      | 2   |"]
         );
         assert_eq!(cursor(&e), (0, 8));
     }
@@ -519,7 +519,7 @@ mod tests {
     fn a_space_typed_after_the_text_is_not_swallowed() {
         let mut e = editor(T, 0, 3);
         type_str(&mut e, " x");
-        assert_eq!(lines(&e)[0], "| a x | b   |");
+        assert_eq!(lines(&e)[0], "| a x |  b  |");
         assert_eq!(cursor(&e), (0, 5));
     }
 
@@ -529,8 +529,8 @@ mod tests {
         for _ in 0..5 {
             press(&mut e, KeyCode::Backspace);
         }
-        assert_eq!(lines(&e)[0], "| a   | b   |");
-        assert_eq!(cursor(&e), (0, 3));
+        assert_eq!(lines(&e)[0], "|  a  |  b  |");
+        assert_eq!(cursor(&e), (0, 4));
     }
 
     #[test]
@@ -546,7 +546,7 @@ mod tests {
         let mut e = editor(T, 2, 9);
         type_str(&mut e, " x");
         assert_eq!(lines(&e)[2], "| 1   | 2 x |");
-        assert_eq!(lines(&e)[0], "| a   | b   |");
+        assert_eq!(lines(&e)[0], "|  a  |  b  |");
         assert_eq!(cursor(&e), (2, 11));
     }
 
@@ -561,14 +561,14 @@ mod tests {
     fn typing_a_delimiter_row_turns_the_lines_into_a_table() {
         let mut e = editor("| a | b |\n|-|-", 1, 4);
         type_str(&mut e, "|");
-        assert_eq!(lines(&e), ["| a   | b   |", "| --- | --- |"]);
+        assert_eq!(lines(&e), ["|  a  |  b  |", "| --- | --- |"]);
     }
 
     #[test]
     fn tab_walks_the_cells_and_wraps_to_the_next_row() {
         let mut e = editor(T, 0, 3);
         press(&mut e, KeyCode::Tab);
-        assert_eq!(cursor(&e), (0, 9));
+        assert_eq!(cursor(&e), (0, 10));
         press(&mut e, KeyCode::Tab);
         assert_eq!(cursor(&e), (2, 3));
         press(&mut e, KeyCode::Tab);
@@ -581,7 +581,7 @@ mod tests {
         press(&mut e, KeyCode::Tab);
         assert_eq!(
             lines(&e),
-            ["| a   | b   |", "| --- | --- |", "| 1   | 2   |", "|     |     |"]
+            ["|  a  |  b  |", "| --- | --- |", "| 1   | 2   |", "|     |     |"]
         );
         assert_eq!(cursor(&e), (3, 2));
     }
@@ -590,9 +590,9 @@ mod tests {
     fn shift_tab_walks_back_and_leaves_above_the_table() {
         let mut e = editor(&format!("text\n\n{T}"), 4, 2);
         key(&mut e, KeyCode::BackTab, KeyModifiers::SHIFT);
-        assert_eq!(cursor(&e), (2, 9));
+        assert_eq!(cursor(&e), (2, 10));
         key(&mut e, KeyCode::BackTab, KeyModifiers::SHIFT);
-        assert_eq!(cursor(&e), (2, 3));
+        assert_eq!(cursor(&e), (2, 4));
         key(&mut e, KeyCode::BackTab, KeyModifiers::SHIFT);
         assert_eq!(cursor(&e), (1, 0));
     }
@@ -609,7 +609,7 @@ mod tests {
     fn enter_in_the_last_row_leaves_the_table_downwards() {
         let mut e = editor(T, 2, 3);
         press(&mut e, KeyCode::Enter);
-        assert_eq!(lines(&e), [&"| a   | b   |"[..], "| --- | --- |", "| 1   | 2   |", "", ""]);
+        assert_eq!(lines(&e), [&"|  a  |  b  |"[..], "| --- | --- |", "| 1   | 2   |", "", ""]);
         assert_eq!(cursor(&e), (4, 0));
 
         let mut e = editor(&format!("{T}\nafter"), 2, 3);
@@ -644,12 +644,12 @@ mod tests {
             lines(&e),
             ["intro", "", "|     |     |", "| --- | --- |", "|     |     |", "", "after"]
         );
-        assert_eq!(cursor(&e), (2, 2));
+        assert_eq!(cursor(&e), (2, 3));
 
         let mut e = editor("", 0, 0);
         key(&mut e, KeyCode::Char('t'), KeyModifiers::CONTROL);
         assert_eq!(lines(&e).len(), 3);
-        assert_eq!(cursor(&e), (0, 2));
+        assert_eq!(cursor(&e), (0, 3));
     }
 
     #[test]
@@ -661,11 +661,11 @@ mod tests {
         assert_eq!(cursor(&e).0, 2);
 
         chord(&mut e, KeyCode::Char('c'));
-        assert_eq!(lines(&e)[0], "| a   |     | b   |");
+        assert_eq!(lines(&e)[0], "|  a  |     |  b  |");
         assert_eq!(cursor(&e), (2, 8));
 
         chord(&mut e, KeyCode::Char('X'));
-        assert_eq!(lines(&e)[0], "| a   | b   |");
+        assert_eq!(lines(&e)[0], "|  a  |  b  |");
         chord(&mut e, KeyCode::Char('x'));
         assert_eq!(lines(&e).len(), 3);
     }
@@ -676,9 +676,9 @@ mod tests {
         chord(&mut e, KeyCode::Char('a'));
         assert_eq!(lines(&e)[1], "| :-- | --- |");
         chord(&mut e, KeyCode::Right);
-        assert_eq!(lines(&e)[0], "| b   | a   |");
+        assert_eq!(lines(&e)[0], "|  b  |  a  |");
         assert_eq!(lines(&e)[1], "| --- | :-- |");
-        assert_eq!(cursor(&e), (0, 9));
+        assert_eq!(cursor(&e), (0, 10));
     }
 
     #[test]
@@ -708,19 +708,19 @@ mod tests {
     fn alt_arrows_swap_and_alt_shift_arrows_add_and_delete() {
         let mut e = editor(T, 0, 3);
         key(&mut e, KeyCode::Right, KeyModifiers::ALT | KeyModifiers::SHIFT);
-        assert_eq!(lines(&e)[0], "| a   |     | b   |");
+        assert_eq!(lines(&e)[0], "|  a  |     |  b  |");
         key(&mut e, KeyCode::Left, KeyModifiers::ALT | KeyModifiers::SHIFT);
-        assert_eq!(lines(&e)[0], "| a   | b   |");
+        assert_eq!(lines(&e)[0], "|  a  |  b  |");
         let mut e = editor(T, 0, 3);
         key(&mut e, KeyCode::Right, KeyModifiers::ALT);
-        assert_eq!(lines(&e)[0], "| b   | a   |");
+        assert_eq!(lines(&e)[0], "|  b  |  a  |");
     }
 
     #[test]
     fn plain_text_keys_are_not_captured_inside_cells() {
         let mut e = editor(T, 0, 3);
         type_str(&mut e, "rcxXaT");
-        assert_eq!(lines(&e)[0], "| arcxXaT | b   |");
+        assert_eq!(lines(&e)[0], "| arcxXaT |  b  |");
     }
 
     #[test]
@@ -730,14 +730,14 @@ mod tests {
         let out = e.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()), None);
         assert!(matches!(out, crate::insert::InsertOutcome::StayWithStatus(None)));
         type_str(&mut e, "z");
-        assert_eq!(lines(&e)[0], "| az  | b   |");
+        assert_eq!(lines(&e)[0], "| az  |  b  |");
     }
 
     #[test]
     fn a_table_op_is_one_undo_step() {
         let mut e = editor(T, 0, 3);
         chord(&mut e, KeyCode::Char('c'));
-        assert_eq!(lines(&e)[0], "| a   |     | b   |");
+        assert_eq!(lines(&e)[0], "|  a  |     |  b  |");
         key(&mut e, KeyCode::Char('z'), KeyModifiers::CONTROL);
         assert_eq!(lines(&e), T.split('\n').collect::<Vec<_>>());
     }
@@ -749,14 +749,14 @@ mod tests {
         key(&mut e, KeyCode::Char('z'), KeyModifiers::CONTROL);
         assert_eq!(lines(&e), T.split('\n').collect::<Vec<_>>());
         key(&mut e, KeyCode::Char('y'), KeyModifiers::CONTROL);
-        assert_eq!(lines(&e)[0], "| abcdef | b   |");
+        assert_eq!(lines(&e)[0], "| abcdef |  b  |");
     }
 
     #[test]
     fn pasting_into_a_table_reformats_it() {
         let mut e = editor(T, 0, 3);
         e.paste_text("long text");
-        assert_eq!(lines(&e)[0], "| along text | b   |");
+        assert_eq!(lines(&e)[0], "| along text |  b  |");
         assert_eq!(lines(&e)[2].len(), lines(&e)[0].len());
     }
 

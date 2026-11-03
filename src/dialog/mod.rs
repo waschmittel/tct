@@ -30,6 +30,7 @@ pub mod confirm_delete_label;
 pub mod confirm_restore_board;
 pub mod confirm_restore_card;
 pub mod confirm_restore_list;
+pub mod export_pdf;
 pub mod label_manager;
 pub mod label_picker;
 
@@ -162,6 +163,9 @@ pub enum DialogSideEffect {
         list_id: crate::model::id::ListId,
         card_ids: Vec<crate::model::id::CardId>,
     },
+    /// Write the PDF of a card to `path` and remember its folder for the
+    /// next export.
+    ExportCardPdf { card_id: crate::model::id::CardId, path: std::path::PathBuf },
     /// Hard-delete an archived card.
     DeleteArchivedCard { card_id: crate::model::id::CardId },
     /// Restore an archived board: apply the RestoreBoard command via a

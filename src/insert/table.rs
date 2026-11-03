@@ -224,7 +224,8 @@ impl Table {
             let mut starts = Vec::new();
             for (c, text) in row.iter().enumerate() {
                 let gap = widths[c] - UnicodeWidthStr::width(text.as_str());
-                let (left, right) = match self.aligns[c] {
+                let align = if r == 0 { Align::Center } else { self.aligns[c] };
+                let (left, right) = match align {
                     Align::Right => (gap, 0),
                     Align::Center => (gap / 2, gap - gap / 2),
                     _ => (0, gap),
@@ -364,7 +365,7 @@ mod tests {
     fn pads_columns_to_the_widest_cell() {
         assert_eq!(
             render(&["| a | bb |", "|-|-|", "| ccccc | d |"]),
-            ["| a     | bb  |", "| ----- | --- |", "| ccccc | d   |"]
+            ["|   a   | bb  |", "| ----- | --- |", "| ccccc | d   |"]
         );
     }
 
@@ -372,7 +373,7 @@ mod tests {
     fn alignment_hints_are_kept_and_applied() {
         assert_eq!(
             render(&["| l | c | r | n |", "| :- | :-: | -: | - |", "| 1 | 2 | 3 | 4 |"]),
-            ["| l   |  c  |   r | n   |", "| :-- | :-: | --: | --- |", "| 1   |  2  |   3 | 4   |"]
+            ["|  l  |  c  |  r  |  n  |", "| :-- | :-: | --: | --- |", "| 1   |  2  |   3 | 4   |"]
         );
     }
 
@@ -385,14 +386,14 @@ mod tests {
     #[test]
     fn display_width_is_used_for_wide_characters() {
         let r = render(&["| 日本 | b |", "| - | - |", "| abcd | c |"]);
-        assert_eq!(r[0], "| 日本 | b   |");
+        assert_eq!(r[0], "| 日本 |  b  |");
         assert_eq!(r[2], "| abcd | c   |");
     }
 
     #[test]
     fn ragged_rows_are_padded_and_extra_cells_widen_the_table() {
         let r = render(&["| a |", "| - |", "| 1 | 2 |"]);
-        assert_eq!(r, ["| a   |     |", "| --- | --- |", "| 1   | 2   |"]);
+        assert_eq!(r, ["|  a  |     |", "| --- | --- |", "| 1   | 2   |"]);
     }
 
     #[test]
@@ -458,14 +459,14 @@ mod tests {
 
     #[test]
     fn indent_is_preserved() {
-        assert_eq!(render(&["  | a |", "  | - |"]), ["  | a   |", "  | --- |"]);
+        assert_eq!(render(&["  | a |", "  | - |"]), ["  |  a  |", "  | --- |"]);
     }
 
     #[test]
     fn text_starts_point_at_the_cell_text() {
         let r = Table::parse(&lines(&["| a | bb |", "| - | -: |"])).unwrap().render();
-        assert_eq!(r.text_starts[0], [2, 9]);
-        assert_eq!(r.lines[0].chars().nth(2), Some('a'));
+        assert_eq!(r.text_starts[0], [3, 8]);
+        assert_eq!(r.lines[0].chars().nth(2), Some(' '));
         assert_eq!(r.lines[0].chars().nth(9), Some('b'));
     }
 }

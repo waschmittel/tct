@@ -16,16 +16,16 @@ expression: render_to_string(&app)
 │    │  y                 Copy description           U                 Clear due date         │    │
 │    │  Y                 Copy checklist (md)                                                 │    │
 │    │  h                 View change history      View                                       │    │
-│    │                                               c                 Show/hide created date │    │
-│    │Checklist                                      d                 Show/hide updated date │    │
-│    │  Up / Down         Navigate items                                                      │    │
-│    │  Shift+Up/Down     Reorder item             App                                        │    │
-│    │  Space             Toggle item                Esc               Close                  │    │
-│    │  a                 Add item                   ?                 Help                   │    │
-│    │  Enter             Edit item                  q                 Quit                   │    │
+│    │  p                 Export as PDF              c                 Show/hide created date │    │
+│    │                                               d                 Show/hide updated date │    │
+│    │Checklist                                                                               │    │
+│    │  Up / Down         Navigate items           App                                        │    │
+│    │  Shift+Up/Down     Reorder item               Esc               Close                  │    │
+│    │  Space             Toggle item                ?                 Help                   │    │
+│    │  a                 Add item                   q                 Quit                   │    │
+│    │  Enter             Edit item                                                           │    │
 │    │  x                 Delete item                                                         │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
-│         │                                                                              │         │
 │         │                                                                              │         │
 │         │                                                                              │         │
 │         └──────────────────────────────────────────────────────────────────────────────┘         │

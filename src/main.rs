@@ -5,6 +5,7 @@ mod cli;
 mod command;
 mod dialog;
 mod event;
+mod export;
 mod input;
 mod insert;
 mod model;
