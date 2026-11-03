@@ -127,6 +127,10 @@ pub struct App {
     pub previous_mode: Option<AppMode>,
     /// Folder of the last PDF export this session; the next export dialog starts there.
     pub export_dir: Option<std::path::PathBuf>,
+    /// Set in a browser session (`TCT_WEB`, the Docker image): files written on
+    /// the server are out of the user's reach, so exports go through this
+    /// terminal stream to the page instead of a file dialog.
+    pub web_sink: Option<Box<dyn std::io::Write>>,
     pub should_quit: bool,
     pub status_message: Option<(String, Instant)>,
     pub boards: Vec<BoardMeta>,
@@ -219,6 +223,7 @@ impl App {
             mode: AppMode::BoardSelector,
             previous_mode: None,
             export_dir: None,
+            web_sink: None,
             should_quit: false,
             status_message: None,
             boards,
@@ -449,15 +454,36 @@ impl App {
         }
     }
 
-    /// Open a modal **Dialog**, remembering the current mode so the
-    /// dispatcher can restore it on `Close`.
-    /// Ask where to save the PDF of the selected card.
+    /// Ask where to save the PDF of the selected card — or, in a browser
+    /// session, send it to the browser straight away.
     pub fn open_export_dialog(&mut self, theme: crate::export::Theme) {
         let Some(card) = self.board().and_then(|b| b.current_card()) else { return };
+        if self.web_sink.is_some() {
+            let card_id = card.id.clone();
+            self.export_to_browser(&card_id, theme);
+            return;
+        }
         let (card_id, title) = (card.id.clone(), card.title.clone());
         let cwd = std::env::current_dir().unwrap_or_default();
         let start = self.export_dir.clone().unwrap_or_else(|| cwd.clone());
         self.open_dialog(Box::new(crate::dialog::export_pdf::ExportPdf::new(card_id, title, theme, &start, cwd)));
+    }
+
+    /// Render the card and hand the PDF to the page over the terminal stream.
+    /// Failures toast; nothing is written on the server.
+    fn export_to_browser(&mut self, card_id: &crate::model::id::CardId, theme: crate::export::Theme) {
+        let Some(board) = self.board() else { return };
+        let Some(card) = board.cards.get(card_id) else { return };
+        let list = board.lists.iter().find(|l| l.id == card.list_id).map_or("", |l| l.name.as_str());
+        let file_name = crate::export::path::default_file_name(&card.title);
+        let sent = crate::export::card_pdf(&board.meta, list, card, theme).and_then(|pdf| {
+            let sink = self.web_sink.as_mut().expect("checked by the caller");
+            crate::export::web::send(sink.as_mut(), &file_name, &pdf)
+        });
+        match sent {
+            Ok(()) => self.set_status(format!("Sent {file_name} to your browser")),
+            Err(e) => self.set_status(format!("Export failed: {e}")),
+        }
     }
 
     pub fn open_dialog(&mut self, dialog: Box<dyn crate::dialog::Dialog>) {
@@ -537,7 +563,7 @@ fn write_osc52_to(text: &str, out: &mut dyn std::io::Write) -> std::io::Result<(
 }
 
 /// Standard RFC 4648 Base64 encoding for OSC 52 payloads.
-fn base64_encode(input: &[u8]) -> String {
+pub(crate) fn base64_encode(input: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     for chunk in input.chunks(3) {
@@ -601,6 +627,7 @@ mod tests {
             mode: AppMode::BoardSelector,
             previous_mode: None,
             export_dir: None,
+            web_sink: None,
             should_quit: false,
             status_message: None,
             boards: vec![],

@@ -7,6 +7,7 @@ WORKDIR /src
 COPY Cargo.toml Cargo.lock build.rs ./
 COPY .git ./.git
 COPY vendor ./vendor
+COPY assets ./assets
 COPY src ./src
 
 RUN cargo build --release --locked

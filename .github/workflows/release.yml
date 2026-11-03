@@ -10,8 +10,49 @@ permissions:
   contents: read
 
 jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      # The project rule is zero warnings; cargo does not apply this to dependencies.
+      RUSTFLAGS: -D warnings
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # build.rs stamps the version via git describe.
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master (stable)
+        with:
+          toolchain: stable
+
+      - name: Build (debug)
+        run: cargo build
+
+      # Debug and release differ in what is compiled (debug assertions), so
+      # a warning can hide in either.
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Unit and integration tests
+        run: cargo test -- --test-threads=1
+
+      - name: Browser (PWA) script tests
+        run: node --test docker/pwa
+
+      - name: Vendored tui-textarea-2 matches upstream + patch
+        if: runner.os == 'Linux'
+        run: scripts/vendor-textarea.sh check
+
   build:
     name: Build ${{ matrix.target }}
+    needs: test
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -159,6 +200,7 @@ jobs:
 
   docker:
     name: Publish Docker Image (GHCR)
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -195,6 +237,22 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build once for the runner's platform and run it, so a broken image
+      # (e.g. files missing from the build context) fails before anything is pushed.
+      - name: Build Docker image (smoke test)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: tct-smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Docker image (smoke test)
+        run: docker run --rm --entrypoint tct tct-smoke --version
 
       - name: Build and push Docker image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0

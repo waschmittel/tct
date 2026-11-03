@@ -8,6 +8,8 @@ Each `tct` release publishes a multi-arch (`linux/amd64`, `linux/arm64`) Docker 
 - **`nginx-light`** on port `7681` serving the PWA manifest (`/manifest.webmanifest`), service worker (`/sw.js`), and vector icon (`/icon.svg`), while proxying `/ws` and `/token` to `ttyd`.
 - **Opt-in HTTP Basic Auth** via `TCT_BASIC_AUTH_USER` and `TCT_BASIC_AUTH_PASSWORD` for standalone deployments without an external auth proxy.
 
+- **PDF export**: `p` (black and white) and `P` (color) send the card's PDF to your browser as a download — or the share sheet on phones and tablets. Nothing is written on the server and there is no save dialog. The image sets `TCT_WEB=1` to switch this on; `tct` then streams the PDF through the terminal as a private escape sequence (`OSC 7733`, see [`src/export/web.rs`](../../src/export/web.rs)) that [`tct-pwa.js`](../../docker/pwa/tct-pwa.js) turns into the download. PDFs over 25 MB are refused.
+
 ---
 
 ## Option 1: Standalone Container (Local or Opt-In Basic Auth)

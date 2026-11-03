@@ -5,6 +5,7 @@
 mod blocks;
 pub mod path;
 mod pdf;
+pub mod web;
 
 pub use pdf::render as card_pdf;
 

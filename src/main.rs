@@ -63,6 +63,9 @@ fn main() -> anyhow::Result<()> {
     // Only the real TUI entry consults the environment — App::new defaults
     // to full caps so tests and goldens stay deterministic.
     app.caps = term_caps::TermCaps::detect();
+    if std::env::var_os("TCT_WEB").is_some() {
+        app.web_sink = Some(Box::new(std::io::stdout()));
+    }
     let events = EventHandler::new(Duration::from_millis(250));
 
     let result = run_app(&mut terminal, &mut app, &events);

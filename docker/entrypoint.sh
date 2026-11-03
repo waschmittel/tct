@@ -4,6 +4,8 @@ set -eu
 export TCT_DATA_DIR="${TCT_DATA_DIR:-/data}"
 export TERM="${TERM:-xterm-256color}"
 export COLORTERM="${COLORTERM:-truecolor}"
+# Tells tct it runs in a browser session: exports are sent to the page, not saved here.
+export TCT_WEB=1
 
 mkdir -p "$TCT_DATA_DIR" /etc/nginx/snippets
 

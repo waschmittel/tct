@@ -263,6 +263,70 @@ mod tests {
         });
     }
 
+    fn web_app(title: &str) -> (App, crate::export::web::tests::SharedBuf) {
+        let sink = crate::export::web::tests::SharedBuf::default();
+        let mut app = app_with_card(title);
+        app.web_sink = Some(Box::new(sink.clone()));
+        (app, sink)
+    }
+
+    #[test]
+    fn in_a_browser_session_p_sends_the_pdf_to_the_page_without_a_dialog() {
+        with_temp_dir(|| {
+            let out = tempfile::tempdir().unwrap();
+            let (mut app, sink) = web_app("Web card");
+            app.export_dir = Some(out.path().to_path_buf());
+
+            press(&mut app, KeyCode::Char('p'));
+            assert_eq!(app.mode, AppMode::Normal, "no save dialog in the browser");
+            let parts = crate::export::web::tests::parse(&sink.0.borrow());
+            assert!(!parts.is_empty());
+            assert!(parts.iter().all(|(_, total, name, _)| *total == parts.len() && name == "web-card.pdf"));
+            let pdf: Vec<u8> = parts.into_iter().flat_map(|p| p.3).collect();
+            assert!(pdf.starts_with(b"%PDF-"));
+            assert_eq!(app.status_message.as_ref().unwrap().0, "Sent web-card.pdf to your browser");
+            assert_eq!(std::fs::read_dir(out.path()).unwrap().count(), 0, "nothing is written on the server");
+        });
+    }
+
+    #[test]
+    fn capital_p_sends_the_color_version_and_card_detail_works_too() {
+        with_temp_dir(|| {
+            let (mut app, sink) = web_app("Web card");
+            press(&mut app, KeyCode::Char('p'));
+            let mono: Vec<u8> = crate::export::web::tests::parse(&sink.0.borrow()).into_iter().flat_map(|p| p.3).collect();
+            sink.0.borrow_mut().clear();
+
+            press(&mut app, KeyCode::Enter);
+            assert_eq!(app.mode, AppMode::CardDetail);
+            handle_input(&mut app, KeyEvent::new(KeyCode::Char('P'), KeyModifiers::SHIFT)).unwrap();
+            assert_eq!(app.mode, AppMode::CardDetail);
+            let color: Vec<u8> = crate::export::web::tests::parse(&sink.0.borrow()).into_iter().flat_map(|p| p.3).collect();
+            assert!(color.starts_with(b"%PDF-"));
+            assert_ne!(color, mono);
+        });
+    }
+
+    #[test]
+    fn a_failing_browser_export_toasts_instead_of_crashing() {
+        struct Broken;
+        impl std::io::Write for Broken {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::other("pipe closed"))
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        with_temp_dir(|| {
+            let mut app = app_with_card("Card");
+            app.web_sink = Some(Box::new(Broken));
+            press(&mut app, KeyCode::Char('p'));
+            assert_eq!(app.mode, AppMode::Normal);
+            assert!(app.status_message.as_ref().unwrap().0.starts_with("Export failed:"));
+        });
+    }
+
     #[test]
     fn export_dialog_opens_from_card_detail_too() {
         with_temp_dir(|| {

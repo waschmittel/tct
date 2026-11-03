@@ -195,6 +195,9 @@ tct cards "My Project" --export "Fix login" --style color    # same file name, i
 tct cards "My Project" --export "Fix login" --out ~/Desktop  # into a folder, or give a file name
 ```
 
+In the [browser version](docs/docker/README.md) the same keys send the PDF to your
+browser as a download instead of opening the save dialog.
+
 Sections, tables, code blocks and the checklist are kept together on a page where
 they fit; long tables repeat their header row. Sample output for awkward inputs is
 in [docs/export-examples](docs/export-examples/).

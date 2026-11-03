@@ -19,6 +19,7 @@ src/
     blocks.rs        # Description markdown -> blocks/runs for the PDF layout
     pdf.rs           # Layout + PDF/A-2b emission (krilla, bundled DejaVu fonts)
     path.rs          # Default file name, typed-path resolution, directory suggestions
+    web.rs           # Browser sessions: PDF sent through the terminal stream (OSC 7733)
   cli/
     mod.rs           # CLI dispatch, help text
     boards.rs        # `tct boards`
