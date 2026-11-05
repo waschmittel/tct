@@ -85,6 +85,19 @@ This means:
 - **Global boards** live in `~/.tct/` — your personal default
 - **Project-local boards** live in a `.tct/` directory inside (or above) your project — shared with anyone who clones the repo
 - **Custom location** via `TCT_DATA_DIR` — useful for testing or pointing at a sync folder
+- **`tct init`** — like `git init`: creates `.tct/` (plus a `README.md` explaining it) in the current directory, or at `$TCT_DATA_DIR` if that is set. Safe to re-run; an existing README is never overwritten
+- tct exits with an error if the current directory no longer exists (except `tct init` with `TCT_DATA_DIR` set)
+
+`TCT_DATA_DIR` is the *complete* path of the data directory — `.version` and `boards/` go directly into it, nothing is appended. It may be a symlink (your own choice; a *discovered* `.tct` must be a real directory).
+
+### Environment variables
+
+| Variable | Effect |
+|---|---|
+| `TCT_DATA_DIR` | Complete path of the data directory. Wins over the `.tct` search and `~/.tct`. |
+| `TCT_SKIP_CORRUPT` | Any value other than empty or `0`: skip unreadable board/card files and load the rest instead of failing. Single-file loads still fail. |
+| `TCT_WEB` | Set by the Docker/ttyd image: PDF export streams to the browser instead of asking for a path. |
+| `TERM`, `COLORTERM` | `COLORTERM=truecolor`/`24bit` gives full color, otherwise 256 colors; `TERM=linux` gets 16 colors and console-safe glyphs. |
 
 ### File layout
 
@@ -137,8 +150,8 @@ Team members who pull will see the board when they run `tct` from that project d
 ```sh
 # Option 1: Put .tct/ inside a synced folder
 cd ~/Dropbox/my-project
-mkdir .tct
-cd ~/Dropbox/my-project && tct
+tct init
+tct
 
 # Option 2: Point TCT_DATA_DIR at a synced location
 export TCT_DATA_DIR=~/Dropbox/shared-boards

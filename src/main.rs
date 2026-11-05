@@ -42,6 +42,20 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // Everything runs from a working directory that must exist — except
+    // `init` when `TCT_DATA_DIR` names the target anyway. Otherwise `init`
+    // targets `./.tct` (never an ancestor's, unlike the lookup).
+    let is_init = args.first().map(String::as_str) == Some("init");
+    let env_dir = std::env::var_os("TCT_DATA_DIR");
+    if !is_init || env_dir.is_none() {
+        let cwd = std::env::current_dir()
+            .map_err(|e| anyhow::anyhow!("current working directory is not accessible: {e}"))?;
+        if is_init {
+            // SAFETY: still single-threaded — no threads have been spawned yet.
+            unsafe { std::env::set_var("TCT_DATA_DIR", cwd.join(".tct")) };
+        }
+    }
+
     // Subcommand mode: first arg is a non-flag word
     if args.first().map(|a| !a.starts_with('-')).unwrap_or(false) {
         if let Err(e) = cli::run(&args) {

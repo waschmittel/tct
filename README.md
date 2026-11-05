@@ -73,11 +73,11 @@ cargo run
 
 Data is stored as JSON files. Storage location is resolved in this order:
 
-1. `TCT_DATA_DIR` environment variable (if set)
+1. `TCT_DATA_DIR` environment variable (if set) — the complete path of the data directory
 2. A `.tct/` directory in the current working directory or any of its parents (project-local boards)
 3. `~/.tct/` (global default)
 
-This means you can keep project-specific boards alongside your code by creating a `.tct/` directory in your project root.
+This means you can keep project-specific boards alongside your code by running `tct init` in your project root (like `git init`; it also drops a README into `.tct/`).
 
 ```
 .tct/  (or ~/.tct/)

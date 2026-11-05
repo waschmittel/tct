@@ -31,6 +31,7 @@ A keyboard-driven TUI Kanban board. Run without arguments to open the TUI.
 USAGE:
     tct                              Open the TUI board selector
     tct --board <name>               Open TUI directly on a board (partial, case-insensitive)
+    tct init                         Create ./.tct (or $TCT_DATA_DIR) with a README, like git init
     tct --help, -h                   Show this help message
     tct --version, -V                Print the version and exit
     tct <COMMAND> [ARGS] [FLAGS]     Run a CLI command (no TUI)
@@ -93,7 +94,18 @@ Multiple name matches or a missing ID result in an error.
 STORAGE:
     By default data is stored in ~/.tct/. If a .tct/ directory exists in the current
     working directory or any of its parents, that directory is used instead.
-    Override with the TCT_DATA_DIR environment variable.
+    Override with the TCT_DATA_DIR environment variable (see ENVIRONMENT).
+    tct exits with an error if the current directory no longer exists.
+
+ENVIRONMENT:
+    TCT_DATA_DIR       Complete path of the data directory (not its parent). Wins over the
+                       .tct search and ~/.tct; may be a symlink. `tct init` creates it.
+    TCT_SKIP_CORRUPT   Set to any value other than empty or 0 to skip unreadable board/card
+                       files and load the rest, instead of failing. Single-file loads still fail.
+    TCT_WEB            Set by the Docker/ttyd image. PDF export streams the file to the browser
+                       instead of asking for a path; nothing is written on the server.
+    TERM, COLORTERM    Pick the color tier: COLORTERM=truecolor|24bit gives full color,
+                       otherwise 256 colors; TERM=linux gets 16 colors and console-safe glyphs.
 ";
 
 pub fn print_help() {
@@ -118,7 +130,21 @@ pub fn resolve_board_flag(args: &[String]) -> anyhow::Result<Option<BoardId>> {
     Ok(None)
 }
 
+/// `tct init`: create the data directory under the working directory.
+fn init(rest: &[String]) -> anyhow::Result<()> {
+    if let Some(extra) = rest.first() {
+        bail!("init takes no arguments (got '{extra}'); set TCT_DATA_DIR to pick the folder");
+    }
+    let existed = crate::storage::board_store::init_data_dir()?;
+    let verb = if existed { "Reinitialized existing" } else { "Initialized empty" };
+    crate::outln!("{verb} tct data directory in {}", crate::storage::paths::base_dir().display());
+    Ok(())
+}
+
 pub fn run(args: &[String]) -> anyhow::Result<()> {
+    if args[0] == "init" {
+        return init(&args[1..]);
+    }
     crate::storage::board_store::open_data_dir()?;
     let by_id = args.iter().any(|a| a == "--by-id");
     let args: Vec<String> = args.iter().filter(|a| *a != "--by-id").cloned().collect();

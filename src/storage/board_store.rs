@@ -15,6 +15,34 @@ pub fn open_data_dir() -> Result<()> {
     super::version::ensure_compatible()
 }
 
+/// Written into a new data directory by `tct init`; kept as a file for easy editing.
+const README: &str = include_str!("../../assets/data-dir-README.md");
+
+/// `tct init`: create the data directory (and its README, once) at
+/// [`paths::base_dir`]. Returns `true` if the directory already existed.
+///
+/// An existing `README.md` is never touched — not even replaced when it is a
+/// symlink, which `symlink_metadata` reports instead of following.
+pub fn init_data_dir() -> Result<bool> {
+    let dir = paths::base_dir();
+    let existed = match fs::symlink_metadata(&dir) {
+        Ok(meta) if meta.is_dir() => true,
+        Ok(_) => {
+            return Err(StorageError::Io(std::io::Error::other(format!(
+                "{} exists and is not a directory",
+                dir.display()
+            ))));
+        }
+        Err(_) => false,
+    };
+    open_data_dir()?;
+    let readme = dir.join("README.md");
+    if fs::symlink_metadata(&readme).is_err() {
+        atomic_write(&readme, README.as_bytes())?;
+    }
+    Ok(existed)
+}
+
 /// Read every `<board id>/board.json` under the boards directory. Entries that
 /// are not a real directory named by a valid [`BoardId`] are not boards and are
 /// passed over — including symlinks, since `DirEntry::file_type` reports the
@@ -131,6 +159,19 @@ pub fn delete_board(board_id: &BoardId) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn init_writes_readme_once_and_never_overwrites() {
+        with_temp_dir(|| {
+            assert!(init_data_dir().unwrap());
+            let readme = paths::base_dir().join("README.md");
+            assert!(fs::read_to_string(&readme).unwrap().contains("https://github.com/waschmittel/tct"));
+
+            fs::write(&readme, "mine").unwrap();
+            init_data_dir().unwrap();
+            assert_eq!(fs::read_to_string(&readme).unwrap(), "mine");
+        });
+    }
     use crate::test_support::with_temp_dir;
 
     #[test]
