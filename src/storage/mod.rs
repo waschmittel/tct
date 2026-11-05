@@ -27,6 +27,8 @@ pub enum StorageError {
     VersionTooOld { found: u32, supported: u32 },
     #[error("unreadable version file: {found:?}\n  hint: .tct/.version must hold a single integer.")]
     VersionUnreadable { found: String },
+    #[error("tct data directory {path} does not exist\n  hint: run `tct init` to create it (or point TCT_DATA_DIR at an existing directory).")]
+    NotInitialized { path: String },
     #[error("Board not found: {0}")]
     BoardNotFound(String),
     #[error("Card not found: {0}")]

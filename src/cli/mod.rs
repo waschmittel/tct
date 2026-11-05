@@ -95,11 +95,12 @@ STORAGE:
     By default data is stored in ~/.tct/. If a .tct/ directory exists in the current
     working directory or any of its parents, that directory is used instead.
     Override with the TCT_DATA_DIR environment variable (see ENVIRONMENT).
+    Only ~/.tct is created implicitly (with a README); any other missing data directory needs `tct init`.
     tct exits with an error if the current directory no longer exists.
 
 ENVIRONMENT:
     TCT_DATA_DIR       Complete path of the data directory (not its parent). Wins over the
-                       .tct search and ~/.tct; may be a symlink. `tct init` creates it.
+                       .tct search and ~/.tct; may be a symlink. Must exist (run `tct init`).
     TCT_SKIP_CORRUPT   Set to any value other than empty or 0 to skip unreadable board/card
                        files and load the rest, instead of failing. Single-file loads still fail.
     TCT_WEB            Set by the Docker/ttyd image. PDF export streams the file to the browser

@@ -7,22 +7,31 @@ use crate::model::id::BoardId;
 use super::paths;
 use super::{atomic_write, Result, StorageError};
 
-/// Prepare the data directory for use: create it if new, then check its
-/// format version. Every entry point already called this before touching
-/// storage, so the version gate cannot be forgotten by a future one.
-pub fn open_data_dir() -> Result<()> {
-    fs::create_dir_all(paths::boards_dir())?;
-    super::version::ensure_compatible()
-}
-
-/// Written into a new data directory by `tct init`; kept as a file for easy editing.
+/// Written into every data directory [`create_data_dir`] sets up; kept as a
+/// file for easy editing.
 const README: &str = include_str!("../../assets/data-dir-README.md");
 
-/// `tct init`: create the data directory (and its README, once) at
-/// [`paths::base_dir`]. Returns `true` if the directory already existed.
+/// Prepare the data directory for use, then check its format version. Every
+/// entry point already called this before touching storage, so the version
+/// gate cannot be forgotten by a future one.
 ///
-/// An existing `README.md` is never touched — not even replaced when it is a
-/// symlink, which `symlink_metadata` reports instead of following.
+/// A missing directory is created only when it is the `~/.tct` fallback; one
+/// chosen by `TCT_DATA_DIR` is [`StorageError::NotInitialized`] — a typo must
+/// not start a fresh data dir, `tct init` creates it deliberately.
+pub fn open_data_dir() -> Result<()> {
+    let dir = paths::base_dir();
+    if dir.is_dir() {
+        fs::create_dir_all(paths::boards_dir())?;
+        super::version::ensure_compatible()
+    } else if paths::is_home_fallback() {
+        create_data_dir(&dir)
+    } else {
+        Err(StorageError::NotInitialized { path: dir.display().to_string() })
+    }
+}
+
+/// `tct init`: create the data directory at [`paths::base_dir`] (and its README
+/// if absent). Returns `true` if the directory already existed.
 pub fn init_data_dir() -> Result<bool> {
     let dir = paths::base_dir();
     let existed = match fs::symlink_metadata(&dir) {
@@ -35,12 +44,22 @@ pub fn init_data_dir() -> Result<bool> {
         }
         Err(_) => false,
     };
-    open_data_dir()?;
+    create_data_dir(&dir)?;
+    Ok(existed)
+}
+
+/// The one place a data directory is set up — `tct init` and the implicit
+/// `~/.tct` both come through here: the directory, `boards/`, the version
+/// stamp, and the README. An existing README is never replaced, not even a
+/// symlink, which `symlink_metadata` reports instead of following.
+fn create_data_dir(dir: &std::path::Path) -> Result<()> {
+    fs::create_dir_all(paths::boards_dir())?;
+    super::version::ensure_compatible()?;
     let readme = dir.join("README.md");
     if fs::symlink_metadata(&readme).is_err() {
         atomic_write(&readme, README.as_bytes())?;
     }
-    Ok(existed)
+    Ok(())
 }
 
 /// Read every `<board id>/board.json` under the boards directory. Entries that
@@ -159,6 +178,48 @@ pub fn delete_board(board_id: &BoardId) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_missing_data_dir_needs_init_and_is_not_created() {
+        with_temp_dir(|| {
+            let missing = paths::base_dir().join("typo");
+            unsafe { std::env::set_var("TCT_DATA_DIR", &missing) };
+
+            assert!(matches!(open_data_dir(), Err(StorageError::NotInitialized { .. })));
+            assert!(!missing.exists());
+
+            init_data_dir().unwrap();
+            assert!(missing.join("boards").is_dir());
+            open_data_dir().unwrap();
+        });
+    }
+
+    #[test]
+    fn implicitly_created_home_dir_gets_the_readme() {
+        let home = tempfile::tempdir().unwrap();
+        let (old_home, old_data) = (std::env::var_os("HOME"), std::env::var_os("TCT_DATA_DIR"));
+        let old_cwd = std::env::current_dir().unwrap();
+        // SAFETY: tests run single-threaded (`--test-threads=1`).
+        unsafe {
+            std::env::set_var("HOME", home.path());
+            std::env::remove_var("TCT_DATA_DIR");
+        }
+        std::env::set_current_dir(home.path()).unwrap();
+
+        let result = open_data_dir();
+        let again = open_data_dir();
+        let readme = home.path().join(".tct/README.md");
+        let first = fs::read_to_string(&readme);
+
+        std::env::set_current_dir(old_cwd).unwrap();
+        unsafe {
+            match old_home { Some(h) => std::env::set_var("HOME", h), None => std::env::remove_var("HOME") }
+            if let Some(d) = old_data { std::env::set_var("TCT_DATA_DIR", d) }
+        }
+        result.unwrap();
+        again.unwrap();
+        assert!(first.unwrap().contains("https://github.com/waschmittel/tct"));
+    }
 
     #[test]
     fn init_writes_readme_once_and_never_overwrites() {

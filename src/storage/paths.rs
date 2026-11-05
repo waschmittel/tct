@@ -17,15 +17,27 @@ use crate::model::id::{BoardId, CardId};
 /// a checked-out `.tct -> /etc` would otherwise silently make `/etc` the data
 /// directory.
 pub fn base_dir() -> PathBuf {
+    resolve().0
+}
+
+/// True when [`base_dir`] is the `~/.tct` fallback — neither `TCT_DATA_DIR`
+/// nor a discovered `.tct` chose it. Only that one may be created implicitly;
+/// any other missing directory needs `tct init`.
+pub fn is_home_fallback() -> bool {
+    resolve().1
+}
+
+/// The data directory and whether it is the `~/.tct` fallback.
+fn resolve() -> (PathBuf, bool) {
     if let Ok(dir) = std::env::var("TCT_DATA_DIR") {
-        return PathBuf::from(dir);
+        return (PathBuf::from(dir), false);
     }
     if let Ok(cwd) = std::env::current_dir() {
         let mut dir = cwd.as_path();
         loop {
             let candidate = dir.join(".tct");
             if is_real_dir(&candidate) {
-                return candidate;
+                return (candidate, false);
             }
             match dir.parent() {
                 Some(parent) => dir = parent,
@@ -33,9 +45,10 @@ pub fn base_dir() -> PathBuf {
             }
         }
     }
-    dirs::home_dir()
+    let home = dirs::home_dir()
         .expect("Cannot determine home directory")
-        .join(".tct")
+        .join(".tct");
+    (home, true)
 }
 
 /// A directory and not a symlink to one — `symlink_metadata` does not follow.
