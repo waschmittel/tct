@@ -1,0 +1,35 @@
+{
+  "list_id": "a589c4f4",
+  "position": 6.0,
+  "title": "support footnotes",
+  "description": "Here is a simple footnote[^1].\n\nA footnote can also have multiple lines[^2].\n\n[^1]: My reference.\n[^2]: To add line breaks within a footnote, add 2 spaces to the end of a line.  \nThis is a second line.\n\nThe position of a footnote in your Markdown does not influence where the footnote will be rendered. You can write a footnote right after your reference to the footnote, and the footnote will still render at the bottom of the Markdown. Footnotes are not supported in wikis.",
+  "label_ids": [
+    "df88cb04"
+  ],
+  "due_date": null,
+  "checklist": [],
+  "archived": false,
+  "created_at": "2026-11-06T18:30:03.400563Z",
+  "updated_at": "2026-11-06T18:30:15.161004Z",
+  "history": [
+    {
+      "at": "2026-11-06T18:30:03.400576Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-06T18:30:04.781574Z",
+      "action": "Added label 'idea'",
+      "field": "labels",
+      "old": "",
+      "new": "idea"
+    },
+    {
+      "at": "2026-11-06T18:30:15.161004Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "",
+      "new": "Here is a simple footnote[^1].\n\nA footnote can also have multiple lines[^2].\n\n[^1]: My reference.\n[^2]: To add line breaks within a footnote, add 2 spaces to the end of a line.  \nThis is a second line.\n\nThe position of a footnote in your Markdown does not influence where the footnote will be rendered. You can write a footnote right after your reference to the footnote, and the footnote will still render at the bottom of the Markdown. Footnotes are not supported in wikis."
+    }
+  ]
+}

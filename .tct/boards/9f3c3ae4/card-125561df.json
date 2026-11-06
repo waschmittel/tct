@@ -1,0 +1,49 @@
+{
+  "list_id": "a589c4f4",
+  "position": 4.0,
+  "title": "support alerts",
+  "description": "> [!note] \n> The following information is useful.\n\n\n- note (i circled icon/emoji) — blue when color, with blue border left when color\n- tip (light bulb icon/emoji) — green\n- important (exclamation mark in speech bubble) — purple\n- caution (exclamation mark in triangle) — dark yellow/gold\n- warning (exclamation mark in stop sign shape) — red\n\nidea: make an existing blockquote or quote to an alert with CTRL+a - show a selection then or use a chord\n\nalso  with  blockquote:\n\n>>> [!note] Things to consider\nYou should consider the following ramifications:\n\n1. consideration 1\n2. consideration 2\n>>>",
+  "label_ids": [
+    "df88cb04"
+  ],
+  "due_date": null,
+  "checklist": [],
+  "archived": false,
+  "created_at": "2026-11-06T18:27:25.630488Z",
+  "updated_at": "2026-11-06T18:29:28.227356Z",
+  "history": [
+    {
+      "at": "2026-11-06T18:27:25.630508Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-06T18:27:37.930997Z",
+      "action": "Added label 'idea'",
+      "field": "labels",
+      "old": "",
+      "new": "idea"
+    },
+    {
+      "at": "2026-11-06T18:28:53.682233Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "",
+      "new": "> [!note] \n> > The following information is useful.\n\n\n- note (i circled icon/emoji) — blue when color, with blue border left when color\n- tip (light bulb icon/emoji) — green\n- important (exclamation mark in speech bubble) — purple\n- caution (exclamation mark in triangle) — dark yellow/gold\n- warning (exclamation mark in stop sign shape) — red\n\nidea: make an existing blockquote or quote to an alert with CTRL+a - show a selection then or use a chord\n\nalso  with  blockquote:\n\n>>> [!note] Things to consider\n>>> You should consider the following ramifications:\n\n1. consideration 1\n2. 2. consideration 2\n3. >>>"
+    },
+    {
+      "at": "2026-11-06T18:29:12.597124Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "> [!note] \n> > The following information is useful.\n\n\n- note (i circled icon/emoji) — blue when color, with blue border left when color\n- tip (light bulb icon/emoji) — green\n- important (exclamation mark in speech bubble) — purple\n- caution (exclamation mark in triangle) — dark yellow/gold\n- warning (exclamation mark in stop sign shape) — red\n\nidea: make an existing blockquote or quote to an alert with CTRL+a - show a selection then or use a chord\n\nalso  with  blockquote:\n\n>>> [!note] Things to consider\n>>> You should consider the following ramifications:\n\n1. consideration 1\n2. 2. consideration 2\n3. >>>",
+      "new": "> [!note] \n> > The following information is useful.\n\n\n- note (i circled icon/emoji) — blue when color, with blue border left when color\n- tip (light bulb icon/emoji) — green\n- important (exclamation mark in speech bubble) — purple\n- caution (exclamation mark in triangle) — dark yellow/gold\n- warning (exclamation mark in stop sign shape) — red\n\nidea: make an existing blockquote or quote to an alert with CTRL+a - show a selection then or use a chord\n\nalso  with  blockquote:\n\n>>> [!note] Things to consider\n>>> You should consider the following ramifications:\n\n1. consideration 1\n2. consideration 2\n>>>"
+    },
+    {
+      "at": "2026-11-06T18:29:26.457897Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "> [!note] \n> > The following information is useful.\n\n\n- note (i circled icon/emoji) — blue when color, with blue border left when color\n- tip (light bulb icon/emoji) — green\n- important (exclamation mark in speech bubble) — purple\n- caution (exclamation mark in triangle) — dark yellow/gold\n- warning (exclamation mark in stop sign shape) — red\n\nidea: make an existing blockquote or quote to an alert with CTRL+a - show a selection then or use a chord\n\nalso  with  blockquote:\n\n>>> [!note] Things to consider\n>>> You should consider the following ramifications:\n\n1. consideration 1\n2. consideration 2\n>>>",
+      "new": "> [!note] \n> The following information is useful.\n\n\n- note (i circled icon/emoji) — blue when color, with blue border left when color\n- tip (light bulb icon/emoji) — green\n- important (exclamation mark in speech bubble) — purple\n- caution (exclamation mark in triangle) — dark yellow/gold\n- warning (exclamation mark in stop sign shape) — red\n\nidea: make an existing blockquote or quote to an alert with CTRL+a - show a selection then or use a chord\n\nalso  with  blockquote:\n\n>>> [!note] Things to consider\nYou should consider the following ramifications:\n\n1. consideration 1\n2. consideration 2\n>>>"
+    }
+  ]
+}

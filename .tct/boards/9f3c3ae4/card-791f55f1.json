@@ -1,0 +1,28 @@
+{
+  "list_id": "a589c4f4",
+  "position": 2.0,
+  "title": "update demo tape before new release",
+  "description": "",
+  "label_ids": [
+    "c740d3f5"
+  ],
+  "due_date": null,
+  "checklist": [],
+  "archived": false,
+  "created_at": "2026-11-06T18:25:48.817196Z",
+  "updated_at": "2026-11-06T18:26:01.238618Z",
+  "history": [
+    {
+      "at": "2026-11-06T18:25:48.817221Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-06T18:26:01.238618Z",
+      "action": "Added label 'chore'",
+      "field": "labels",
+      "old": "",
+      "new": "chore"
+    }
+  ]
+}

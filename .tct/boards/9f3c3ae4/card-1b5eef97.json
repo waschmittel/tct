@@ -1,0 +1,28 @@
+{
+  "list_id": "a589c4f4",
+  "position": 3.0,
+  "title": "multiline blockquotes fenced with >>>",
+  "description": "",
+  "label_ids": [
+    "df88cb04"
+  ],
+  "due_date": null,
+  "checklist": [],
+  "archived": false,
+  "created_at": "2026-11-06T18:26:24.999032Z",
+  "updated_at": "2026-11-06T18:27:29.813972Z",
+  "history": [
+    {
+      "at": "2026-11-06T18:26:24.999040Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-06T18:27:29.813972Z",
+      "action": "Added label 'idea'",
+      "field": "labels",
+      "old": "",
+      "new": "idea"
+    }
+  ]
+}

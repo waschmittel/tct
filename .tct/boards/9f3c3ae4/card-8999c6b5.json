@@ -1,0 +1,28 @@
+{
+  "list_id": "a589c4f4",
+  "position": 5.0,
+  "title": "detect paste into terminal and don't auto-list etc.",
+  "description": "",
+  "label_ids": [
+    "1e645dfb"
+  ],
+  "due_date": null,
+  "checklist": [],
+  "archived": false,
+  "created_at": "2026-11-06T18:29:43.331816Z",
+  "updated_at": "2026-11-06T18:29:45.970073Z",
+  "history": [
+    {
+      "at": "2026-11-06T18:29:43.331831Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-06T18:29:45.970073Z",
+      "action": "Added label 'bugfix'",
+      "field": "labels",
+      "old": "",
+      "new": "bugfix"
+    }
+  ]
+}
