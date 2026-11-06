@@ -337,7 +337,7 @@ A full overlay showing all card properties: title, description, checklist, label
 
 ### Description Editor
 
-A full Markdown editor with syntax highlighting. Supports headings, bold, italic, inline code, code blocks, lists, blockquotes, and strikethrough.
+A full Markdown editor with syntax highlighting. Supports headings, bold, italic, bold italic (`***text***`), inline code, code blocks, lists, blockquotes, and strikethrough.
 
 | Key | Action |
 |-----|--------|
@@ -350,8 +350,8 @@ A full Markdown editor with syntax highlighting. Supports headings, bold, italic
 | Ctrl+X | Cut selected text |
 | Ctrl+V | Paste from clipboard |
 | Shift+Arrows | Highlight / select text (for formatting, cut, copy) |
-| Ctrl+B | Toggle bold (`**text**`, wraps selection) |
-| Ctrl+I | Toggle italic (`*text*`, wraps selection) |
+| Ctrl+B | Toggle bold (`**text**`). Wraps the selection without its surrounding spaces; inside or on already-formatted text it removes the formatting; in a table cell without a selection it formats the whole cell |
+| Ctrl+E | Toggle italic (`*text*`), same rules; combined with bold it gives `***text***`. (`Ctrl+I` is not used: terminals send it as Tab; `Cmd+I` works where the terminal reports it) |
 | Ctrl+K | Toggle inline code (`` `text` ``, wraps selection) |
 | Ctrl+L | Insert list item (`- `) |
 | Up / Down | Move by visual (wrapped) line |

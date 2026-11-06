@@ -49,6 +49,7 @@ const MIDRULE: f32 = 0.5;
 
 static SANS: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans.ttf");
 static BOLD: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans-Bold.ttf");
+static BOLD_OBLIQUE: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans-BoldOblique.ttf");
 static OBLIQUE: &[u8] = include_bytes!("../../assets/fonts/DejaVuSans-Oblique.ttf");
 static MONO: &[u8] = include_bytes!("../../assets/fonts/DejaVuSansMono.ttf");
 
@@ -99,6 +100,7 @@ struct Fonts {
     sans: Face,
     bold: Face,
     oblique: Face,
+    bold_oblique: Face,
     mono: Face,
 }
 
@@ -114,6 +116,7 @@ impl Fonts {
             sans: Face::new(SANS)?,
             bold: Face::new(BOLD)?,
             oblique: Face::new(OBLIQUE)?,
+            bold_oblique: Face::new(BOLD_OBLIQUE)?,
             mono: Face::new(MONO)?,
         })
     }
@@ -125,6 +128,8 @@ impl Fonts {
     fn face(&self, style: Style) -> &Face {
         if style.code {
             &self.mono
+        } else if style.bold && style.italic {
+            &self.bold_oblique
         } else if style.bold {
             &self.bold
         } else if style.italic {
@@ -947,8 +952,18 @@ fn layout<'f>(
 
 /// Render `card` (from `list` of `board`) as a PDF/A-2b document in the given theme.
 pub fn render(board: &BoardMeta, list: &str, card: &Card, theme: Theme) -> anyhow::Result<Vec<u8>> {
+    render_at(board, list, card, theme, chrono::Utc::now())
+}
+
+/// Like [`render`] with an explicit "made at" time (creation date and the "Status" stamp).
+pub fn render_at(
+    board: &BoardMeta,
+    list: &str,
+    card: &Card,
+    theme: Theme,
+    now: chrono::DateTime<chrono::Utc>,
+) -> anyhow::Result<Vec<u8>> {
     let fonts = Fonts::load_for(theme)?;
-    let now = chrono::Utc::now();
     let (pages, labels) = layout(&fonts, board, list, card, now);
     emit(&pages, &fonts, board, list, card, &labels, now)
 }
@@ -1373,6 +1388,14 @@ mod tests {
                 "Unclosed **bold and `code and *italic\n\n2 * 3 * 4 = 24\n\n**\n\n####### seven hashes\n\n#no space\n\n| only | header |\n|---|---|\n\n| ragged | row |\n|---|---|\n| a |\n| a | b | c |\n| esc \\| pipe | `x` |\n|  |  |\n\n---\n\n<b>html</b> &amp; stuff".into(),
             ),
         ));
+        cases.push((
+            "13-emphasis",
+            meta.clone(),
+            plain(
+                "Emphasis",
+                "**bold** *italic* ***bold italic*** and ***unclosed\n\n- ***item*** with `code`\n\n> ***quoted*** text\n\n| ***head*** | **b** |\n|---|---|\n| *i* | ***both*** |\n\n***\n\n******".into(),
+            ),
+        ));
         cases
     }
 
@@ -1429,6 +1452,19 @@ mod tests {
         }
     }
 
+    /// Fixed "made at" time, so regenerated examples only change with their content.
+    const EXAMPLE_TIME: chrono::DateTime<chrono::Utc> =
+        chrono::DateTime::from_timestamp(1_767_225_600, 0).unwrap();
+
+    #[test]
+    fn rendering_at_a_fixed_time_is_deterministic() {
+        for (_, meta, card) in corner_cases().into_iter().take(3) {
+            let a = render_at(&meta, "To Do", &card, Theme::Color, EXAMPLE_TIME).unwrap();
+            let b = render_at(&meta, "To Do", &card, Theme::Color, EXAMPLE_TIME).unwrap();
+            assert!(a == b, "PDF output must not depend on anything but its input");
+        }
+    }
+
     /// Regenerates `docs/export-examples/*.pdf`:
     /// `cargo test write_example_pdfs -- --ignored`.
     #[test]
@@ -1438,7 +1474,7 @@ mod tests {
         for (theme, dir) in [(Theme::Mono, root.clone()), (Theme::Color, root.join("color"))] {
             std::fs::create_dir_all(&dir).unwrap();
             for (name, meta, card) in corner_cases() {
-                let pdf = render(&meta, "To Do", &card, theme).unwrap();
+                let pdf = render_at(&meta, "To Do", &card, theme, EXAMPLE_TIME).unwrap();
                 std::fs::write(dir.join(format!("{name}.pdf")), pdf).unwrap();
             }
         }

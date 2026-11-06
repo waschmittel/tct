@@ -19,5 +19,6 @@ them after changing the layout; the dates inside change on every run.
 | `10-checklist-page-break` | Checklist moved to a fresh page as a unit |
 | `11-many-labels` | Label chips wrapping over rows, due date |
 | `12-markdown-oddities` | Unclosed markers, header-only and ragged tables, raw HTML |
+| `13-emphasis` | Bold, italic and bold italic, in paragraphs, lists, quotes and table cells |
 
 `color/` holds the same twelve cases in color (`P` in the TUI, `--style color`).

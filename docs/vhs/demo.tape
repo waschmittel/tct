@@ -192,10 +192,34 @@ Tab
 Type "15 min"
 Tab
 Type "n/a"
-Sleep 1s
+Sleep 800ms
+
+# Emphasis in a table cell without a selection formats the whole cell and reflows:
+# Ctrl+B bold, Ctrl+E adds italic (bold italic), Ctrl+B again drops the bold
+Ctrl+B
+Sleep 800ms
+Ctrl+E
+Sleep 800ms
+Ctrl+B
+Sleep 800ms
 Enter
 Sleep 500ms
 Type "Table rows stay aligned."
+Sleep 600ms
+
+# Outside tables the keys open a pair; pressed inside formatted text they remove it
+Enter
+Sleep 300ms
+Ctrl+B
+Type "bold"
+Right 2
+Type " and "
+Ctrl+E
+Type "italic"
+Right
+Sleep 600ms
+Left 3
+Ctrl+E
 Sleep 1s
 
 # Save without closing (Ctrl+S), then save and close (Ctrl+Q)

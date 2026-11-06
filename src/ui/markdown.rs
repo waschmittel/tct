@@ -414,6 +414,22 @@ fn highlight_inline(text: &str, spans: &mut Vec<Span<'static>>) {
     let mut buf = String::new();
 
     while i < chars.len() {
+        if i + 2 < chars.len() && chars[i..i + 3] == ['*', '*', '*']
+            && let Some(end) = find_closing_triple(&chars, i + 3) {
+                if !buf.is_empty() {
+                    spans.push(Span::raw(std::mem::take(&mut buf)));
+                }
+                spans.push(Span::styled("***".to_string(), Style::default().fg(Color::DarkGray)));
+                let content: String = chars[i + 3..end].iter().collect();
+                spans.push(Span::styled(
+                    content,
+                    Style::default().add_modifier(Modifier::BOLD | Modifier::ITALIC),
+                ));
+                spans.push(Span::styled("***".to_string(), Style::default().fg(Color::DarkGray)));
+                i = end + 3;
+                continue;
+            }
+
         if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == '*'
             && let Some(end) = find_closing(&chars, i + 2, &['*', '*']) {
                 if !buf.is_empty() {
@@ -492,6 +508,11 @@ fn find_closing(chars: &[char], start: usize, pattern: &[char]) -> Option<usize>
         .find(|&i| chars[i] == pattern[0] && chars[i + 1] == pattern[1])
 }
 
+fn find_closing_triple(chars: &[char], start: usize) -> Option<usize> {
+    (start + 1..chars.len().saturating_sub(2))
+        .find(|&i| chars[i..i + 3] == ['*', '*', '*'])
+}
+
 fn find_closing_single(chars: &[char], start: usize, ch: char) -> Option<usize> {
     chars
         .iter()
@@ -555,6 +576,13 @@ mod tests {
     fn test_highlight_lines_heading() {
         let r = render("# Hello", Color::Cyan, WRAP_WIDTH);
         assert!(!r.lines().is_empty());
+    }
+
+    #[test]
+    fn highlight_line_bold_italic() {
+        let spans = highlight_line("a ***both*** b", Color::Cyan);
+        let m = spans.iter().find(|s| s.content == "both").expect("span");
+        assert!(m.style.add_modifier.contains(Modifier::BOLD | Modifier::ITALIC));
     }
 
     #[test]

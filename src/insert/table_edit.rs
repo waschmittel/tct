@@ -289,6 +289,24 @@ pub(crate) fn reformat_at_cursor(ta: &mut Area) -> bool {
     true
 }
 
+/// Rewrite the text of the cell under the cursor (not the delimiter row, not an
+/// empty cell) with `f` and reformat. Returns whether it did.
+pub(crate) fn map_cell_text(ta: &mut Area, f: impl FnOnce(&str) -> Option<String>) -> bool {
+    let Some(mut ctx) = context(ta) else {
+        return false;
+    };
+    if ctx.line == 1 {
+        return false;
+    }
+    let row = ctx.row();
+    let Some(new) = f(&ctx.table.rows[row][ctx.cell]) else {
+        return false;
+    };
+    ctx.table.rows[row][ctx.cell] = new;
+    put(ta, ctx.span, &ctx.table, Target { line: ctx.line, cell: ctx.cell, off: END });
+    true
+}
+
 /// Move the cursor out of the table, below it. Opens a text line when the
 /// table ends the description (a blank line keeps following text out of the table).
 fn leave_below(ta: &mut Area, span: Span) {

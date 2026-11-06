@@ -17,6 +17,7 @@ use crate::app::LoadedBoard;
 use crate::command::Command;
 
 pub mod date_picker;
+pub mod emphasis;
 pub mod line_editor;
 pub mod line_input;
 pub mod markdown_editor;

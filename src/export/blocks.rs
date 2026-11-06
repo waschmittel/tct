@@ -2,7 +2,7 @@
 //!
 //! Mirrors the dialect the TUI preview understands (`ui/markdown.rs`): `#`
 //! headings, `-`/`*`/`1.` list items, `>` citations, fenced code, pipe
-//! tables, and `**bold**`, `*italic*`, `~~strike~~` and `` `code` `` inline.
+//! tables, and `**bold**`, `*italic*`, `***both***`, `~~strike~~` and `` `code` `` inline.
 //! Like the preview, every source line stays its own visual line.
 
 use crate::insert::table::{Table, is_table_line};
@@ -132,15 +132,19 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
     };
 
     while i < chars.len() {
-        let marker = [("**", 2), ("~~", 2), ("*", 1), ("`", 1)]
+        let marker = [("***", 3), ("**", 2), ("~~", 2), ("*", 1), ("`", 1)]
             .into_iter()
             .find(|(m, _)| chars[i..].starts_with(&m.chars().collect::<Vec<_>>()));
         if let Some((m, len)) = marker
-            && let Some(end) = find_close(&chars, i + len, m, len == 1 && m == "*")
+            && let Some(end) = find_close(&chars, i + len, m, m == "*")
         {
             flush(&mut plain, &mut runs);
             let mut style = base;
             match m {
+                "***" => {
+                    style.bold = true;
+                    style.italic = true;
+                }
                 "**" => style.bold = true,
                 "~~" => style.strike = true,
                 "*" => style.italic = true,
@@ -182,6 +186,13 @@ mod tests {
         assert!(runs.iter().any(|r| r.text == "c" && r.style.italic));
         assert!(runs.iter().any(|r| r.text == "d" && r.style.strike));
         assert!(runs.iter().any(|r| r.text == "e" && r.style.code));
+    }
+
+    #[test]
+    fn triple_star_is_bold_italic() {
+        let runs = inline("a ***b*** c", Style::default());
+        assert_eq!(plain(&runs), "a b c");
+        assert!(runs.iter().any(|r| r.text == "b" && r.style.bold && r.style.italic));
     }
 
     #[test]

@@ -16,8 +16,8 @@ expression: render_to_string(&app)
 │    │  Ctrl+V            Paste                      Ctrl+T            Insert table           │    │
 │    │                                               Ctrl+T, r / c     Add row / column       │    │
 │    │Format                                         Ctrl+T, R / C     Add before             │    │
-│    │  Ctrl+B            Bold (**text**)            Ctrl+T, x / X     Delete row / column    │    │
-│    │  Ctrl+I            Italic (*text*)            Ctrl+T, T         Delete table           │    │
+│    │  Ctrl+B            Toggle bold (**text**)     Ctrl+T, x / X     Delete row / column    │    │
+│    │  Ctrl+E            Toggle italic (*text*)     Ctrl+T, T         Delete table           │    │
 │    │  Ctrl+K            Inline code (`text`)       Ctrl+T, Arrows    Swap row / column      │    │
 │    │  Ctrl+L            Insert list item (- )      Ctrl+T, a         Cycle alignment        │    │
 │    │                                                                                        │    │

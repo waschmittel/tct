@@ -38,7 +38,7 @@ mv tct /usr/local/bin/
 - Multiple boards with named lists and cards, reorderable and archivable
 - Shift+Arrow card movement (within and across lists)
 - Inline markdown description editor with syntax highlighting and word-wrap (80 chars)
-- Markdown syntax highlighting (code blocks, headings, bold/italic, inline code, lists)
+- Markdown syntax highlighting (code blocks, headings, bold/italic/bold-italic, inline code, lists)
 - Unified card detail view — description, checklist, labels, due date in one scrollable view
 - Checklist CRUD — add, edit, toggle, delete, reorder items
 - Board-level global labels with auto-generated pastel colors

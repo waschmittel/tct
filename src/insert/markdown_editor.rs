@@ -7,6 +7,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui_textarea::CursorMove;
 
 use super::line_input::has_ctrl_or_cmd;
+use super::emphasis;
 use super::table_edit::{self, grouped};
 use super::text_area_input::TextAreaInput;
 use super::{InsertHandler, InsertOutcome, InsertSurface};
@@ -179,11 +180,13 @@ impl MarkdownEditor {
                 InsertOutcome::Stay
             }
             (KeyCode::Char('b'), m) if has_ctrl_or_cmd(m) => {
-                grouped(&mut self.input.textarea, None, |ta| wrap_selection_or_insert(ta, "**", "**"));
+                grouped(&mut self.input.textarea, None, |ta| emphasis::toggle(ta, emphasis::BOLD));
                 InsertOutcome::Stay
             }
-            (KeyCode::Char('i'), m) if has_ctrl_or_cmd(m) => {
-                grouped(&mut self.input.textarea, None, |ta| wrap_selection_or_insert(ta, "*", "*"));
+            // Ctrl+I is Tab on a terminal, so italic lives on Ctrl+E (emphasis); Cmd+I
+            // still reaches here as 'i' on terminals that report Super.
+            (KeyCode::Char('e' | 'i'), m) if has_ctrl_or_cmd(m) => {
+                grouped(&mut self.input.textarea, None, |ta| emphasis::toggle(ta, emphasis::ITALIC));
                 InsertOutcome::Stay
             }
             (KeyCode::Char('k'), m) if has_ctrl_or_cmd(m) => {
@@ -776,6 +779,44 @@ mod tests {
         // Bold the selection
         e.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL), None);
         assert_eq!(editor_lines(&e), vec!["format **me** please".to_string()]);
+    }
+
+    fn ctrl(e: &mut MarkdownEditor, c: char) {
+        e.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL), None);
+    }
+
+    #[test]
+    fn bold_selection_skips_surrounding_whitespace() {
+        let mut e = make_editor("one two three four");
+        e.input.textarea.move_cursor(CursorMove::Jump(0, 3));
+        e.input.textarea.start_selection();
+        e.input.textarea.move_cursor(CursorMove::Jump(0, 14));
+        ctrl(&mut e, 'b');
+        assert_eq!(editor_lines(&e), vec!["one **two three** four".to_string()]);
+    }
+
+    #[test]
+    fn bold_inside_bold_removes_it() {
+        let mut e = make_editor("a **bold** b");
+        e.input.textarea.move_cursor(CursorMove::Jump(0, 6));
+        ctrl(&mut e, 'b');
+        assert_eq!(editor_lines(&e), vec!["a bold b".to_string()]);
+        assert_eq!(editor_cursor(&e), (0, 4));
+    }
+
+    #[test]
+    fn emphasis_without_selection_in_table_cell_formats_cell_and_reformats() {
+        let mut e = make_editor("| a | b |\n|---|---|\n| one | two |");
+        e.input.textarea.move_cursor(CursorMove::Jump(2, 3));
+        ctrl(&mut e, 'b');
+        let lines = editor_lines(&e);
+        assert!(lines[2].contains("**one**"), "{lines:?}");
+        assert_eq!(lines[0].len(), lines[2].len(), "{lines:?}");
+        ctrl(&mut e, 'b');
+        assert!(editor_lines(&e)[2].contains("| one "));
+        ctrl(&mut e, 'b');
+        ctrl(&mut e, 'e');
+        assert!(editor_lines(&e)[2].contains("***one***"));
     }
 
     #[test]
