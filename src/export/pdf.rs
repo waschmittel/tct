@@ -164,8 +164,25 @@ struct TableLayout<'a> {
     left: f32,
     size: f32,
     pad: (f32, f32),
-    /// Vertical column lines: only for tables with more than 7 rows or 3 columns.
-    grid: bool,
+    /// Thin vertical lines between columns and at both edges.
+    col_lines: bool,
+    /// Thin rules between body rows (matrices only).
+    row_lines: bool,
+    /// Matrix (empty top-left cell): the corner cell is open above and to the
+    /// left, and a heavier line separates the labels from the contents.
+    matrix: bool,
+}
+
+impl TableLayout<'_> {
+    /// Top and bottom rule: heavy, unless row separators make them one of many.
+    fn outer_rule(&self) -> f32 {
+        if self.row_lines { MIDRULE } else { HEAVY_RULE }
+    }
+
+    /// A matrix without row separators has no top and bottom border at all.
+    fn open_ends(&self) -> bool {
+        self.matrix && !self.row_lines
+    }
 }
 
 struct Flow<'f> {
@@ -174,8 +191,6 @@ struct Flow<'f> {
     y: f32,
     /// A throw-away flow used to measure content; it skips page-break planning.
     measuring: bool,
-    /// Bottom edge of the last code row drawn, for closing a frame at a page break.
-    last_code_bottom: f32,
 }
 
 impl<'f> Flow<'f> {
@@ -187,16 +202,18 @@ impl<'f> Flow<'f> {
         if self.mono() { BLACK } else { INK }
     }
 
+    /// Grays (secondary text, light rules, code tint) are shared by both
+    /// themes; only chromatic things differ.
     fn muted(&self) -> Rgb {
-        if self.mono() { BLACK } else { MUTED }
+        MUTED
     }
 
     fn rule_color(&self) -> Rgb {
-        if self.mono() { BLACK } else { RULE }
+        RULE
     }
 
     fn new(fonts: &'f Fonts) -> Self {
-        Self { fonts, pages: vec![Vec::new()], y: MARGIN, measuring: false, last_code_bottom: MARGIN }
+        Self { fonts, pages: vec![Vec::new()], y: MARGIN, measuring: false }
     }
 
     /// Start a new page unless `build`'s output fits on one page but not on
@@ -319,8 +336,8 @@ impl<'f> Flow<'f> {
                     y: top + height * 0.08,
                     w: seg.w + 2.0,
                     h: height * 0.86,
-                    fill: (!self.mono()).then_some(TINT),
-                    stroke: self.mono().then_some(BLACK),
+                    fill: Some(TINT),
+                    stroke: None,
                 });
             }
             self.push(Op::Text {
@@ -356,7 +373,7 @@ impl<'f> Flow<'f> {
         self.need(40.0);
         self.y += 14.0;
         let runs = [Run { text: title.to_uppercase(), style: Style { bold: true, ..Style::default() } }];
-        let thickness = if self.mono() { 0.8 } else { 0.6 };
+        let thickness = 0.6;
         self.paragraph(&runs, 9.0, MARGIN, CONTENT_W, self.muted());
         self.y += 1.0;
         self.rule(self.rule_color(), thickness);
@@ -498,10 +515,9 @@ impl<'f> Flow<'f> {
     }
 
     /// Code keeps its line structure; lines wider than the block are broken
-    /// at the margin rather than clipped, so no content is lost. The
-    /// monochrome theme outlines the block instead of tinting it.
+    /// at the margin rather than clipped, so no content is lost. The block is
+    /// tinted gray in both themes.
     fn code_block(&mut self, lines: &[String]) {
-        let framed = self.mono();
         let size = CODE;
         let height = size * LEADING;
         let mono = &self.fonts.mono;
@@ -518,27 +534,10 @@ impl<'f> Flow<'f> {
             rows.push(row);
         }
         self.y += 2.0;
-        let mut open = false;
         for (i, text) in rows.iter().enumerate() {
-            let before = self.pages.len();
             self.need(Self::lines_to_keep(i, rows.len()) as f32 * height);
-            if framed && open && self.pages.len() != before {
-                self.code_frame_edge(before - 1, self.last_code_bottom);
-                open = false;
-            }
             let y = self.y;
-            if !framed {
-                self.push(Op::Rect { x: MARGIN, y, w: CONTENT_W, h: height, fill: Some(TINT), stroke: None });
-            }
-            if framed {
-                if !open {
-                    self.push(Op::Line { x1: MARGIN, y1: y, x2: MARGIN + CONTENT_W, y2: y, color: BLACK, width: 0.8 });
-                    open = true;
-                }
-                for x in [MARGIN, MARGIN + CONTENT_W] {
-                    self.push(Op::Line { x1: x, y1: y, x2: x, y2: y + height, color: BLACK, width: 0.8 });
-                }
-            }
+            self.push(Op::Rect { x: MARGIN, y, w: CONTENT_W, h: height, fill: Some(TINT), stroke: None });
             self.push(Op::Text {
                 x: MARGIN + 6.0,
                 y: y + size * 1.05,
@@ -548,18 +547,8 @@ impl<'f> Flow<'f> {
                 color: self.ink(),
             });
             self.y += height;
-            self.last_code_bottom = self.y;
-        }
-        if framed && open {
-            let y = self.y;
-            self.push(Op::Line { x1: MARGIN, y1: y, x2: MARGIN + CONTENT_W, y2: y, color: BLACK, width: 0.8 });
         }
         self.y += 2.0;
-    }
-
-    /// Close a framed code block with a bottom edge on page `page`.
-    fn code_frame_edge(&mut self, page: usize, y: f32) {
-        self.pages[page].push(Op::Line { x1: MARGIN, y1: y, x2: MARGIN + CONTENT_W, y2: y, color: BLACK, width: 0.8 });
     }
 
     /// Column widths: the full text where it fits; otherwise every column
@@ -603,16 +592,34 @@ impl<'f> Flow<'f> {
     /// Booktabs-like: heavy rules above and below, a light rule under the
     /// centered bold header; tables with more than 7 rows or 3 columns also get
     /// thin vertical lines between columns and at both edges. No row separators.
+    ///
+    /// A *matrix* (empty top-left cell, `Table::is_matrix`) has labels on the
+    /// left too, so it differs in these ways:
+    /// - the first column is bold like the header;
+    /// - the corner cell has no rule above it and no line to its left;
+    /// - heavy lines (`HEAVY_RULE`) always separate the labels from the
+    ///   contents: under the header row and right of the first column;
+    /// - column lines follow the *content* columns: only with more than 3 of
+    ///   them (so more than 4 columns in all);
+    /// - without row separators it has no top or bottom border at all;
+    /// - thin row separators appear with more than 7 rows (as for column lines in normal tables), whatever the column
+    ///   count; then the top and bottom rules are as thin as those separators.
     fn table(&mut self, table: &Table) {
         const PAD_Y: f32 = 2.5;
         let header_style = Style { bold: true, ..Style::default() };
+        let matrix = table.is_matrix();
         let cells: Vec<Vec<Vec<Run>>> = table
             .rows
             .iter()
             .enumerate()
             .map(|(r, row)| {
-                let base = if r == 0 { header_style } else { Style::default() };
-                row.iter().map(|text| blocks::inline(text, base)).collect()
+                row.iter()
+                    .enumerate()
+                    .map(|(c, text)| {
+                        let bold = r == 0 || (matrix && c == 0);
+                        blocks::inline(text, if bold { header_style } else { Style::default() })
+                    })
+                    .collect()
             })
             .collect();
         let (mut size, mut pad_x) = (9.5, 5.0);
@@ -641,27 +648,54 @@ impl<'f> Flow<'f> {
                 (wrapped, lines as f32 * height + 2.0 * PAD_Y)
             })
             .collect();
-        let layout = TableLayout { widths: &widths, aligns: &table.aligns, left, size: size, pad: (pad_x, PAD_Y), grid: table.rows.len() > 7 || table.cols() > 3 };
+        let (col_lines, row_lines) = if matrix {
+            (table.cols() - 1 > 3, table.rows.len() > 7)
+        } else {
+            (table.rows.len() > 7 || table.cols() > 3, false)
+        };
+        let layout = TableLayout { widths: &widths, aligns: &table.aligns, left, size, pad: (pad_x, PAD_Y), col_lines, row_lines, matrix };
 
         let first_rows = rows.iter().take(2).map(|(_, h)| h).sum::<f32>();
         self.need(first_rows + 2.0);
         self.y += 2.0;
-        self.rule_across(self.y, left, total, HEAVY_RULE);
+        self.top_rule(&layout, total);
         self.table_row(&rows[0], true, &layout);
-        self.rule_across(self.y, left, total, MIDRULE);
-        for row in &rows[1..] {
-            if self.y + row.1 > BOTTOM && self.y > MARGIN {
+        self.header_rule(&layout, total);
+        for (i, row) in rows[1..].iter().enumerate() {
+            if layout.row_lines && i > 0 {
                 self.rule_across(self.y, left, total, MIDRULE);
+            }
+            if self.y + row.1 > BOTTOM && self.y > MARGIN {
+                if !layout.open_ends() {
+                    self.rule_across(self.y, left, total, MIDRULE);
+                }
                 self.pages.push(Vec::new());
                 self.y = MARGIN + 2.0;
-                self.rule_across(self.y, left, total, HEAVY_RULE);
+                self.top_rule(&layout, total);
                 self.table_row(&rows[0], true, &layout);
-                self.rule_across(self.y, left, total, MIDRULE);
+                self.header_rule(&layout, total);
             }
             self.table_row(row, false, &layout);
         }
-        self.rule_across(self.y, left, total, HEAVY_RULE);
+        if !layout.open_ends() {
+            self.rule_across(self.y, left, total, layout.outer_rule());
+        }
         self.y += 6.0;
+    }
+
+    /// Rule above the header; a matrix leaves the empty corner cell open.
+    fn top_rule(&mut self, t: &TableLayout, total: f32) {
+        if t.open_ends() {
+            return;
+        }
+        let skip = if t.matrix { t.widths[0] } else { 0.0 };
+        self.rule_across(self.y, t.left + skip, total - skip, t.outer_rule());
+    }
+
+    /// Rule under the header: light, but heavy in a matrix where it separates
+    /// the column labels from the contents.
+    fn header_rule(&mut self, t: &TableLayout, total: f32) {
+        self.rule_across(self.y, t.left, total, if t.matrix { HEAVY_RULE } else { MIDRULE });
     }
 
     fn table_row(&mut self, (wrapped, row_h): &(Vec<Vec<Vec<Seg>>>, f32), header: bool, t: &TableLayout) {
@@ -682,12 +716,15 @@ impl<'f> Flow<'f> {
             }
             x += t.widths[c];
         }
-        if t.grid {
-            let mut vx = t.left;
-            for w in std::iter::once(&0.0).chain(t.widths) {
-                vx += w;
-                self.push(Op::Line { x1: vx, y1: top, x2: vx, y2: top + row_h, color: self.ink(), width: MIDRULE });
+        let mut vx = t.left;
+        for (i, w) in std::iter::once(&0.0).chain(t.widths).enumerate() {
+            vx += w;
+            let divider = t.matrix && i == 1; // labels | contents
+            if !(t.col_lines || divider) || (t.matrix && header && i == 0) {
+                continue;
             }
+            let width = if divider { HEAVY_RULE } else { MIDRULE };
+            self.push(Op::Line { x1: vx, y1: top, x2: vx, y2: top + row_h, color: self.ink(), width });
         }
         self.y += row_h;
     }
@@ -771,7 +808,7 @@ fn stamp(t: chrono::DateTime<chrono::Utc>) -> String {
 
 /// Running header (from the second page on) and footer of page `n` of `total`.
 fn page_chrome(fonts: &Fonts, card: &Card, location: &str, created: &str, n: usize, total: usize) -> Vec<Op> {
-    let (muted, rule) = if fonts.mono_theme() { (BLACK, BLACK) } else { (MUTED, RULE) };
+    let (muted, rule) = (MUTED, RULE);
     let small = |x: f32, y: f32, text: String| Op::Text {
         x,
         y,
@@ -1131,6 +1168,113 @@ mod tests {
         texts(page).iter().filter(|t| **t == needle).count()
     }
 
+    /// Vertical lines of the given weight, as (x, y1, y2).
+    fn verticals(page: &[Op], weight: f32) -> Vec<(f32, f32, f32)> {
+        page.iter()
+            .filter_map(|op| match op {
+                Op::Line { x1, y1, x2, y2, width, .. } if x1 == x2 && *width == weight => Some((*x1, *y1, *y2)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Table rules of the given weight, as (y, x1, x2) in drawing order.
+    fn rules(page: &[Op], weight: f32) -> Vec<(f32, f32, f32)> {
+        page.iter()
+            .filter_map(|op| match op {
+                Op::Line { x1, y1, x2, y2, width, .. } if y1 == y2 && *width == weight => Some((*y1, *x1, *x2)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn table_page(table: &str) -> Vec<Op> {
+        let mut card = Card::new("T".into());
+        card.description = table.into();
+        laid_out(&card).remove(0)
+    }
+
+    #[test]
+    fn matrix_first_column_is_bold_and_normal_tables_are_not() {
+        let bold = |page: &[Op], t: &str| page.iter().any(|op| matches!(op, Op::Text { text, style, .. } if text == t && style.bold));
+        let m = table_page("|  | A |\n|---|---|\n| row | 1 |");
+        assert!(bold(&m, "row") && !bold(&m, "1") && bold(&m, "A"));
+        let n = table_page("| H | A |\n|---|---|\n| row | 1 |");
+        assert!(!bold(&n, "row"));
+    }
+
+    fn matrix(cols: usize, body_rows: usize) -> String {
+        let head: Vec<String> = (1..cols).map(|c| format!("C{c}")).collect();
+        let delim = vec!["---"; cols].join("|");
+        let mut t = format!("|  | {} |\n|{delim}|\n", head.join(" | "));
+        for r in 0..body_rows {
+            t.push_str(&format!("| r{r} |{}\n", " x |".repeat(cols - 1)));
+        }
+        t
+    }
+
+    #[test]
+    fn matrix_corner_has_no_rule_above_and_no_line_left() {
+        // Few rows: no row separators, so no top or bottom border either; only
+        // the heavy rule under the header remains.
+        let m = table_page(&matrix(3, 2));
+        let hm = rules(&m, HEAVY_RULE);
+        assert_eq!(hm.len(), 1, "just the header rule");
+        // With row separators the top rule starts right of the open corner.
+        let r = table_page(&matrix(3, 8));
+        let (thin, header) = (rules(&r, MIDRULE), rules(&r, HEAVY_RULE)[0]);
+        assert!(thin[0].1 > header.1 + 10.0, "top rule must start right of the corner");
+        assert_eq!(thin[0].2, header.2);
+        assert!(thin.last().unwrap().1 <= header.1 + 0.1, "the bottom rule stays whole");
+        // Wide matrix: left edge line is dropped on the header row only.
+        let g = table_page(&matrix(5, 2));
+        let thin = verticals(&g, MIDRULE);
+        let left = thin.iter().map(|l| l.0).fold(f32::MAX, f32::min);
+        assert_eq!(thin.iter().filter(|l| l.0 == left).count(), 2, "left edge on the two body rows only");
+    }
+
+    #[test]
+    fn matrix_labels_are_separated_from_contents_by_heavy_lines() {
+        let m = table_page(&matrix(3, 2));
+        // Heavy divider right of the labels, over header + body rows; no thin
+        // column lines with only 2 content columns.
+        assert_eq!(verticals(&m, HEAVY_RULE).len(), 3);
+        assert!(verticals(&m, MIDRULE).is_empty());
+        assert_eq!(rules(&m, MIDRULE).len(), 0, "no row separators and no light header rule");
+        assert_eq!(rules(&m, HEAVY_RULE).len(), 1, "header rule only; no top or bottom border");
+    }
+
+    #[test]
+    fn matrix_column_lines_start_at_four_content_columns() {
+        let thin = |cols| verticals(&table_page(&matrix(cols, 2)), MIDRULE).len();
+        assert_eq!(thin(4), 0, "3 content columns");
+        // Header: 4 (no left edge); each of the 2 body rows: 5. The divider after the labels is heavy.
+        assert_eq!(thin(5), 4 + 2 * 5, "4 content columns");
+    }
+
+    #[test]
+    fn matrix_row_separators_start_above_eight_rows_regardless_of_columns() {
+        let seps = |cols, body| rules(&table_page(&matrix(cols, body)), MIDRULE).len();
+        assert_eq!(seps(3, 6), 0, "7 rows in all");
+        // 6 between the 7 body rows + the (now thin) top and bottom rules
+        assert_eq!(seps(3, 7), 8, "8 rows");
+        assert_eq!(seps(6, 7), 8, "column count is irrelevant");
+        assert_eq!(seps(6, 3), 0, "few rows, many columns: no row separators");
+    }
+
+    #[test]
+    fn matrix_outer_rules_are_as_thin_as_row_separators_when_there_are_any() {
+        let many = table_page(&matrix(3, 7));
+        let few = table_page(&matrix(3, 3));
+        // Heavy: only the header rule remains in the long one.
+        assert_eq!(rules(&many, HEAVY_RULE).len(), 1);
+        assert_eq!(rules(&few, HEAVY_RULE).len(), 1, "only the header rule: no outer borders");
+        assert!(rules(&few, MIDRULE).is_empty());
+        // A normal table keeps its outer borders.
+        let plain = table_page(&matrix(3, 3).replacen("|  |", "| H |", 1));
+        assert_eq!(rules(&plain, HEAVY_RULE).len(), 2);
+    }
+
     #[test]
     fn long_tables_repeat_their_header_on_every_page() {
         let mut card = Card::new("T".into());
@@ -1208,24 +1352,20 @@ mod tests {
         assert!(x_of("hundred").unwrap() >= marker_end + 3.0);
     }
 
-    fn mono_layout(card: &Card) -> Vec<Vec<Op>> {
-        let fonts = Fonts::load_for(Theme::Mono).unwrap();
-        layout(&fonts, &board(), "L", card, chrono::Utc::now()).0
-    }
-
     #[test]
-    fn mono_draws_nothing_but_black_lines_and_text_and_no_fills() {
+    fn mono_uses_only_black_and_grays() {
         let fonts = Fonts::load_for(Theme::Mono).unwrap();
+        let gray = |c: Rgb| c == BLACK || c == INK || c == MUTED || c == RULE || c == TINT;
         for (name, meta, card) in corner_cases() {
             let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
             for (n, page) in pages.iter().enumerate() {
                 let chrome = page_chrome(&fonts, &card, "B › L", "Status 2026-01-01 00:00", n, pages.len());
                 for op in page.iter().chain(&chrome) {
                     match op {
-                        Op::Text { color, .. } | Op::Line { color, .. } => assert_eq!(*color, BLACK, "{name} p{n}"),
+                        Op::Text { color, .. } | Op::Line { color, .. } => assert!(gray(*color), "{name} p{n}: {color:?}"),
                         Op::Rect { fill, stroke, .. } => {
-                            assert!(fill.is_none(), "{name} p{n}: filled rectangle");
-                            assert!(stroke.is_none_or(|c| c == BLACK), "{name} p{n}: coloured outline");
+                            assert!(fill.is_none_or(|c| c == TINT), "{name} p{n}: colored fill");
+                            assert!(stroke.is_none_or(gray), "{name} p{n}: colored outline");
                         }
                     }
                 }
@@ -1257,30 +1397,20 @@ mod tests {
     }
 
     #[test]
-    fn mono_outlines_labels_and_code_instead_of_tinting() {
+    fn mono_outlines_labels_but_tints_code_gray() {
         let mut card = Card::new("T".into());
-        card.description = "`inline`\n\n```\none\n```".into();
+        card.description = "`inline`\n\n```\none\n```\n\n> quoted".into();
         let mut meta = board();
         meta.labels.push(crate::model::label::Label::new("urgent".into(), crate::model::label::LabelColor::Red));
         card.label_ids.push(meta.labels[0].id.clone());
         let fonts = Fonts::load_for(Theme::Mono).unwrap();
         let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
         let outlined = pages[0].iter().filter(|op| matches!(op, Op::Rect { stroke: Some(_), fill: None, .. })).count();
-        assert_eq!(outlined, 2, "the label chip and the inline code");
-        let frame_lines = pages[0].iter().filter(|op| matches!(op, Op::Line { x1, x2, y1, y2, width, .. } if (x1 == x2 || y1 == y2) && *width == 0.8)).count();
-        assert!(frame_lines >= 4, "top, bottom, left and right of the code frame: {frame_lines}");
-    }
-
-    #[test]
-    fn mono_code_frames_are_closed_at_page_breaks() {
-        let mut card = Card::new("T".into());
-        card.description = format!("```\n{}\n```", lines("row", 120));
-        let pages = mono_layout(&card);
-        assert!(pages.len() >= 2);
-        for (n, page) in pages.iter().enumerate() {
-            let caps = page.iter().filter(|op| matches!(op, Op::Line { y1, y2, x1, x2, width, .. } if y1 == y2 && (x2 - x1) >= CONTENT_W - 1.0 && *width == 0.8)).count();
-            assert!(caps >= 2, "page {n} has {caps} frame caps");
-        }
+        assert_eq!(outlined, 1, "only the label chip is outlined");
+        let tinted = pages[0].iter().filter(|op| matches!(op, Op::Rect { fill: Some(TINT), .. })).count();
+        assert_eq!(tinted, 2, "inline code and the code block");
+        let gray_quote = pages[0].iter().any(|op| matches!(op, Op::Text { text, color, .. } if text == "quoted" && *color == MUTED));
+        assert!(gray_quote, "quotes are gray");
     }
 
     #[test]
@@ -1305,6 +1435,14 @@ mod tests {
         }
 
         let mut cases = Vec::new();
+        let mut showcase = plain("Release 2.0 — planning overview", SHOWCASE.into());
+        showcase.label_ids = meta.labels.iter().take(3).map(|l| l.id.clone()).collect();
+        showcase.due_date = chrono::NaiveDate::from_ymd_opt(2030, 6, 30);
+        showcase.checklist = [("Freeze the feature list", true), ("Write the migration guide", true), ("Run the load test", false), ("Tag the release", false)]
+            .into_iter()
+            .map(|(text, completed)| ChecklistItem { text: text.into(), completed })
+            .collect();
+        cases.push(("00-showcase", meta.clone(), showcase));
         cases.push(("01-empty-card", meta.clone(), Card::new(String::new())));
         cases.push((
             "02-very-long-title",
@@ -1406,8 +1544,59 @@ mod tests {
                 "**bold** *italic* ***bold italic*** and ***unclosed\n\n- ***item*** with `code`\n\n> ***quoted*** text\n\n| ***head*** | **b** |\n|---|---|\n| *i* | ***both*** |\n\n***\n\n******".into(),
             ),
         ));
+        let mut matrix = String::from("A matrix has an empty top-left cell; its first column labels the rows.\n\n");
+        matrix.push_str("|  | A | B |\n|---|:-:|--:|\n| **x** | 1 | 2 |\n| y | 3 | 4 |\n\n");
+        matrix.push_str("Whitespace-only corner and emphasis in the labels:\n\n|   | north | south | east | west |\n|---|---|---|---|---|\n| *italic* | 1 | 2 | 3 | 4 |\n| ***both*** | 5 | 6 | 7 | 8 |\n| `code` | 9 | 10 | 11 | 12 |\n\n");
+        matrix.push_str("Wrapping labels and cells, and empty row labels:\n\n|  | Short | Long |\n|---|---|---|\n| a row label that is long enough to wrap inside its column | x | a cell that is long enough to wrap as well, over several lines |\n|  | no label | still fine |\n\n");
+        matrix.push_str("Header-only matrix and a one-column matrix:\n\n|  | only header |\n|---|---|\n\n|  |\n|---|\n| lonely |\n\n");
+        matrix.push_str("Many rows: a grid with row separators, repeating its header across pages:\n\n|  | Q1 | Q2 | Q3 | Q4 |\n|---|--:|--:|--:|--:|\n");
+        for i in 0..90 {
+            matrix.push_str(&format!("| region {i} | {} | {} | {} | {} |\n", i, i * 2, i * 3, i * 4));
+        }
+        cases.push(("14-matrix", meta.clone(), plain("Matrix tables", matrix)));
         cases
     }
+
+    const SHOWCASE: &str = "\
+Short, readable summary of the release plan with **bold**, *italic* and `inline code`.
+
+# Goals
+
+- Ship the new **export** pipeline
+- Cut start-up time in half
+  - measured on the reference laptop
+  - reported in the release notes
+1. Freeze
+2. Test
+3. Release
+
+> Scope is fixed; dates are not.
+
+# Timeline
+
+| Phase | Owner | Weeks |
+|:--|:-:|--:|
+| Design | Ada | 2 |
+| Build | Grace | 6 |
+| Verify | Linus | 3 |
+
+# Responsibilities
+
+A matrix labels its rows as well as its columns (empty top-left cell):
+
+|  | Design | Build | Verify |
+|---|:-:|:-:|:-:|
+| Ada | owner | review | — |
+| Grace | review | owner | support |
+| Linus | — | support | owner |
+
+# Notes
+
+```
+cargo build --release
+./scripts/package.sh
+```
+";
 
     #[test]
     fn corner_cases_render_as_valid_pdf_a() {
@@ -1484,6 +1673,10 @@ mod tests {
         for (theme, dir) in [(Theme::Mono, root.clone()), (Theme::Color, root.join("color"))] {
             std::fs::create_dir_all(&dir).unwrap();
             for (name, meta, card) in corner_cases() {
+                // Color is shown by the showcase only; the rest are monochrome.
+                if !name.starts_with("00-") && theme == Theme::Color {
+                    continue;
+                }
                 let pdf = render_at(&meta, "To Do", &card, theme, EXAMPLE_TIME).unwrap();
                 std::fs::write(dir.join(format!("{name}.pdf")), pdf).unwrap();
             }

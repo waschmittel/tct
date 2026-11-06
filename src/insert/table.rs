@@ -206,6 +206,13 @@ impl Table {
         self.aligns.len()
     }
 
+    /// A table whose top-left cell is empty is a *matrix*: its labels sit on the
+    /// left as well as on top. Readers (read view, PDF) style the first column
+    /// like the header and leave the empty corner open.
+    pub fn is_matrix(&self) -> bool {
+        self.rows.first().and_then(|r| r.first()).is_some_and(|c| c.trim().is_empty())
+    }
+
     pub fn render(&self) -> Rendered {
         let widths: Vec<usize> = (0..self.cols())
             .map(|c| {
@@ -338,6 +345,13 @@ fn delimiter_cell(align: Align, width: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empty_top_left_cell_makes_a_matrix() {
+        let parse = |l: &[&str]| Table::parse(&l.iter().map(|s| s.to_string()).collect::<Vec<_>>()).unwrap();
+        assert!(parse(&["|  | a |", "|---|---|", "| r | 1 |"]).is_matrix());
+        assert!(!parse(&["| h | a |", "|---|---|", "| r | 1 |"]).is_matrix());
+    }
 
     fn lines(s: &[&str]) -> Vec<String> {
         s.iter().map(|l| l.to_string()).collect()

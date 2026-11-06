@@ -9,8 +9,8 @@ pub mod web;
 
 pub use pdf::render as card_pdf;
 
-/// How the PDF looks: pure black on white for monochrome printers (the
-/// default), or the same layout in color.
+/// How the PDF looks: black text on white with gray accents for monochrome
+/// printers (the default), or the same layout in color.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Theme {
     #[default]

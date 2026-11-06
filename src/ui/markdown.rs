@@ -108,14 +108,15 @@ fn render_table(block: &[&str], accent: Color) -> Vec<Line<'static>> {
     let Some(table) = Table::parse(&owned) else {
         return block.iter().map(|l| Line::from(highlight_line(l, accent))).collect();
     };
+    let matrix = table.is_matrix();
     table
         .render()
         .lines
         .iter()
         .enumerate()
         .map(|(i, line)| match i {
-            1 => rule_line(line),
-            _ => row_line(line, i == 0, accent),
+            1 => rule_line(line, matrix),
+            _ => row_line(line, i == 0, matrix, accent),
         })
         .collect()
 }
@@ -124,37 +125,48 @@ fn border_style() -> Style {
     Style::default().fg(Color::DarkGray)
 }
 
-fn row_line(line: &str, header: bool, accent: Color) -> Line<'static> {
+/// One table row. In a matrix (empty top-left cell) the first column is bold
+/// like the header, and the header row has no border left of the open corner.
+fn row_line(line: &str, header: bool, matrix: bool, accent: Color) -> Line<'static> {
     let mut spans = Vec::new();
+    let mut pipes = 0; // unescaped pipes seen so far; the first cell sits after pipe 1
     for span in highlight_line(line, accent) {
-        let style = if header { span.style.add_modifier(Modifier::BOLD) } else { span.style };
         let mut text = String::new();
         let mut escaped = false;
+        let bold = |pipes: usize| header || (matrix && pipes == 1);
+        let styled = |pipes: usize| if bold(pipes) { span.style.add_modifier(Modifier::BOLD) } else { span.style };
         for c in span.content.chars() {
             if c == '|' && !escaped {
                 if !text.is_empty() {
-                    spans.push(Span::styled(std::mem::take(&mut text), style));
+                    spans.push(Span::styled(std::mem::take(&mut text), styled(pipes)));
                 }
-                spans.push(Span::styled("│", border_style()));
+                pipes += 1;
+                if matrix && header && pipes == 1 {
+                    spans.push(Span::raw(" "));
+                } else {
+                    spans.push(Span::styled("│", border_style()));
+                }
             } else {
                 text.push(c);
             }
             escaped = c == '\\' && !escaped;
         }
         if !text.is_empty() {
-            spans.push(Span::styled(text, style));
+            spans.push(Span::styled(text, styled(pipes)));
         }
     }
     Line::from(spans)
 }
 
-fn rule_line(line: &str) -> Line<'static> {
+/// The rule under the header. In a matrix the header row has no left border,
+/// so the rule opens the frame and gets a corner (`┌`) instead of a `├`.
+fn rule_line(line: &str, matrix: bool) -> Line<'static> {
     let first = line.find('|');
     let last = line.rfind('|');
     let text: String = line
         .char_indices()
         .map(|(i, c)| match c {
-            '|' if Some(i) == first => '├',
+            '|' if Some(i) == first => if matrix { '┌' } else { '├' },
             '|' if Some(i) == last => '┤',
             '|' => '┼',
             ' ' if first.is_none_or(|f| i < f) => ' ',
@@ -539,6 +551,21 @@ mod tests {
         let r = render("| a | bb |\n|:-|-:|\n| ccc | d |", Color::Cyan, 10);
         let rows: Vec<String> = r.lines().iter().map(text).collect();
         assert_eq!(rows, ["│  a  │ bb  │", "├─────┼─────┤", "│ ccc │   d │"]);
+    }
+
+    #[test]
+    fn matrix_corner_is_open_and_first_column_bold() {
+        let r = render("|  | x |\n|---|---|\n| row | 1 |", Color::Cyan, 10);
+        let rows: Vec<String> = r.lines().iter().map(text).collect();
+        assert!(rows[0].starts_with(' ') && !rows[0].starts_with('│'), "no border left of the corner: {:?}", rows[0]);
+        assert!(rows[1].starts_with('┌'), "the open corner gets a corner glyph, not a tee: {:?}", rows[1]);
+        assert!(rows[2].starts_with('│'));
+        let bold = |l: &Line, t: &str| l.spans.iter().any(|s| s.content.contains(t) && s.style.add_modifier.contains(Modifier::BOLD));
+        assert!(bold(&r.lines()[2], "row") && !bold(&r.lines()[2], "1"));
+        // A normal table keeps its left border and plain first column.
+        let n = render("| h | x |\n|---|---|\n| row | 1 |", Color::Cyan, 10);
+        assert!(text(&n.lines()[0]).starts_with('│') && text(&n.lines()[1]).starts_with('├'));
+        assert!(!bold(&n.lines()[2], "row"));
     }
 
     #[test]

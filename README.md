@@ -52,7 +52,7 @@ mv tct /usr/local/bin/
 - Auto-continuing lists in editor
 - Per-board configurable accent color (pastel palette cycle with 'c', or free HSL color picker with 'C')
 - Periodic filesystem reload (every 15s) for background sync support
-- PDF export of a card (PDF/A, fonts embedded, nothing to install) — black-and-white for monochrome printers by default, or in color; long descriptions break across pages sensibly (see below)
+- PDF export of a card (PDF/A, fonts embedded, nothing to install) — black and gray for monochrome printers by default, or in color; long descriptions break across pages sensibly (see below)
 - Full CLI interface for scripting and AI agent use (`tct --help`)
 
 ## Build from source
@@ -182,7 +182,7 @@ Export the selected card — title, labels, due date, markdown description (tabl
 included) and checklist — as a PDF/A document. The fonts are built into the
 binary, so it works the same on any machine.
 
-- In the TUI press `p` for a **black-and-white** PDF (the default, made for
+- In the TUI press `p` for a **black-and-gray** PDF (the default, made for
   monochrome printers) or `P` for a **color** one, from the board view or the
   card detail. A small dialog asks where to save: type a path or browse folders
   with Up/Down and Tab. It starts in the folder you last exported to and
@@ -198,9 +198,19 @@ tct cards "My Project" --export "Fix login" --out ~/Desktop  # into a folder, or
 In the [browser version](docs/docker/README.md) the same keys send the PDF to your
 browser as a download instead of opening the save dialog.
 
+A table whose top-left cell is empty is treated as a *matrix* (labels on the left
+too): its first column is bold like the header and the empty corner is left open.
+In the PDF, heavier lines separate the labels from the contents; matrices with
+more than 3 content columns get thin column lines, and matrices with more than 8
+rows get thin row separators (with thin top and bottom rules); without row
+separators a matrix has no top or bottom border.
+
 Sections, tables, code blocks and the checklist are kept together on a page where
 they fit; long tables repeat their header row. Sample output for awkward inputs is
-in [docs/export-examples](docs/export-examples/).
+in [docs/export-examples](docs/export-examples/). A nicely laid-out example with
+headings, lists, a table, a matrix, labels and a checklist:
+[monochrome](docs/export-examples/00-showcase.pdf) ·
+[color](docs/export-examples/color/00-showcase.pdf).
 
 ## Documentation
 
