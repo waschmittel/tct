@@ -164,6 +164,8 @@ struct TableLayout<'a> {
     left: f32,
     size: f32,
     pad: (f32, f32),
+    /// Vertical column lines: only for tables with more than 7 rows or 3 columns.
+    grid: bool,
 }
 
 struct Flow<'f> {
@@ -598,8 +600,9 @@ impl<'f> Flow<'f> {
         self.push(Op::Line { x1: x, y1: y, x2: x + width, y2: y, color: self.ink(), width: thickness });
     }
 
-    /// LaTeX booktabs style: heavy rules above and below, a light rule under
-    /// the centered bold header, no vertical lines.
+    /// Booktabs-like: heavy rules above and below, a light rule under the
+    /// centered bold header; tables with more than 7 rows or 3 columns also get
+    /// thin vertical lines between columns and at both edges. No row separators.
     fn table(&mut self, table: &Table) {
         const PAD_Y: f32 = 2.5;
         let header_style = Style { bold: true, ..Style::default() };
@@ -638,7 +641,7 @@ impl<'f> Flow<'f> {
                 (wrapped, lines as f32 * height + 2.0 * PAD_Y)
             })
             .collect();
-        let layout = TableLayout { widths: &widths, aligns: &table.aligns, left, size: size, pad: (pad_x, PAD_Y) };
+        let layout = TableLayout { widths: &widths, aligns: &table.aligns, left, size: size, pad: (pad_x, PAD_Y), grid: table.rows.len() > 7 || table.cols() > 3 };
 
         let first_rows = rows.iter().take(2).map(|(_, h)| h).sum::<f32>();
         self.need(first_rows + 2.0);
@@ -678,6 +681,13 @@ impl<'f> Flow<'f> {
                 self.draw_line(line, x + t.pad.0, ly, t.size, self.ink(), shift.max(0.0));
             }
             x += t.widths[c];
+        }
+        if t.grid {
+            let mut vx = t.left;
+            for w in std::iter::once(&0.0).chain(t.widths) {
+                vx += w;
+                self.push(Op::Line { x1: vx, y1: top, x2: vx, y2: top + row_h, color: self.ink(), width: MIDRULE });
+            }
         }
         self.y += row_h;
     }
