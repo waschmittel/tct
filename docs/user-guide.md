@@ -362,6 +362,27 @@ A full Markdown editor with syntax highlighting. Supports headings, bold, italic
 
 On macOS, **Cmd** can substitute for Ctrl in terminals that support it (kitty, Alacritty, WezTerm).
 
+#### Tables
+
+A run of `|` lines whose second line is a delimiter row (`|---|---|`, with `:--`, `:-:`, `--:` for alignment) is a table. The editor reformats it on every edit, padded to the widest cell. `Tab` / `Shift+Tab` walk the cells (`Tab` in the last cell appends a row), `Enter` goes to the row below, `Ctrl+T` inserts a table skeleton, and `Alt+arrows` / `Alt+Shift+arrows` move and add/delete rows and columns (see `F1` for the full list).
+
+**Matrices.** If the top-left cell of a table is empty, the table is a *matrix*: it has labels on the left as well as on top. In the read view and the PDF export the first column is then bold like the header and the empty corner is left open (no border around it):
+
+```
+|       | Design | Build |
+|-------|:------:|:-----:|
+| Ada   | owner  | review|
+| Grace | review | owner |
+```
+
+Put any text in the top-left cell to get a normal table back. Details of how matrices are drawn in the PDF are in [ADR-0013](adr/0013-matrix-tables.md).
+
+### PDF export
+
+Press `p` in the board view or card detail to export the selected card (title, labels, due date, description with tables, checklist) as a PDF/A document, or `P` for a color version. `p` produces black text with gray accents, made for monochrome printers; `P` is the same layout in color. A dialog asks where to save: type a path or browse folders with Up/Down and Tab; it starts in the folder you last exported to and suggests the card title as file name. In the browser version the PDF is sent to the browser as a download instead.
+
+Sections, the checklist, code blocks and tables are kept together on a page where they fit; long tables repeat their header row on every page. Sample output is in [`docs/export-examples/`](export-examples/) (monochrome, plus a color showcase).
+
 ### Search
 
 Press `/` in board view to open the search bar. Type a query and press Enter.
@@ -506,6 +527,9 @@ tct cards "Sprint" --edit "Fix login" --title "Fix login flow"  # Edit title
 tct cards "Sprint" --edit "Fix login" --due 2026-06-01          # Set due date
 tct cards "Sprint" --edit "Fix login" --due none                # Clear due date
 tct cards "Sprint" --edit "Fix login" --description "New desc"  # Set description
+tct cards "Sprint" --export "Fix login"               # PDF to ./fix-login.pdf (black and gray)
+tct cards "Sprint" --export "Fix login" --style color # Same, in color
+tct cards "Sprint" --export "Fix login" --out ~/Desktop  # Into a folder, or give a file name
 tct cards "Sprint" --archive "Fix login"              # Archive
 tct cards "Sprint" --restore "Fix login"              # Restore
 tct cards "Sprint" --delete "Fix login"               # Permanently delete

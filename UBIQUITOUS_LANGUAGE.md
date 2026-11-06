@@ -15,6 +15,8 @@
 | **Label Color** | Pastel color value for a **Label** — either a named variant (Red…Cyan) or `Custom { r, g, b }` | Hue, swatch                     |
 | **History Entry** | A timestamped action on a **Card**, with the changed field and its old/new value (capped at `HISTORY_LIMIT = 50`)                | Audit log, changelog            |
 | **Accent Color** | Per-**Board** UI highlight color (`BoardMeta.accent_color`); replaces hardcoded Cyan         | Theme color, primary color      |
+| **Matrix**    | A pipe table in a description whose top-left cell is empty: labels on the left as well as on top, so the first column is bold and the corner is open in the read view and the PDF (ADR-0013) | Grid, cross table, pivot |
+| **Theme**     | Look of the PDF export: `Mono` (black text, shared grays; default, for monochrome printers) or `Color`; same layout (ADR-0014) | Style, mode, palette |
 
 ## State & lifecycle
 

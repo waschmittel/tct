@@ -609,6 +609,14 @@ Card description editing operates over `MarkdownEditor` with rich formatting, ne
 - **Non-Destructive Help:** Pressing `F1` or `Ctrl+H` returns `InsertOutcome::Help`, transitioning to `AppMode::Help` while preserving editor text, cursor offset, and undo stack on `app.insert`. Closing help immediately returns to `AppMode::Insert`.
 - **Border and Status Bar Hints:** The bottom border of the card detail modal displays ` F1 / Ctrl+H:help ` during description editing, placing the shortcut hint directly beneath the editor viewport. The status bar similarly displays mode and help guidance (ADR-0011).
 
+### 8.11 Description Emphasis, Tables and PDF Export
+
+The description is Markdown text; three renderers read it and are kept in step: the editor's highlighter, the read view (`ui/markdown.rs`) and the PDF (`export/blocks.rs`, which re-parses the text in the same dialect). Emphasis is toggled by `insert/emphasis.rs` (`Ctrl+B` bold, `Ctrl+E` italic, ADR-0012) as an XOR on the run of `*` around the text (1 italic, 2 bold, 3 both); `***x***` renders as bold italic everywhere, in the PDF with the bundled `DejaVuSans-BoldOblique`.
+
+Pipe tables are modelled by `insert/table.rs` (`Table`), shared by the editor (live reformatting), the read view and the PDF. A table whose top-left cell is empty is a *matrix* (`Table::is_matrix`, ADR-0013): its first column is bold, the corner is open, and the PDF draws it with heavier label/content separators and its own thresholds for column and row lines.
+
+PDF export (`export::card_pdf`, PDF/A-2b via krilla, fonts embedded) has two themes (ADR-0014): `Mono` (default; black text and rules, shared grays, outlined label chips) and `Color`. The layout is identical; a test compares text positions across themes. Browser sessions (`TCT_WEB`) stream the PDF through the terminal instead of writing a file (`export/web.rs`). Sample output lives in `docs/export-examples/` (`cargo test write_example_pdfs -- --ignored`).
+
 ---
 
 ## 9. Architecture Decisions
@@ -628,6 +636,9 @@ The numbered, dated decision records live in [`docs/adr/`](adr/). Summary:
 | [0009](adr/0009-versioned-format-no-migrations.md) | Versioned data directory (`.tct/.version`) and no on-load migrations |
 | [0010](adr/0010-viewport-scroll-and-session-state.md) | Viewport scroll reconciliation via interior mutability and session navigation persistence |
 | [0011](adr/0011-editor-shortcuts-and-clipboard-fallback.md) | Multi-tier clipboard fallback, bracketed paste routing, and description editor shortcut discoverability |
+| [0012](adr/0012-italic-on-ctrl-e.md) | Italic is `Ctrl+E` (not `Ctrl+I`, which terminals send as Tab); `Ctrl+B` toggles bold |
+| [0013](adr/0013-matrix-tables.md) | A pipe table with an empty top-left cell is a *matrix*: labels left and top, rendered differently in the read view and the PDF |
+| [0014](adr/0014-pdf-themes-share-grays.md) | The monochrome PDF theme keeps the color theme's grays; only chromatic elements differ |
 
 Foundational decisions not captured as ADRs:
 
@@ -705,6 +716,8 @@ mindmap
 | **Label** | A board-level named tag with a color, assignable to cards via `label_ids`. |
 | **BoardId / CardId** | Identifier that *is* a location: the board's directory name, the card's file name (ADR-0007). |
 | **ListId / LabelId** | Identifier that is a reference into `board.json`, where Lists and Labels live inline. |
+| **Matrix** | A pipe table whose top-left cell is empty: labels on the left as well as on top (ADR-0013). |
+| **Theme** | PDF export look: `Mono` (black and gray, for monochrome printers; default) or `Color` (ADR-0014). |
 | **AppMode** | Enum controlling which input handler and renderer are active. |
 | **InsertHandler** | Trait; one struct per insert target owns its render + input + buffer state (ADR-0003). |
 | **Dialog** | Trait; one struct per dialog kind owns its render + input + state (ADR-0003). |

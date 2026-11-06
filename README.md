@@ -190,7 +190,7 @@ binary, so it works the same on any machine.
 - From the command line:
 
 ```sh
-tct cards "My Project" --export "Fix login"                  # ./fix-login-bug.pdf, black and white
+tct cards "My Project" --export "Fix login"                  # ./fix-login-bug.pdf, black and gray
 tct cards "My Project" --export "Fix login" --style color    # same file name, in color
 tct cards "My Project" --export "Fix login" --out ~/Desktop  # into a folder, or give a file name
 ```
