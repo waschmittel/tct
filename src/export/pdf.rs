@@ -1501,7 +1501,7 @@ mod tests {
             meta.clone(),
             plain(
                 "Lists and quotes",
-                "- one\n  - two\n    - three\n      - four\n1. first\n2. second with a very long line that wraps around the page because it just keeps going and going and going\n> quote\n>> nested quote\n> > spaced nested quote\n\n* star item\n10. ten".into(),
+                "- one\n  - two\n    - three\n      - four\n1. first\n2. second with a very long line that wraps around the page because it just keeps going and going and going\n> quote\n>> nested quote\n> > spaced nested quote\n\n>>>\nmultiline quote\n\nsecond paragraph of it\n>>>\n\n* star item\n10. ten".into(),
             ),
         ));
         cases.push((
@@ -1571,6 +1571,13 @@ Short, readable summary of the release plan with **bold**, *italic* and `inline 
 3. Release
 
 > Scope is fixed; dates are not.
+
+>>>
+A multiline quote spans several lines
+without a `>` on each of them.
+
+Even paragraphs.
+>>>
 
 # Timeline
 

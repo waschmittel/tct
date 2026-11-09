@@ -16,7 +16,7 @@ src/
   text_diff.rs       # Line diff for the history detail pane
   export/
     mod.rs           # Card export entry point (`card_pdf`)
-    blocks.rs        # Description markdown -> blocks/runs for the PDF layout
+    blocks.rs        # Description markdown -> blocks/runs for the PDF layout (`>>>` multiline quotes, ADR-0015)
     pdf.rs           # Layout + PDF/A-2b emission (krilla, bundled DejaVu fonts); Mono/Color themes (ADR-0014), matrix tables (ADR-0013)
     path.rs          # Default file name, typed-path resolution, directory suggestions
     web.rs           # Browser sessions: PDF sent through the terminal stream (OSC 7733)
@@ -80,7 +80,7 @@ src/
     dialog.rs        # Dialog frame helpers
     search_bar.rs    # Search input bar
     status_bar.rs    # Mode + hints + status messages
-    markdown.rs      # Markdown rendering, word-wrap, source<->visual cursor map
+    markdown.rs      # Markdown rendering, word-wrap, source<->visual cursor map; never moves characters (ADR-0015)
     theme.rs         # Color theme
     snapshot_tests.rs# Golden-screen tests (insta + TestBackend)
     widgets/

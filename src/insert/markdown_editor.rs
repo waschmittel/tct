@@ -957,6 +957,14 @@ mod tests {
     }
 
     #[test]
+    fn enter_on_quote_fence_is_plain_newline() {
+        let mut e = make_editor(">>>");
+        e.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(editor_lines(&e), vec![">>>".to_string(), "".to_string()]);
+    }
+
+    #[test]
     fn enter_on_empty_citation_clears_marker_and_exits() {
         let mut e = make_editor("> ");
         press(&mut e, KeyCode::Enter);

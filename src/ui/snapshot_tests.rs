@@ -487,6 +487,18 @@ fn snapshot_card_detail_citation() {
 }
 
 #[test]
+fn snapshot_card_detail_multiline_quote() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_description(&mut app, "Intro.\n\n>>>\nA multiline quote with a line long enough to wrap across the popup and show the hanging indent.\n\nSecond paragraph.\n>>>\n\nAfter.");
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
 fn snapshot_description_editor_wrapping() {
     with_temp_dir(|| {
         let id = seed_demo_board();

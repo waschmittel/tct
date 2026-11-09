@@ -119,6 +119,17 @@ Sleep 400ms
 Enter
 Sleep 400ms
 
+# GitLab-style multiline quote
+Type ">>>"
+Enter
+Type "Plain lines, no marker needed."
+Enter
+Type ">>>"
+Enter
+Sleep 600ms
+Enter
+Sleep 400ms
+
 # Numbered list with auto-numbering, indentation (Tab), and un-indentation (Shift+Tab)
 Type "1. Check token expiration"
 Sleep 600ms

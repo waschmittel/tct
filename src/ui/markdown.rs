@@ -39,6 +39,7 @@ impl<'a> MarkdownRenderer<'a> {
 fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Rendered {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut in_code_block = false;
+    let mut in_quote = false;
 
     let mut idx = 0;
     while idx < source_lines.len() {
@@ -59,6 +60,20 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
                 format!("  {line_text}"),
                 Style::default().fg(Color::Green),
             )]));
+            continue;
+        }
+
+        if is_quote_fence(line_text) {
+            in_quote = !in_quote;
+            lines.push(Line::from(Span::styled(
+                line_text.to_string(),
+                Style::default().fg(Color::Yellow),
+            )));
+            continue;
+        }
+        if in_quote {
+            let style = Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC);
+            lines.extend(wrap_spans(vec![Span::styled(line_text.to_string(), style)], width));
             continue;
         }
 
@@ -202,9 +217,14 @@ pub(crate) fn detect_list_indent(line: &str) -> usize {
     0
 }
 
+/// A line that is just `>>>` opens or closes a multiline blockquote (GitLab style).
+pub(crate) fn is_quote_fence(line: &str) -> bool {
+    line.trim() == ">>>"
+}
+
 /// Parse citation/blockquote marker length in `trimmed` (e.g. `> `, `>> `, `> > `).
 pub(crate) fn citation_marker_len(trimmed: &str) -> Option<usize> {
-    if !trimmed.starts_with('>') {
+    if !trimmed.starts_with('>') || is_quote_fence(trimmed) {
         return None;
     }
     let mut len = 0;
@@ -810,6 +830,16 @@ mod tests {
         assert_eq!(detect_list_indent(">"), 1);
         assert_eq!(detect_list_indent(">= 5"), 0);
         assert_eq!(detect_list_indent("plain text"), 0);
+    }
+
+    #[test]
+    fn quote_fence_is_not_a_citation_marker() {
+        assert_eq!(citation_marker_len(">>>"), None);
+        assert_eq!(citation_marker_len(">>> x"), Some(4));
+        let text = ">>>\nquoted line\n>>>\nplain";
+        let r = render(text, Color::Cyan, 80);
+        let l: Vec<String> = r.lines().iter().map(|l| l.to_string()).collect();
+        assert_eq!(l, vec![">>>", "quoted line", ">>>", "plain"]);
     }
 
     #[test]

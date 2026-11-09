@@ -6,7 +6,7 @@
 //! Like the preview, every source line stays its own visual line.
 
 use crate::insert::table::{Table, is_table_line};
-use crate::ui::markdown::{citation_marker_len, table_block_len};
+use crate::ui::markdown::{citation_marker_len, is_quote_fence, table_block_len};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub struct Style {
@@ -41,8 +41,23 @@ pub fn parse(markdown: &str) -> Vec<Block> {
     let lines: Vec<&str> = markdown.lines().collect();
     let mut blocks = Vec::new();
     let mut idx = 0;
+    let mut in_quote = false;
     while idx < lines.len() {
         let line = lines[idx];
+        if !line.starts_with("```") && is_quote_fence(line) {
+            in_quote = !in_quote;
+            idx += 1;
+            continue;
+        }
+        if in_quote && !line.starts_with("```") {
+            let mut block = parse_line(line);
+            if let Block::Text { quote_depth, .. } = &mut block {
+                *quote_depth += 1;
+            }
+            blocks.push(block);
+            idx += 1;
+            continue;
+        }
         if line.starts_with("```") {
             let body: Vec<String> = lines[idx + 1..]
                 .iter()
@@ -213,6 +228,17 @@ mod tests {
         assert!(matches!(&blocks[5], Block::Text { quote_depth: 1, .. }));
         assert_eq!(blocks[6], Block::Code(vec!["let x;".into()]));
         assert!(matches!(&blocks[7], Block::Text { marker: None, .. }));
+    }
+
+    #[test]
+    fn multiline_quote_fences_quote_the_lines_between() {
+        let blocks = parse("a\n>>>\none\n\ntwo\n>>>\nb");
+        assert!(matches!(&blocks[0], Block::Text { quote_depth: 0, .. }));
+        assert!(matches!(&blocks[1], Block::Text { quote_depth: 1, .. }));
+        assert!(matches!(&blocks[2], Block::Blank));
+        assert!(matches!(&blocks[3], Block::Text { quote_depth: 1, .. }));
+        assert!(matches!(&blocks[4], Block::Text { quote_depth: 0, .. }));
+        assert_eq!(blocks.len(), 5);
     }
 
     #[test]

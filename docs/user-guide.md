@@ -337,7 +337,7 @@ A full overlay showing all card properties: title, description, checklist, label
 
 ### Description Editor
 
-A full Markdown editor with syntax highlighting. Supports headings, bold, italic, bold italic (`***text***`), inline code, code blocks, lists, blockquotes, and strikethrough.
+A full Markdown editor with syntax highlighting. Supports headings, bold, italic, bold italic (`***text***`), inline code, code blocks, lists, blockquotes (`> text` per line, or a block between two `>>>` lines), and strikethrough.
 
 | Key | Action |
 |-----|--------|
