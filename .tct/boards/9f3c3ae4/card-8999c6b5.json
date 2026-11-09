@@ -1,7 +1,7 @@
 {
   "list_id": "a589c4f4",
   "position": 5.0,
-  "title": "detect paste into terminal and don't auto-list etc.",
+  "title": "add paste mode without auto-list etc.",
   "description": "",
   "label_ids": [
     "1e645dfb"
@@ -10,7 +10,7 @@
   "checklist": [],
   "archived": false,
   "created_at": "2026-11-06T18:29:43.331816Z",
-  "updated_at": "2026-11-06T18:29:45.970073Z",
+  "updated_at": "2026-11-09T17:06:46.202986Z",
   "history": [
     {
       "at": "2026-11-06T18:29:43.331831Z",
@@ -23,6 +23,13 @@
       "field": "labels",
       "old": "",
       "new": "bugfix"
+    },
+    {
+      "at": "2026-11-09T17:06:46.202986Z",
+      "action": "Edited title",
+      "field": "title",
+      "old": "detect paste into terminal and don't auto-list etc.",
+      "new": "add paste mode without auto-list etc."
     }
   ]
 }
