@@ -1,0 +1,139 @@
+# AGENTS.md — Agent Instructions for tct
+
+## Build & Test
+
+```sh
+cargo fmt --check    # Must be clean (run `cargo fmt`; never `--all`, see Formatting)
+cargo build          # Must compile with zero errors and zero warnings
+cargo test -- --test-threads=1   # Tests use shared filesystem state
+```
+
+- **Golden-screen tests**: `src/ui/snapshot_tests.rs` renders the full UI into a ratatui `TestBackend` and snapshots the text with `insta` (goldens in `src/ui/snapshots/`). After intentional UI changes: `INSTA_UPDATE=always cargo test snapshot_ -- --test-threads=1`, inspect the `.snap` diff, commit. Fixture rule: no due dates / history timestamps (rendered relative to now → churn).
+- **vhs demo + visual regression**: `docs/vhs/*.tape` drive the real binary (seeded by `docs/vhs/seed.sh`); `demo.tape` produces `docs/vhs/demo.gif` + a final-frame text golden, `linux-tty.tape` runs with `TERM=linux` to cover the degraded rendering tier and the char-alias card moves (vhs cannot send Shift+Arrow). check.sh trims vhs's multi-frame .txt to its last frame — intermediate frames race against status-message timing. `./docs/vhs/check.sh` re-records and diffs all tapes (requires `brew install vhs`; goldens are platform/font dependent — regenerate locally, don't compare cross-platform).
+
+- **Integration testing matters — do it.** Unit tests alone are not enough: exercise features through the real surfaces (input handlers → render, CLI, PDF export). When a feature touches them, extend in the same change:
+  - **PDF**: add all its corner cases to `pdf.rs::tests::corner_cases()` and the `SHOWCASE`, then regenerate `docs/export-examples/` (`TZ=UTC cargo test write_example_pdfs -- --ignored`).
+  - **Terminal snapshots**: add `snapshot_*` golden tests in `snapshot_tests.rs` for each new/changed screen or state (read view, editor, dialogs, help).
+  - **VHS tapes**: update `docs/vhs/*.tape` to show the feature, but do **not** re-record (`check.sh`, `demo.gif`, goldens) per change — that is a pre-release task.
+
+- **Keep docs in step.** When a change touches documented behavior or design, update the docs in the same change: ADRs (`docs/adr/`), `docs/architecture.md`, `docs/arc42.md`, `docs/user-guide.md`, `--help`, and this file (AGENTS.md). Create a new ADR when the change is a design decision (new syntax, new invariant, rejected alternatives worth recording).
+
+## Toolchain
+
+`rust-toolchain.toml` pins the toolchain (incl. `rustfmt`, `clippy`, `rust-analyzer`); rustup installs it on first use.
+
+## Code intelligence: use rust-analyzer
+
+Prefer rust-analyzer (LSP tool, IDE integration, or MCP equivalent) over text search for go-to-definition, find-references, hover/types, call hierarchy, rename and diagnostics. Fall back to grep only for strings, docs and non-Rust files. If no rust-analyzer integration is available in your agent, say so rather than silently guessing.
+
+## Formatting
+
+- All Rust code must be `cargo fmt`-clean. Run `cargo fmt` after editing `.rs` files and before every commit.
+- Use plain `cargo fmt` / `cargo fmt --check`, **never `--all`**: it also reformats `vendor/tui-textarea-2`, which must stay upstream + patch.
+- Enforced by the `fmt` job in `.github/workflows/ci.yml`.
+
+## Architecture
+
+- **Modal input**: `AppMode` enum in `app.rs` drives which handler in `input/` runs. Modes: BoardSelector, Normal, CardDetail, Insert, Command, Dialog, Help. `Insert` and `Dialog` are parameterless — the active handler is `Box<dyn>` on `App.insert` / `App.dialog`. BoardSelector/Normal/CardDetail dispatch via per-mode `KEYMAP` tables (see "New keybinding").
+- **Base vs overlay modes**: BoardSelector/Normal/CardDetail are *base* modes (`AppMode::is_base()`); Insert/Command/Dialog/Help are transient overlays. The overlay return target (`App.previous_mode`) may only ever hold a base mode — record via `app.remember_return_mode()`, restore via `app.take_return_mode()`; never write/consume `previous_mode` directly (an overlay recorded as return target once froze the UI: mode `Insert` with no handler swallows every key). `handle_input` calls `app.enforce_mode_invariants()` after every event — panics in debug/test, self-heals in release.
+- **Board Editor** (`src/board_editor.rs`, ADR-0001/0002): aggregate root for the open board. `App.editor: Option<BoardEditor>`; reads via `app.board() -> Option<&LoadedBoard>`; domain mutations via `app.apply(Command)`; selection moves via editor verbs (`select_card_down`, `detail_item_up`, `reset_detail_cursor`, …). Input/UI code never mutates `LoadedBoard` fields directly.
+- **Board Directory** (`src/board_directory.rs`): owns the board collection — create/archive/restore/rename/cycle accent/display order/listing. Used by the board selector, insert/dialog side effects, and `tct boards`. Stores are internals of the two aggregates.
+- **Visibility**: `LoadedBoard::visible_cards(list_idx, search)` is the single source of truth for which Cards show (archived always hidden; search hides non-matching). Navigation, clamping, and rendering all consume it.
+- **Dialog trait** (`src/dialog/`): One struct per dialog kind implementing `Dialog { render, handle_key, background, help }`. Each holds its own payload + cursor/scroll state. Returns `DialogOutcome { apply: Option<Command>, side_effect, status, follow }`. The dispatcher in `input/dialog_input.rs` interprets the outcome. See `docs/adr/0003-dialog-and-insert-as-traits.md`. Every dialog implements `help()` (`DialogHelp` rows for the Help overlay) and maps `?` to `DialogOutcome::help()` — `Follow::Help` shows the overlay while the dialog stays alive; Help-Esc returns to it.
+- **InsertHandler trait** (`src/insert/`): One struct per insert target, grouped by widget kind: `line_editor.rs` (single-line inputs sharing `LineInput`), `markdown_editor.rs` (description editor over `TextAreaInput`), `date_picker.rs`. Returns `InsertOutcome` (`Stay`, `Cancel`, `Confirm(Command)`, `ConfirmAndOpenDialog`, `OpenDialog`, …). Dispatcher in `input/insert.rs`.
+- **Storage**: JSON files under `~/.tct/boards/` (override with `TCT_DATA_DIR`). One file per board (`board.json`) and per card (`card-<id>.json`) — the path carries the id, which is not repeated inside the file (ADR-0007); **no list files** — lists are inline ordered `lists: [ListMeta]` in `board.json`. A Card owns membership (`list_id`) + order (`position`, fractional rank) — ADR-0006; `CardList.card_ids` is *derived* (`model/list.rs`), never persisted. Boards carry their own display order (`position`, fractional rank — ADR-0008); there is no order file. All writes via `atomic_write` (`.tmp` then rename).
+- **`tct init`** (`cli/mod.rs::init` → `board_store::init_data_dir`): creates `./.tct` (or `$TCT_DATA_DIR`) like `git init`; `main` pins `TCT_DATA_DIR` to `./.tct` for it, and every other command fails if the cwd is gone. The README it drops in is `assets/data-dir-README.md` (`include_str!`, written only if absent). Env vars (`TCT_DATA_DIR`, `TCT_SKIP_CORRUPT`, `TCT_WEB`, `TERM`/`COLORTERM`) are listed in the `--help` `ENVIRONMENT:` block — keep it in sync when adding one.
+- **Format version** (`src/storage/version.rs`, ADR-0009): `.tct/.version` holds one integer, checked once by `board_store::open_data_dir` — which every entry point already calls, so the gate cannot be skipped. Newer than `version::CURRENT` is refused; older is refused too, and that arm is the *only* place a future migration may live. There are no on-load migrations: the loaders parse exactly one shape, no legacy field lingers on a domain type, and no `Value` munging happens on the read path. When you change the persisted format, bump `CURRENT`.
+- **Untrusted data dir**: `paths::base_dir()` walks up from cwd and adopts any `.tct` it finds, so the JSON may come from a checked-out repository — treat every file under the data dir as attacker-controlled. Three invariants keep that safe, the first two enforced by types rather than by checks at call sites:
+  - **Ids are typed and validated** (`model/id.rs`): one newtype per entity — `BoardId`, `CardId`, `ListId`, `LabelId` — generated by a shared macro, each with a `Deserialize` enforcing `[A-Za-z0-9_-]{0,64}`. A `..` or `/` in an id cannot exist. `storage::paths` accepts only `BoardId`/`CardId`, the two that *are* locations; `ListId`/`LabelId` are references into `board.json` and cannot build a path, and swapped arguments are a compile error. Never widen the charset, never collapse the four back into one type, never add a `From<String>`/`&str` conversion outside `#[cfg(test)]`, and never build a data-dir path from a bare `&str`.
+  - **The path is the id** (ADR-0007) — a Board's id is its directory, a Card's id is its file name; neither is persisted (`#[serde(skip)]` on `Card.id`/`BoardMeta.id`). `board_store::read_board_at` and `card_store::load_card` are the *only* places these types are deserialized and they stamp the id from the path, so read path and write path cannot diverge and no file can shadow another record. Don't add a third parse site; `save_card`/`save_board` `debug_assert!` the id was stamped. Directory/file names that are not valid ids are not boards/cards and are passed over.
+  - **Nothing under the data dir may be a symlink** — validated ids keep a *path* inside the data dir, but a symlink redirects in the filesystem, where the path cannot show it. Every read goes through `storage::read_unlinked`; the boards dir is checked with `reject_symlink`, symlinked board dirs are skipped (`DirEntry::file_type` does not follow — don't "fix" it to `entry.path().is_dir()`), and a *discovered* `.tct` must be a real directory (`TCT_DATA_DIR` and `~/.tct` may be symlinks — those are the user's own choice, not repository content).
+- **CLI output** (`src/term_out.rs`): card titles, list names and file names reach the terminal verbatim in CLI mode, so `cli/` and `storage/` must print through `outln!`/`errln!`, never `println!`/`eprintln!` — the macros strip control characters from the whole formatted line (keeping `\n`/`\t`), closing the ANSI-escape injection channel. The TUI needs no equivalent: ratatui already drops control chars when filling its cell buffer.
+- **Description editing**: Lives on the `MarkdownEditor` insert handler (`src/insert/markdown_editor.rs`). Wraps `tui-textarea-2::TextArea` via `TextAreaInput` shared base; **`tui-textarea-2` is a vendored fork** (`vendor/tui-textarea-2` = upstream + `vendor/patches/tui-textarea-2.patch`, adds hanging indent on soft wrap for list items, and undo grouping: `undo_mark`/`undo_group_since`/`break_undo_run`). Never edit the vendored source without running `scripts/vendor-textarea.sh refresh-patch`; to bump the crate use `scripts/vendor-textarea.sh update` (see `vendor/README.md`), and run `scripts/vendor-textarea.sh check` whenever touching `Cargo.toml` deps or `vendor/`. The textarea itself handles soft wrap (`WrapMode::WordOrGlyph`), wrapped Up/Down navigation, scrolling, and selection — `card_detail.rs::render_description_editor()` renders the widget frameless inside the detail popup (popup title gains "(editing description)"; text width capped at `WRAP_WIDTH`) plus a cursor-tracking scrollbar. List autocontinue + renumbering + nest/unnest live on the handler. While editing, the buffer shows as plain text; the styled markdown preview is the read view (scrollbar when it overflows, PgUp/PgDn scroll one line).
+- **Emphasis keys** (`src/insert/emphasis.rs`): `Ctrl+B`/`Ctrl+E` toggle (not `Ctrl+I`: terminals send it as Tab; see ADR-0012) by XOR on the run of `*` around the text (1 italic, 2 bold, 3 both); selections are trimmed of surrounding whitespace, formatted text is un-formatted, and a table cell without selection is formatted whole (`table_edit::map_cell_text`) and reformatted. `***x***` is bold italic in the read view (`ui/markdown.rs`), `export/blocks.rs` and the PDF (bundled `DejaVuSans-BoldOblique`).
+- **Alerts** (ADR-0016, `src/alert.rs`): a quote whose first line is `[!note|tip|important|caution|warning]` — `> [!kind]` plus the following `>` lines (tag only counts on a quote's first line, single `>`), or `>>> [!kind]` … `>>>` (`fence_alert`/`is_quote_fence`/`closes_quote` in `ui/markdown.rs`; an alert opener is a fence, a bare `>>>` closes). Read view keeps the text but swaps the tag for the kind in bold capitals (`NOTE`) padded to the tag's width, lines in the alert's color (`Alert::tui_color`) — no emoji/icons in the terminal (width and color-emoji problems), icons are PDF-only. PDF: `Block::Text.alert` (`InAlert`, title line + body lines, blank lines kept inside), colored bar + bold capitalized kind as title + GitHub's Primer Octicon (`assets/octicons/*.svg`, MIT, path parsed with `kurbo`, `Op::Icon`; black in Mono). Editor: `Ctrl+G` in a quote arms a chord (`insert/alert_edit.rs`, `n t i c w x`), outside a quote it is ignored (`Ctrl+A` stays line start). Colors follow GitHub (warning gold, caution red).
+- **Multiline quotes** (ADR-0015): a line that is just `>>>` opens/closes a GitLab-style blockquote (`is_quote_fence` in `ui/markdown.rs`; `citation_marker_len` excludes it). Read view: fences and inner lines yellow, inner italic, text unchanged; PDF (`export/blocks.rs`): inner lines are `Block::Text` with `quote_depth + 1`.
+- **Pipe tables** (`src/insert/table.rs` model, `table_edit.rs` glue): the editor treats a run of `|` lines whose second line is a delimiter row as a table and reformats it on every edit (padded to the widest cell, `:--`/`:-:`/`--:` honored for body cells — header cells are always centered — `unicode-width` for display width, cursor kept on the same cell text; spaces typed after cell text survive while the cursor is in the cell). Tab/Shift+Tab walk cells (Tab in the last cell appends a row, Shift+Tab in the first leaves upwards), Enter goes to the row below (leaves below the last row; on a lone `| header |` line it builds the table), `Ctrl+T` inserts a skeleton (inside a table it arms a one-shot chord — `r c R C x X a T`/arrows — for terminals without Alt), `Alt+arrows` swap and `Alt+Shift+arrows` add/delete. Deleting the header row or last column deletes the table. Plain keys are never captured; only Tab/Enter/chord/Alt are. Every table operation is one undo step via `table_edit::grouped`; typing in one cell joins by `cell_key`. The same helper groups list ops/paste/cut. The read view (`ui/markdown.rs::render_table`) re-aligns tables, draws box pipes in place (no extra rows) and never wraps them; the detail popup grows to the widest table up to the terminal width, beyond which the editor soft-wraps table lines (no per-line no-wrap).
+- **Matrix tables** (ADR-0013; `Table::is_matrix`, `insert/table.rs`): a pipe table whose top-left cell is empty is a *matrix* — labels on the left as well as on top (a semantic difference, not a style option). Detail read view (`ui/markdown.rs::row_line`/`rule_line`): the header row has no border left of the open corner, the rule under it starts with `┌` instead of `├`, and the first column is bold like the header. PDF (`export/pdf.rs::table`, `TableLayout`, `top_rule`/`header_rule`/`table_row`): first column bold; the corner has no rule above and no line left of it; heavy lines (`HEAVY_RULE`) always separate labels from contents (under the header, right of the first column); column lines only with more than 3 *content* columns (i.e. >4 in all); thin row separators only with more than 7 rows, whatever the column count, and then the top/bottom rules are as thin as the separators; a matrix *without* row separators has no top or bottom border at all (`TableLayout::open_ends`). Normal tables keep their own thresholds (>7 rows or >3 columns → column lines). The editor is unaffected. Tests: `matrix_*` in `pdf.rs`, `markdown.rs`, `table.rs`; examples `00-showcase`, `14-matrix`.
+- **PDF export** (`src/export/`): `export::card_pdf(&BoardMeta, list_name, &Card, Theme)` is shared by the TUI (`p` = monochrome, `P` = color, both in board view and card detail → `dialog/export_pdf.rs` → `DialogSideEffect::ExportCardPdf`) and the CLI (`tct cards <board> --export <card> [--out <path>] [--style mono|color]`). **Themes** (ADR-0014): `Mono` (the default) is for monochrome printers: black text and table rules on white, plus the *same grays as `Color`* (secondary text, light rules, quote text/bars, tinted code and code blocks) — only chromatic things change: label chips are outlined instead of filled, the accent rule is black; `Color` is the same layout with colors — only colors differ, which a test pins by comparing every text position across themes (`Flow::mono()` switches the palette). Both themes share one default file name (the card title), so the second export asks before overwriting the first. Page breaks are planned hierarchically (`Flow::keep_together`: a heading's section moves to a fresh page when it fits one page but not the rest of this one; longer sections flow and their sub-sections get the same rule), the checklist moves as a unit likewise, text paragraphs, code blocks and tables up to half a page are kept whole (larger ones split with no single orphan/widow line, and tables repeat their header row on each page), and every page has a footer with board › list and the page number (pages 2+ also a running header with the card title and the "Status" date, i.e. when the PDF was made). Corner cases live in `pdf.rs::tests::corner_cases()`: each is rendered and checked for validity and layout invariants, and `TZ=UTC cargo test write_example_pdfs -- --ignored` regenerates the example PDFs in `docs/export-examples/` — rerun it (all cases in monochrome; only `00-showcase` and `15-alerts` also in color, under `color/`) — it renders at a fixed time (`EXAMPLE_TIME`, via `render_at`), so the PDFs only change when their content does and eyeball them after layout changes. Tables are drawn booktabs-style (rules above/below/under the header); tables with more than 7 rows or more than 3 columns also get thin vertical column lines, and matrices (see "Matrix tables") have their own rules. Output is **PDF/A-2b**: krilla validates on `finish()`, which is why every font is embedded (bundled DejaVu under `assets/fonts/`, `include_bytes!`) and why chars the fonts lack become `?` rather than `.notdef`. `export/blocks.rs` re-parses the description in the preview's markdown dialect (not `ui/markdown.rs`, which yields terminal-styled lines); keep both in step when adding syntax. The dialog is a path input plus a directory listing (Up/Down, Tab, `..`); `App.export_dir` remembers the last folder for the session and the file name always defaults from the card title. Export failures toast, they never propagate. **Browser sessions** (Docker/ttyd image sets `TCT_WEB`; `main` then sets `App.web_sink` to stdout): `open_export_dialog` skips the dialog and `export::web::send` streams the PDF as chunked `ESC ] 7733 ; index ; total ; b64 name ; b64 chunk BEL` sequences that `docker/pwa/tct-pwa.js` reassembles into a download (share sheet on touch devices) — nothing is written on the server and no server path is ever user-chosen, which is the point (a file dialog there would let any logged-in user browse and overwrite the container filesystem). The wire format is pinned by the same literal in `web.rs` and `docker/pwa/tct-pwa.test.js` (`node --test docker/pwa/tct-pwa.test.js`); change both sides together. The Dockerfile must `COPY assets` (fonts are `include_bytes!`d).
+- **Markdown rendering**: `MarkdownRenderer` in `ui/markdown.rs`, word-wrap at `WRAP_WIDTH` (80). **Design constraint (ADR-0015): the read view never changes the text so that characters move** — it keeps the editor's layout and line breaks, so the preview matches what was typed. Restyling and substituting same-width glyphs is fine (pipes → box pipes, spaces → rules); adding, removing or shifting characters is not (no inserted bars/prefixes, no dropped markers). Read-view display only (`render() -> Rendered`, `.lines()`); the editor does not use it.
+- **Label colors**: `LabelColor` enum with named pastel variants + `Custom { r, g, b }`. New labels get auto-generated pastel colors via `LabelColor::generate_pastel()` which picks maximally distant hue from existing labels.
+- **Board accent color**: Each board has an `accent_color: LabelColor` field in `BoardMeta`. All UI highlight/accent colors use `app.accent_color()` instead of hardcoded `Color::Cyan`. New boards auto-get a differentiated pastel color. Users cycle with 'c' in board selector. Help overlay keeps structural Cyan.
+- **Terminal capabilities** (`src/term_caps.rs`): `App.caps` holds the detected `TermCaps` (set once in `main`; `TermCaps::full()` everywhere else so tests are environment-independent). `ui::render` post-processes the finished buffer — RGB colors quantize to 256 colors when `COLORTERM` doesn't advertise truecolor, and to the 16 ANSI colors on `TERM=linux`, which also swaps glyphs missing from console fonts (`selected_border_type()`, `check_mark()`, `scrollbar_thumb()`, `selection_bg()`). Style sites stay tier-unaware; consult `app.caps` only where the quantized style would be unusable. `main` also forces `terminal.clear()` after init — the Linux console has no alternate screen buffer, so without it stale shell output shines through "empty" cells. Because the console never transmits modifiers on arrow keys either, shift-free alternatives exist: grab mode (`m` in the board view — `App.grab_active`, arrows move the card, `m`/Esc drop, MOVE status chip) and `,`/`.` for the date-picker year jump.
+- **Status messages**: Transient feedback ("Card archived", …) renders as a yellow toast in the *top-right corner* (`ui/mod.rs::render_status_toast`) — not in the status bar, so the `?:help` hint stays visible. Set via `app.set_status(msg)`; cleared by `App::on_tick()` after 30s. The status bar (`ui/status_bar.rs`) carries only the mode chip, the single hint, and the data dir (right-aligned).
+- **Search**: When active, non-matching cards are hidden (not just dimmed). Navigation skips hidden cards. First match auto-selected on search confirm.
+- **Periodic reload**: `App::on_tick()` reloads board from filesystem every 15s (configurable via `reload_interval`). Skipped during editing/dialog/grab modes. Preserves selection state.
+- **Viewport scrolling and session state** (`LoadedBoard.scroll_offset: Vec<Cell<usize>>`, ADR-0010): Dynamic card heights and viewport bounds are known only at render time. The renderer reconciles and updates per-list scroll offsets via interior mutability so Up/Down navigation is symmetric: focus moves across visible cards before the viewport scrolls. `App` remembers `focused_cards` and `scroll_offsets` per board across board switches in the session.
+
+## How to Add Things
+
+### New keybinding (board selector / board view / card detail)
+Keybindings live in a **keymap table** per mode (`KEYMAP` in `input/board_selector_input.rs`, `input/normal.rs`, `input/card_detail_input.rs`). Dispatch and the help overlay both read the table.
+1. Add an `Action` enum variant and a `Binding` row to the mode's `KEYMAP` (key, action, help text, section)
+2. Add the action's match arm in the same file's `run()`
+3. The help overlay (`ui/mod.rs::render_help()`) generates rows from the table — only touch it if you introduce a new *section* (and extend the section list + the `help_layout_covers_all_keymap_sections` test)
+
+The help overlay is the single source of truth for keybindings — README.md no longer lists them.
+
+### New dialog
+1. Create `src/dialog/<name>.rs` with a struct implementing `Dialog` (payload + cursor/scroll state, `render`, `handle_key`, optional `background`).
+2. Register the module in `src/dialog/mod.rs`.
+3. Open from input handlers with `app.open_dialog(Box::new(MyDialog { ... }))`.
+4. Implement `help()` (its `DialogHelp` rows document all the dialog's keys) and map `?` to `DialogOutcome::help()` in `handle_key` — every dialog does this; there are no inline hints.
+5. If the dialog needs side effects beyond `Command` (hard delete, board create) add a variant to `DialogSideEffect` and handle in `input/dialog_input.rs::apply_side_effect`.
+
+### New card field
+1. Add field to `Card` struct in `model/card.rs` (with serde attributes)
+2. Add `CardDetailTab` variant in `app.rs` if it needs its own tab
+3. Add render function in `ui/card_detail.rs`
+4. Add input handling in `input/card_detail_input.rs`
+5. If editable via insert: add a new `InsertHandler` struct in the appropriate widget-kind submodule under `src/insert/`.
+
+### New insert handler
+1. Pick the right widget kind: `src/insert/line_editor.rs` (single-line text), `src/insert/markdown_editor.rs` (multi-line markdown), `src/insert/date_picker.rs`, or add a new submodule.
+2. Add a struct holding its payload + the shared base (`LineInput`, `TextAreaInput`).
+3. Implement `InsertHandler { handle_key, surface, title?, line_buffer?, line_cursor?, as_any }`.
+4. Open with `app.start_insert(Box::new(MyHandler::new(...)))` from the relevant input handler.
+5. The rendering site (`ui/board_view.rs`, `ui/board_selector.rs`, `ui/card_detail.rs`) keys off `handler.surface()` and `handler.title()`/`line_buffer()` automatically — no UI edits needed for line editors.
+
+### New CLI subcommand
+1. Add a `<name>.rs` module in `src/cli/` with a `pub(super) fn run`
+2. Add `mod <name>;` in `src/cli/mod.rs`
+3. Wire the dispatch arm in `cli::run`'s `match sub`
+4. Add the command's usage block to the `HELP` string in `cli/mod.rs` (this is the full CLI reference — README.md only carries basic usage + an example workflow)
+
+## Keep in Sync
+
+When changing keybindings or features, update:
+- The mode's `KEYMAP` table (help overlay generates from it)
+- The matching help page: `Dialog::help()` rows for dialogs, the date-picker/description-editor pages in `ui/mod.rs::render_help()` for insert handlers
+- This file (AGENTS.md) if architectural patterns change
+
+The status bar carries contextual help hints (`?:help`, or `F1 / Ctrl+H:help` for the description editor); the description editor modal bottom also hints `F1 / Ctrl+H:help`. There are **no other inline shortcut hints** anywhere — all shortcuts live in the contextual help overlay only. Status messages never occupy the status bar; they toast top-right (see "Status messages" above).
+
+Doc homes (don't duplicate elsewhere): keybindings → help overlay only; full CLI reference → `cli/mod.rs` `HELP`; module layout → `docs/architecture.md`; README keeps basic usage + one example workflow.
+
+## Key Patterns
+
+- `has_ctrl_or_cmd()` in `insert/line_input.rs` — checks both Ctrl and Cmd (macOS Super) modifiers
+- `LoadedBoard` in `app.rs` — holds all board state including selection indices
+- `app.start_insert(Box::new(handler))` — enter Insert mode with a fresh `InsertHandler`
+- `app.open_dialog(Box::new(dialog))` / `app.close_dialog()` / `app.close_dialog_to(mode)` — manage the modal `Dialog` stack
+- `board.current_card()` / `board.current_card_id()` — get currently selected card
+- `card.touch()` — updates `updated_at` timestamp
+- `board.clamp_selection()` — fix selection indices after card removal
+- `markdown::WRAP_WIDTH` — word-wrap width for description (80 chars)
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical names (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `UBIQUITOUS_LANGUAGE.md` (domain glossary) + `docs/adr/` at root. See `docs/agents/domain.md`.

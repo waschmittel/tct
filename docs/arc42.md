@@ -688,7 +688,7 @@ mindmap
 | QS-2 | Usability | User presses wrong key in Normal mode | Destructive actions require confirmation dialog |
 | QS-3 | Performance | User navigates 100+ cards on a board | Render completes within single frame |
 | QS-4 | Portability | User runs on macOS with kitty terminal | Cmd+S works via `has_ctrl_or_cmd()` helper |
-| QS-5 | Maintainability | Developer adds new card field | Follow documented 5-step recipe in CLAUDE.md |
+| QS-5 | Maintainability | Developer adds new card field | Follow documented 5-step recipe in AGENTS.md |
 | QS-6 | Data safety | Two tct instances access same board | Periodic reload (15s) picks up external changes |
 
 ---
