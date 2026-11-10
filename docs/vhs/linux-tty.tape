@@ -18,7 +18,7 @@ Set Padding 10
 Hide
 # Fixed data dir (not mktemp): the path shows bottom-right in the status
 # bar, so it must be deterministic for the frame-text golden.
-Type `cargo build -q && cp target/debug/tct ./tct && export TCT_DATA_DIR="/tmp/tct-vhs-linux" && rm -rf "$TCT_DATA_DIR" && TCT=./tct ./docs/vhs/seed.sh >/dev/null && clear`
+Type `cargo build -q && cp target/debug/tct ./tct && export TCT_DATA_DIR="/tmp/tct-vhs-linux" && rm -rf "$TCT_DATA_DIR" && mkdir -p "$TCT_DATA_DIR" && TCT=./tct ./docs/vhs/seed.sh >/dev/null && clear`
 Enter
 Sleep 3s
 Show
