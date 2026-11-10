@@ -1,6 +1,123 @@
+diff -ruN --exclude=.cargo-ok a/Cargo.toml.orig b/Cargo.toml.orig
+--- a/Cargo.toml.orig	2006-07-24 03:21:28
++++ b/Cargo.toml.orig	1970-01-01 01:00:00
+@@ -1,113 +0,0 @@
+-[package]
+-name = "tui-textarea-2"
+-homepage = "https://github.com/srothgan/tui-textarea#readme"
+-repository = "https://github.com/srothgan/tui-textarea"
+-documentation = "https://docs.rs/tui-textarea-2/latest/tui_textarea/"
+-version = "0.14.0"
+-edition = "2024"
+-rust-version = "1.88.0" # for Ratatui 0.30 split crates
+-authors = ["Simon Peter Rothgang <simonrothgang@icloud.com>", "rhysd <lin90162@yahoo.co.jp>"]
+-description = """
+-tui-textarea is a simple yet powerful text editor widget for ratatui. Multi-line
+-text editor can be easily put as part of your TUI application.
+-"""
+-license = "MIT"
+-readme = "README.md"
+-categories = ["text-editors", "text-processing"]
+-keywords = ["tui", "textarea", "editor", "input", "ratatui"]
+-include = ["/src", "/examples", "/tests", "/README.md", "/LICENSE"]
+-
+-[lib]
+-name = "tui_textarea"
+-
+-[features]
+-default = ["crossterm"]
+-# Features to use ratatui
+-ratatui = ["dep:ratatui-core", "dep:ratatui-widgets"]
+-crossterm = ["ratatui", "dep:crossterm"]
+-crossterm_0_28 = ["ratatui", "dep:crossterm-028"]
+-termion = ["ratatui", "dep:termion"]
+-termwiz = ["ratatui", "dep:termwiz"]
+-no-backend = ["ratatui"]
+-# Other optional features
+-search = ["dep:regex"]
+-serde = ["dep:serde"]
+-arbitrary = ["dep:arbitrary"]
+-
+-[dependencies]
+-arbitrary = { version = "1", features = ["derive"], optional = true }
+-crossterm = { package = "crossterm", version = "0.29", optional = true }
+-crossterm-028 = { package = "crossterm", version = "0.28", optional = true }
+-ratatui-core = { version = "0.1.0", default-features = false, optional = true }
+-ratatui-widgets = { version = "0.3.0", default-features = false, optional = true }
+-portable-atomic = "1.11.1"
+-regex = { version = "1", optional = true }
+-termion = { version = "4.0", optional = true }
+-termwiz = { version = "0.23.0", optional = true }
+-unicode-width = "0.2.0"
+-unicode-segmentation = "1.10.1"
+-serde = { version = "1", optional = true , features = ["derive"] }
+-
+-[[example]]
+-name = "minimal"
+-required-features = ["crossterm"]
+-
+-[[example]]
+-name = "editor"
+-required-features = ["crossterm", "search"]
+-
+-[[example]]
+-name = "split"
+-required-features = ["crossterm"]
+-
+-[[example]]
+-name = "single_line"
+-required-features = ["crossterm"]
+-
+-[[example]]
+-name = "variable"
+-required-features = ["crossterm"]
+-
+-[[example]]
+-name = "vim"
+-required-features = ["crossterm"]
+-
+-[[example]]
+-name = "password"
+-required-features = ["crossterm"]
+-
+-[[example]]
+-name = "popup_placeholder"
+-required-features = ["crossterm"]
+-
+-[[example]]
+-name = "wrap"
+-required-features = ["crossterm"]
+-
+-[[example]]
+-name = "undo_coalescing"
+-required-features = ["crossterm"]
+-
+-[[example]]
+-name = "termwiz"
+-required-features = ["termwiz"]
+-
+-[[example]]
+-name = "termion"
+-required-features = ["termion"]
+-
+-[workspace]
+-members = ["bench"]
+-
+-[profile.bench]
+-lto = "thin"
+-
+-[dev-dependencies]
+-serde_json = "1.0.120"
+-# Ratatui with all backends enabled for tests and examples
+-ratatui = {version = "0.30.0", features=["crossterm", "termion", "termwiz"]} # Used by examples
+-
+-[package.metadata.docs.rs]
+-targets = ["x86_64-unknown-linux-gnu"]
+-features = ["search", "crossterm", "termwiz", "termion", "serde"]
+-rustdoc-args = ["--cfg", "docsrs"]
 diff -ruN --exclude=.cargo-ok a/src/history.rs b/src/history.rs
 --- a/src/history.rs	2006-07-24 03:21:28
-+++ b/src/history.rs	2026-11-02 16:34:14
++++ b/src/history.rs	2026-11-10 13:53:53
 @@ -120,6 +120,8 @@
      kind: EditKind,
      before: Pos,
@@ -179,7 +296,7 @@ diff -ruN --exclude=.cargo-ok a/src/history.rs b/src/history.rs
      #[test]
 diff -ruN --exclude=.cargo-ok a/src/screen_map.rs b/src/screen_map.rs
 --- a/src/screen_map.rs	2006-07-24 03:21:28
-+++ b/src/screen_map.rs	2026-11-02 16:34:14
++++ b/src/screen_map.rs	2026-11-10 13:53:53
 @@ -77,6 +77,7 @@
                  end_col: line.chars().count(),
                  first_in_row: true,
@@ -259,7 +376,7 @@ diff -ruN --exclude=.cargo-ok a/src/screen_map.rs b/src/screen_map.rs
              row: screen_idx,
 diff -ruN --exclude=.cargo-ok a/src/textarea.rs b/src/textarea.rs
 --- a/src/textarea.rs	2006-07-24 03:21:28
-+++ b/src/textarea.rs	2026-11-02 16:34:14
++++ b/src/textarea.rs	2026-11-10 13:53:53
 @@ -219,6 +219,7 @@
      search: Search,
      alignment: Alignment,
@@ -276,7 +393,7 @@ diff -ruN --exclude=.cargo-ok a/src/textarea.rs b/src/textarea.rs
              min_rows: 1,
              max_rows: u16::MAX,
              placeholder: Text::default().style(Style::default().fg(Color::DarkGray)),
-@@ -2021,6 +2023,22 @@
+@@ -2027,6 +2029,22 @@
          }
      }
  
@@ -299,7 +416,7 @@ diff -ruN --exclude=.cargo-ok a/src/textarea.rs b/src/textarea.rs
      /// Redo the last undo change. This method returns if the redo modified text contents or not in the textarea.
      /// ```
      /// use tui_textarea::{TextArea, CursorMove};
-@@ -2841,6 +2859,19 @@
+@@ -2847,6 +2865,19 @@
          self.wrap_mode
      }
  
@@ -319,7 +436,7 @@ diff -ruN --exclude=.cargo-ok a/src/textarea.rs b/src/textarea.rs
      /// Set the minimum preferred height in rows.
      ///
      /// The value is applied to measured outer rows (content + block chrome). Setting 0 is
-@@ -2934,7 +2965,14 @@
+@@ -2940,7 +2971,14 @@
          }
  
          let rows = if let Some(wrap_width) = self.layout_metrics(width_cols).wrap_width() {
@@ -337,7 +454,7 @@ diff -ruN --exclude=.cargo-ok a/src/textarea.rs b/src/textarea.rs
          };
 diff -ruN --exclude=.cargo-ok a/src/widget.rs b/src/widget.rs
 --- a/src/widget.rs	2006-07-24 03:21:28
-+++ b/src/widget.rs	2026-11-02 16:34:14
++++ b/src/widget.rs	2026-11-10 13:53:53
 @@ -105,7 +105,15 @@
          let mut lines = Vec::with_capacity(bottom_row - top_row);
          for row in &screen_lines[top_row..bottom_row] {
@@ -357,7 +474,7 @@ diff -ruN --exclude=.cargo-ok a/src/widget.rs b/src/widget.rs
      }
 diff -ruN --exclude=.cargo-ok a/src/wrap.rs b/src/wrap.rs
 --- a/src/wrap.rs	2006-07-24 03:21:28
-+++ b/src/wrap.rs	2026-11-02 16:34:14
++++ b/src/wrap.rs	2026-11-10 13:53:53
 @@ -31,8 +31,13 @@
      pub end_col: usize,
      pub first_in_row: bool,
