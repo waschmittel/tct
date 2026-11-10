@@ -24,6 +24,8 @@ const WIDTH: u16 = 72;
 pub struct ExportPdf {
     card_id: CardId,
     card_title: String,
+    /// Language the PDF is set in, as detected from the card.
+    language: String,
     theme: Theme,
     file_name: String,
     /// Relative input is taken relative to this directory.
@@ -41,6 +43,7 @@ impl ExportPdf {
     pub fn new(
         card_id: CardId,
         card_title: String,
+        language: String,
         theme: Theme,
         start_dir: &Path,
         cwd: PathBuf,
@@ -49,6 +52,7 @@ impl ExportPdf {
         let mut dialog = Self {
             card_id,
             card_title,
+            language,
             theme,
             file_name,
             cwd,
@@ -171,6 +175,7 @@ impl Dialog for ExportPdf {
                     " (color)"
                 }
             ))
+            .title_bottom(Line::from(format!(" Language: {} ", self.language)).right_aligned())
             .borders(Borders::ALL)
             .border_style(Style::default().fg(accent));
         let inner = block.inner(popup);
@@ -329,6 +334,7 @@ mod tests {
         ExportPdf::new(
             CardId::generate(),
             "My Card".into(),
+            "English (default)".into(),
             Theme::Mono,
             dir,
             dir.to_path_buf(),
@@ -363,6 +369,7 @@ mod tests {
         let mut d = ExportPdf::new(
             CardId::generate(),
             "My Card".into(),
+            "English (default)".into(),
             Theme::Mono,
             tmp.path(),
             tmp.path().to_path_buf(),
@@ -378,6 +385,7 @@ mod tests {
         let mut d = ExportPdf::new(
             CardId::generate(),
             "My Card".into(),
+            "Deutsch".into(),
             Theme::Color,
             tmp.path(),
             tmp.path().to_path_buf(),
@@ -513,6 +521,7 @@ mod tests {
         let d = ExportPdf::new(
             CardId::generate(),
             "My Card".into(),
+            "Deutsch".into(),
             Theme::Color,
             Path::new("/"),
             PathBuf::from("/"),
@@ -529,6 +538,7 @@ mod tests {
             .map(|c| c.symbol())
             .collect();
         assert!(row.contains("/my-card.pdf"), "{row}");
+        assert!(row.contains("Language: Deutsch"), "{row}");
     }
 
     #[test]

@@ -1517,3 +1517,48 @@ fn help_from_card_detail_keeps_the_detail_visible() {
         );
     });
 }
+
+/// The export dialog browsing a fixed folder: the typed path is relative to
+/// the dialog's cwd (a temp dir), so nothing machine-specific is rendered.
+fn export_dialog_screen(language: &str) -> String {
+    use crate::dialog::Dialog;
+    use crate::dialog::export_pdf::ExportPdf;
+    use crate::export::Theme;
+    use crate::model::id::CardId;
+
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::create_dir(tmp.path().join("notes")).unwrap();
+    for name in ["report.pdf", "todo.txt"] {
+        std::fs::write(tmp.path().join(name), "").unwrap();
+    }
+    let mut dialog = ExportPdf::new(
+        CardId::generate(),
+        "Quarterly plan".into(),
+        language.into(),
+        Theme::Mono,
+        tmp.path(),
+        tmp.path().to_path_buf(),
+    );
+    let key = |code| KeyEvent::new(code, KeyModifiers::empty());
+    for _ in 0..tmp.path().as_os_str().len() + 2 {
+        dialog.handle_key(key(KeyCode::Backspace), None);
+    }
+    for c in "./".chars() {
+        dialog.handle_key(key(KeyCode::Char(c)), None);
+    }
+    let mut terminal = Terminal::new(TestBackend::new(90, 16)).unwrap();
+    terminal
+        .draw(|f| dialog.render(f, f.area(), None, ratatui::style::Color::Cyan))
+        .unwrap();
+    buffer_to_string(terminal.backend().buffer())
+}
+
+#[test]
+fn snapshot_export_dialog_shows_detected_language() {
+    insta::assert_snapshot!(export_dialog_screen("Deutsch"));
+}
+
+#[test]
+fn snapshot_export_dialog_default_language() {
+    insta::assert_snapshot!(export_dialog_screen("English (default)"));
+}

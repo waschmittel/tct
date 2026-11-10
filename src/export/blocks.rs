@@ -5,6 +5,7 @@
 //! tables, and `**bold**`, `*italic*`, `***both***`, `~~strike~~` and `` `code` `` inline.
 //! Like the preview, every source line stays its own visual line.
 
+use super::lang::Lang;
 use crate::alert::Alert;
 use crate::footnote;
 use crate::insert::table::{Table, is_table_line};
@@ -68,10 +69,10 @@ pub struct Doc {
     pub notes: Vec<Note>,
 }
 
-pub fn parse_doc(markdown: &str) -> Doc {
+pub fn parse_doc(markdown: &str, lang: Lang) -> Doc {
     let extracted = footnote::extract(markdown);
     let lines: Vec<&str> = extracted.body.iter().map(String::as_str).collect();
-    let mut blocks = parse_lines(&lines);
+    let mut blocks = parse_lines(&lines, lang);
     if extracted.removed {
         while blocks.last() == Some(&Block::Blank) {
             blocks.pop();
@@ -85,7 +86,7 @@ pub fn parse_doc(markdown: &str) -> Doc {
             lines: note
                 .lines
                 .iter()
-                .map(|l| inline(l, Style::default()))
+                .map(|l| inline(l, Style::default(), lang))
                 .collect(),
         })
         .collect();
@@ -94,10 +95,10 @@ pub fn parse_doc(markdown: &str) -> Doc {
 
 #[cfg(test)]
 pub fn parse(markdown: &str) -> Vec<Block> {
-    parse_doc(markdown).blocks
+    parse_doc(markdown, Lang::En).blocks
 }
 
-fn parse_lines(lines: &[&str]) -> Vec<Block> {
+fn parse_lines(lines: &[&str], lang: Lang) -> Vec<Block> {
     let mut blocks = Vec::new();
     let mut idx = 0;
     let mut in_quote = false;
@@ -109,13 +110,13 @@ fn parse_lines(lines: &[&str]) -> Vec<Block> {
         if !code && is_quote_fence(line) && (!in_quote || closes_quote(line)) {
             in_quote = !in_quote;
             alert = if in_quote { fence_alert(line) } else { None };
-            blocks.extend(alert.filter(|_| in_quote).map(title));
+            blocks.extend(alert.filter(|_| in_quote).map(|kind| title(kind, lang)));
             prev_cite = false;
             idx += 1;
             continue;
         }
         if in_quote && !code {
-            let mut block = parse_line(line);
+            let mut block = parse_line(line, lang);
             match alert {
                 Some(kind) => block = in_alert(block, kind),
                 None => {
@@ -162,9 +163,9 @@ fn parse_lines(lines: &[&str]) -> Vec<Block> {
             prev_cite = true;
             if let Some(kind) = alert {
                 blocks.push(if first {
-                    title(kind)
+                    title(kind, lang)
                 } else {
-                    in_alert(parse_line(&trimmed[marker..]), kind)
+                    in_alert(parse_line(&trimmed[marker..], lang), kind)
                 });
                 idx += 1;
                 continue;
@@ -173,14 +174,14 @@ fn parse_lines(lines: &[&str]) -> Vec<Block> {
             prev_cite = false;
             alert = None;
         }
-        blocks.push(parse_line(line));
+        blocks.push(parse_line(line, lang));
         idx += 1;
     }
     blocks
 }
 
 /// The title line of an alert box.
-fn title(kind: Alert) -> Block {
+fn title(kind: Alert, lang: Lang) -> Block {
     let style = Style {
         bold: true,
         ..Style::default()
@@ -191,7 +192,7 @@ fn title(kind: Alert) -> Block {
         quote_depth: 0,
         alert: Some(InAlert { kind, title: true }),
         runs: vec![Run {
-            text: kind.name().to_uppercase(),
+            text: lang.alert_title(kind).to_uppercase(),
             style,
         }],
     }
@@ -243,14 +244,14 @@ fn in_alert(block: Block, kind: Alert) -> Block {
     }
 }
 
-fn parse_line(line: &str) -> Block {
+fn parse_line(line: &str, lang: Lang) -> Block {
     if line.trim().is_empty() {
         return Block::Blank;
     }
     if let Some((level, rest)) = heading(line) {
         return Block::Heading {
             level,
-            runs: inline(rest, Style::default()),
+            runs: inline(rest, Style::default(), lang),
         };
     }
 
@@ -266,7 +267,7 @@ fn parse_line(line: &str) -> Block {
             marker: None,
             quote_depth,
             alert: None,
-            runs: inline(&trimmed[marker_len..], Style::default()),
+            runs: inline(&trimmed[marker_len..], Style::default(), lang),
         };
     }
     if let Some(rest) = trimmed
@@ -274,29 +275,34 @@ fn parse_line(line: &str) -> Block {
         .or_else(|| trimmed.strip_prefix("* "))
     {
         let marker = if indent >= 2 { "◦" } else { "•" };
-        return list_item(indent, marker.to_string(), rest);
+        return list_item(indent, marker.to_string(), rest, lang);
     }
     if let Some(dot) = trimmed.find(". ")
         && trimmed[..dot].parse::<u64>().is_ok()
     {
-        return list_item(indent, format!("{}.", &trimmed[..dot]), &trimmed[dot + 2..]);
+        return list_item(
+            indent,
+            format!("{}.", &trimmed[..dot]),
+            &trimmed[dot + 2..],
+            lang,
+        );
     }
     Block::Text {
         level: 0,
         marker: None,
         quote_depth: 0,
         alert: None,
-        runs: inline(line, Style::default()),
+        runs: inline(line, Style::default(), lang),
     }
 }
 
-fn list_item(indent: usize, marker: String, text: &str) -> Block {
+fn list_item(indent: usize, marker: String, text: &str, lang: Lang) -> Block {
     Block::Text {
         level: indent / 2,
         marker: Some(marker),
         quote_depth: 0,
         alert: None,
-        runs: inline(text, Style::default()),
+        runs: inline(text, Style::default(), lang),
     }
 }
 
@@ -311,16 +317,17 @@ fn heading(line: &str) -> Option<(u8, &str)> {
 }
 
 /// Split `text` into styled runs; `base` is the style of unmarked text.
-pub fn inline(text: &str, base: Style) -> Vec<Run> {
+pub fn inline(text: &str, base: Style, lang: Lang) -> Vec<Run> {
     let chars: Vec<char> = text.chars().collect();
     let mut runs = Vec::new();
-    let mut plain = String::new();
+    // Unmarked text is the stretch `start..i`.
+    let mut start = 0;
     let mut i = 0;
 
-    let flush = |plain: &mut String, runs: &mut Vec<Run>| {
-        if !plain.is_empty() {
+    let flush = |from: usize, to: usize, runs: &mut Vec<Run>| {
+        if from < to {
             runs.push(Run {
-                text: ellipsis(&std::mem::take(plain)),
+                text: typeset(&chars, from, to, lang),
                 style: base,
             });
         }
@@ -330,13 +337,14 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
         if chars[i] == footnote::OPEN
             && let Some(len) = chars[i + 1..].iter().position(|&c| c == footnote::CLOSE)
         {
-            flush(&mut plain, &mut runs);
+            flush(start, i, &mut runs);
             runs.push(Run {
                 // Raised and in brackets, like `[1]`.
                 text: format!("[{}]", chars[i + 1..i + 1 + len].iter().collect::<String>()),
                 style: Style { sup: true, ..base },
             });
             i += len + 2;
+            start = i;
             continue;
         }
         let marker = [("***", 3), ("**", 2), ("~~", 2), ("*", 1), ("`", 1)]
@@ -345,7 +353,7 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
         if let Some((m, len)) = marker
             && let Some(end) = find_close(&chars, i + len, m, m == "*")
         {
-            flush(&mut plain, &mut runs);
+            flush(start, i, &mut runs);
             let mut style = base;
             match m {
                 "***" => {
@@ -357,24 +365,73 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
                 "*" => style.italic = true,
                 _ => style.code = true,
             }
-            let text: String = chars[i + len..end].iter().collect();
             runs.push(Run {
-                text: if style.code { text } else { ellipsis(&text) },
+                text: if style.code {
+                    chars[i + len..end].iter().collect()
+                } else {
+                    typeset(&chars, i + len, end, lang)
+                },
                 style,
             });
             i = end + len;
+            start = i;
             continue;
         }
-        plain.push(chars[i]);
         i += 1;
     }
-    flush(&mut plain, &mut runs);
+    flush(start, chars.len(), &mut runs);
     runs
 }
 
-/// Typographic ellipsis for `...` (never applied to code).
-fn ellipsis(text: &str) -> String {
-    text.replace("...", "\u{2026}")
+/// `chars[from..to]` with `...` as an ellipsis and straight quotes as the
+/// language's typographic ones (never applied to code).
+fn typeset(chars: &[char], from: usize, to: usize, lang: Lang) -> String {
+    let mut out = String::new();
+    let mut i = from;
+    while i < to {
+        match chars[i] {
+            '.' if i + 3 <= to && chars[i + 1] == '.' && chars[i + 2] == '.' => {
+                out.push('\u{2026}');
+                i += 3;
+                continue;
+            }
+            '"' | '\'' => out.push_str(&quote(chars, i, lang)),
+            c => out.push(c),
+        }
+        i += 1;
+    }
+    out
+}
+
+/// The typographic form of the straight quote at `chars[at]`, judged by its
+/// neighbors (emphasis markers are looked through).
+fn quote(chars: &[char], at: usize, lang: Lang) -> String {
+    let marker = |c: &char| matches!(c, '*' | '~' | '`');
+    let prev = chars[..at].iter().rev().find(|c| !marker(c)).copied();
+    let next = chars[at + 1..].iter().find(|c| !marker(c)).copied();
+    let single = chars[at] == '\'';
+    let q = lang.quotes();
+    let alnum = |c: Option<char>| c.is_some_and(char::is_alphanumeric);
+    let (open, close) = if single {
+        (q.open1, q.close1)
+    } else {
+        (q.open2, q.close2)
+    };
+    if single && alnum(prev) && alnum(next) {
+        return q.close1.into(); // apostrophe: don't
+    }
+    if prev.is_some_and(|c| c.is_ascii_digit()) && !alnum(next) {
+        return chars[at].into(); // inch and foot marks: 5"
+    }
+    let opens = match (prev, next) {
+        (_, None) => false,
+        (_, Some(n)) if n.is_whitespace() => false,
+        (None, _) => true,
+        (Some(p), _) if p.is_whitespace() || "([{/–—".contains(p) => true,
+        (Some('"' | '\''), n) => alnum(n),
+        _ => false,
+    };
+    (if opens { open } else { close }).into()
 }
 
 fn find_close(chars: &[char], from: usize, marker: &str, single_star: bool) -> Option<usize> {
@@ -394,7 +451,7 @@ mod tests {
 
     #[test]
     fn inline_markers_become_styled_runs() {
-        let runs = inline("a **b** *c* ~~d~~ `e` f", Style::default());
+        let runs = inline("a **b** *c* ~~d~~ `e` f", Style::default(), Lang::En);
         assert_eq!(plain(&runs), "a b c d e f");
         assert!(runs.iter().any(|r| r.text == "b" && r.style.bold));
         assert!(runs.iter().any(|r| r.text == "c" && r.style.italic));
@@ -404,14 +461,68 @@ mod tests {
 
     #[test]
     fn three_dots_become_an_ellipsis_except_in_code() {
-        let runs = inline("wait... **bold...** `a...b` x....", Style::default());
+        let runs = inline(
+            "wait... **bold...** `a...b` x....",
+            Style::default(),
+            Lang::En,
+        );
         assert_eq!(plain(&runs), "wait\u{2026} bold\u{2026} a...b x\u{2026}.");
-        assert_eq!(plain(&inline("..", Style::default())), "..");
+        assert_eq!(plain(&inline("..", Style::default(), Lang::En)), "..");
+    }
+
+    fn quoted(text: &str, lang: Lang) -> String {
+        plain(&inline(text, Style::default(), lang))
+    }
+
+    #[test]
+    fn quotes_follow_the_language() {
+        let t = "He said \"hi\" and 'bye'.";
+        assert_eq!(
+            quoted(t, Lang::En),
+            "He said \u{201c}hi\u{201d} and \u{2018}bye\u{2019}."
+        );
+        assert_eq!(
+            quoted(t, Lang::De),
+            "He said \u{201e}hi\u{201c} and \u{201a}bye\u{2018}."
+        );
+        assert_eq!(
+            quoted(t, Lang::Fr),
+            "He said \u{ab}\u{202f}hi\u{202f}\u{bb} and \u{2018}bye\u{2019}."
+        );
+        assert_eq!(
+            quoted(t, Lang::Es),
+            "He said \u{ab}hi\u{bb} and \u{2018}bye\u{2019}."
+        );
+    }
+
+    #[test]
+    fn quote_corner_cases() {
+        let en = |t| quoted(t, Lang::En);
+        // Apostrophes, inch/foot marks, quote at the ends, nesting, brackets.
+        assert_eq!(en("don't"), "don\u{2019}t");
+        assert_eq!(en("5\" and 6'"), "5\" and 6'");
+        assert_eq!(en("\"a\""), "\u{201c}a\u{201d}");
+        assert_eq!(en("\"'a' b\""), "\u{201c}\u{2018}a\u{2019} b\u{201d}");
+        assert_eq!(en("(\"a\")"), "(\u{201c}a\u{201d})");
+        assert_eq!(en("dogs' toys"), "dogs\u{2019} toys");
+        // Through emphasis markers; code stays straight.
+        assert_eq!(en("\"**a**\" `\"b\"`"), "\u{201c}a\u{201d} \"b\"");
+        assert_eq!(en("**\"a\"**"), "\u{201c}a\u{201d}");
+        assert_eq!(en("\""), "\u{201d}"); // lone: nothing to open
+    }
+
+    #[test]
+    fn alert_titles_are_translated() {
+        let blocks = parse_doc("> [!warning]\n> x", Lang::De).blocks;
+        let Block::Text { runs, .. } = &blocks[0] else {
+            panic!()
+        };
+        assert_eq!(plain(runs), "WARNUNG");
     }
 
     #[test]
     fn triple_star_is_bold_italic() {
-        let runs = inline("a ***b*** c", Style::default());
+        let runs = inline("a ***b*** c", Style::default(), Lang::En);
         assert_eq!(plain(&runs), "a b c");
         assert!(
             runs.iter()
@@ -421,9 +532,12 @@ mod tests {
 
     #[test]
     fn unclosed_markers_stay_literal() {
-        let runs = inline("2 * 3 and **open", Style::default());
+        let runs = inline("2 * 3 and **open", Style::default(), Lang::En);
         assert!(runs.iter().all(|r| !r.style.bold));
-        assert_eq!(plain(&inline("a ** b", Style::default())), "a ** b");
+        assert_eq!(
+            plain(&inline("a ** b", Style::default(), Lang::En)),
+            "a ** b"
+        );
     }
 
     #[test]

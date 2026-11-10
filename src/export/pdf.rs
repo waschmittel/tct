@@ -23,6 +23,7 @@ use skrifa::{FontRef, MetadataProvider};
 
 use super::Theme;
 use super::blocks::{self, Block, InAlert, Note, Run, Style};
+use super::lang::Lang;
 use crate::alert::Alert;
 use crate::insert::table::{Align, Table};
 use crate::model::board::BoardMeta;
@@ -248,6 +249,8 @@ fn eff(style: Style, size: f32) -> f32 {
 }
 
 struct Flow<'f> {
+    /// Language of the document: typographic quotes in table cells and checklist.
+    lang: Lang,
     fonts: &'f Fonts,
     pages: Vec<Vec<Op>>,
     y: f32,
@@ -301,6 +304,7 @@ impl<'f> Flow<'f> {
             })
             .fold(0.0, f32::max);
         Self {
+            lang: Lang::default(),
             note_wrap_indent: (longest + NOTE_MARKER_GAP).min(CONTENT_W / 3.0),
             fonts,
             pages: vec![Vec::new()],
@@ -326,6 +330,7 @@ impl<'f> Flow<'f> {
         }
         let mut scratch = Flow {
             measuring: true,
+            lang: self.lang,
             ..Flow::with_notes(self.fonts, self.notes.clone())
         };
         build(&mut scratch);
@@ -1131,7 +1136,11 @@ impl<'f> Flow<'f> {
                     .enumerate()
                     .map(|(c, text)| {
                         let bold = r == 0 || (matrix && c == 0);
-                        blocks::inline(text, if bold { header_style } else { Style::default() })
+                        blocks::inline(
+                            text,
+                            if bold { header_style } else { Style::default() },
+                            self.lang,
+                        )
                     })
                     .collect()
             })
@@ -1327,7 +1336,7 @@ impl<'f> Flow<'f> {
         let height = BODY * LEADING;
         let x = MARGIN + 18.0;
         for item in &card.checklist {
-            let runs = blocks::inline(&item.text, Style::default());
+            let runs = blocks::inline(&item.text, Style::default(), self.lang);
             let color = if item.completed {
                 self.muted()
             } else {
@@ -1456,8 +1465,7 @@ fn emit(
     list: &str,
     card: &Card,
     labels: &[String],
-    now: chrono::DateTime<chrono::Utc>,
-    version: &str,
+    (now, version): (chrono::DateTime<chrono::Utc>, &str),
 ) -> anyhow::Result<Vec<u8>> {
     let configuration = ConfigurationBuilder::new()
         .with_archival_validator(Archival::A2_B)
@@ -1619,15 +1627,17 @@ fn draw_op(surface: &mut krilla::surface::Surface, fonts: &Fonts, op: &Op) -> an
     Ok(())
 }
 
-fn layout<'f>(
-    fonts: &'f Fonts,
+fn layout(
+    fonts: &Fonts,
     board: &BoardMeta,
     list: &str,
     card: &Card,
     now: chrono::DateTime<chrono::Utc>,
 ) -> (Vec<Vec<Op>>, Vec<String>) {
-    let doc = blocks::parse_doc(&card.description);
+    let lang = Lang::of(card);
+    let doc = blocks::parse_doc(&card.description, lang);
     let mut flow = Flow::with_notes(fonts, Rc::new(doc.notes));
+    flow.lang = lang;
 
     let title = [Run {
         text: card.title.clone(),
@@ -1718,7 +1728,7 @@ pub fn render_at(
 ) -> anyhow::Result<Vec<u8>> {
     let fonts = Fonts::load_for(theme)?;
     let (pages, labels) = layout(&fonts, board, list, card, now);
-    emit(&pages, &fonts, board, list, card, &labels, now, version)
+    emit(&pages, &fonts, board, list, card, &labels, (now, version))
 }
 
 #[cfg(test)]
@@ -2335,6 +2345,22 @@ mod tests {
             ),
         ));
         cases.push((
+            "03b-german-quotes-and-alert-titles",
+            meta.clone(),
+            plain(
+                "Anführungszeichen und Hinweise",
+                "Er sagte \"Hallo\" und 'tschüss', aber nicht \"**fett**\" oder `\"Code\"`. Das ist der Tag, an dem wir ihn nicht mehr gesehen haben, und es war schön.\n\n> [!warning]\n> Das ist eine \"Warnung\" für alle Leser.\n\n> [!tip]\n> Ein Tipp: \"so\" geht es.\n\n```\nlet s = \"unverändert\";\n```".into(),
+            ),
+        ));
+        cases.push((
+            "03c-french-guillemets",
+            meta.clone(),
+            plain(
+                "Guillemets français",
+                "Il a dit \"bonjour\" et nous sommes partis, car c'est la vie que nous avons choisie ensemble avec les enfants.\n\n> [!note]\n> Une \"remarque\" pour tout le monde dans la maison.".into(),
+            ),
+        ));
+        cases.push((
             "04-unbreakable-words",
             meta.clone(),
             plain(
@@ -2358,7 +2384,7 @@ mod tests {
                 format!(
                     "| {} |\n|{}|\n| {} |",
                     wide_header.join(" | "),
-                    vec!["---"; 10].join("|"),
+                    ["---"; 10].join("|"),
                     wide_row.join(" | ")
                 ),
             ),
@@ -2586,6 +2612,20 @@ cargo build --release
 
 That is all — a last paragraph after the code block.
 ";
+
+    #[test]
+    fn corner_cases_are_set_in_their_language() {
+        for (name, _, card) in corner_cases() {
+            let expected = match name {
+                "03b-german-quotes-and-alert-titles" => Some(Lang::De),
+                "03c-french-guillemets" => Some(Lang::Fr),
+                _ => None,
+            };
+            if let Some(lang) = expected {
+                assert_eq!(Lang::detect(&card), Some(lang), "{name}");
+            }
+        }
+    }
 
     #[test]
     fn alerts_draw_a_bar_and_a_capitalized_title_in_their_color_or_black() {

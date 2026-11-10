@@ -468,10 +468,11 @@ impl App {
             return;
         }
         let (card_id, title) = (card.id.clone(), card.title.clone());
+        let language = crate::export::lang::Lang::describe(card);
         let cwd = std::env::current_dir().unwrap_or_default();
         let start = self.export_dir.clone().unwrap_or_else(|| cwd.clone());
         self.open_dialog(Box::new(crate::dialog::export_pdf::ExportPdf::new(
-            card_id, title, theme, &start, cwd,
+            card_id, title, language, theme, &start, cwd,
         )));
     }
 

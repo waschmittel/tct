@@ -3,6 +3,7 @@
 //! card.
 
 mod blocks;
+pub mod lang;
 pub mod path;
 mod pdf;
 pub mod web;
