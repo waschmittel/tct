@@ -2000,13 +2000,22 @@ That is all — a last paragraph after the code block.
         }
     }
 
-    /// Fixed "made at" time, so regenerated examples only change with their content.
+    /// Fixed "made at" time (2000-01-01 00:00 UTC) and fixed created/updated
+    /// times of every example card, so regenerated examples only change with
+    /// their content. Dates print in local time: regenerate with `TZ=UTC`.
     const EXAMPLE_TIME: chrono::DateTime<chrono::Utc> =
-        chrono::DateTime::from_timestamp(1_767_225_600, 0).unwrap();
+        chrono::DateTime::from_timestamp(946_684_800, 0).unwrap();
+
+    fn at_example_time(mut card: Card) -> Card {
+        card.created_at = chrono::DateTime::from_timestamp(946_022_400, 0).unwrap(); // 1999-12-24 08:00
+        card.updated_at = chrono::DateTime::from_timestamp(946_684_740, 0).unwrap(); // 1999-12-31 23:59
+        card
+    }
 
     #[test]
     fn rendering_at_a_fixed_time_is_deterministic() {
         for (_, meta, card) in corner_cases().into_iter().take(3) {
+            let card = at_example_time(card);
             let a = render_at(&meta, "To Do", &card, Theme::Color, EXAMPLE_TIME).unwrap();
             let b = render_at(&meta, "To Do", &card, Theme::Color, EXAMPLE_TIME).unwrap();
             assert!(a == b, "PDF output must not depend on anything but its input");
@@ -2014,7 +2023,7 @@ That is all — a last paragraph after the code block.
     }
 
     /// Regenerates `docs/export-examples/*.pdf`:
-    /// `cargo test write_example_pdfs -- --ignored`.
+    /// `TZ=UTC cargo test write_example_pdfs -- --ignored`.
     #[test]
     #[ignore = "writes files into docs/"]
     fn write_example_pdfs() {
@@ -2026,6 +2035,7 @@ That is all — a last paragraph after the code block.
                 if !name.starts_with("00-") && !name.starts_with("15-") && theme == Theme::Color {
                     continue;
                 }
+                let card = at_example_time(card);
                 let pdf = render_at(&meta, "To Do", &card, theme, EXAMPLE_TIME).unwrap();
                 std::fs::write(dir.join(format!("{name}.pdf")), pdf).unwrap();
             }
