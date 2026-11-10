@@ -27,10 +27,14 @@ jobs:
           # build.rs stamps the version via git describe.
           fetch-depth: 0
 
+      # Install the pinned toolchain minimally and select it via env, so rustup does not
+      # re-sync rust-toolchain.toml's components (clippy conflicted with the preinstalled one).
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master (stable)
-        with:
-          toolchain: stable
+        shell: bash
+        run: |
+          v=$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$v" --profile minimal
+          echo "RUSTUP_TOOLCHAIN=$v" >> "$GITHUB_ENV"
 
       - name: Build (debug)
         run: cargo build
@@ -86,11 +90,14 @@ jobs:
           # Need tags so build.rs can stamp the version via git describe.
           fetch-depth: 0
 
+      # Install the pinned toolchain minimally and select it via env, so rustup does not
+      # re-sync rust-toolchain.toml's components (clippy conflicted with the preinstalled one).
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master (stable)
-        with:
-          toolchain: stable
-          targets: ${{ matrix.target }}
+        shell: bash
+        run: |
+          v=$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$v" --profile minimal --target ${{ matrix.target }}
+          echo "RUSTUP_TOOLCHAIN=$v" >> "$GITHUB_ENV"
 
       # zig is the C cross-compiler (psm builds a little C); the PyPI wheel bundles it.
       - name: Install cargo-zigbuild
