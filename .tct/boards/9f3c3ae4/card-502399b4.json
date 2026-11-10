@@ -1,8 +1,8 @@
 {
-  "list_id": "a589c4f4",
-  "position": 2.0,
+  "list_id": "24d6c0f0",
+  "position": 1.0,
   "title": "How can the huge source files be made more modular?",
-  "description": "",
+  "description": "there are huge files here. suggest how to make the codebase more modular, but don't do anything.",
   "label_ids": [
     "ae7207e7"
   ],
@@ -10,7 +10,7 @@
   "checklist": [],
   "archived": false,
   "created_at": "2026-11-10T20:04:33.787147Z",
-  "updated_at": "2026-11-10T20:04:55.357729Z",
+  "updated_at": "2026-11-10T20:26:12.001890Z",
   "history": [
     {
       "at": "2026-11-10T20:04:33.787198Z",
@@ -65,6 +65,13 @@
       "field": "labels",
       "old": "",
       "new": "longterm"
+    },
+    {
+      "at": "2026-11-10T20:26:12.001890Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "",
+      "new": "there are huge files here. suggest how to make the codebase more modular, but don't do anything."
     }
   ]
 }

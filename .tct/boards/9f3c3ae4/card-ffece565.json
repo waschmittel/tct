@@ -1,0 +1,54 @@
+{
+  "list_id": "91077b69",
+  "position": 0.0,
+  "title": "add git support",
+  "description": "build git integration\n\nThe idea is that tct should automatically commit the current .tct contents.\nFor the commit message, it should in the first line say which boards have been updated. if only a single card has been updated, it could mention that.\n\nThe details could describe which cards have been updated in particular (very concisely, not in detail)\n\nthe titles of boards/cards/lists should be used \n\ngit integration should be required to be activated explicitly with `tct --git enable|disable`\n\ntct init should automatically detect whether to enable or disable git depending on whether the newly created .tct folder is in a git repo or not. but it should also allow overriding that with --git enable|disable and it should output whether it has been enabled or not.\n\nbefore implementing, list pros and cons and propose a design as well as alternatives.",
+  "label_ids": [
+    "df88cb04"
+  ],
+  "due_date": null,
+  "checklist": [],
+  "archived": true,
+  "created_at": "2026-11-10T20:26:19.602450Z",
+  "updated_at": "2026-11-10T20:47:31.722714Z",
+  "history": [
+    {
+      "at": "2026-11-10T20:26:19.602478Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-10T20:26:23.071066Z",
+      "action": "Added label 'idea'",
+      "field": "labels",
+      "old": "",
+      "new": "idea"
+    },
+    {
+      "at": "2026-11-10T20:26:23.462585Z",
+      "action": "Removed label 'idea'",
+      "field": "labels",
+      "old": "idea",
+      "new": ""
+    },
+    {
+      "at": "2026-11-10T20:26:23.829927Z",
+      "action": "Added label 'idea'",
+      "field": "labels",
+      "old": "",
+      "new": "idea"
+    },
+    {
+      "at": "2026-11-10T20:32:05.756074Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "",
+      "new": "build git integration\n\nThe idea is that tct should automatically commit the current .tct contents.\nFor the commit message, it should in the first line say which boards have been updated. if only a single card has been updated, it could mention that.\n\nThe details could describe which cards have been updated in particular (very concisely, not in detail)\n\nthe titles of boards/cards/lists should be used \n\ngit integration should be required to be activated explicitly with `tct --git enable|disable`\n\ntct init should automatically detect whether to enable or disable git depending on whether the newly created .tct folder is in a git repo or not. but it should also allow overriding that with --git enable|disable and it should output whether it has been enabled or not.\n\nbefore implementing, list pros and cons and propose a design as well as alternatives."
+    },
+    {
+      "at": "2026-11-10T20:47:31.722714Z",
+      "action": "Archived",
+      "field": "general"
+    }
+  ]
+}

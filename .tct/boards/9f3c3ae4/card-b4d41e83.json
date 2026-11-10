@@ -1,16 +1,16 @@
 {
-  "list_id": "a589c4f4",
+  "list_id": "91077b69",
   "position": 1.0,
   "title": "cleanup --help",
-  "description": "add --readme and --user-guide (both optionally with TOC), to help with agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS, maybe also --help examples\n\nFind out what fits where (--readme vs --user-guide vs. --help examples)\n",
+  "description": "add --help readme and --help user-guide (both optionally with TOC), to help with agents.\n\nThey should basically output the readme and user guide from the repo, so these files should be referenced and included.\n\nIn --help, there should also be a hint that these are relevant for users as well as agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS.\n\nMaybe there should also be --help examples\n\nFind out what fits where and how this would be well-structured and make suggestions (but don't implement yet)\n",
   "label_ids": [
     "df88cb04"
   ],
   "due_date": null,
   "checklist": [],
-  "archived": false,
+  "archived": true,
   "created_at": "2026-11-06T18:23:57.155859Z",
-  "updated_at": "2026-11-10T14:07:50.780185Z",
+  "updated_at": "2026-11-10T20:41:44.277184Z",
   "history": [
     {
       "at": "2026-11-06T18:23:57.155883Z",
@@ -44,6 +44,18 @@
       "field": "description",
       "old": "add --readme and --user-guide (both optionally with TOC), to help with agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS, maybe also --help examples\n\nFind out what fits where (--readme vs --user-guide vs. --help examples)",
       "new": "add --readme and --user-guide (both optionally with TOC), to help with agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS, maybe also --help examples\n\nFind out what fits where (--readme vs --user-guide vs. --help examples)\n"
+    },
+    {
+      "at": "2026-11-10T20:21:19.880122Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "add --readme and --user-guide (both optionally with TOC), to help with agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS, maybe also --help examples\n\nFind out what fits where (--readme vs --user-guide vs. --help examples)\n",
+      "new": "add --help readme and --help user-guide (both optionally with TOC), to help with agents.\n\nThey should basically output the readme and user guide from the repo, so these files should be referenced and included.\n\nIn --help, there should also be a hint that these are relevant for users as well as agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS.\n\nMaybe there should also be --help examples\n\nFind out what fits where and how this would be well-structured and make suggestions (but don't implement yet)\n"
+    },
+    {
+      "at": "2026-11-10T20:41:44.277184Z",
+      "action": "Archived",
+      "field": "general"
     }
   ]
 }
