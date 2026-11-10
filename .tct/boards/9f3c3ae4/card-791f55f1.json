@@ -2,7 +2,7 @@
   "list_id": "a589c4f4",
   "position": 0.0,
   "title": "update demo tape before new release",
-  "description": "test\n\n> a quote\n\n>>> [!note]\n1. a multiline quote\n2. something\n>>>",
+  "description": "test [^3]\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny\n[^3]: this is not very funny",
   "label_ids": [
     "c740d3f5"
   ],
@@ -10,7 +10,7 @@
   "checklist": [],
   "archived": false,
   "created_at": "2026-11-06T18:25:48.817196Z",
-  "updated_at": "2026-11-09T19:02:21.939118Z",
+  "updated_at": "2026-11-10T16:37:56.417867Z",
   "history": [
     {
       "at": "2026-11-06T18:25:48.817221Z",
@@ -44,6 +44,27 @@
       "field": "description",
       "old": "test\n\n> a quote\n\n>>> [!note]\na multiline quote\n>>>",
       "new": "test\n\n> a quote\n\n>>> [!note]\n1. a multiline quote\n2. something\n>>>"
+    },
+    {
+      "at": "2026-11-10T16:37:21.578111Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "test\n\n> a quote\n\n>>> [!note]\n1. a multiline quote\n2. something\n>>>",
+      "new": "test\n\n> a quote\n[^1]\n>>> [!note]\n1. a multiline quote\n2. something\n>>>\n\n[^1]: this is funny"
+    },
+    {
+      "at": "2026-11-10T16:37:35.725257Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "test\n\n> a quote\n[^1]\n>>> [!note]\n1. a multiline quote\n2. something\n>>>\n\n[^1]: this is funny",
+      "new": "test\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny"
+    },
+    {
+      "at": "2026-11-10T16:37:56.417867Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "test\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny",
+      "new": "test [^3]\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny\n[^3]: this is not very funny"
     }
   ]
 }

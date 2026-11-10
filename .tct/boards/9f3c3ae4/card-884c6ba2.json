@@ -1,8 +1,8 @@
 {
-  "list_id": "a589c4f4",
-  "position": 8.0,
+  "list_id": "24d6c0f0",
+  "position": 3.0,
   "title": "use typographic quotations. if possible, detect language",
-  "description": "",
+  "description": "When converting to PDF, I'd like to have typographic quotes.\n\nBefore you implement, tell me how language detection could work so that the quotes are always correct.\n\nAlso if language detection does work, consider translating the alert titles in the PDF, too.",
   "label_ids": [
     "df88cb04"
   ],
@@ -10,7 +10,7 @@
   "checklist": [],
   "archived": false,
   "created_at": "2026-11-10T10:13:37.837231Z",
-  "updated_at": "2026-11-10T10:13:40.401755Z",
+  "updated_at": "2026-11-10T14:04:37.798279Z",
   "history": [
     {
       "at": "2026-11-10T10:13:37.837261Z",
@@ -23,6 +23,13 @@
       "field": "labels",
       "old": "",
       "new": "idea"
+    },
+    {
+      "at": "2026-11-10T14:04:36.971735Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "",
+      "new": "When converting to PDF, I'd like to have typographic quotes.\n\nBefore you implement, tell me how language detection could work so that the quotes are always correct.\n\nAlso if language detection does work, consider translating the alert titles in the PDF, too."
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "list_id": "24d6c0f0",
+  "list_id": "91077b69",
   "position": 1.0,
   "title": "add paste mode without auto-list etc.",
   "description": "Add a paste mode to the details editor.\n\nThe idea is that one should be able to paste Markdown into the editor without it actually adding list numbers etc.\n\nWhen leaving paste mode (which should be implicit when saving), markdown should be normalized (tables formatted, list indentation corrected etc.)",
@@ -8,9 +8,9 @@
   ],
   "due_date": null,
   "checklist": [],
-  "archived": false,
+  "archived": true,
   "created_at": "2026-11-06T18:29:43.331816Z",
-  "updated_at": "2026-11-09T17:32:31.402301Z",
+  "updated_at": "2026-11-10T16:11:37.327803Z",
   "history": [
     {
       "at": "2026-11-06T18:29:43.331831Z",
@@ -37,6 +37,11 @@
       "field": "description",
       "old": "",
       "new": "Add a paste mode to the details editor.\n\nThe idea is that one should be able to paste Markdown into the editor without it actually adding list numbers etc.\n\nWhen leaving paste mode (which should be implicit when saving), markdown should be normalized (tables formatted, list indentation corrected etc.)"
+    },
+    {
+      "at": "2026-11-10T16:11:37.327803Z",
+      "action": "Archived",
+      "field": "general"
     }
   ]
 }

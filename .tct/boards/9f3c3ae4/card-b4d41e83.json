@@ -2,7 +2,7 @@
   "list_id": "a589c4f4",
   "position": 1.0,
   "title": "cleanup --help",
-  "description": "add --readme and --user-guide (both optionally with TOC), to help with agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS, maybe also --help examples\n\nFind out what fits where (--readme vs --user-guide vs. --help examples)",
+  "description": "add --readme and --user-guide (both optionally with TOC), to help with agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS, maybe also --help examples\n\nFind out what fits where (--readme vs --user-guide vs. --help examples)\n",
   "label_ids": [
     "df88cb04"
   ],
@@ -10,7 +10,7 @@
   "checklist": [],
   "archived": false,
   "created_at": "2026-11-06T18:23:57.155859Z",
-  "updated_at": "2026-11-06T18:25:33.352496Z",
+  "updated_at": "2026-11-10T14:07:50.780185Z",
   "history": [
     {
       "at": "2026-11-06T18:23:57.155883Z",
@@ -37,6 +37,13 @@
       "field": "labels",
       "old": "",
       "new": "idea"
+    },
+    {
+      "at": "2026-11-10T14:07:48.646411Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "add --readme and --user-guide (both optionally with TOC), to help with agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS, maybe also --help examples\n\nFind out what fits where (--readme vs --user-guide vs. --help examples)",
+      "new": "add --readme and --user-guide (both optionally with TOC), to help with agents.\n\nAlso, --help should only give basic USAGE info and there should be --help cli for FLAGS and COMMANDS, maybe also --help examples\n\nFind out what fits where (--readme vs --user-guide vs. --help examples)\n"
     }
   ]
 }

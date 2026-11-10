@@ -1,6 +1,6 @@
 {
-  "list_id": "a589c4f4",
-  "position": 6.0,
+  "list_id": "91077b69",
+  "position": 1.0,
   "title": "support footnotes",
   "description": "Add footnote functionality to the details editor.\n\nThey should work like in Gitlab/Github markdown:\n\nHere is a simple footnote[^1].\n\nA footnote can also have multiple lines[^my-footnote].\n\n[^1]: My reference.\n[^my-footnore]: To add line breaks within a footnote, add 2 spaces to the end of a line.  \nThis is a second line.\n\nThe position of a footnote in Markdown does not influence where the footnote will be rendered. In the PDF, it must always be on the same page where the reference is. Make sure to make this algorighmically sound and to test properly for corner cases.\n\nAlso CTRL+N should create a footnote reference where the cursor is (counting up from existing ones) and should then jump to the definition (at the very bottom, so it can be written directly.\nWhen CTRL+N is pressed when the cursor in the definition, the cursor should jump back to the reference.",
   "label_ids": [
@@ -8,9 +8,9 @@
   ],
   "due_date": null,
   "checklist": [],
-  "archived": false,
+  "archived": true,
   "created_at": "2026-11-06T18:30:03.400563Z",
-  "updated_at": "2026-11-09T17:39:50.989223Z",
+  "updated_at": "2026-11-10T19:43:02.878782Z",
   "history": [
     {
       "at": "2026-11-06T18:30:03.400576Z",
@@ -37,6 +37,11 @@
       "field": "description",
       "old": "Here is a simple footnote[^1].\n\nA footnote can also have multiple lines[^2].\n\n[^1]: My reference.\n[^2]: To add line breaks within a footnote, add 2 spaces to the end of a line.  \nThis is a second line.\n\nThe position of a footnote in your Markdown does not influence where the footnote will be rendered. You can write a footnote right after your reference to the footnote, and the footnote will still render at the bottom of the Markdown. Footnotes are not supported in wikis.",
       "new": "Add footnote functionality to the details editor.\n\nThey should work like in Gitlab/Github markdown:\n\nHere is a simple footnote[^1].\n\nA footnote can also have multiple lines[^my-footnote].\n\n[^1]: My reference.\n[^my-footnore]: To add line breaks within a footnote, add 2 spaces to the end of a line.  \nThis is a second line.\n\nThe position of a footnote in Markdown does not influence where the footnote will be rendered. In the PDF, it must always be on the same page where the reference is. Make sure to make this algorighmically sound and to test properly for corner cases.\n\nAlso CTRL+N should create a footnote reference where the cursor is (counting up from existing ones) and should then jump to the definition (at the very bottom, so it can be written directly.\nWhen CTRL+N is pressed when the cursor in the definition, the cursor should jump back to the reference."
+    },
+    {
+      "at": "2026-11-10T19:43:02.878782Z",
+      "action": "Archived",
+      "field": "general"
     }
   ]
 }
