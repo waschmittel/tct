@@ -1,0 +1,70 @@
+{
+  "list_id": "a589c4f4",
+  "position": 2.0,
+  "title": "How can the huge source files be made more modular?",
+  "description": "",
+  "label_ids": [
+    "ae7207e7"
+  ],
+  "due_date": null,
+  "checklist": [],
+  "archived": false,
+  "created_at": "2026-11-10T20:04:33.787147Z",
+  "updated_at": "2026-11-10T20:04:55.357729Z",
+  "history": [
+    {
+      "at": "2026-11-10T20:04:33.787198Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-10T20:04:38.428667Z",
+      "action": "Added label 'idea'",
+      "field": "labels",
+      "old": "",
+      "new": "idea"
+    },
+    {
+      "at": "2026-11-10T20:04:39.920603Z",
+      "action": "Removed label 'idea'",
+      "field": "labels",
+      "old": "idea",
+      "new": ""
+    },
+    {
+      "at": "2026-11-10T20:04:40.532819Z",
+      "action": "Added label 'chore'",
+      "field": "labels",
+      "old": "",
+      "new": "chore"
+    },
+    {
+      "at": "2026-11-10T20:04:41.770594Z",
+      "action": "Removed label 'chore'",
+      "field": "labels",
+      "old": "chore",
+      "new": ""
+    },
+    {
+      "at": "2026-11-10T20:04:53.909013Z",
+      "action": "Added label 'idea'",
+      "field": "labels",
+      "old": "",
+      "new": "idea"
+    },
+    {
+      "at": "2026-11-10T20:04:54.603726Z",
+      "action": "Removed label 'idea'",
+      "field": "labels",
+      "old": "idea",
+      "new": ""
+    },
+    {
+      "at": "2026-11-10T20:04:55.357729Z",
+      "action": "Added label 'longterm'",
+      "field": "labels",
+      "old": "",
+      "new": "longterm"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
-  "list_id": "24d6c0f0",
-  "position": 2.0,
+  "list_id": "91077b69",
+  "position": 1.0,
   "title": "use ellipsis for ... except for code blocks",
   "description": "When converting to PDF, use proper ellipsis for ...\n\nExcept for where it's not applicable like in code blocks.",
   "label_ids": [

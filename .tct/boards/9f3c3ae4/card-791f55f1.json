@@ -2,7 +2,7 @@
   "list_id": "a589c4f4",
   "position": 0.0,
   "title": "update demo tape before new release",
-  "description": "test [^3]\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny\n[^3]: this is not very funny",
+  "description": "test[^1]\n\n> a quote [^2]\n\nsomething goes here[^3]\n\nlets talk about stuffstuff[^stuff]\n\n>>> [!note]\n1. a multiline quote [^4]\n2. something[^thing]\n>>>\n\n[^1]: this is not very funny\n[^2]: this is funny\n[^3]: this seems to work\n[^4]: this is also funny\n[^thing]: whatever\n[^stuff]: this is stuffy",
   "label_ids": [
     "c740d3f5"
   ],
@@ -10,7 +10,7 @@
   "checklist": [],
   "archived": false,
   "created_at": "2026-11-06T18:25:48.817196Z",
-  "updated_at": "2026-11-10T16:37:56.417867Z",
+  "updated_at": "2026-11-10T20:09:16.019345Z",
   "history": [
     {
       "at": "2026-11-06T18:25:48.817221Z",
@@ -65,6 +65,27 @@
       "field": "description",
       "old": "test\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny",
       "new": "test [^3]\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny\n[^3]: this is not very funny"
+    },
+    {
+      "at": "2026-11-10T19:57:48.309664Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "test [^3]\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny\n[^3]: this is not very funny",
+      "new": "test[^3]\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny\n[^3]: this is not very funny"
+    },
+    {
+      "at": "2026-11-10T20:00:13.535636Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "test[^3]\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny\n[^3]: this is not very funny",
+      "new": "test[^3]\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something[^thing]\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny\n[^3]: this is not very funny\n[^thing]: whatever"
+    },
+    {
+      "at": "2026-11-10T20:09:16.019345Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "test[^3]\n\n> a quote [^1]\n>>> [!note]\n1. a multiline quote [^2]\n2. something[^thing]\n>>>\n\n[^1]: this is funny\n[^2]: this is also funny\n[^3]: this is not very funny\n[^thing]: whatever",
+      "new": "test[^1]\n\n> a quote [^2]\n\nsomething goes here[^3]\n\nlets talk about stuffstuff[^stuff]\n\n>>> [!note]\n1. a multiline quote [^4]\n2. something[^thing]\n>>>\n\n[^1]: this is not very funny\n[^2]: this is funny\n[^3]: this seems to work\n[^4]: this is also funny\n[^thing]: whatever\n[^stuff]: this is stuffy"
     }
   ]
 }

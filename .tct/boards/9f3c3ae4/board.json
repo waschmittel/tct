@@ -15,7 +15,7 @@
     {
       "id": "91077b69",
       "name": "DOING",
-      "archived": false
+      "archived": true
     }
   ],
   "labels": [
@@ -49,6 +49,17 @@
           "r": 168,
           "g": 230,
           "b": 168
+        }
+      }
+    },
+    {
+      "id": "ae7207e7",
+      "name": "longterm",
+      "color": {
+        "custom": {
+          "r": 230,
+          "g": 168,
+          "b": 230
         }
       }
     }
