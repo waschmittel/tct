@@ -5,6 +5,7 @@ see the [arc42 document](arc42.md); for design decisions see [docs/adr/](adr/).
 
 ```
 src/
+  alert.rs           # Alert kinds (`[!note]` …): parsing, colors, icons (ADR-0016)
   main.rs            # Entry point, CLI dispatch, TUI event loop (bracketed paste)
   app.rs             # App state, AppMode, LoadedBoard, internal clipboard buffer, on_tick reload
   board_editor.rs    # Aggregate root for the open board (ADR-0001/0002)
@@ -16,7 +17,7 @@ src/
   text_diff.rs       # Line diff for the history detail pane
   export/
     mod.rs           # Card export entry point (`card_pdf`)
-    blocks.rs        # Description markdown -> blocks/runs for the PDF layout (`>>>` multiline quotes, ADR-0015)
+    blocks.rs        # Description markdown -> blocks/runs for the PDF layout (`>>>` multiline quotes, ADR-0015; alerts, ADR-0016)
     pdf.rs           # Layout + PDF/A-2b emission (krilla, bundled DejaVu fonts); Mono/Color themes (ADR-0014), matrix tables (ADR-0013)
     path.rs          # Default file name, typed-path resolution, directory suggestions
     web.rs           # Browser sessions: PDF sent through the terminal stream (OSC 7733)
@@ -57,6 +58,7 @@ src/
     line_editor.rs   # Single-line text inputs (share LineInput)
     table.rs           # Pipe-table model: parse / render / row+column edits, `is_matrix` (ADR-0013) (pure)
     table_edit.rs      # Table editing glue on the textarea: live reformat, Tab/Enter, Ctrl+T chord, Alt ops
+    alert_edit.rs      # Ctrl+G chord: quote -> alert / change kind / plain quote (ADR-0016)
     emphasis.rs        # Bold/italic toggling by XOR on the `*` run around the text (ADR-0012)
     markdown_editor.rs # Description editor (over TextAreaInput): copy/cut/paste, selection, autocontinue, nest (ADR-0011)
     date_picker.rs   # Due-date picker

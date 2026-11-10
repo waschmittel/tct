@@ -16,6 +16,7 @@ use crossterm::event::KeyEvent;
 use crate::app::LoadedBoard;
 use crate::command::Command;
 
+pub mod alert_edit;
 pub mod date_picker;
 pub mod emphasis;
 pub mod line_editor;

@@ -1968,6 +1968,7 @@ dependencies = [
  "dirs",
  "insta",
  "krilla",
+ "kurbo",
  "ratatui",
  "regex",
  "serde",

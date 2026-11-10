@@ -499,6 +499,21 @@ fn snapshot_card_detail_multiline_quote() {
 }
 
 #[test]
+fn snapshot_card_detail_alerts() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_description(
+            &mut app,
+            "> [!note]\n> Info.\n\n>>> [!important]\nConsider:\n1. one\n>>>\n\n> [!warning]\n> Danger.",
+        );
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, AppMode::CardDetail);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
 fn snapshot_description_editor_wrapping() {
     with_temp_dir(|| {
         let id = seed_demo_board();

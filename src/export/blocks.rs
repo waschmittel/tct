@@ -5,8 +5,11 @@
 //! tables, and `**bold**`, `*italic*`, `***both***`, `~~strike~~` and `` `code` `` inline.
 //! Like the preview, every source line stays its own visual line.
 
+use crate::alert::Alert;
 use crate::insert::table::{Table, is_table_line};
-use crate::ui::markdown::{citation_marker_len, is_quote_fence, table_block_len};
+use crate::ui::markdown::{
+    citation_marker_len, closes_quote, fence_alert, is_quote_fence, quote_alert, table_block_len,
+};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub struct Style {
@@ -22,6 +25,13 @@ pub struct Run {
     pub style: Style,
 }
 
+/// A line of an alert box: the title line (the kind in capitals) or a body line.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct InAlert {
+    pub kind: Alert,
+    pub title: bool,
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Block {
     Blank,
@@ -31,6 +41,7 @@ pub enum Block {
         level: usize,
         marker: Option<String>,
         quote_depth: usize,
+        alert: Option<InAlert>,
         runs: Vec<Run>,
     },
     Code(Vec<String>),
@@ -42,23 +53,35 @@ pub fn parse(markdown: &str) -> Vec<Block> {
     let mut blocks = Vec::new();
     let mut idx = 0;
     let mut in_quote = false;
+    let mut alert: Option<Alert> = None;
+    let mut prev_cite = false;
     while idx < lines.len() {
         let line = lines[idx];
-        if !line.starts_with("```") && is_quote_fence(line) {
+        let code = line.starts_with("```");
+        if !code && is_quote_fence(line) && (!in_quote || closes_quote(line)) {
             in_quote = !in_quote;
+            alert = if in_quote { fence_alert(line) } else { None };
+            blocks.extend(alert.filter(|_| in_quote).map(title));
+            prev_cite = false;
             idx += 1;
             continue;
         }
-        if in_quote && !line.starts_with("```") {
+        if in_quote && !code {
             let mut block = parse_line(line);
-            if let Block::Text { quote_depth, .. } = &mut block {
-                *quote_depth += 1;
+            match alert {
+                Some(kind) => block = in_alert(block, kind),
+                None => {
+                    if let Block::Text { quote_depth, .. } = &mut block {
+                        *quote_depth += 1;
+                    }
+                }
             }
             blocks.push(block);
             idx += 1;
             continue;
         }
-        if line.starts_with("```") {
+        if code {
+            prev_cite = false;
             let body: Vec<String> = lines[idx + 1..]
                 .iter()
                 .take_while(|l| !l.starts_with("```"))
@@ -74,14 +97,99 @@ pub fn parse(markdown: &str) -> Vec<Block> {
             let owned: Vec<String> = lines[idx..idx + len].iter().map(|l| l.to_string()).collect();
             if let Some(table) = Table::parse(&owned) {
                 blocks.push(Block::Table(table));
+                prev_cite = false;
                 idx += len;
                 continue;
             }
+        }
+        let trimmed = line.trim_start();
+        if let Some(marker) = citation_marker_len(trimmed) {
+            let first = !prev_cite;
+            if first {
+                alert = quote_alert(line);
+            }
+            prev_cite = true;
+            if let Some(kind) = alert {
+                blocks.push(if first {
+                    title(kind)
+                } else {
+                    in_alert(parse_line(&trimmed[marker..]), kind)
+                });
+                idx += 1;
+                continue;
+            }
+        } else {
+            prev_cite = false;
+            alert = None;
         }
         blocks.push(parse_line(line));
         idx += 1;
     }
     blocks
+}
+
+/// The title line of an alert box.
+fn title(kind: Alert) -> Block {
+    let style = Style {
+        bold: true,
+        ..Style::default()
+    };
+    Block::Text {
+        level: 0,
+        marker: None,
+        quote_depth: 0,
+        alert: Some(InAlert { kind, title: true }),
+        runs: vec![Run {
+            text: kind.name().to_uppercase(),
+            style,
+        }],
+    }
+}
+
+/// A body line of an alert box; blank and heading lines stay inside the box.
+fn in_alert(block: Block, kind: Alert) -> Block {
+    let alert = Some(InAlert { kind, title: false });
+    match block {
+        Block::Text {
+            level,
+            marker,
+            quote_depth,
+            runs,
+            ..
+        } => Block::Text {
+            level,
+            marker,
+            quote_depth,
+            alert,
+            runs,
+        },
+        Block::Heading { runs, .. } => {
+            let runs = runs
+                .into_iter()
+                .map(|r| Run {
+                    style: Style {
+                        bold: true,
+                        ..r.style
+                    },
+                    ..r
+                })
+                .collect();
+            Block::Text {
+                level: 0,
+                marker: None,
+                quote_depth: 0,
+                alert,
+                runs,
+            }
+        }
+        _ => Block::Text {
+            level: 0,
+            marker: None,
+            quote_depth: 0,
+            alert,
+            runs: Vec::new(),
+        },
+    }
 }
 
 fn parse_line(line: &str) -> Block {
@@ -101,6 +209,7 @@ fn parse_line(line: &str) -> Block {
             level: 0,
             marker: None,
             quote_depth,
+            alert: None,
             runs: inline(&trimmed[marker_len..], Style::default()),
         };
     }
@@ -113,7 +222,13 @@ fn parse_line(line: &str) -> Block {
     {
         return list_item(indent, format!("{}.", &trimmed[..dot]), &trimmed[dot + 2..]);
     }
-    Block::Text { level: 0, marker: None, quote_depth: 0, runs: inline(line, Style::default()) }
+    Block::Text {
+        level: 0,
+        marker: None,
+        quote_depth: 0,
+        alert: None,
+        runs: inline(line, Style::default()),
+    }
 }
 
 fn list_item(indent: usize, marker: String, text: &str) -> Block {
@@ -121,6 +236,7 @@ fn list_item(indent: usize, marker: String, text: &str) -> Block {
         level: indent / 2,
         marker: Some(marker),
         quote_depth: 0,
+        alert: None,
         runs: inline(text, Style::default()),
     }
 }
@@ -239,6 +355,69 @@ mod tests {
         assert!(matches!(&blocks[3], Block::Text { quote_depth: 1, .. }));
         assert!(matches!(&blocks[4], Block::Text { quote_depth: 0, .. }));
         assert_eq!(blocks.len(), 5);
+    }
+
+    fn alert_of(b: &Block) -> Option<(Alert, bool)> {
+        match b {
+            Block::Text { alert, .. } => alert.map(|a| (a.kind, a.title)),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn citation_alert_boxes_its_run_of_quote_lines() {
+        let blocks = parse("> [!tip]\n> one\n>\n> - item\nafter\n> [!note]");
+        let alerts: Vec<_> = blocks.iter().map(alert_of).collect();
+        assert_eq!(
+            alerts,
+            vec![
+                Some((Alert::Tip, true)),
+                Some((Alert::Tip, false)),
+                Some((Alert::Tip, false)),
+                Some((Alert::Tip, false)),
+                None,
+                Some((Alert::Note, true)),
+            ]
+        );
+        assert!(matches!(
+            &blocks[3],
+            Block::Text {
+                marker: Some(_),
+                quote_depth: 0,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn tag_only_counts_on_the_first_line_of_a_quote() {
+        let blocks = parse("> text\n> [!note]\n>> [!note]\n\n>> [!tip]");
+        assert!(blocks.iter().all(|b| alert_of(b).is_none()));
+        assert_eq!(blocks.len(), 5);
+    }
+
+    #[test]
+    fn fenced_alert_keeps_blank_lines_and_ends_at_the_fence() {
+        let blocks = parse(">>> [!NOTE]\nYou should:\n\n1. one\n>>>\nafter");
+        let alerts: Vec<_> = blocks.iter().map(alert_of).collect();
+        assert_eq!(alerts.len(), 5);
+        assert_eq!(alerts[0], Some((Alert::Note, true)));
+        assert!(
+            alerts[1..4]
+                .iter()
+                .all(|a| *a == Some((Alert::Note, false)))
+        );
+        assert_eq!(alerts[4], None);
+        assert!(
+            matches!(&blocks[3], Block::Text { marker: Some(m), quote_depth: 0, .. } if m == "1.")
+        );
+    }
+
+    #[test]
+    fn unknown_tags_stay_ordinary_quotes() {
+        let blocks = parse("> [!bogus]\n>>> [!bogus]\nx\n>>>");
+        assert!(blocks.iter().all(|b| alert_of(b).is_none()));
+        assert!(matches!(&blocks[0], Block::Text { quote_depth: 1, .. }));
     }
 
     #[test]

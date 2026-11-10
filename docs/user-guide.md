@@ -337,7 +337,9 @@ A full overlay showing all card properties: title, description, checklist, label
 
 ### Description Editor
 
-A full Markdown editor with syntax highlighting. Supports headings, bold, italic, bold italic (`***text***`), inline code, code blocks, lists, blockquotes (`> text` per line, or a block between two `>>>` lines), and strikethrough.
+A full Markdown editor with syntax highlighting. Supports headings, bold, italic, bold italic (`***text***`), inline code, code blocks, lists, blockquotes (`> text` per line, or a block between two `>>>` lines), alerts, and strikethrough.
+
+**Alerts** are quotes whose first line is a tag — `> [!note]` followed by `> ` lines, or `>>> [!note]` … `>>>` for several paragraphs. Kinds: `note` (blue), `tip` (green), `important` (purple), `warning` (gold), `caution` (red); unknown tags stay ordinary quotes. The details view shows the tag as the kind in bold capitals (`NOTE`) in the alert's color; the PDF draws a colored bar with GitHub's icon and the kind in bold capitals (black in the monochrome theme). With the cursor in a quote, `Ctrl+G` then `n` `t` `i` `c` `w` makes it an alert (or changes its kind), `x` makes it a plain quote again.
 
 | Key | Action |
 |-----|--------|

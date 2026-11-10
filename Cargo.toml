@@ -23,6 +23,7 @@ unicode-width = "0.2"
 # PDF/A export (embedded DejaVu fonts, validated at finish)
 krilla = { version = "0.8", default-features = false, features = ["simple-text"] }
 skrifa = "0.42"
+kurbo = { version = "0.13.1", default-features = false, features = ["std"] }
 
 [build-dependencies]
 chrono = "0.4"

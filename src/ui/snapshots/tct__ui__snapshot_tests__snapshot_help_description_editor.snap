@@ -4,15 +4,14 @@ expression: render_to_string(&app)
 ---
  Demo (2 lists)
 ┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
-│┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓││┌──────────────────────────────────────────────┐│
-│┃Fix┌ Help — Description Editor ─────────────────────────────────────────────────────────────┐   ││
-│┃[bu│Edit                                         Tables                                     │───┘│
-│┃[1/│  Ctrl+S            Save                       Tab / Shift+Tab   Next / previous cell   │    │
-│┗━━━│  Ctrl+Q            Save and close             Enter             Row below / leave      │    │
-│┌───│  Esc               Cancel                     Alt+Arrows        Swap column / row      │    │
-││Red│  Ctrl+Z / Ctrl+Y   Undo / redo                Alt+Shift+→ / ↓   Add column / row       │    │
-│└───│  Ctrl+C            Copy selection             Alt+Shift+← / ↑   Delete column / row    │    │
-│    │  Ctrl+X            Cut selection              Alt+A             Cycle alignment        │    │
+│┏━━━┌ Help — Description Editor ─────────────────────────────────────────────────────────────┐───┐│
+│┃Fix│Edit                                         Tables                                     │   ││
+│┃[bu│  Ctrl+S            Save                       Tab / Shift+Tab   Next / previous cell   │───┘│
+│┃[1/│  Ctrl+Q            Save and close             Enter             Row below / leave      │    │
+│┗━━━│  Esc               Cancel                     Alt+Arrows        Swap column / row      │    │
+│┌───│  Ctrl+Z / Ctrl+Y   Undo / redo                Alt+Shift+→ / ↓   Add column / row       │    │
+││Red│  Ctrl+C            Copy selection             Alt+Shift+← / ↑   Delete column / row    │    │
+│└───│  Ctrl+X            Cut selection              Alt+A             Cycle alignment        │    │
 │    │  Ctrl+V            Paste                      Ctrl+T            Insert table           │    │
 │    │                                               Ctrl+T, r / c     Add row / column       │    │
 │    │Format                                         Ctrl+T, R / C     Add before             │    │
@@ -21,12 +20,13 @@ expression: render_to_string(&app)
 │    │  Ctrl+K            Inline code (`text`)       Ctrl+T, Arrows    Swap row / column      │    │
 │    │  Ctrl+L            Insert list item (- )      Ctrl+T, a         Cycle alignment        │    │
 │    │                                                                                        │    │
-│    │Selection                                    Navigation                                 │    │
-│    │  Shift+Arrows      Highlight text             Up / Down         Move by visual line    │    │
-│    │                                                                                        │    │
-│    │Lists                                        App                                        │    │
-│    │  Enter             Auto-continue list         F1 / Ctrl+H       Help                   │    │
-│    │  Tab               Nest item                                                           │    │
+│    │Selection / navigation                       Alerts (in a quote)                        │    │
+│    │  Shift+Arrows      Highlight text             Ctrl+G, n t i     Note / tip / important │    │
+│    │  Up / Down         Move by visual line        Ctrl+G, c w       Caution / warning      │    │
+│    │                                               Ctrl+G, x         Plain quote again      │    │
+│    │Lists                                                                                   │    │
+│    │  Enter             Auto-continue list       App                                        │    │
+│    │  Tab               Nest item                  F1 / Ctrl+H       Help                   │    │
 │    │  Shift+Tab         Un-nest item                                                        │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
 │                                                ││                                                │

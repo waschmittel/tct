@@ -127,6 +127,17 @@ Enter
 Type ">>>"
 Enter
 Sleep 600ms
+
+# Alert: Ctrl+G then a kind letter turns the quote under the cursor into one
+Up
+Up
+Ctrl+G
+Sleep 400ms
+Type "i"
+Sleep 600ms
+Down
+Down
+Down
 Enter
 Sleep 400ms
 

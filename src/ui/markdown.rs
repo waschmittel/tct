@@ -2,6 +2,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
+use crate::alert::Alert;
 use crate::insert::table::{Table, delimiter_aligns, is_table_line};
 
 pub const WRAP_WIDTH: usize = 80;
@@ -40,6 +41,8 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut in_code_block = false;
     let mut in_quote = false;
+    let mut alert: Option<Alert> = None;
+    let mut prev_cite = false;
 
     let mut idx = 0;
     while idx < source_lines.len() {
@@ -63,18 +66,71 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
             continue;
         }
 
-        if is_quote_fence(line_text) {
-            in_quote = !in_quote;
-            lines.push(Line::from(Span::styled(
-                line_text.to_string(),
-                Style::default().fg(Color::Yellow),
-            )));
+        if is_quote_fence(line_text) && (!in_quote || closes_quote(line_text)) {
+            let opening = !in_quote;
+            if opening {
+                alert = fence_alert(line_text);
+            }
+            let color = alert.map_or(Color::Yellow, Alert::tui_color);
+            let trimmed = line_text.trim_start();
+            match alert.filter(|_| opening) {
+                Some(a) => {
+                    let tag = trimmed[3..].trim_start();
+                    let lead = line_text.len() - tag.len();
+                    lines.push(Line::from(vec![
+                        Span::styled(line_text[..lead].to_string(), Style::default().fg(color)),
+                        alert_header(a, tag, color),
+                    ]));
+                }
+                None => lines.push(Line::from(Span::styled(
+                    line_text.to_string(),
+                    Style::default().fg(color),
+                ))),
+            }
+            in_quote = opening;
+            if !opening {
+                alert = None;
+            }
+            prev_cite = false;
             continue;
         }
         if in_quote {
-            let style = Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC);
-            lines.extend(wrap_spans(vec![Span::styled(line_text.to_string(), style)], width));
+            let color = alert.map_or(Color::Yellow, Alert::tui_color);
+            let style = Style::default().fg(color).add_modifier(Modifier::ITALIC);
+            lines.extend(wrap_spans(
+                vec![Span::styled(line_text.to_string(), style)],
+                width,
+            ));
             continue;
+        }
+
+        let trimmed = line_text.trim_start();
+        if let Some(marker_len) = citation_marker_len(trimmed) {
+            let first = !prev_cite;
+            if first {
+                alert = quote_alert(line_text);
+            }
+            prev_cite = true;
+            if let Some(a) = alert {
+                let color = a.tui_color();
+                let indent = line_text.len() - trimmed.len();
+                let (marker, rest) = trimmed.split_at(marker_len);
+                let mut spans = vec![Span::raw(" ".repeat(indent))];
+                spans.push(Span::styled(marker.to_string(), Style::default().fg(color)));
+                spans.push(if first {
+                    alert_header(a, rest, color)
+                } else {
+                    Span::styled(
+                        rest.to_string(),
+                        Style::default().fg(color).add_modifier(Modifier::ITALIC),
+                    )
+                });
+                lines.extend(wrap_spans_with_indent(spans, width, indent + marker_len));
+                continue;
+            }
+        } else {
+            prev_cite = false;
+            alert = None;
         }
 
         if is_table_line(line_text)
@@ -217,9 +273,39 @@ pub(crate) fn detect_list_indent(line: &str) -> usize {
     0
 }
 
-/// A line that is just `>>>` opens or closes a multiline blockquote (GitLab style).
-pub(crate) fn is_quote_fence(line: &str) -> bool {
+/// A line that is just `>>>` closes a multiline blockquote (GitLab style).
+pub(crate) fn closes_quote(line: &str) -> bool {
     line.trim() == ">>>"
+}
+
+/// A line that opens or closes a multiline blockquote: `>>>`, or `>>> [!kind]`
+/// (which opens an alert).
+pub(crate) fn is_quote_fence(line: &str) -> bool {
+    closes_quote(line) || fence_alert(line).is_some()
+}
+
+/// The alert a `>>> [!kind]` line opens.
+pub(crate) fn fence_alert(line: &str) -> Option<Alert> {
+    Alert::parse(line.trim().strip_prefix(">>> ")?)
+}
+
+/// The alert a `> [!kind]` line opens (single `>`; the caller checks that it
+/// starts a quote).
+pub(crate) fn quote_alert(line: &str) -> Option<Alert> {
+    let trimmed = line.trim_start();
+    let marker = citation_marker_len(trimmed)?;
+    if trimmed[..marker].matches('>').count() != 1 {
+        return None;
+    }
+    Alert::parse(&trimmed[marker..])
+}
+
+/// The tag line of an alert, shown as the kind in capitals, in the width of the tag.
+fn alert_header(alert: Alert, tag: &str, color: Color) -> Span<'static> {
+    Span::styled(
+        alert.header(tag.trim_end().width()),
+        Style::default().fg(color).add_modifier(Modifier::BOLD),
+    )
 }
 
 /// Parse citation/blockquote marker length in `trimmed` (e.g. `> `, `>> `, `> > `).
@@ -840,6 +926,37 @@ mod tests {
         let r = render(text, Color::Cyan, 80);
         let l: Vec<String> = r.lines().iter().map(|l| l.to_string()).collect();
         assert_eq!(l, vec![">>>", "quoted line", ">>>", "plain"]);
+    }
+
+    #[test]
+    fn alerts_keep_their_width_and_show_the_kind_in_capitals_and_color() {
+        let text =
+            "> [!note]\n> body\n> more\nplain\n>>> [!WARNING]\nx\n\ny\n>>>\n>>> [!tip]\nz\n>>>";
+        let r = render(text, Color::Cyan, WRAP_WIDTH);
+        let rows: Vec<String> = r.lines().iter().map(line_text).collect();
+        assert_eq!(rows[0], "> NOTE   ");
+        assert_eq!(rows[1], "> body");
+        assert_eq!(rows[3], "plain");
+        assert_eq!(rows[4], ">>> WARNING   ");
+        assert_eq!(rows[9], ">>> TIP   ");
+        let fg = |i: usize| r.lines()[i].spans.last().unwrap().style.fg;
+        assert_eq!(fg(0), Some(Alert::Note.tui_color()));
+        assert_eq!(fg(1), Some(Alert::Note.tui_color()));
+        assert_eq!(fg(3), None, "ends with the quote");
+        assert_eq!(fg(5), Some(Alert::Warning.tui_color()));
+        assert_eq!(fg(8), Some(Alert::Warning.tui_color()), "closing fence");
+        assert_eq!(rows[0].width(), "> [!note]".width());
+    }
+
+    #[test]
+    fn tag_not_at_the_start_of_a_quote_or_unknown_stays_literal() {
+        let rows = render_texts(
+            "> a\n> [!note]\n> [!bogus]\n>>> [!bogus]\nq\n>>>",
+            WRAP_WIDTH,
+        );
+        assert_eq!(rows[1], "> [!note]");
+        assert_eq!(rows[2], "> [!bogus]");
+        assert_eq!(rows[3], ">>> [!bogus]");
     }
 
     #[test]

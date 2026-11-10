@@ -20,7 +20,8 @@ use skrifa::metrics::GlyphMetrics;
 use skrifa::{FontRef, MetadataProvider};
 
 use super::Theme;
-use super::blocks::{self, Block, Run, Style};
+use super::blocks::{self, Block, InAlert, Run, Style};
+use crate::alert::Alert;
 use crate::insert::table::{Align, Table};
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
@@ -35,6 +36,8 @@ const HEADER_BASELINE: f32 = MARGIN - 14.0;
 
 const KEEP_MAX: f32 = (BOTTOM - MARGIN) / 2.0;
 const BODY: f32 = 10.0;
+/// Room taken by an alert's icon before its title.
+const ICON_SLOT: f32 = 15.0;
 const CODE: f32 = 9.0;
 const LEADING: f32 = 1.4;
 
@@ -141,9 +144,38 @@ impl Fonts {
 }
 
 enum Op {
-    Text { x: f32, y: f32, text: String, style: Style, size: f32, color: Rgb },
-    Rect { x: f32, y: f32, w: f32, h: f32, fill: Option<Rgb>, stroke: Option<Rgb> },
-    Line { x1: f32, y1: f32, x2: f32, y2: f32, color: Rgb, width: f32 },
+    Text {
+        x: f32,
+        y: f32,
+        text: String,
+        style: Style,
+        size: f32,
+        color: Rgb,
+    },
+    Rect {
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        fill: Option<Rgb>,
+        stroke: Option<Rgb>,
+    },
+    Line {
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+        color: Rgb,
+        width: f32,
+    },
+    /// GitHub's Octicon for an alert, in the `size` square at (`x`, `y`).
+    Icon {
+        kind: Alert,
+        x: f32,
+        y: f32,
+        size: f32,
+        color: Rgb,
+    },
 }
 
 struct Seg {
@@ -401,7 +433,20 @@ impl<'f> Flow<'f> {
         while i < blocks.len() {
             let mut next = i + 1;
             match &blocks[i] {
-                Block::Blank => self.y += BODY * 0.6,
+                Block::Blank => {
+                    let side = |b: Option<&Block>| -> f32 {
+                        match b {
+                            Some(Block::Text { alert: Some(_), .. }) => 0.35,
+                            Some(Block::Text { quote_depth, .. }) if *quote_depth > 0 => 0.35,
+                            Some(Block::Text {
+                                marker: Some(_), ..
+                            }) => 0.2,
+                            _ => 0.0,
+                        }
+                    };
+                    let (before, after) = (i.checked_sub(1).map(|j| &blocks[j]), blocks.get(i + 1));
+                    self.y += BODY * (0.6 + side(before).max(side(after)));
+                }
                 Block::Heading { level, runs } => {
                     let size = [16.0, 14.0, 12.5, 11.0, 10.5, 10.0][usize::from(*level - 1)];
                     let bold: Vec<Run> = runs
@@ -413,7 +458,7 @@ impl<'f> Flow<'f> {
                         self.keep_together(&|f| f.blocks_inner(section, true));
                     }
                     self.need(size * LEADING + 2.0 * BODY * LEADING);
-                    self.y += size * 0.4;
+                    self.y += size * 0.8;
                     self.paragraph(&bold, size, MARGIN, CONTENT_W, self.ink());
                     self.y += size * 0.15;
                 }
@@ -448,9 +493,17 @@ impl<'f> Flow<'f> {
         let counts: Vec<usize> = blocks
             .iter()
             .map(|b| match b {
-                Block::Text { level, marker, quote_depth, runs } => {
-                    let (_, _, width) = self.text_geometry(*level, marker.as_deref(), *quote_depth);
-                    self.wrap(&self.quoted(runs, *quote_depth), BODY, width).len()
+                Block::Text {
+                    level,
+                    marker,
+                    quote_depth,
+                    alert,
+                    runs,
+                } => {
+                    let (_, _, width) =
+                        self.text_geometry(*level, marker.as_deref(), *quote_depth, *alert);
+                    self.wrap(&self.quoted(runs, *quote_depth), BODY, width)
+                        .len()
                 }
                 _ => 0,
             })
@@ -458,18 +511,50 @@ impl<'f> Flow<'f> {
         let total: usize = counts.iter().sum();
         let mut before = 0;
         for (block, count) in blocks.iter().zip(counts) {
-            if let Block::Text { level, marker, quote_depth, runs } = block {
-                self.text_block(*level, marker.as_deref(), *quote_depth, runs, (before, total));
+            if let Block::Text {
+                level,
+                marker,
+                quote_depth,
+                alert,
+                runs,
+            } = block
+            {
+                self.text_block(
+                    *level,
+                    marker.as_deref(),
+                    *quote_depth,
+                    *alert,
+                    runs,
+                    (before, total),
+                );
             }
             before += count;
         }
     }
 
     /// Indent, text x and text width of a text block.
-    fn text_geometry(&self, level: usize, marker: Option<&str>, quote_depth: usize) -> (f32, f32, f32) {
-        let indent = level as f32 * 14.0 + quote_depth as f32 * 12.0;
-        let marker_w = marker.map_or(0.0, |m| (self.fonts.sans.width(m, BODY) + 5.0).max(16.0));
-        (indent, MARGIN + indent + marker_w, (CONTENT_W - indent - marker_w).max(40.0))
+    fn text_geometry(
+        &self,
+        level: usize,
+        marker: Option<&str>,
+        quote_depth: usize,
+        alert: Option<InAlert>,
+    ) -> (f32, f32, f32) {
+        let indent = level as f32 * 14.0
+            + quote_depth as f32 * 12.0
+            + if alert.is_some() { 12.0 } else { 0.0 };
+        let icon_w = if alert.is_some_and(|a| a.title) {
+            ICON_SLOT
+        } else {
+            0.0
+        };
+        let marker_w =
+            icon_w + marker.map_or(0.0, |m| (self.fonts.sans.width(m, BODY) + 5.0).max(16.0));
+        (
+            indent,
+            MARGIN + indent + marker_w,
+            (CONTENT_W - indent - marker_w).max(40.0),
+        )
     }
 
     /// `place` is (lines of the paragraph before this block, lines in the paragraph).
@@ -478,11 +563,17 @@ impl<'f> Flow<'f> {
         level: usize,
         marker: Option<&str>,
         quote_depth: usize,
+        alert: Option<InAlert>,
         runs: &[Run],
         place: (usize, usize),
     ) {
-        let (indent, x, width) = self.text_geometry(level, marker, quote_depth);
-        let color = if quote_depth > 0 { self.muted() } else { self.ink() };
+        let (indent, x, width) = self.text_geometry(level, marker, quote_depth, alert);
+        let alert_color = alert.map(|a| if self.mono() { BLACK } else { a.kind.rgb() });
+        let color = match (alert, alert_color) {
+            (Some(InAlert { title: true, .. }), Some(c)) => c,
+            _ if quote_depth > 0 => self.muted(),
+            _ => self.ink(),
+        };
         let height = BODY * LEADING;
         let lines = self.wrap(&self.quoted(runs, quote_depth), BODY, width);
         for (i, line) in lines.iter().enumerate() {
@@ -494,6 +585,27 @@ impl<'f> Flow<'f> {
                     self.push(Op::Line { x1: bx, y1: y, x2: bx, y2: y + height, color: self.rule_color(), width: 1.5 });
                 }
             }
+            if let (Some(a), Some(bar)) = (alert, alert_color) {
+                let y = self.y;
+                self.push(Op::Line {
+                    x1: MARGIN + 3.0,
+                    y1: y,
+                    x2: MARGIN + 3.0,
+                    y2: y + height,
+                    color: bar,
+                    width: 2.5,
+                });
+                if a.title && i == 0 {
+                    let size = BODY + 1.0;
+                    self.push(Op::Icon {
+                        kind: a.kind,
+                        x: MARGIN + indent,
+                        y: y + (height - size) / 2.0,
+                        size,
+                        color: bar,
+                    });
+                }
+            }
             if i == 0
                 && let Some(marker) = marker
             {
@@ -501,7 +613,12 @@ impl<'f> Flow<'f> {
                 let w = self.fonts.face(face_style).width(marker, BODY);
                 let seg = Seg { text: marker.to_string(), style: face_style, x: 0.0, w };
                 let y = self.y;
-                self.draw_line(&[seg], MARGIN + indent, y, BODY, self.muted(), 0.0);
+                let marker_color = if quote_depth > 0 {
+                    self.muted()
+                } else {
+                    self.ink()
+                };
+                self.draw_line(&[seg], MARGIN + indent, y, BODY, marker_color, 0.0);
             }
             self.draw_line(line, x, self.y, BODY, color, 0.0);
             self.y += height;
@@ -924,7 +1041,46 @@ fn draw_op(surface: &mut krilla::surface::Surface, fonts: &Fonts, op: &Op) -> an
             surface.set_stroke(stroke.map(|c| Stroke { paint: paint(c), width: 0.6, ..Stroke::default() }));
             surface.draw_path(&path);
         }
-        Op::Line { x1, y1, x2, y2, color, width } => {
+        Op::Icon {
+            kind,
+            x,
+            y,
+            size,
+            color,
+        } => {
+            let svg = kurbo::BezPath::from_svg(kind.octicon_path())
+                .context("bundled icon is unusable")?;
+            let k = f64::from(*size) / 16.0;
+            let (ox, oy) = (f64::from(*x), f64::from(*y));
+            let p = |pt: kurbo::Point| ((ox + pt.x * k) as f32, (oy + pt.y * k) as f32);
+            let mut path = PathBuilder::new();
+            for el in svg.elements() {
+                match *el {
+                    kurbo::PathEl::MoveTo(a) => path.move_to(p(a).0, p(a).1),
+                    kurbo::PathEl::LineTo(a) => path.line_to(p(a).0, p(a).1),
+                    kurbo::PathEl::QuadTo(a, b) => path.quad_to(p(a).0, p(a).1, p(b).0, p(b).1),
+                    kurbo::PathEl::CurveTo(a, b, c) => {
+                        path.cubic_to(p(a).0, p(a).1, p(b).0, p(b).1, p(c).0, p(c).1)
+                    }
+                    kurbo::PathEl::ClosePath => path.close(),
+                }
+            }
+            let path = path.finish().ok_or_else(|| anyhow!("degenerate icon"))?;
+            surface.set_stroke(None);
+            surface.set_fill(Some(Fill {
+                paint: paint(*color),
+                ..Fill::default()
+            }));
+            surface.draw_path(&path);
+        }
+        Op::Line {
+            x1,
+            y1,
+            x2,
+            y2,
+            color,
+            width,
+        } => {
             let mut path = PathBuilder::new();
             path.move_to(*x1, *y1);
             path.line_to(*x2, *y2);
@@ -1362,7 +1518,9 @@ mod tests {
                 let chrome = page_chrome(&fonts, &card, "B › L", "Status 2026-01-01 00:00", n, pages.len());
                 for op in page.iter().chain(&chrome) {
                     match op {
-                        Op::Text { color, .. } | Op::Line { color, .. } => assert!(gray(*color), "{name} p{n}: {color:?}"),
+                        Op::Text { color, .. }
+                        | Op::Line { color, .. }
+                        | Op::Icon { color, .. } => assert!(gray(*color), "{name} p{n}: {color:?}"),
                         Op::Rect { fill, stroke, .. } => {
                             assert!(fill.is_none_or(|c| c == TINT), "{name} p{n}: colored fill");
                             assert!(stroke.is_none_or(gray), "{name} p{n}: colored outline");
@@ -1554,13 +1712,27 @@ mod tests {
             matrix.push_str(&format!("| region {i} | {} | {} | {} | {} |\n", i, i * 2, i * 3, i * 4));
         }
         cases.push(("14-matrix", meta.clone(), plain("Matrix tables", matrix)));
+        cases.push((
+            "15-alerts",
+            meta.clone(),
+            plain(
+                "Alerts",
+                "> [!note]\n> Useful information, with **bold** and `code`.\n\n> [!tip]\n> A tip that is long enough to wrap around the page because it just keeps going and going and going and going\n> - with a list\n\n>>> [!important]\nYou should consider the following ramifications:\n\n1. consideration 1\n2. consideration 2\n>>>\n\n> [!caution]\n> Careful.\n\n>>> [!warning]\nDanger!\n>>>\n\n> [!NOTE]\n\n> [!bogus]\n> stays an ordinary quote".into(),
+            ),
+        ));
         cases
     }
 
     const SHOWCASE: &str = "\
 Short, readable summary of the release plan with **bold**, *italic* and `inline code`.
 
+This second paragraph is deliberately a little longer, so that it wraps over several lines and the spacing between consecutive paragraphs can be judged: the gap should be clearly visible, yet smaller than the one above a heading.
+
+A third paragraph follows directly. It is here to show that prose reads evenly, and that line spacing inside a paragraph differs from the space between paragraphs.
+
 # Goals
+
+The goals below are ordered by priority. This paragraph precedes a list, so the distance to the first bullet matters.
 
 - Ship the new **export** pipeline
 - Cut start-up time in half
@@ -1570,7 +1742,24 @@ Short, readable summary of the release plan with **bold**, *italic* and `inline 
 2. Test
 3. Release
 
+A paragraph directly after a list must not stick to its last item, and should not float away either.
+
 > Scope is fixed; dates are not.
+
+Prose after a quote, to judge the gap below it.
+
+> [!warning]
+> The freeze date is firm.
+
+Prose between two alerts and before the next block: it should neither touch the alert nor leave a gulf.
+
+>>> [!tip]
+A multiline alert may hold several paragraphs.
+
+Like this one.
+>>>
+
+Text right below an alert, followed by a plain multiline quote.
 
 >>>
 A multiline quote spans several lines
@@ -1581,11 +1770,15 @@ Even paragraphs.
 
 # Timeline
 
+The schedule has three phases. This paragraph introduces the table, so check the gap between the text and the table's top rule.
+
 | Phase | Owner | Weeks |
 |:--|:-:|--:|
 | Design | Ada | 2 |
 | Build | Grace | 6 |
 | Verify | Linus | 3 |
+
+The paragraph after a table follows the bottom rule at a comfortable distance, and is itself long enough to wrap onto a second line.
 
 # Responsibilities
 
@@ -1597,13 +1790,126 @@ A matrix labels its rows as well as its columns (empty top-left cell):
 | Grace | review | owner | support |
 | Linus | — | support | owner |
 
+Closing prose after the matrix, before a heading and a code block.
+
 # Notes
+
+Run the following to package a release:
 
 ```
 cargo build --release
 ./scripts/package.sh
 ```
+
+That is all — a last paragraph after the code block.
 ";
+
+    #[test]
+    fn alerts_draw_a_bar_and_a_capitalized_title_in_their_color_or_black() {
+        let (meta, card) = corner_cases()
+            .into_iter()
+            .find(|(n, ..)| *n == "15-alerts")
+            .map(|(_, m, c)| (m, c))
+            .unwrap();
+        for theme in THEMES {
+            let fonts = Fonts::load_for(theme).unwrap();
+            let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
+            let ops: Vec<&Op> = pages.iter().flatten().collect();
+            let titles: Vec<(&str, Rgb)> = ops
+                .iter()
+                .filter_map(|op| match op {
+                    Op::Text {
+                        text, style, color, ..
+                    } if style.bold
+                        && text != "DESCRIPTION"
+                        && text.chars().all(|c| c.is_ascii_uppercase()) =>
+                    {
+                        Some((text.as_str(), *color))
+                    }
+                    _ => None,
+                })
+                .collect();
+            let names: Vec<&str> = titles.iter().map(|t| t.0).collect();
+            assert_eq!(
+                names,
+                ["NOTE", "TIP", "IMPORTANT", "CAUTION", "WARNING", "NOTE"],
+                "{theme:?}"
+            );
+            for ((_, color), kind) in titles.iter().zip([
+                Alert::Note,
+                Alert::Tip,
+                Alert::Important,
+                Alert::Caution,
+                Alert::Warning,
+                Alert::Note,
+            ]) {
+                assert_eq!(
+                    *color,
+                    if theme == Theme::Mono {
+                        BLACK
+                    } else {
+                        kind.rgb()
+                    }
+                );
+            }
+            let icons: Vec<(Alert, Rgb)> = ops
+                .iter()
+                .filter_map(|op| {
+                    if let Op::Icon { kind, color, .. } = op {
+                        Some((*kind, *color))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            assert_eq!(
+                icons.iter().map(|i| i.0).collect::<Vec<_>>(),
+                [
+                    Alert::Note,
+                    Alert::Tip,
+                    Alert::Important,
+                    Alert::Caution,
+                    Alert::Warning,
+                    Alert::Note
+                ]
+            );
+            assert!(
+                icons
+                    .iter()
+                    .all(|(k, c)| *c == if theme == Theme::Mono { BLACK } else { k.rgb() })
+            );
+            let bars = ops
+                .iter()
+                .filter(|op| matches!(op, Op::Line { width, .. } if *width == 2.5))
+                .count();
+            assert!(bars >= 12, "{theme:?}: {bars} bar segments");
+            assert!(
+                ops.iter()
+                    .any(|op| matches!(op, Op::Text { text, .. } if text.contains("[!bogus]")))
+            );
+        }
+    }
+
+    #[test]
+    fn list_markers_are_ink_except_in_quotes() {
+        let meta = board();
+        let mut card = Card::new("T".into());
+        card.description = "- a\n1. b\n> alert\n\n> [!note]\n> - c\n> 2. d".into();
+        for theme in THEMES {
+            let fonts = Fonts::load_for(theme).unwrap();
+            let ink = if theme == Theme::Mono { BLACK } else { INK };
+            let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
+            let color = |m: &str| {
+                pages[0].iter().find_map(|op| match op {
+                    Op::Text { text, color, .. } if text == m => Some(*color),
+                    _ => None,
+                })
+            };
+            for m in ["•", "1.", "2."] {
+                assert_eq!(color(m), Some(ink), "{theme:?} {m}");
+            }
+        }
+    }
 
     #[test]
     fn corner_cases_render_as_valid_pdf_a() {
@@ -1618,30 +1924,66 @@ cargo build --release
     #[test]
     fn corner_cases_stay_inside_the_page() {
         for theme in THEMES {
-        let fonts = Fonts::load_for(theme).unwrap();
-        for (name, meta, card) in corner_cases() {
-            let name = format!("{name} {theme:?}");
-            let (pages, _) = layout(&fonts, &meta, "List", &card, chrono::Utc::now());
-            for (n, page) in pages.iter().enumerate() {
-                for op in page {
-                    match op {
-                        Op::Text { x, y, text, style, size, .. } => {
-                            let right = x + fonts.face(*style).width(text, *size);
-                            assert!(*x >= MARGIN - 1.0 && right <= PAGE_W - MARGIN + 1.0, "{name} p{n}: '{text}' leaves the margins ({x}..{right})");
-                            assert!(*y <= BOTTOM + 1.0, "{name} p{n}: '{text}' below the content area ({y})");
-                        }
-                        Op::Rect { x, w, y, h, .. } => {
-                            assert!(*x >= MARGIN - 1.0 && x + w <= PAGE_W - MARGIN + 1.0, "{name} p{n}: rect leaves the margins");
-                            assert!(y + h <= BOTTOM + 1.0, "{name} p{n}: rect below the content area");
-                        }
-                        Op::Line { x1, x2, y1, y2, .. } => {
-                            assert!(x1.min(*x2) >= MARGIN - 1.0 && x1.max(*x2) <= PAGE_W - MARGIN + 1.0, "{name} p{n}: line leaves the margins");
-                            assert!(y1.max(*y2) <= BOTTOM + 1.0, "{name} p{n}: line below the content area");
+            let fonts = Fonts::load_for(theme).unwrap();
+            for (name, meta, card) in corner_cases() {
+                let name = format!("{name} {theme:?}");
+                let (pages, _) = layout(&fonts, &meta, "List", &card, chrono::Utc::now());
+                for (n, page) in pages.iter().enumerate() {
+                    for op in page {
+                        match op {
+                            Op::Text {
+                                x,
+                                y,
+                                text,
+                                style,
+                                size,
+                                ..
+                            } => {
+                                let right = x + fonts.face(*style).width(text, *size);
+                                assert!(
+                                    *x >= MARGIN - 1.0 && right <= PAGE_W - MARGIN + 1.0,
+                                    "{name} p{n}: '{text}' leaves the margins ({x}..{right})"
+                                );
+                                assert!(
+                                    *y <= BOTTOM + 1.0,
+                                    "{name} p{n}: '{text}' below the content area ({y})"
+                                );
+                            }
+                            Op::Rect { x, w, y, h, .. } => {
+                                assert!(
+                                    *x >= MARGIN - 1.0 && x + w <= PAGE_W - MARGIN + 1.0,
+                                    "{name} p{n}: rect leaves the margins"
+                                );
+                                assert!(
+                                    y + h <= BOTTOM + 1.0,
+                                    "{name} p{n}: rect below the content area"
+                                );
+                            }
+                            Op::Icon { x, y, size, .. } => {
+                                assert!(
+                                    *x >= MARGIN - 1.0 && x + size <= PAGE_W - MARGIN + 1.0,
+                                    "{name} p{n}: icon leaves the margins"
+                                );
+                                assert!(
+                                    y + size <= BOTTOM + 1.0,
+                                    "{name} p{n}: icon below the content area"
+                                );
+                            }
+                            Op::Line { x1, x2, y1, y2, .. } => {
+                                assert!(
+                                    x1.min(*x2) >= MARGIN - 1.0
+                                        && x1.max(*x2) <= PAGE_W - MARGIN + 1.0,
+                                    "{name} p{n}: line leaves the margins"
+                                );
+                                assert!(
+                                    y1.max(*y2) <= BOTTOM + 1.0,
+                                    "{name} p{n}: line below the content area"
+                                );
+                            }
                         }
                     }
                 }
             }
-        }
         }
     }
 
@@ -1680,8 +2022,8 @@ cargo build --release
         for (theme, dir) in [(Theme::Mono, root.clone()), (Theme::Color, root.join("color"))] {
             std::fs::create_dir_all(&dir).unwrap();
             for (name, meta, card) in corner_cases() {
-                // Color is shown by the showcase only; the rest are monochrome.
-                if !name.starts_with("00-") && theme == Theme::Color {
+                // Color is shown by the showcase and the alerts only; the rest are monochrome.
+                if !name.starts_with("00-") && !name.starts_with("15-") && theme == Theme::Color {
                     continue;
                 }
                 let pdf = render_at(&meta, "To Do", &card, theme, EXAMPLE_TIME).unwrap();

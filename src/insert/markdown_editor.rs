@@ -6,6 +6,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui_textarea::CursorMove;
 
+use super::alert_edit;
 use super::line_input::has_ctrl_or_cmd;
 use super::emphasis;
 use super::table_edit::{self, grouped};
@@ -23,6 +24,8 @@ pub struct MarkdownEditor {
     pub card_id: CardId,
     /// `Ctrl+T` was pressed inside a table; the next key picks the table edit.
     table_chord: bool,
+    /// `Ctrl+G` was pressed inside a quote; the next key picks the alert kind.
+    alert_chord: bool,
 }
 
 impl MarkdownEditor {
@@ -30,7 +33,12 @@ impl MarkdownEditor {
         let mut input = TextAreaInput::from_initial(initial);
         input.textarea.move_cursor(CursorMove::Bottom);
         input.textarea.move_cursor(CursorMove::End);
-        Self { input, card_id, table_chord: false }
+        Self {
+            input,
+            card_id,
+            table_chord: false,
+            alert_chord: false,
+        }
     }
 }
 
@@ -107,6 +115,14 @@ impl MarkdownEditor {
         if std::mem::take(&mut self.table_chord) {
             return self.table_chord_key(key);
         }
+        if std::mem::take(&mut self.alert_chord) {
+            let refused = alert_edit::chord_kind(key).and_then(|kind| {
+                grouped(&mut self.input.textarea, None, |ta| {
+                    alert_edit::set(ta, kind)
+                })
+            });
+            return InsertOutcome::StayWithStatus(refused);
+        }
         if let Some(op) = table_edit::alt_op(key)
             && table_edit::in_table(&self.input.textarea)
         {
@@ -178,6 +194,13 @@ impl MarkdownEditor {
             (KeyCode::Char('a'), m) if m.contains(KeyModifiers::SUPER) => {
                 self.input.textarea.select_all();
                 InsertOutcome::Stay
+            }
+            (KeyCode::Char('g'), m)
+                if m.contains(KeyModifiers::CONTROL)
+                    && alert_edit::in_quote(&self.input.textarea) =>
+            {
+                self.alert_chord = true;
+                InsertOutcome::StayWithStatus(Some(alert_edit::CHORD_HINT.into()))
             }
             (KeyCode::Char('b'), m) if has_ctrl_or_cmd(m) => {
                 grouped(&mut self.input.textarea, None, |ta| emphasis::toggle(ta, emphasis::BOLD));
@@ -962,6 +985,65 @@ mod tests {
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::Enter);
         assert_eq!(editor_lines(&e), vec![">>>".to_string(), "".to_string()]);
+    }
+
+    #[test]
+    fn enter_on_alert_fence_is_plain_newline() {
+        let mut e = make_editor(">>> [!note]");
+        e.input.textarea.move_cursor(CursorMove::End);
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(
+            editor_lines(&e),
+            vec![">>> [!note]".to_string(), "".to_string()]
+        );
+    }
+
+    fn ctrl_out(e: &mut MarkdownEditor, c: char) -> InsertOutcome {
+        e.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL), None)
+    }
+
+    fn plain(e: &mut MarkdownEditor, c: char) -> InsertOutcome {
+        e.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()), None)
+    }
+
+    #[test]
+    fn ctrl_g_chord_turns_a_quote_into_an_alert_in_one_undo_step() {
+        let mut e = make_editor("> one\n> two");
+        assert!(matches!(
+            ctrl_out(&mut e, 'g'),
+            InsertOutcome::StayWithStatus(Some(_))
+        ));
+        plain(&mut e, 'w');
+        assert_eq!(editor_lines(&e), vec!["> [!warning]", "> one", "> two"]);
+        e.input.textarea.undo();
+        assert_eq!(editor_lines(&e), vec!["> one", "> two"]);
+    }
+
+    #[test]
+    fn ctrl_g_chord_in_multiline_quote_and_removal() {
+        let mut e = make_editor(">>>\ntext\n>>>");
+        e.input.textarea.move_cursor(CursorMove::Jump(1, 0));
+        ctrl(&mut e, 'g');
+        plain(&mut e, 'c');
+        assert_eq!(editor_lines(&e), vec![">>> [!caution]", "text", ">>>"]);
+        ctrl(&mut e, 'g');
+        plain(&mut e, 'x');
+        assert_eq!(editor_lines(&e), vec![">>>", "text", ">>>"]);
+    }
+
+    #[test]
+    fn ctrl_g_outside_a_quote_is_ignored_and_unknown_chord_key_is_ignored() {
+        let mut e = make_editor("plain text");
+        assert!(matches!(ctrl_out(&mut e, 'g'), InsertOutcome::Stay));
+        plain(&mut e, 'x');
+        assert_eq!(editor_lines(&e), vec!["plain textx"], "no chord armed");
+        ctrl_out(&mut e, 'a');
+        assert_eq!(editor_cursor(&e), (0, 0), "Ctrl+A is still line start");
+
+        let mut e = make_editor("> q");
+        ctrl(&mut e, 'g');
+        plain(&mut e, 'z');
+        assert_eq!(editor_lines(&e), vec!["> q"]);
     }
 
     #[test]
