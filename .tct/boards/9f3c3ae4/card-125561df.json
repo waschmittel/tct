@@ -1,6 +1,6 @@
 {
-  "list_id": "a589c4f4",
-  "position": 4.0,
+  "list_id": "91077b69",
+  "position": 0.0,
   "title": "support alerts",
   "description": "> [!note] \n> The following information is useful.\n\n\n- note (i circled icon/emoji) — blue when color, with blue border left when color\n- tip (light bulb icon/emoji) — green\n- important (exclamation mark in speech bubble) — purple\n- caution (exclamation mark in triangle) — dark yellow/gold\n- warning (exclamation mark in stop sign shape) — red\n\nidea: make an existing blockquote or quote to an alert with CTRL+a - show a selection then or use a chord\n\nalso  with  blockquote:\n\n>>> [!note] Things to consider\nYou should consider the following ramifications:\n\n1. consideration 1\n2. consideration 2\n>>>",
   "label_ids": [

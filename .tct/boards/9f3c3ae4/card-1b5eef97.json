@@ -1,5 +1,5 @@
 {
-  "list_id": "24d6c0f0",
+  "list_id": "91077b69",
   "position": 1.0,
   "title": "multiline blockquotes fenced with >>>",
   "description": "",
@@ -8,9 +8,9 @@
   ],
   "due_date": null,
   "checklist": [],
-  "archived": false,
+  "archived": true,
   "created_at": "2026-11-06T18:26:24.999032Z",
-  "updated_at": "2026-11-06T18:27:29.813972Z",
+  "updated_at": "2026-11-09T17:30:20.217116Z",
   "history": [
     {
       "at": "2026-11-06T18:26:24.999040Z",
@@ -23,6 +23,11 @@
       "field": "labels",
       "old": "",
       "new": "idea"
+    },
+    {
+      "at": "2026-11-09T17:30:20.217116Z",
+      "action": "Archived",
+      "field": "general"
     }
   ]
 }
