@@ -480,6 +480,14 @@ fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
         return spans;
     }
 
+    if let Some((_, marker, _)) = crate::footnote::def_start(&owned) {
+        let head: String = owned.chars().take(marker).collect();
+        let rest: String = owned.chars().skip(marker).collect();
+        spans.push(Span::styled(head, footnote_style()));
+        highlight_inline(&rest, &mut spans);
+        return spans;
+    }
+
     if let Some(stripped) = owned.strip_prefix("# ") {
         spans.push(Span::styled(
             "# ".to_string(),
@@ -553,12 +561,31 @@ fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
     spans
 }
 
+/// Footnote references and definition labels; the text itself stays as typed.
+fn footnote_style() -> Style {
+    Style::default().fg(Color::Magenta)
+}
+
 fn highlight_inline(text: &str, spans: &mut Vec<Span<'static>>) {
     let chars: Vec<char> = text.chars().collect();
     let mut i = 0;
     let mut buf = String::new();
 
     while i < chars.len() {
+        if chars[i] == '['
+            && let Some((len, _)) = crate::footnote::ref_at(&chars[i..])
+        {
+            if !buf.is_empty() {
+                spans.push(Span::raw(std::mem::take(&mut buf)));
+            }
+            spans.push(Span::styled(
+                chars[i..i + len].iter().collect::<String>(),
+                footnote_style(),
+            ));
+            i += len;
+            continue;
+        }
+
         if i + 2 < chars.len()
             && chars[i..i + 3] == ['*', '*', '*']
             && let Some(end) = find_closing_triple(&chars, i + 3)
@@ -727,6 +754,33 @@ mod tests {
         let r = render("| a | bb |\n|:-|-:|\n| ccc | d |", Color::Cyan, 10);
         let rows: Vec<String> = r.lines().iter().map(text).collect();
         assert_eq!(rows, ["│  a  │ bb  │", "├─────┼─────┤", "│ ccc │   d │"]);
+    }
+
+    fn colored(r: &Rendered, color: Color) -> Vec<String> {
+        r.lines()
+            .iter()
+            .flat_map(|l| l.spans.iter())
+            .filter(|s| s.style.fg == Some(color))
+            .map(|s| s.content.to_string())
+            .collect()
+    }
+
+    #[test]
+    fn footnotes_are_colored_but_the_text_is_unchanged() {
+        let src = "A[^1] b `c[^2]` d[^my-note].\n\n[^1]: Note *text*[^2]\n  [^my-note]:x";
+        let r = render(src, Color::Cyan, WRAP_WIDTH);
+        let text: Vec<String> = r.lines().iter().map(text).collect();
+        assert_eq!(text.join("\n"), src);
+        assert_eq!(
+            colored(&r, Color::Magenta),
+            ["[^1]", "[^my-note]", "[^1]:", "[^2]", "  [^my-note]:"]
+        );
+    }
+
+    #[test]
+    fn footnotes_in_code_blocks_and_malformed_ones_stay_plain() {
+        let r = render("```\n[^1]: x\n```\n[^] [^a b]", Color::Cyan, WRAP_WIDTH);
+        assert!(colored(&r, Color::Magenta).is_empty());
     }
 
     #[test]

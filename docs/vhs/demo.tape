@@ -244,6 +244,16 @@ Left 3
 Ctrl+E
 Sleep 1s
 
+# Footnotes: Ctrl+N adds [^1] here and jumps to its definition at the bottom;
+# type the note, then Ctrl+N again jumps back to the reference
+Type " Footnotes work"
+Ctrl+N
+Sleep 600ms
+Type "Shown at the bottom of the page in the PDF."
+Sleep 800ms
+Ctrl+N
+Sleep 1s
+
 # Save without closing (Ctrl+S), then save and close (Ctrl+Q)
 Ctrl+S
 Sleep 1.2s

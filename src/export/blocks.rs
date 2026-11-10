@@ -6,6 +6,7 @@
 //! Like the preview, every source line stays its own visual line.
 
 use crate::alert::Alert;
+use crate::footnote;
 use crate::insert::table::{Table, is_table_line};
 use crate::ui::markdown::{
     citation_marker_len, closes_quote, fence_alert, is_quote_fence, quote_alert, table_block_len,
@@ -17,6 +18,8 @@ pub struct Style {
     pub italic: bool,
     pub strike: bool,
     pub code: bool,
+    /// Footnote reference: the run's text is the marker in brackets, set raised.
+    pub sup: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -51,8 +54,50 @@ pub enum Block {
     Table(Table),
 }
 
+/// A footnote: the marker printed for it (its name, or a running number) and
+/// one run list per source line.
+pub struct Note {
+    pub label: String,
+    pub lines: Vec<Vec<Run>>,
+}
+
+/// A parsed description: its blocks and its footnotes in order of first
+/// reference.
+pub struct Doc {
+    pub blocks: Vec<Block>,
+    pub notes: Vec<Note>,
+}
+
+pub fn parse_doc(markdown: &str) -> Doc {
+    let extracted = footnote::extract(markdown);
+    let lines: Vec<&str> = extracted.body.iter().map(String::as_str).collect();
+    let mut blocks = parse_lines(&lines);
+    if extracted.removed {
+        while blocks.last() == Some(&Block::Blank) {
+            blocks.pop();
+        }
+    }
+    let notes = extracted
+        .notes
+        .iter()
+        .map(|note| Note {
+            label: note.label.clone(),
+            lines: note
+                .lines
+                .iter()
+                .map(|l| inline(l, Style::default()))
+                .collect(),
+        })
+        .collect();
+    Doc { blocks, notes }
+}
+
+#[cfg(test)]
 pub fn parse(markdown: &str) -> Vec<Block> {
-    let lines: Vec<&str> = markdown.lines().collect();
+    parse_doc(markdown).blocks
+}
+
+fn parse_lines(lines: &[&str]) -> Vec<Block> {
     let mut blocks = Vec::new();
     let mut idx = 0;
     let mut in_quote = false;
@@ -282,6 +327,18 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
     };
 
     while i < chars.len() {
+        if chars[i] == footnote::OPEN
+            && let Some(len) = chars[i + 1..].iter().position(|&c| c == footnote::CLOSE)
+        {
+            flush(&mut plain, &mut runs);
+            runs.push(Run {
+                // Raised and in brackets, like `[1]`.
+                text: format!("[{}]", chars[i + 1..i + 1 + len].iter().collect::<String>()),
+                style: Style { sup: true, ..base },
+            });
+            i += len + 2;
+            continue;
+        }
         let marker = [("***", 3), ("**", 2), ("~~", 2), ("*", 1), ("`", 1)]
             .into_iter()
             .find(|(m, _)| chars[i..].starts_with(&m.chars().collect::<Vec<_>>()));

@@ -341,6 +341,8 @@ A full Markdown editor with syntax highlighting. Supports headings, bold, italic
 
 **Alerts** are quotes whose first line is a tag — `> [!note]` followed by `> ` lines, or `>>> [!note]` … `>>>` for several paragraphs. Kinds: `note` (blue), `tip` (green), `important` (purple), `warning` (gold), `caution` (red); unknown tags stay ordinary quotes. The details view shows the tag as the kind in bold capitals (`NOTE`) in the alert's color; the PDF draws a colored bar with GitHub's icon and the kind in bold capitals (black in the monochrome theme). With the cursor in a quote, `Ctrl+G` then `n` `t` `i` `c` `w` makes it an alert (or changes its kind), `x` makes it a plain quote again.
 
+**Footnotes** work as on GitHub/GitLab: a reference `text[^1]` and a definition `[^1]: The note.` anywhere in the text (labels may be names, `[^my-note]`). A note continues on following lines (two trailing spaces are optional) and, after a blank line, in paragraphs indented by four spaces. Position does not matter: the PDF prints each note under the name of its label (`[^my-note]` → `my-note`), while numbered labels count up 1, 2, … by first reference whatever their digits, and prints each at the bottom of every page that references it (a note too long for a page continues on the next). Definitions without reference, references without definition, and anything in code stay literal. `Ctrl+N` inserts a numbered reference at the cursor — the numbered footnotes of the text are renumbered to ascend in the order of their references (names untouched; a reference without definition or a definition without reference keeps its number, and the others skip it) — and jumps to its new definition, placed among the numbered definitions by its number (at the bottom if there are none), ready to type; in a definition, `Ctrl+N` jumps back to its first reference. With text highlighted, the reference is named after it instead of numbered: the text stays and `[^two-words]` is added behind it (whitespace becomes `-`, at most 32 characters; a name that is already defined just jumps to its definition).
+
 | Key | Action |
 |-----|--------|
 | F1 / Ctrl+H | Show help / shortcut overview |
@@ -351,6 +353,7 @@ A full Markdown editor with syntax highlighting. Supports headings, bold, italic
 | Ctrl+C | Copy selected text |
 | Ctrl+X | Cut selected text |
 | Ctrl+V | Paste from clipboard |
+| Ctrl+N | Footnote: insert reference + jump to definition; in a definition, jump back |
 | Ctrl+P | Paste mode on/off: keys and pastes insert plain text (no list continuation, renumbering or table reflow); a `PASTE MODE` badge shows bottom right. Leaving it (or saving) normalizes the text: tables reformatted, list indentation snapped, numbers fixed. Fenced code is untouched. |
 | Shift+Arrows | Highlight / select text (for formatting, cut, copy) |
 | Ctrl+B | Toggle bold (`**text**`). Wraps the selection without its surrounding spaces; inside or on already-formatted text it removes the formatting; in a table cell without a selection it formats the whole cell |

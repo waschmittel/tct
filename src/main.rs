@@ -7,6 +7,7 @@ mod command;
 mod dialog;
 mod event;
 mod export;
+mod footnote;
 mod input;
 mod insert;
 mod model;

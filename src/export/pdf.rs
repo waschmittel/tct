@@ -5,6 +5,8 @@
 //! DejaVu faces; characters they lack are replaced with `?` instead of
 //! drawing `.notdef`.
 
+use std::rc::Rc;
+
 use anyhow::{Context, anyhow};
 use chrono::{Datelike, Local, Timelike};
 use krilla::configure::{Archival, ConfigurationBuilder};
@@ -20,7 +22,7 @@ use skrifa::metrics::GlyphMetrics;
 use skrifa::{FontRef, MetadataProvider};
 
 use super::Theme;
-use super::blocks::{self, Block, InAlert, Run, Style};
+use super::blocks::{self, Block, InAlert, Note, Run, Style};
 use crate::alert::Alert;
 use crate::insert::table::{Align, Table};
 use crate::model::board::BoardMeta;
@@ -36,6 +38,18 @@ const HEADER_BASELINE: f32 = MARGIN - 14.0;
 
 const KEEP_MAX: f32 = (BOTTOM - MARGIN) / 2.0;
 const BODY: f32 = 10.0;
+/// Footnote text size, gap between the longest marker and the text, gap above
+/// the footnote area, and the most a page's footnote area may take before the
+/// rest of a long note continues on the next page.
+const NOTE: f32 = 8.5;
+const NOTE_MARKER_GAP: f32 = 6.0;
+/// Line height of footnote text and the extra space between two notes.
+const NOTE_LINE: f32 = NOTE * 1.5;
+const NOTE_BETWEEN: f32 = 2.5;
+const NOTE_GAP: f32 = 8.0;
+const NOTE_BUDGET: f32 = KEEP_MAX;
+/// Footnote references are set at this fraction of the text size, raised.
+const SUP_SCALE: f32 = 0.7;
 /// Room taken by an alert's icon before its title.
 const ICON_SLOT: f32 = 15.0;
 const CODE: f32 = 9.0;
@@ -220,12 +234,33 @@ impl TableLayout<'_> {
     }
 }
 
+/// The laid-out lines of footnote `num` on a page; `cont` marks the rest of a
+/// note that began on an earlier page (no number is drawn).
+struct NoteItem {
+    num: usize,
+    lines: Vec<Vec<Seg>>,
+    cont: bool,
+}
+
+/// Size a run is drawn at: footnote references are small.
+fn eff(style: Style, size: f32) -> f32 {
+    if style.sup { size * SUP_SCALE } else { size }
+}
+
 struct Flow<'f> {
     fonts: &'f Fonts,
     pages: Vec<Vec<Op>>,
     y: f32,
     /// A throw-away flow used to measure content; it skips page-break planning.
     measuring: bool,
+    /// Footnotes in order of first reference; `num` below is index + 1.
+    notes: Rc<Vec<Note>>,
+    /// Footnotes shown at the bottom of each page: those referenced on it.
+    page_notes: Vec<Vec<NoteItem>>,
+    /// Lines of notes that did not fit their page; they open the next one.
+    carry: Vec<NoteItem>,
+    /// The widest indent of note text (behind the longest marker of the document).
+    note_wrap_indent: f32,
 }
 
 impl<'f> Flow<'f> {
@@ -248,11 +283,32 @@ impl<'f> Flow<'f> {
     }
 
     fn new(fonts: &'f Fonts) -> Self {
+        Self::with_notes(fonts, Rc::default())
+    }
+
+    fn with_notes(fonts: &'f Fonts, notes: Rc<Vec<Note>>) -> Self {
+        // Note text is wrapped for the longest marker of the document; each
+        // page then indents by its own longest one.
+        let marker_style = Style {
+            sup: true,
+            ..Style::default()
+        };
+        let longest = notes
+            .iter()
+            .map(|n| {
+                let marker = format!("[{}]", n.label);
+                fonts.sans.width(&marker, eff(marker_style, BODY))
+            })
+            .fold(0.0, f32::max);
         Self {
+            note_wrap_indent: (longest + NOTE_MARKER_GAP).min(CONTENT_W / 3.0),
             fonts,
             pages: vec![Vec::new()],
             y: MARGIN,
             measuring: false,
+            notes,
+            page_notes: vec![Vec::new()],
+            carry: Vec::new(),
         }
     }
 
@@ -270,10 +326,10 @@ impl<'f> Flow<'f> {
         }
         let mut scratch = Flow {
             measuring: true,
-            ..Flow::new(self.fonts)
+            ..Flow::with_notes(self.fonts, self.notes.clone())
         };
         build(&mut scratch);
-        let height = scratch.y - MARGIN;
+        let height = scratch.y - MARGIN + scratch.reserved();
         if scratch.pages.len() == 1 && height <= max {
             self.need(height);
         }
@@ -287,16 +343,240 @@ impl<'f> Flow<'f> {
     }
 
     fn need(&mut self, height: f32) {
-        if self.y + height > BOTTOM && self.y > MARGIN {
-            self.pages.push(Vec::new());
-            self.y = MARGIN;
+        if self.y + height > self.bottom() && self.y > MARGIN {
+            self.new_page();
         }
+    }
+
+    /// Where content must end on this page: above its footnotes.
+    fn bottom(&self) -> f32 {
+        BOTTOM - self.reserved()
+    }
+
+    fn reserved(&self) -> f32 {
+        Self::notes_height(self.page_notes.last().expect("a page always exists"))
+    }
+
+    /// Height of a footnote area: gap, lines, and the space between notes.
+    fn notes_height(items: &[NoteItem]) -> f32 {
+        if items.is_empty() {
+            return 0.0;
+        }
+        let lines: usize = items.iter().map(|i| i.lines.len()).sum();
+        NOTE_GAP + lines as f32 * NOTE_LINE + (items.len() - 1) as f32 * NOTE_BETWEEN
+    }
+
+    /// Space a note takes above its first line: the gap to the body for the
+    /// first note of a page, the space between notes for the others.
+    fn note_head(first: bool) -> f32 {
+        if first { NOTE_GAP } else { NOTE_BETWEEN }
+    }
+
+    fn lines_fitting(height: f32) -> usize {
+        (height / NOTE_LINE).floor().max(0.0) as usize
+    }
+
+    fn new_page(&mut self) {
+        self.pages.push(Vec::new());
+        self.page_notes.push(Vec::new());
+        self.y = MARGIN;
+        // Carried note lines open the page, up to the budget.
+        let page = self.page_notes.last_mut().expect("just pushed");
+        while !self.carry.is_empty() {
+            let used = Self::notes_height(page);
+            let room = Self::lines_fitting(NOTE_BUDGET - used - Self::note_head(page.is_empty()));
+            if room == 0 {
+                break;
+            }
+            let mut item = self.carry.remove(0);
+            let rest = item.lines.split_off(room.min(item.lines.len()));
+            if !rest.is_empty() {
+                self.carry.insert(
+                    0,
+                    NoteItem {
+                        num: item.num,
+                        lines: rest,
+                        cont: true,
+                    },
+                );
+            }
+            page.push(item);
+        }
+    }
+
+    /// Wrapped lines of footnote `num`; every source line starts a new line.
+    fn note_lines(&self, num: usize) -> Vec<Vec<Seg>> {
+        // Wrapped for the widest indent any page may use, so text never
+        // outgrows a page whose area turns out to need a wider one.
+        let width = CONTENT_W - self.note_wrap_indent;
+        self.notes[num - 1]
+            .lines
+            .iter()
+            .flat_map(|runs| self.wrap(runs, NOTE, width))
+            .collect()
+    }
+
+    /// Footnote numbers referenced in a laid-out line (references carry the
+    /// marker as their text).
+    fn refs(&self, line: &[Seg]) -> Vec<usize> {
+        line.iter()
+            .filter(|s| s.style.sup)
+            .filter_map(|s| {
+                let label = s.text.strip_prefix('[')?.strip_suffix(']')?;
+                self.notes.iter().position(|n| n.label == label)
+            })
+            .map(|p| p + 1)
+            .collect()
+    }
+
+    fn row_refs(&self, (wrapped, _): &(Vec<Vec<Vec<Seg>>>, f32)) -> Vec<usize> {
+        wrapped
+            .iter()
+            .flatten()
+            .flat_map(|l| self.refs(l))
+            .collect()
+    }
+
+    /// The notes of `nums` the current page does not show yet.
+    fn new_notes(&self, nums: &[usize]) -> Vec<usize> {
+        let shown = self.page_notes.last().expect("a page always exists");
+        let mut new = Vec::new();
+        for &n in nums {
+            if !new.contains(&n) && !shown.iter().any(|i| i.num == n) {
+                new.push(n);
+            }
+        }
+        new
+    }
+
+    /// Does a block of `height` at the cursor fit with its footnotes?
+    fn fits(&self, height: f32, nums: &[usize]) -> bool {
+        let new = self.new_notes(nums);
+        let mut extra = 0.0;
+        if !new.is_empty() {
+            let mut first = self.page_notes.last().is_some_and(Vec::is_empty);
+            for &n in &new {
+                extra += Self::note_head(first) + self.note_lines(n).len() as f32 * NOTE_LINE;
+                first = false;
+            }
+            if self.reserved() + extra > NOTE_BUDGET {
+                return false;
+            }
+        }
+        self.y + height + self.reserved() + extra <= BOTTOM
+    }
+
+    /// Show the notes of `nums` on this page, for a block of `height` at the
+    /// cursor. What cannot fit even a fresh page continues on the next one.
+    fn register(&mut self, height: f32, nums: &[usize]) {
+        for num in self.new_notes(nums) {
+            let page = self.page_notes.last().expect("a page always exists");
+            let used = Self::notes_height(page);
+            let free = (BOTTOM - self.y - height - used).min(NOTE_BUDGET - used);
+            let room = Self::lines_fitting(free - Self::note_head(page.is_empty()));
+            let mut lines = self.note_lines(num);
+            let rest = lines.split_off(room.min(lines.len()));
+            let placed = !lines.is_empty();
+            if placed {
+                self.page_notes
+                    .last_mut()
+                    .expect("a page always exists")
+                    .push(NoteItem {
+                        num,
+                        lines,
+                        cont: false,
+                    });
+            }
+            if !rest.is_empty() {
+                self.carry.push(NoteItem {
+                    num,
+                    lines: rest,
+                    cont: placed,
+                });
+            }
+        }
+    }
+
+    /// Break the page until a block of `height` fits together with the
+    /// footnotes it references (a fresh page takes it regardless), then show
+    /// those footnotes on the page.
+    fn need_notes(&mut self, height: f32, nums: &[usize]) {
+        while !self.fits(height, nums) && self.y > MARGIN {
+            self.new_page();
+        }
+        self.register(height, nums);
+    }
+
+    /// Finish the document: flush carried note lines onto pages of their own
+    /// and draw each page's footnote area above the footer.
+    fn finish(mut self) -> Vec<Vec<Op>> {
+        while !self.carry.is_empty() {
+            self.new_page();
+        }
+        let page_notes = std::mem::take(&mut self.page_notes);
+        for (page, mut items) in page_notes.into_iter().enumerate() {
+            if items.is_empty() {
+                continue;
+            }
+            items.sort_by_key(|i| (!i.cont, i.num));
+            let top = BOTTOM - Self::notes_height(&items);
+            // Text starts behind the longest marker of this page.
+            let marker_style = Style {
+                sup: true,
+                ..Style::default()
+            };
+            let longest = items
+                .iter()
+                .map(|i| {
+                    let marker = format!("[{}]", self.notes[i.num - 1].label);
+                    self.fonts.sans.width(&marker, eff(marker_style, BODY))
+                })
+                .fold(0.0, f32::max);
+            let indent = (longest + NOTE_MARKER_GAP).min(CONTENT_W / 3.0);
+            let mut canvas = Flow::new(self.fonts);
+            canvas.push(Op::Line {
+                x1: MARGIN,
+                y1: top + 2.0,
+                x2: MARGIN + CONTENT_W / 4.0,
+                y2: top + 2.0,
+                color: self.muted(),
+                width: 0.6,
+            });
+            let mut y = top + NOTE_GAP;
+            for (k, item) in items.iter().enumerate() {
+                if k > 0 {
+                    y += NOTE_BETWEEN;
+                }
+                for (i, line) in item.lines.iter().enumerate() {
+                    if i == 0 && !item.cont {
+                        // The marker: raised, as large as a reference in the
+                        // text, no dot, always black; on the text's baseline.
+                        let label = format!("[{}]", self.notes[item.num - 1].label);
+                        let w = self.fonts.sans.width(&label, eff(marker_style, BODY));
+                        let seg = Seg {
+                            text: label,
+                            style: marker_style,
+                            x: 0.0,
+                            w,
+                        };
+                        let top = y - (BODY - NOTE) * 1.05;
+                        canvas.draw_line(&[seg], MARGIN, top, BODY, BLACK, 0.0);
+                    }
+                    canvas.draw_line(line, MARGIN + indent, y, NOTE, self.ink(), 0.0);
+                    y += NOTE_LINE;
+                }
+            }
+            let ops = canvas.pages.remove(0);
+            self.pages[page].extend(ops);
+        }
+        self.pages
     }
 
     fn atoms(&self, runs: &[Run], size: f32) -> Vec<Atom> {
         let mut atoms = Vec::new();
         for run in runs {
             let face = self.fonts.face(run.style);
+            let size = eff(run.style, size);
             let text = face.clean(&run.text);
             let mut word = String::new();
             let flush = |word: &mut String, atoms: &mut Vec<Atom>| {
@@ -326,7 +606,7 @@ impl<'f> Flow<'f> {
         let place = |lines: &mut Vec<Vec<Seg>>, x: &mut f32, text: &str, style: Style, w: f32| {
             let line = lines.last_mut().expect("a line always exists");
             match line.last_mut() {
-                Some(seg) if seg.style == style => {
+                Some(seg) if seg.style == style && !style.sup => {
                     seg.text.push_str(text);
                     seg.w += w;
                 }
@@ -363,7 +643,7 @@ impl<'f> Flow<'f> {
                     }
                     let face = self.fonts.face(style);
                     for c in word.chars() {
-                        let cw = face.advance(c, size);
+                        let cw = face.advance(c, eff(style, size));
                         if x > 0.0 && x + cw > width {
                             lines.push(Vec::new());
                             x = 0.0;
@@ -391,12 +671,13 @@ impl<'f> Flow<'f> {
                     stroke: None,
                 });
             }
+            let lift = if seg.style.sup { size * 0.35 } else { 0.0 };
             self.push(Op::Text {
                 x: sx,
-                y: baseline,
+                y: baseline - lift,
                 text: seg.text.clone(),
                 style: seg.style,
-                size,
+                size: eff(seg.style, size),
                 color,
             });
             if seg.style.strike {
@@ -416,7 +697,7 @@ impl<'f> Flow<'f> {
     fn paragraph(&mut self, runs: &[Run], size: f32, x: f32, width: f32, color: Rgb) {
         let height = size * LEADING;
         for line in self.wrap(runs, size, width) {
-            self.need(height);
+            self.need_notes(height, &self.refs(&line));
             self.draw_line(&line, x, self.y, size, color, 0.0);
             self.y += height;
         }
@@ -631,7 +912,12 @@ impl<'f> Flow<'f> {
         let height = BODY * LEADING;
         let lines = self.wrap(&self.quoted(runs, quote_depth), BODY, width);
         for (i, line) in lines.iter().enumerate() {
-            self.need(Self::lines_to_keep(place.0 + i, place.1) as f32 * height);
+            let keep = Self::lines_to_keep(place.0 + i, place.1);
+            let nums: Vec<usize> = lines[i..(i + keep).min(lines.len())]
+                .iter()
+                .flat_map(|l| self.refs(l))
+                .collect();
+            self.need_notes(keep as f32 * height, &nums);
             if quote_depth > 0 {
                 for d in 0..quote_depth {
                     let bx = MARGIN + d as f32 * 12.0 + 3.0;
@@ -893,7 +1179,8 @@ impl<'f> Flow<'f> {
         };
 
         let first_rows = rows.iter().take(2).map(|(_, h)| h).sum::<f32>();
-        self.need(first_rows + 2.0);
+        let first_refs: Vec<usize> = rows.iter().take(2).flat_map(|r| self.row_refs(r)).collect();
+        self.need_notes(first_rows + 2.0, &first_refs);
         self.y += 2.0;
         self.top_rule(&layout, total);
         self.table_row(&rows[0], true, &layout);
@@ -902,16 +1189,20 @@ impl<'f> Flow<'f> {
             if layout.row_lines && i > 0 {
                 self.rule_across(self.y, left, total, MIDRULE);
             }
-            if self.y + row.1 > BOTTOM && self.y > MARGIN {
+            let nums = self.row_refs(row);
+            if !self.fits(row.1, &nums) && self.y > MARGIN {
                 if !layout.open_ends() {
                     self.rule_across(self.y, left, total, MIDRULE);
                 }
-                self.pages.push(Vec::new());
+                self.new_page();
                 self.y = MARGIN + 2.0;
+                let header_refs = self.row_refs(&rows[0]);
+                self.register(rows[0].1, &header_refs);
                 self.top_rule(&layout, total);
                 self.table_row(&rows[0], true, &layout);
                 self.header_rule(&layout, total);
             }
+            self.register(row.1, &nums);
             self.table_row(row, false, &layout);
         }
         if !layout.open_ends() {
@@ -1166,6 +1457,7 @@ fn emit(
     card: &Card,
     labels: &[String],
     now: chrono::DateTime<chrono::Utc>,
+    version: &str,
 ) -> anyhow::Result<Vec<u8>> {
     let configuration = ConfigurationBuilder::new()
         .with_archival_validator(Archival::A2_B)
@@ -1187,7 +1479,7 @@ fn emit(
         )
         .title(card.title.clone())
         .creator("tct".to_string())
-        .producer(format!("tct {}", crate::VERSION))
+        .producer(format!("tct {version}"))
         .description(format!("{} / {}", board.name, list));
     if !labels.is_empty() {
         metadata = metadata.keywords(labels.to_vec());
@@ -1334,7 +1626,8 @@ fn layout<'f>(
     card: &Card,
     now: chrono::DateTime<chrono::Utc>,
 ) -> (Vec<Vec<Op>>, Vec<String>) {
-    let mut flow = Flow::new(fonts);
+    let doc = blocks::parse_doc(&card.description);
+    let mut flow = Flow::with_notes(fonts, Rc::new(doc.notes));
 
     let title = [Run {
         text: card.title.clone(),
@@ -1392,8 +1685,8 @@ fn layout<'f>(
         flow.chips(&chips);
     }
 
-    if !card.description.trim().is_empty() {
-        flow.description(&blocks::parse(&card.description));
+    if !doc.blocks.is_empty() {
+        flow.description(&doc.blocks);
     }
     if !card.checklist.is_empty() {
         let checklist = |f: &mut Flow<'_>| {
@@ -1405,25 +1698,27 @@ fn layout<'f>(
     }
 
     let label_names: Vec<String> = chips.into_iter().map(|(name, _)| name).collect();
-    (flow.pages, label_names)
+    (flow.finish(), label_names)
 }
 
 /// Render `card` (from `list` of `board`) as a PDF/A-2b document in the given theme.
 pub fn render(board: &BoardMeta, list: &str, card: &Card, theme: Theme) -> anyhow::Result<Vec<u8>> {
-    render_at(board, list, card, theme, chrono::Utc::now())
+    render_at(board, list, card, theme, chrono::Utc::now(), crate::VERSION)
 }
 
-/// Like [`render`] with an explicit "made at" time (creation date and the "Status" stamp).
+/// Like [`render`] with an explicit "made at" time (creation date and the "Status" stamp)
+/// and tool version, so output can be made independent of the build.
 pub fn render_at(
     board: &BoardMeta,
     list: &str,
     card: &Card,
     theme: Theme,
     now: chrono::DateTime<chrono::Utc>,
+    version: &str,
 ) -> anyhow::Result<Vec<u8>> {
     let fonts = Fonts::load_for(theme)?;
     let (pages, labels) = layout(&fonts, board, list, card, now);
-    emit(&pages, &fonts, board, list, card, &labels, now)
+    emit(&pages, &fonts, board, list, card, &labels, now, version)
 }
 
 #[cfg(test)]
@@ -2180,7 +2475,31 @@ mod tests {
                 "> [!note]\n> Useful information, with **bold** and `code`.\n\n> [!tip]\n> A tip that is long enough to wrap around the page because it just keeps going and going and going and going\n> - with a list\n\n>>> [!important]\nYou should consider the following ramifications:\n\n1. consideration 1\n2. consideration 2\n>>>\n\n> [!caution]\n> Careful.\n\n>>> [!warning]\nDanger!\n>>>\n\n> [!NOTE]\n\n> [!bogus]\n> stays an ordinary quote".into(),
             ),
         ));
+        cases.push((
+            "16-footnotes",
+            meta.clone(),
+            plain("Footnotes", footnote_example()),
+        ));
         cases
+    }
+
+    /// Definitions first, references spread over several pages: a note is on
+    /// the page of its reference, wherever it is defined.
+    fn footnote_example() -> String {
+        let mut text = String::from(
+            "[^late]: Defined at the top, shown on the page of its reference.\n\
+             [^1]: A numbered note.  \nWith a second line, after two trailing spaces.\n\
+             [^fn-long]: A long note wraps over several lines inside the footnote area at the bottom of the page, set smaller than the body text.\n\
+             [^unused]: Never referenced, so never printed.\n\n\
+             A simple footnote[^1] and a named one[^late].\n\n",
+        );
+        for i in 0..40 {
+            text.push_str(&format!(
+                "Filler paragraph {i} pushes the next reference down.\n"
+            ));
+        }
+        text.push_str("\nLater on[^fn-long], citing the first again[^1], and a missing one[^nope].\n\n| Cell | Note |\n|---|---|\n| a | with a note[^late] |\n\n- list item[^fn-long]\n\n> quote[^1]\n");
+        text
     }
 
     const SHOWCASE: &str = "\
@@ -2207,6 +2526,10 @@ A paragraph directly after a list must not stick to its last item, and should no
 > Scope is fixed; dates are not.
 
 Prose after a quote, to judge the gap below it.
+
+Footnotes[^scope] sit at the bottom of the page of their reference.
+
+[^scope]: Defined anywhere in the text; set small below a rule.
 
 > [!warning]
 > The freeze date is firm.
@@ -2464,6 +2787,9 @@ That is all — a last paragraph after the code block.
     /// Fixed "made at" time (2000-01-01 00:00 UTC) and fixed created/updated
     /// times of every example card, so regenerated examples only change with
     /// their content. Dates print in local time: regenerate with `TZ=UTC`.
+    /// Fixed: the build's version is `snap-<today>` and would change every example daily.
+    const EXAMPLE_VERSION: &str = "snap-2026-11-06";
+
     const EXAMPLE_TIME: chrono::DateTime<chrono::Utc> =
         chrono::DateTime::from_timestamp(946_684_800, 0).unwrap();
 
@@ -2477,8 +2803,24 @@ That is all — a last paragraph after the code block.
     fn rendering_at_a_fixed_time_is_deterministic() {
         for (_, meta, card) in corner_cases().into_iter().take(3) {
             let card = at_example_time(card);
-            let a = render_at(&meta, "To Do", &card, Theme::Color, EXAMPLE_TIME).unwrap();
-            let b = render_at(&meta, "To Do", &card, Theme::Color, EXAMPLE_TIME).unwrap();
+            let a = render_at(
+                &meta,
+                "To Do",
+                &card,
+                Theme::Color,
+                EXAMPLE_TIME,
+                EXAMPLE_VERSION,
+            )
+            .unwrap();
+            let b = render_at(
+                &meta,
+                "To Do",
+                &card,
+                Theme::Color,
+                EXAMPLE_TIME,
+                EXAMPLE_VERSION,
+            )
+            .unwrap();
             assert!(
                 a == b,
                 "PDF output must not depend on anything but its input"
@@ -2503,9 +2845,552 @@ That is all — a last paragraph after the code block.
                     continue;
                 }
                 let card = at_example_time(card);
-                let pdf = render_at(&meta, "To Do", &card, theme, EXAMPLE_TIME).unwrap();
+                let pdf =
+                    render_at(&meta, "To Do", &card, theme, EXAMPLE_TIME, EXAMPLE_VERSION).unwrap();
                 std::fs::write(dir.join(format!("{name}.pdf")), pdf).unwrap();
             }
         }
+    }
+
+    // ── Footnotes ────────────────────────────────────────────────────
+
+    /// Size of a reference in the text and of the marker in front of a note.
+    const MARKER_SIZE: f32 = BODY * SUP_SCALE;
+
+    /// Is this op the marker in front of a note (a raised run at the left margin
+    /// inside the footnote area)?
+    fn is_marker(page: &[Op], op: &Op) -> bool {
+        matches!(op, Op::Text { x, y, style, .. }
+            if style.sup && *x == MARGIN && note_area_top(page).is_some_and(|top| *y > top))
+    }
+
+    /// Baseline of the marker `label` of a note.
+    fn marker_y(page: &[Op], label: &str) -> f32 {
+        page.iter()
+            .find_map(|op| match op {
+                Op::Text { text, y, .. }
+                    if is_marker(page, op) && *text == format!("[{label}]") =>
+                {
+                    Some(*y)
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("no marker {label}"))
+    }
+
+    /// Markers of the references drawn in the text of `page`.
+    fn refs_on(page: &[Op]) -> Vec<String> {
+        page.iter()
+            .filter_map(|op| match op {
+                Op::Text { text, style, .. } if style.sup && !is_marker(page, op) => {
+                    // The reference in the text is bracketed: `[1]`.
+                    Some(text.trim_matches(['[', ']']).to_string())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Markers of the footnotes that start on `page`, in drawing order.
+    fn markers_on(page: &[Op]) -> Vec<String> {
+        page.iter()
+            .filter_map(|op| match op {
+                Op::Text { text, .. } if is_marker(page, op) => {
+                    Some(text.trim_matches(['[', ']']).to_string())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Baseline and x of the first text `text` drawn at `size`.
+    fn text_at(page: &[Op], text: &str, size: f32) -> (f32, f32) {
+        page.iter()
+            .find_map(|op| match op {
+                Op::Text {
+                    text: t,
+                    x,
+                    y,
+                    size: s,
+                    ..
+                } if t == text && *s == size => Some((*y, *x)),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("{text} not drawn at {size}"))
+    }
+
+    /// Top of the footnote area: the short rule above it.
+    fn note_area_top(page: &[Op]) -> Option<f32> {
+        page.iter().find_map(|op| match op {
+            Op::Line { x1, x2, y1, .. } if (x2 - x1 - CONTENT_W / 4.0).abs() < 0.01 => Some(*y1),
+            _ => None,
+        })
+    }
+
+    /// The invariants of footnote layout, for every page: each reference has
+    /// its note on the same page (`whole`: no note is long enough to carry
+    /// over), notes are in order, and the footnote area never overlaps the body.
+    fn assert_notes_consistent(pages: &[Vec<Op>], whole: bool, name: &str) {
+        for (n, page) in pages.iter().enumerate() {
+            let markers = markers_on(page);
+            let top = note_area_top(page);
+            assert_eq!(
+                top.is_some(),
+                !markers.is_empty() || {
+                    // A page of continuation lines has an area but no marker.
+                    top.is_some()
+                },
+                "{name} p{n}"
+            );
+            if whole {
+                for r in refs_on(page) {
+                    assert!(
+                        markers.contains(&r),
+                        "{name} p{n}: note {r} is not on its page"
+                    );
+                }
+            }
+            assert!(
+                markers
+                    .iter()
+                    .all(|m| markers.iter().filter(|o| *o == m).count() == 1),
+                "{name} p{n}: notes out of order"
+            );
+            if let Some(top) = top {
+                for op in page {
+                    if let Op::Text { y, size, style, .. } = op
+                        && (*size == BODY || (style.sup && !is_marker(page, op)))
+                    {
+                        assert!(*y < top, "{name} p{n}: body text runs into the notes");
+                    }
+                }
+            }
+        }
+    }
+
+    fn note_card(description: String) -> Card {
+        let mut card = Card::new("T".into());
+        card.description = description;
+        card
+    }
+
+    #[test]
+    fn a_note_is_on_the_page_of_its_reference_wherever_it_is_defined() {
+        for definition_first in [true, false] {
+            let body = format!("{}\n\nsee[^a] here\n", lines("filler", 60));
+            let def = "[^a]: The note text.";
+            let text = if definition_first {
+                format!("{def}\n\n{body}")
+            } else {
+                format!("{body}\n{def}")
+            };
+            let pages = laid_out(&note_card(text));
+            assert!(pages.len() >= 2);
+            let reference = page_of(&pages, "here");
+            assert!(reference > 0);
+            assert_eq!(page_of(&pages, "The note text."), reference);
+            assert_eq!(refs_on(&pages[reference]), ["a"]);
+            assert_notes_consistent(&pages, true, "placement");
+        }
+    }
+
+    #[test]
+    fn the_reference_never_ends_up_apart_from_its_note_at_a_page_boundary() {
+        // Sweep the reference line across the bottom of page one.
+        let (mut first, mut second) = (false, false);
+        for filler in 38..=62 {
+            let text = format!(
+                "{}\n\nlast line[^1]\n\n[^1]: Boundary note.",
+                lines("filler", filler)
+            );
+            let pages = laid_out(&note_card(text));
+            assert_notes_consistent(&pages, true, &format!("filler {filler}"));
+            let page = page_of(&pages, "last line");
+            assert_eq!(page_of(&pages, "Boundary note."), page, "filler {filler}");
+            first |= page == 0;
+            second |= page == 1;
+        }
+        assert!(first && second, "the sweep must cover both outcomes");
+    }
+
+    #[test]
+    fn named_notes_keep_their_name_and_are_drawn_in_order_of_first_reference() {
+        let pages = laid_out(&note_card(
+            "[^alpha]: Alpha\n[^b]: Beta\n\nx[^b] y[^alpha] z[^b]\n".into(),
+        ));
+        assert_eq!(refs_on(&pages[0]), ["b", "alpha", "b"]);
+        assert_eq!(markers_on(&pages[0]), ["b", "alpha"]);
+        let y = |t: &str| text_at(&pages[0], t, NOTE).0;
+        let marker = |t: &str| marker_y(&pages[0], t);
+        assert!((y("Beta") - marker("b") - BODY * 0.35).abs() < 0.01);
+        assert!(y("Beta") < marker("alpha"));
+        assert!((y("Alpha") - marker("alpha") - BODY * 0.35).abs() < 0.01);
+    }
+
+    #[test]
+    fn numbered_notes_count_up_by_first_reference_whatever_their_labels() {
+        let pages = laid_out(&note_card(
+            "[^3]: Three\n[^7]: Seven\n[^x]: Named\n\na[^7] b[^x] c[^3] d[^7]\n".into(),
+        ));
+        assert_eq!(refs_on(&pages[0]), ["1", "x", "2", "1"]);
+        assert_eq!(markers_on(&pages[0]), ["1", "x", "2"]);
+        let shown = texts(&pages[0]);
+        let at = |t: &str| shown.iter().position(|s| *s == t).unwrap();
+        assert!(at("Seven") < at("Named") && at("Named") < at("Three"));
+    }
+
+    #[test]
+    fn references_in_the_text_and_markers_in_front_of_notes_are_both_bracketed() {
+        let pages = laid_out(&note_card("a[^1] b[^name]\n\n[^1]: A\n[^name]: B".into()));
+        let page = &pages[0];
+        let raised = |marker: bool| -> Vec<&str> {
+            page.iter()
+                .filter_map(|op| match op {
+                    Op::Text { text, style, .. } if style.sup && is_marker(page, op) == marker => {
+                        Some(text.as_str())
+                    }
+                    _ => None,
+                })
+                .collect()
+        };
+        assert_eq!(raised(false), ["[1]", "[name]"]);
+        assert_eq!(raised(true), ["[1]", "[name]"]);
+    }
+
+    #[test]
+    fn markers_are_raised_black_and_without_a_dot() {
+        for theme in THEMES {
+            let fonts = Fonts::load_for(theme).unwrap();
+            let card = note_card("x[^a] y[^2]\n\n[^a]: A\n[^2]: B".into());
+            let (pages, _) = layout(&fonts, &board(), "L", &card, chrono::Utc::now());
+            let markers: Vec<(&str, Rgb)> = pages[0]
+                .iter()
+                .filter_map(|op| match op {
+                    Op::Text {
+                        text,
+                        size,
+                        style,
+                        color,
+                        ..
+                    } if is_marker(&pages[0], op) && *size == MARKER_SIZE && style.sup => {
+                        Some((text.as_str(), *color))
+                    }
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(markers, [("[a]", BLACK), ("[1]", BLACK)], "{theme:?}");
+            assert!(
+                !texts(&pages[0])
+                    .iter()
+                    .any(|t| t.ends_with('.') && t.len() <= 2)
+            );
+        }
+    }
+
+    #[test]
+    fn all_note_text_shares_one_indent_set_by_the_longest_marker() {
+        let long = "a-rather-long-footnote-name";
+        let text = format!("a[^1] b[^{long}] c[^2]\n\n[^1]: One\n[^{long}]: Long\n[^2]: Two");
+        let pages = laid_out(&note_card(text));
+        let xs: Vec<f32> = ["One", "Long", "Two"]
+            .iter()
+            .map(|t| text_at(&pages[0], t, NOTE).1)
+            .collect();
+        assert!(xs.windows(2).all(|w| (w[0] - w[1]).abs() < 0.01), "{xs:?}");
+        let fonts = Fonts::load().unwrap();
+        let marker_end = MARGIN + fonts.sans.width(&format!("[{long}]"), MARKER_SIZE);
+        assert!(xs[0] > marker_end, "text starts behind the longest marker");
+        // Short markers alone need a much smaller indent.
+        let pages = laid_out(&note_card("a[^1]\n\n[^1]: One".into()));
+        assert!(text_at(&pages[0], "One", NOTE).1 < xs[0] - 50.0);
+    }
+
+    #[test]
+    fn each_page_indents_by_its_own_longest_marker() {
+        let long = "name-long-enough";
+        let text = format!(
+            "a[^{long}]\n\n{}\n\nb[^1]\n\n[^{long}]: Alpha\n[^1]: Beta",
+            lines("filler", 60)
+        );
+        let pages = laid_out(&note_card(text));
+        let (a, b) = (page_of(&pages, "Alpha"), page_of(&pages, "Beta"));
+        assert_ne!(a, b);
+        let (long_x, short_x) = (
+            text_at(&pages[a], "Alpha", NOTE).1,
+            text_at(&pages[b], "Beta", NOTE).1,
+        );
+        let fonts = Fonts::load().unwrap();
+        assert!(long_x > MARGIN + fonts.sans.width(&format!("[{long}]"), MARKER_SIZE));
+        assert!(short_x < long_x - 40.0, "{short_x} vs {long_x}");
+    }
+
+    #[test]
+    fn notes_are_set_apart_and_the_rule_is_visible() {
+        let pages = laid_out(&note_card("a[^1] b[^2]\n\n[^1]: A1  \nA2\n[^2]: B".into()));
+        let y = |t: &str| text_at(&pages[0], t, NOTE).0;
+        assert!((y("A2") - y("A1") - NOTE_LINE).abs() < 0.01);
+        assert!((y("B") - y("A2") - NOTE_LINE - NOTE_BETWEEN).abs() < 0.01);
+        let rule = pages[0].iter().find_map(|op| match op {
+            Op::Line { color, x1, x2, .. } if (x2 - x1 - CONTENT_W / 4.0).abs() < 0.01 => {
+                Some(*color)
+            }
+            _ => None,
+        });
+        assert_eq!(rule, Some(MUTED));
+    }
+
+    #[test]
+    fn markers_are_as_large_as_references_and_sit_on_the_text_baseline() {
+        let pages = laid_out(&note_card("a[^1]\n\n[^1]: Note".into()));
+        let sizes: Vec<f32> = pages[0]
+            .iter()
+            .filter_map(|op| match op {
+                Op::Text { style, size, .. } if style.sup => Some(*size),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(sizes, [MARKER_SIZE, MARKER_SIZE]);
+        // Raised by the same fraction as in the text (the baseline lift is 0.35 em).
+        let lift = text_at(&pages[0], "Note", NOTE).0 - marker_y(&pages[0], "1");
+        assert!((lift - BODY * 0.35).abs() < 0.01, "{lift}");
+    }
+
+    #[test]
+    fn multi_line_notes_keep_their_lines_and_unreferenced_ones_are_dropped() {
+        let pages = laid_out(&note_card(
+            "a[^m]\n\n[^m]: First line  \nsecond line\n[^dead]: unreferenced".into(),
+        ));
+        let shown = texts(&pages[0]);
+        assert!(shown.contains(&"First line") && shown.contains(&"second line"));
+        assert!(!shown.iter().any(|t| t.contains("unreferenced")));
+        assert!(!shown.iter().any(|t| t.contains("[^")));
+        // The definitions left no gap or text in the body.
+        assert_eq!(count(&pages[0], "a"), 1);
+    }
+
+    #[test]
+    fn an_indented_paragraph_after_a_blank_line_belongs_to_the_note() {
+        let pages = laid_out(&note_card("a[^1]\n\n[^1]: one\n\n    two\n\nafter".into()));
+        let shown = texts(&pages[0]);
+        assert!(shown.contains(&"two") && shown.contains(&"after"));
+        let top = note_area_top(&pages[0]).unwrap();
+        let y = |t: &str| {
+            pages[0]
+                .iter()
+                .find_map(|op| match op {
+                    Op::Text { text, y, .. } if text == t => Some(*y),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        assert!(y("two") > top && y("after") < top);
+    }
+
+    #[test]
+    fn unresolved_references_and_code_stay_literal() {
+        let pages = laid_out(&note_card(
+            "missing[^zz] and `code[^1]`\n```\n[^1]: not a definition\n```\nreal[^1]\n\n[^1]: Real"
+                .into(),
+        ));
+        let shown = texts(&pages[0]).join("|");
+        assert!(shown.contains("missing[^zz]"));
+        assert!(shown.contains("code[^1]"));
+        assert!(shown.contains("[^1]: not a definition"));
+        assert_eq!(refs_on(&pages[0]), ["1"]);
+        assert_eq!(markers_on(&pages[0]), ["1"]);
+    }
+
+    #[test]
+    fn a_note_referenced_on_several_pages_is_repeated_on_each() {
+        let text = format!(
+            "[^r]: Repeated\n\nfirst[^r]\n\n{}\n\nsecond[^r]\n",
+            lines("filler", 60)
+        );
+        let pages = laid_out(&note_card(text));
+        let with_ref: Vec<usize> = (0..pages.len())
+            .filter(|&p| !refs_on(&pages[p]).is_empty())
+            .collect();
+        assert_eq!(with_ref.len(), 2);
+        for p in with_ref {
+            assert_eq!(markers_on(&pages[p]), ["r"]);
+            assert_eq!(count(&pages[p], "Repeated"), 1);
+        }
+        assert_notes_consistent(&pages, true, "repeat");
+    }
+
+    #[test]
+    fn references_in_headings_lists_quotes_alerts_and_tables_get_their_notes() {
+        let text = "# Head[^1]\n- item[^2]\n> quote[^3]\n> [!note]\n> alert[^4]\n\n| H[^5] | x |\n|---|---|\n| c[^6] | y |\n\n\
+                    [^1]: n1\n[^2]: n2\n[^3]: n3\n[^4]: n4\n[^5]: n5\n[^6]: n6\n";
+        let pages = laid_out(&note_card(text.into()));
+        let expected = ["1", "2", "3", "4", "5", "6"];
+        assert_eq!(refs_on(&pages[0]), expected);
+        assert_eq!(markers_on(&pages[0]), expected);
+        assert_notes_consistent(&pages, true, "blocks");
+    }
+
+    #[test]
+    fn a_long_table_repeats_header_references_and_keeps_row_notes_on_their_page() {
+        let mut text = String::from("| H[^h] | x |\n|---|---|\n");
+        for i in 0..90 {
+            text.push_str(&format!("| row {i}[^{}] | v |\n", i % 7));
+        }
+        for label in std::iter::once("h".to_string()).chain((0..7).map(|i| i.to_string())) {
+            text.push_str(&format!("\n[^{label}]: Note {label}"));
+        }
+        let pages = laid_out(&note_card(text));
+        assert!(pages.len() >= 2);
+        assert_notes_consistent(&pages, true, "table");
+        for page in &pages {
+            // The repeated header carries its reference, so its note is there too.
+            assert!(refs_on(page).contains(&"h".to_string()));
+        }
+    }
+
+    #[test]
+    fn a_note_longer_than_its_page_budget_continues_on_the_next_pages() {
+        let long: String = (0..90).map(|i| format!("\nnote line {i}")).collect();
+        let text = format!(
+            "[^1]: start{long}\n\nref[^1] and after\n\n{}",
+            lines("body", 70)
+        );
+        let pages = laid_out(&note_card(text));
+        assert_notes_consistent(&pages, false, "long");
+        assert!(pages.len() >= 3);
+        // Every line is drawn once, in order, and only the first part has the marker.
+        let mut seen = Vec::new();
+        for page in &pages {
+            for t in texts(page) {
+                if let Some(n) = t.strip_prefix("note line ") {
+                    seen.push(n.parse::<usize>().unwrap());
+                }
+            }
+        }
+        assert_eq!(seen, (0..90).collect::<Vec<_>>());
+        let marker_pages: Vec<usize> = (0..pages.len())
+            .filter(|&p| markers_on(&pages[p]).contains(&"1".to_string()))
+            .collect();
+        assert_eq!(marker_pages, [page_of(&pages, "ref")]);
+        // The area never takes more than its budget.
+        for page in &pages {
+            if let Some(top) = note_area_top(page) {
+                assert!(BOTTOM - top <= NOTE_BUDGET + 1.0);
+            }
+        }
+    }
+
+    #[test]
+    fn a_note_that_ends_the_document_on_a_carried_page_is_still_drawn() {
+        let long: String = (0..60).map(|i| format!("\nend line {i}")).collect();
+        let pages = laid_out(&note_card(format!("ref[^1]\n\n[^1]: head{long}")));
+        let drawn: usize = pages
+            .iter()
+            .map(|p| {
+                texts(p)
+                    .iter()
+                    .filter(|t| t.starts_with("end line"))
+                    .count()
+            })
+            .sum();
+        assert_eq!(drawn, 60);
+        assert!(pages.iter().all(|p| !p.is_empty()));
+    }
+
+    #[test]
+    fn many_references_in_one_paragraph_never_overflow_the_page() {
+        let refs: String = (0..12).map(|i| format!("w{i}[^{i}] ")).collect();
+        let defs: String = (0..12)
+            .map(|i| format!("\n[^{i}]: Note {i} with a few words so that it takes a little room"))
+            .collect();
+        let pages = laid_out(&note_card(format!("{refs}\n{defs}")));
+        assert_notes_consistent(&pages, true, "many");
+        assert_eq!(notes_drawn(&pages, 12), 12);
+    }
+
+    fn notes_drawn(pages: &[Vec<Op>], n: usize) -> usize {
+        (0..n)
+            .filter(|i| {
+                pages.iter().any(|p| {
+                    texts(p)
+                        .iter()
+                        .any(|t| t.starts_with(&format!("Note {i} ")))
+                })
+            })
+            .count()
+    }
+
+    #[test]
+    fn more_notes_than_a_page_budget_spill_onto_following_pages_without_loss() {
+        let refs: String = (0..40).map(|i| format!("w{i}[^{i}] ")).collect();
+        let defs: String = (0..40)
+            .map(|i| format!("\n[^{i}]: Note {i} with a few words so that it takes a little room"))
+            .collect();
+        let pages = laid_out(&note_card(format!("{refs}\n{defs}")));
+        assert_notes_consistent(&pages, false, "spill");
+        assert_eq!(notes_drawn(&pages, 40), 40);
+        assert!(pages.len() >= 2);
+    }
+
+    #[test]
+    fn a_page_of_only_definitions_leaves_no_description() {
+        let pages = laid_out(&note_card("[^1]: lonely".into()));
+        assert_eq!(pages.len(), 1);
+        assert!(!texts(&pages[0]).iter().any(|t| t.contains("lonely")));
+        assert!(
+            !texts(&pages[0])
+                .iter()
+                .any(|t| t.eq_ignore_ascii_case("description"))
+        );
+    }
+
+    #[test]
+    fn references_are_raised_and_smaller_than_the_text() {
+        let pages = laid_out(&note_card("word[^1]\n\n[^1]: n".into()));
+        let (mut text_y, mut ref_y, mut ref_size) = (0.0, 0.0, 0.0);
+        for op in &pages[0] {
+            if let Op::Text {
+                text,
+                y,
+                size,
+                style,
+                ..
+            } = op
+            {
+                if text == "word" {
+                    text_y = *y;
+                } else if style.sup && text == "[1]" && !is_marker(&pages[0], op) {
+                    (ref_y, ref_size) = (*y, *size);
+                }
+            }
+        }
+        assert!(ref_y < text_y && ref_size < BODY);
+    }
+
+    #[test]
+    fn footnote_pdfs_stay_deterministic_across_themes() {
+        let (meta, card) = corner_cases()
+            .into_iter()
+            .find(|(n, ..)| *n == "16-footnotes")
+            .map(|(_, m, c)| (m, c))
+            .unwrap();
+        let positions = |theme| {
+            let fonts = Fonts::load_for(theme).unwrap();
+            let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
+            assert_notes_consistent(&pages, true, "example");
+            pages
+                .iter()
+                .map(|p| {
+                    p.iter()
+                        .filter_map(|op| match op {
+                            Op::Text { text, x, y, .. } => {
+                                Some((text.clone(), *x as i32, *y as i32))
+                            }
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(positions(Theme::Mono), positions(Theme::Color));
     }
 }

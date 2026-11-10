@@ -634,6 +634,38 @@ fn snapshot_description_editor_paste_mode() {
     });
 }
 
+const FOOTNOTE_DESCRIPTION: &str = "A simple footnote[^1] and a named one[^my-note].\n\n[^1]: My reference.\n[^my-note]: Two lines.  \nThis is the second line.";
+
+/// Footnote references and definition labels are colored; no text moves.
+#[test]
+fn snapshot_card_detail_footnotes() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_description(&mut app, FOOTNOTE_DESCRIPTION);
+        press(&mut app, KeyCode::Enter);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+/// Ctrl+N adds the next reference at the cursor and lands in its new
+/// definition at the very bottom; Ctrl+N there jumps back.
+#[test]
+fn snapshot_description_editor_footnote() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_description(&mut app, "Needs a source");
+        press(&mut app, KeyCode::Enter);
+        press(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.mode, AppMode::Insert);
+        let ctrl_n = KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL);
+        crate::input::handle_input(&mut app, ctrl_n).unwrap();
+        crate::input::handle_paste(&mut app, "See the ADR.".to_string()).unwrap();
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
 /// Widget-level golden for the date-picker popup (layout broke twice:
 /// oversized popup, off-center calendar). Rendered with a fixed date so
 /// the text is deterministic — the today-highlight is style-only and

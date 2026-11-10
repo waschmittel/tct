@@ -5,6 +5,7 @@ see the [arc42 document](arc42.md); for design decisions see [docs/adr/](adr/).
 
 ```
 src/
+  footnote.rs        # Footnotes `[^x]` / `[^x]: …`: parsing, numbering, extraction (ADR-0017)
   alert.rs           # Alert kinds (`[!note]` …): parsing, colors, icons (ADR-0016)
   main.rs            # Entry point, CLI dispatch, TUI event loop (bracketed paste)
   app.rs             # App state, AppMode, LoadedBoard, internal clipboard buffer, on_tick reload
@@ -58,6 +59,7 @@ src/
     line_editor.rs   # Single-line text inputs (share LineInput)
     table.rs           # Pipe-table model: parse / render / row+column edits, `is_matrix` (ADR-0013) (pure)
     table_edit.rs      # Table editing glue on the textarea: live reformat, Tab/Enter, Ctrl+T chord, Alt ops
+    # Ctrl+N footnote insert/jump lives in markdown_editor.rs (ADR-0017)
     alert_edit.rs      # Ctrl+G chord: quote -> alert / change kind / plain quote (ADR-0016)
     emphasis.rs        # Bold/italic toggling by XOR on the `*` run around the text (ADR-0012)
     markdown_editor.rs # Description editor (over TextAreaInput): copy/cut/paste, selection, autocontinue, nest (ADR-0011)
