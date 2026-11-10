@@ -1,6 +1,6 @@
 # Board Editor as aggregate root
 
-A **Board Editor** (`src/board_editor.rs`) owns the **Loaded Board** + **Selection State** for the currently open board and is the only path through which board, list, and card mutations reach disk. It replaces direct calls into the three Stores from input handlers and CLI subcommands.
+A **Board Editor** (`src/board_editor/`) owns the **Loaded Board** + **Selection State** for the currently open board and is the only path through which board, list, and card mutations reach disk. It replaces direct calls into the three Stores from input handlers and CLI subcommands.
 
 ## Why
 

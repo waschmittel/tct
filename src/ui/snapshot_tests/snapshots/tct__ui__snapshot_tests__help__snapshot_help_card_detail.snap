@@ -1,0 +1,34 @@
+---
+source: src/ui/snapshot_tests/help.rs
+expression: render_to_string(&app)
+---
+ Demo (2 lists)
+┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
+│┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓││┌──────────────────────────────────────────────┐│
+│┃Fix logi┌ Fix login flow ──────────────────────────────────────────────────────────────┐        ││
+│┃[bug]   │                                                                              │────────┘│
+│┃[1/┌ Help — Card Detail ────────────────────────────────────────────────────────────────────┐    │
+│┗━━━│Card                                         Labels & Due                               │    │
+│┌───│  t                 Edit title                 l                 Assign / remove labels │    │
+││Red│  e                 Edit description           L                 Manage labels          │    │
+│└───│  PgUp/PgDn ←/→     Scroll description         u                 Set due date           │    │
+│    │  y                 Copy description           U                 Clear due date         │    │
+│    │  Y                 Copy checklist (md)                                                 │    │
+│    │  h                 View change history      View                                       │    │
+│    │  p                 Export as PDF              c                 Show/hide created date │    │
+│    │  P                 Export as color PDF        d                 Show/hide updated date │    │
+│    │                                                                                        │    │
+│    │Checklist                                    App                                        │    │
+│    │  Up / Down         Navigate items             Esc               Close                  │    │
+│    │  Shift+Up/Down     Reorder item               ?                 Help                   │    │
+│    │  Space             Toggle item                q                 Quit                   │    │
+│    │  a                 Add item                                                            │    │
+│    │  Enter             Edit item                                                           │    │
+│    │  x                 Delete item                                                         │    │
+│    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
+│         │                                                                              │         │
+│         │                                                                              │         │
+│         └──────────────────────────────────────────────────────────────────────────────┘         │
+│                                                ││                                                │
+└────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
+ HELP                                                                                        ~/.tct

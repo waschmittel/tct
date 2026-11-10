@@ -32,4 +32,4 @@ A page's area is capped (`NOTE_BUDGET`, half the content height) so body text al
 
 ## Consequences
 
-Tests: `footnote.rs`; `ctrl_n_*` in the editor; `footnotes_*` in `ui/markdown.rs`; in `export/pdf.rs` the boundary sweep, `assert_notes_consistent` over blocks/tables/long notes/spill, determinism across themes; snapshots `card_detail_footnotes`, `description_editor_footnote`; example `16-footnotes` (+ showcase).
+Tests: `footnote.rs`; `ctrl_n_*` in the editor; `footnotes_*` in `ui/markdown/`; in `export/pdf/` the boundary sweep, `assert_notes_consistent` over blocks/tables/long notes/spill, determinism across themes; snapshots `card_detail_footnotes`, `description_editor_footnote`; example `16-footnotes` (+ showcase).

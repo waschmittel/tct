@@ -1,0 +1,16 @@
+---
+source: src/ui/snapshot_tests/dialogs.rs
+expression: "export_dialog_screen(\"English (default)\")"
+---
+
+
+
+
+         ┌ Export PDF (mono) — Quarterly plan ──────────────────────────────────┐
+         │./quarterly-plan.pdf                                                  │
+         │──────────────────────────────────────────────────────────────────────│
+         │  ../                                                                 │
+         │  notes/                                                              │
+         │  report.pdf                                                          │
+         │                                                                      │
+         └───────────────────────────────────────── Language: English (default) ┘

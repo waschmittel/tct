@@ -176,7 +176,7 @@ graph TB
             CLI_UTIL["util.rs<br>flags + formatting"]
         end
         APP_MOD["app.rs<br><i>App state, modes, board loading</i>"]
-        EDITOR["board_editor.rs<br><i>Aggregate root for open board (ADR-0001/0002)</i>"]
+        EDITOR["board_editor/<br><i>Aggregate root for open board (ADR-0001/0002)</i>"]
         DIRECTORY["board_directory.rs<br><i>Board collection ops (ADR-0004)</i>"]
         COMMAND["command.rs<br><i>Command enum — mutation chokepoint (ADR-0002)</i>"]
 
@@ -199,7 +199,7 @@ graph TB
         subgraph "input/"
             INPUT_MOD["mod.rs<br>Input dispatch by AppMode"]
             KEYMAP_I["keymap.rs<br>Binding table + lookup + help_rows (ADR-0005)"]
-            NORMAL_I["normal.rs<br>Board view keys"]
+            NORMAL_I["normal/<br>Board view keys"]
             DETAIL_I["card_detail_input.rs<br>Card detail keys"]
             INSERT_I["insert.rs<br>Insert dispatch to active InsertHandler + paste"]
             DIALOG_I["dialog_input.rs<br>Dialog dispatch + side effects"]
@@ -210,7 +210,7 @@ graph TB
         subgraph "insert/ (ADR-0003)"
             INS_MOD["mod.rs<br>InsertHandler trait + InsertOutcome"]
             INS_LINE["line_editor.rs<br>single-line inputs"]
-            INS_MD["markdown_editor.rs<br>desc editor: copy/cut/paste / nest / help (ADR-0011)"]
+            INS_MD["markdown_editor/<br>desc editor: copy/cut/paste / nest / help (ADR-0011)"]
             INS_DATE["date_picker.rs<br>due-date picker"]
         end
 
@@ -227,7 +227,7 @@ graph TB
             DIALOG_UI["dialog.rs<br>Confirmation + picker dialogs"]
             SEARCH_UI["search_bar.rs<br>Search input"]
             STATUS_UI["status_bar.rs<br>Mode hints + status"]
-            MD_UI["markdown.rs<br>Markdown highlighting"]
+            MD_UI["markdown/<br>Markdown highlighting"]
             THEME_UI["theme.rs<br>Color constants"]
             subgraph "widgets/"
                 CARD_W["card_widget.rs<br>Card rendering"]
@@ -286,7 +286,7 @@ path for board-collection operations (ADR-0001/0002/0004).
 | Module | Mode(s) Handled |
 |--------|----------------|
 | `board_selector_input.rs` | `BoardSelector` |
-| `normal.rs` | `Normal` (board view) |
+| `normal/` | `Normal` (board view) |
 | `card_detail_input.rs` | `CardDetail` |
 | `keymap.rs` | Generic `Binding` table + `lookup`/`help_rows`, shared by the three table-driven modes (ADR-0005) |
 | `insert.rs` | `Insert` — dispatches keys and bracketed paste to the active `Box<dyn InsertHandler>` (handlers live in `src/insert/`) |
@@ -303,7 +303,7 @@ path for board-collection operations (ADR-0001/0002/0004).
 | `dialog.rs` | Confirmation, label picker, label manager, archive dialogs |
 | `search_bar.rs` | Search input bar |
 | `status_bar.rs` | Mode indicators + keyboard hints |
-| `markdown.rs` | Line-level Markdown syntax highlighting |
+| `markdown/` | Line-level Markdown syntax highlighting |
 | `widgets/card_widget.rs` | Individual card rendering (title, labels, due, checklist progress) |
 | `widgets/list_widget.rs` | List column with card stack |
 | `widgets/date_picker.rs` | Calendar grid for the due-date picker |
@@ -615,7 +615,7 @@ Card description editing operates over `MarkdownEditor` with rich formatting, ne
 
 ### 8.11 Description Emphasis, Tables and PDF Export
 
-The description is Markdown text; three renderers read it and are kept in step: the editor's highlighter, the read view (`ui/markdown.rs`) and the PDF (`export/blocks.rs`, which re-parses the text in the same dialect). Emphasis is toggled by `insert/emphasis.rs` (`Ctrl+B` bold, `Ctrl+E` italic, ADR-0012) as an XOR on the run of `*` around the text (1 italic, 2 bold, 3 both); `***x***` renders as bold italic everywhere, in the PDF with the bundled `DejaVuSans-BoldOblique`.
+The description is Markdown text; three renderers read it and are kept in step: the editor's highlighter, the read view (`ui/markdown/`) and the PDF (`export/blocks.rs`, which re-parses the text in the same dialect). Emphasis is toggled by `insert/emphasis.rs` (`Ctrl+B` bold, `Ctrl+E` italic, ADR-0012) as an XOR on the run of `*` around the text (1 italic, 2 bold, 3 both); `***x***` renders as bold italic everywhere, in the PDF with the bundled `DejaVuSans-BoldOblique`.
 
 Pipe tables are modelled by `insert/table.rs` (`Table`), shared by the editor (live reformatting), the read view and the PDF. A table whose top-left cell is empty is a *matrix* (`Table::is_matrix`, ADR-0013): its first column is bold, the corner is open, and the PDF draws it with heavier label/content separators and its own thresholds for column and row lines.
 
@@ -644,6 +644,7 @@ The numbered, dated decision records live in [`docs/adr/`](adr/). Summary:
 | [0013](adr/0013-matrix-tables.md) | A pipe table with an empty top-left cell is a *matrix*: labels left and top, rendered differently in the read view and the PDF |
 | [0014](adr/0014-pdf-themes-share-grays.md) | The monochrome PDF theme keeps the color theme's grays; only chromatic elements differ |
 | [0019](adr/0019-git-integration.md) | Git integration: explicit commits of the data directory only (`tct commit`, `C`, optional commit-on-quit); opt-in in local git config |
+| [0020](adr/0020-module-layout.md) | Directory modules for large files; tests beside, not inside a big file |
 
 Foundational decisions not captured as ADRs:
 

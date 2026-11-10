@@ -9,7 +9,16 @@ src/
   alert.rs           # Alert kinds (`[!note]` …): parsing, colors, icons (ADR-0016)
   main.rs            # Entry point, CLI dispatch, TUI event loop (bracketed paste)
   app.rs             # App state, AppMode, LoadedBoard, internal clipboard buffer, on_tick reload
-  board_editor.rs    # Aggregate root for the open board (ADR-0001/0002)
+  board_editor/      # Aggregate root for the open board (ADR-0001/0002)
+    mod.rs           # BoardEditor, errors, load/reload
+    apply.rs         # `apply(Command)`: all domain mutations
+    selection.rs     # Selection + card-detail cursor verbs (ADR-0002)
+    accessors.rs     # Archived-card access, `last_added_card_id`
+    moves.rs         # Card/list moves
+    helpers.rs       # Positions, `card_mut`, `commit_pending`
+    invariants.rs    # Debug-build structural invariants
+    repair.rs        # Load-time repair of dangling references
+    tests/           # basics, history, persistence, invariants
   board_directory.rs # Board collection: create/archive/rename/order (ADR-0004)
   command.rs         # Command enum — sole chokepoint for domain mutations (ADR-0002)
   event.rs           # Crossterm event polling (key, paste, tick)
@@ -20,7 +29,19 @@ src/
     mod.rs           # Card export entry point (`card_pdf`)
     lang.rs          # Language detection (whatlang): quotes, alert titles (ADR-0018)
     blocks.rs        # Description markdown -> blocks/runs for the PDF layout (`>>>` multiline quotes, ADR-0015; alerts, ADR-0016)
-    pdf.rs           # Layout + PDF/A-2b emission (krilla, bundled DejaVu fonts); Mono/Color themes (ADR-0014), matrix tables (ADR-0013)
+    pdf/             # Layout + PDF/A-2b emission (krilla, bundled DejaVu fonts); Mono/Color themes (ADR-0014), matrix tables (ADR-0013)
+      mod.rs         # Constants, draw ops, `Flow` state, `render`/`render_at`
+      fonts.rs       # Bundled faces, glyph metrics
+      flow.rs        # Flow core: palette, page breaks, keep-together
+      notes.rs       # Footnote areas per page, `finish` (ADR-0017)
+      text.rs        # Atoms, wrapping, paragraphs, rules
+      body.rs        # Block dispatch: text blocks, code blocks, sections
+      table.rs       # Table layout and drawing (ADR-0013)
+      card.rs        # Label chips, checklist
+      chrome.rs      # Running header and footer
+      layout.rs      # Whole-card layout
+      emit.rs        # Ops -> krilla PDF
+      tests/         # basics, pagination, tables, text, themes, alerts, footnotes, corner_cases (+ example PDFs)
     path.rs          # Default file name, typed-path resolution, directory suggestions
     web.rs           # Browser sessions: PDF sent through the terminal stream (OSC 7733)
   cli/
@@ -53,7 +74,7 @@ src/
   input/
     mod.rs           # Input dispatch by AppMode, bracketed paste routing
     keymap.rs        # Generic Binding table + lookup + help_rows (ADR-0005)
-    normal.rs        # Board view keybindings
+    normal/          # Board view: `bindings.rs` (Action + KEYMAP), `actions.rs` (`run`), `mod.rs` (`handle`)
     card_detail_input.rs   # Card detail keybindings
     board_selector_input.rs# Board selector keybindings
     insert.rs        # Insert-mode dispatch over the active InsertHandler, Help outcome
@@ -63,11 +84,16 @@ src/
     mod.rs           # InsertHandler trait + InsertOutcome
     line_editor.rs   # Single-line text inputs (share LineInput)
     table.rs           # Pipe-table model: parse / render / row+column edits, `is_matrix` (ADR-0013) (pure)
-    table_edit.rs      # Table editing glue on the textarea: live reformat, Tab/Enter, Ctrl+T chord, Alt ops
-    # Ctrl+N footnote insert/jump lives in markdown_editor.rs (ADR-0017)
+    table_edit.rs      # (tests in `table_edit/tests.rs`) Table editing glue on the textarea: live reformat, Tab/Enter, Ctrl+T chord, Alt ops
+    # Ctrl+N footnote insert/jump lives in markdown_editor/footnotes.rs (ADR-0017)
     alert_edit.rs      # Ctrl+G chord: quote -> alert / change kind / plain quote (ADR-0016)
     emphasis.rs        # Bold/italic toggling by XOR on the `*` run around the text (ADR-0012)
-    markdown_editor.rs # Description editor (over TextAreaInput): copy/cut/paste, selection, autocontinue, nest (ADR-0011)
+    markdown_editor/   # Description editor (over TextAreaInput): copy/cut/paste, selection (ADR-0011)
+      mod.rs           # Handler + key dispatch
+      lists.rs         # Autocontinue, nest/unnest, renumber
+      footnotes.rs     # Footnote insert/jump/renumber (ADR-0017)
+      normalize.rs     # Paste-mode normalization
+      tests/           # basics, enter, numbered, nesting, renumber, quotes, session, footnotes
     date_picker.rs   # Due-date picker
     line_input.rs    # Shared single-line buffer/cursor base
     text_area_input.rs # Shared multi-line buffer base
@@ -89,9 +115,14 @@ src/
     dialog.rs        # Dialog frame helpers
     search_bar.rs    # Search input bar
     status_bar.rs    # Mode + hints + status messages
-    markdown.rs      # Markdown rendering, word-wrap, source<->visual cursor map; never moves characters (ADR-0015)
+    markdown/        # Markdown read view; never moves characters (ADR-0015)
+      mod.rs         # MarkdownRenderer
+      table.rs       # Pipe tables, matrix tables
+      quote.rs       # Citations, `>>>` quotes, alerts, list indent
+      wrap.rs        # Span wrapping with hanging indent
+      inline.rs      # Inline styling (bold, code, footnotes)
     theme.rs         # Color theme
-    snapshot_tests.rs# Golden-screen tests (insta + TestBackend)
+    snapshot_tests/  # Golden-screen tests (insta + TestBackend), grouped by screen; goldens in snapshot_tests/snapshots/
     widgets/
       card_widget.rs # Individual card rendering
       list_widget.rs # List column rendering and viewport scroll reconciliation (ADR-0010)

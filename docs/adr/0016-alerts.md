@@ -26,4 +26,4 @@ Unknown tags are ordinary quotes. Kinds and colors as on GitHub: note blue, tip 
 
 ## Consequences
 
-Tests: `alert.rs`, `alert_edit.rs`, `citation_alert_*`/`fenced_alert_*` in `export/blocks.rs`, `alerts_*` in `ui/markdown.rs` and `export/pdf.rs`, `ctrl_g_*` in the editor, snapshot `card_detail_alerts`; example `15-alerts` (+ showcase).
+Tests: `alert.rs`, `alert_edit.rs`, `citation_alert_*`/`fenced_alert_*` in `export/blocks.rs`, `alerts_*` in `ui/markdown/` and `export/pdf/`, `ctrl_g_*` in the editor, snapshot `card_detail_alerts`; example `15-alerts` (+ showcase).

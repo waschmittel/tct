@@ -20,5 +20,5 @@ The distinction is semantic, so it has to come from the content. Markdown pipe t
 ## Consequences
 
 - Typing text into the corner turns a matrix back into a normal table, in the preview and in the next export.
-- Both Markdown dialects (`ui/markdown.rs` and `export/blocks.rs`) get the answer from the same `Table::is_matrix`, so they cannot drift.
-- Tests: `matrix_*` in `src/export/pdf.rs`, `src/ui/markdown.rs`, `src/insert/table.rs`; examples `00-showcase` and `14-matrix` in `docs/export-examples/`.
+- Both Markdown dialects (`ui/markdown/` and `export/blocks.rs`) get the answer from the same `Table::is_matrix`, so they cannot drift.
+- Tests: `matrix_*` in `src/export/pdf/`, `src/ui/markdown/`, `src/insert/table.rs`; examples `00-showcase` and `14-matrix` in `docs/export-examples/`.

@@ -1,0 +1,34 @@
+---
+source: src/ui/snapshot_tests/help.rs
+expression: render_to_string(&app)
+---
+ Demo (2 lists)
+┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
+│┏━━━┌ Help — Description Editor ─────────────────────────────────────────────────────────────┐───┐│
+│┃Fix│Edit                                         Tables                                     │   ││
+│┃[bu│  Ctrl+S            Save                       Tab / Shift+Tab   Next / previous cell   │───┘│
+│┃[1/│  Ctrl+Q            Save and close             Enter             Row below / leave      │    │
+│┗━━━│  Esc               Cancel                     Alt+Arrows        Swap column / row      │    │
+│┌───│  Ctrl+Z / Ctrl+Y   Undo / redo                Alt+Shift+→ / ↓   Add column / row       │    │
+││Red│  Ctrl+C            Copy selection             Alt+Shift+← / ↑   Delete column / row    │    │
+│└───│  Ctrl+X            Cut selection              Alt+A             Cycle alignment        │    │
+│    │  Ctrl+V            Paste                      Ctrl+T            Insert table           │    │
+│    │  Shift+Arrows      Highlight text             Ctrl+T, r / c     Add row / column       │    │
+│    │                                               Ctrl+T, R / C     Add before             │    │
+│    │Format                                         Ctrl+T, x / X     Delete row / column    │    │
+│    │  Ctrl+B            Toggle bold (**text**)     Ctrl+T, T         Delete table           │    │
+│    │  Ctrl+E            Toggle italic (*text*)     Ctrl+T, Arrows    Swap row / column      │    │
+│    │  Ctrl+K            Inline code (`text`)       Ctrl+T, a         Cycle alignment        │    │
+│    │  Ctrl+L            Insert list item (- )                                               │    │
+│    │  Ctrl+N            Footnote / jump back     Alerts (in a quote)                        │    │
+│    │  Ctrl+N (selected) Name it after the text     Ctrl+G, n t i     Note / tip / important │    │
+│    │  Ctrl+P            Toggle paste mode          Ctrl+G, c w       Caution / warning      │    │
+│    │                                               Ctrl+G, x         Plain quote again      │    │
+│    │Lists                                                                                   │    │
+│    │  Enter             Auto-continue list       App                                        │    │
+│    │  Tab               Nest item                  F1 / Ctrl+H       Help                   │    │
+│    │  Shift+Tab         Un-nest item                                                        │    │
+│    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
+│                                                ││                                                │
+└────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
+ HELP                                                                                        ~/.tct
