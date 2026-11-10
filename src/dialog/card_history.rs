@@ -55,13 +55,7 @@ impl CardHistory {
 }
 
 impl Dialog for CardHistory {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        board: Option<&LoadedBoard>,
-        accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, board: Option<&LoadedBoard>, accent: Color) {
         let Some(card) = board.and_then(|b| b.current_card()) else {
             return;
         };
@@ -82,7 +76,8 @@ impl Dialog for CardHistory {
 
         let summary_width = SUMMARY_WIDTH.min(inner.width / 2);
         let [left, right] =
-            Layout::horizontal([Constraint::Length(summary_width), Constraint::Min(1)]).areas(inner);
+            Layout::horizontal([Constraint::Length(summary_width), Constraint::Min(1)])
+                .areas(inner);
 
         self.render_summary(frame, left, card, accent);
         self.render_detail(frame, right, card);
@@ -204,7 +199,11 @@ impl CardHistory {
     }
 
     fn render_detail(&self, frame: &mut Frame, area: Rect, card: &Card) {
-        let area = Rect { x: area.x + 1, width: area.width.saturating_sub(1), ..area };
+        let area = Rect {
+            x: area.x + 1,
+            width: area.width.saturating_sub(1),
+            ..area
+        };
         let [body, footer] =
             Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(area);
 
@@ -214,17 +213,39 @@ impl CardHistory {
         let (at, action, field, old, new) = match self.history_index(card) {
             Some(i) => {
                 let e = &card.history[i];
-                (e.at, e.action.as_str(), e.field, e.old.as_deref(), e.new.as_deref())
+                (
+                    e.at,
+                    e.action.as_str(),
+                    e.field,
+                    e.old.as_deref(),
+                    e.new.as_deref(),
+                )
             }
-            None => (card.created_at, "Created", HistoryField::General, None, None),
+            None => (
+                card.created_at,
+                "Created",
+                HistoryField::General,
+                None,
+                None,
+            ),
         };
 
         lines.push(Line::from(vec![
             Span::styled("At      ", dim),
-            Span::raw(at.with_timezone(&Local).format("%Y-%m-%d %H:%M:%S").to_string()),
+            Span::raw(
+                at.with_timezone(&Local)
+                    .format("%Y-%m-%d %H:%M:%S")
+                    .to_string(),
+            ),
         ]));
-        lines.push(Line::from(vec![Span::styled("Field   ", dim), Span::raw(field.label())]));
-        lines.push(Line::from(vec![Span::styled("Action  ", dim), Span::raw(action.to_string())]));
+        lines.push(Line::from(vec![
+            Span::styled("Field   ", dim),
+            Span::raw(field.label()),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("Action  ", dim),
+            Span::raw(action.to_string()),
+        ]));
         lines.push(Line::raw(""));
 
         if old.is_none() && new.is_none() {
@@ -246,7 +267,9 @@ impl CardHistory {
 
         let scroll = self.detail_scroll.min(max_scroll);
         frame.render_widget(
-            Paragraph::new(lines).wrap(Wrap { trim: false }).scroll((scroll, 0)),
+            Paragraph::new(lines)
+                .wrap(Wrap { trim: false })
+                .scroll((scroll, 0)),
             body,
         );
 
@@ -273,13 +296,19 @@ fn visual_line_count(lines: &[Line], width: u16) -> usize {
         .iter()
         .map(|line| {
             let w = line.width();
-            if w == 0 { 1 } else { w.div_ceil(width as usize) }
+            if w == 0 {
+                1
+            } else {
+                w.div_ceil(width as usize)
+            }
         })
         .sum()
 }
 
 fn short_stamp(at: DateTime<Utc>) -> String {
-    at.with_timezone(&Local).format("%Y-%m-%d %H:%M").to_string()
+    at.with_timezone(&Local)
+        .format("%Y-%m-%d %H:%M")
+        .to_string()
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -309,8 +338,18 @@ mod tests {
             let mut meta = crate::model::board::BoardMeta::new("Test".into());
             let list = crate::test_support::add_list(&mut meta, "L");
             let mut card = Card::new("Task".into());
-            card.log_change(HistoryField::Title, "Edited title", Some("old".into()), Some("new".into()));
-            card.log_change(HistoryField::Labels, "Added label 'foo'", Some("".into()), Some("foo".into()));
+            card.log_change(
+                HistoryField::Title,
+                "Edited title",
+                Some("old".into()),
+                Some("new".into()),
+            );
+            card.log_change(
+                HistoryField::Labels,
+                "Added label 'foo'",
+                Some("".into()),
+                Some("foo".into()),
+            );
             crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
             let editor = crate::board_editor::BoardEditor::load(&meta.id).unwrap();
             f(editor.board());
@@ -356,9 +395,16 @@ mod tests {
             let mut meta = crate::model::board::BoardMeta::new("Test".into());
             let list = crate::test_support::add_list(&mut meta, "L");
             let mut card = Card::new("Task".into());
-            let old = "line1\nline2\nline3\nline4\nline5\nold_mid\nline6\nline7\nline8\nline9\nline10";
-            let new = "line1\nline2\nline3\nline4\nline5\nnew_mid\nline6\nline7\nline8\nline9\nline10";
-            card.log_change(HistoryField::Description, "Edit description", Some(old.into()), Some(new.into()));
+            let old =
+                "line1\nline2\nline3\nline4\nline5\nold_mid\nline6\nline7\nline8\nline9\nline10";
+            let new =
+                "line1\nline2\nline3\nline4\nline5\nnew_mid\nline6\nline7\nline8\nline9\nline10";
+            card.log_change(
+                HistoryField::Description,
+                "Edit description",
+                Some(old.into()),
+                Some(new.into()),
+            );
             crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
             let editor = crate::board_editor::BoardEditor::load(&meta.id).unwrap();
             let board = editor.board();
@@ -366,21 +412,51 @@ mod tests {
             let d = CardHistory::new();
             let text = render_text(&d, board);
 
-            assert!(text.contains("  line1"), "missing first line of start run: {text}");
-            assert!(text.contains("  line5"), "missing last line of start run: {text}");
+            assert!(
+                text.contains("  line1"),
+                "missing first line of start run: {text}"
+            );
+            assert!(
+                text.contains("  line5"),
+                "missing last line of start run: {text}"
+            );
             assert!(text.contains("- old_mid"), "missing removed line: {text}");
             assert!(text.contains("+ new_mid"), "missing added line: {text}");
-            assert!(text.contains("  line6"), "missing first line of end run: {text}");
-            assert!(text.contains("  line10"), "missing last line of end run: {text}");
+            assert!(
+                text.contains("  line6"),
+                "missing first line of end run: {text}"
+            );
+            assert!(
+                text.contains("  line10"),
+                "missing last line of end run: {text}"
+            );
             assert!(text.contains("  ..."), "missing collapsed ellipsis: {text}");
 
             // The intermediate collapsed lines must not appear.
-            assert!(!text.contains("line2"), "line2 should have been collapsed: {text}");
-            assert!(!text.contains("line3"), "line3 should have been collapsed: {text}");
-            assert!(!text.contains("line4"), "line4 should have been collapsed: {text}");
-            assert!(!text.contains("line7"), "line7 should have been collapsed: {text}");
-            assert!(!text.contains("line8"), "line8 should have been collapsed: {text}");
-            assert!(!text.contains("line9"), "line9 should have been collapsed: {text}");
+            assert!(
+                !text.contains("line2"),
+                "line2 should have been collapsed: {text}"
+            );
+            assert!(
+                !text.contains("line3"),
+                "line3 should have been collapsed: {text}"
+            );
+            assert!(
+                !text.contains("line4"),
+                "line4 should have been collapsed: {text}"
+            );
+            assert!(
+                !text.contains("line7"),
+                "line7 should have been collapsed: {text}"
+            );
+            assert!(
+                !text.contains("line8"),
+                "line8 should have been collapsed: {text}"
+            );
+            assert!(
+                !text.contains("line9"),
+                "line9 should have been collapsed: {text}"
+            );
         });
     }
 
@@ -395,7 +471,10 @@ mod tests {
             assert!(out.apply.is_none());
             d.handle_key(key(KeyCode::Char('x')), Some(board));
             let out = d.handle_key(key(KeyCode::Char('y')), Some(board));
-            assert!(matches!(out.apply, Some(Command::DeleteHistoryEntry { index: 0, .. })));
+            assert!(matches!(
+                out.apply,
+                Some(Command::DeleteHistoryEntry { index: 0, .. })
+            ));
         });
     }
 
@@ -451,9 +530,20 @@ mod tests {
             let mut meta = crate::model::board::BoardMeta::new("Test".into());
             let list = crate::test_support::add_list(&mut meta, "L");
             let mut card = Card::new("Task".into());
-            let old_desc = (1..=30).map(|i| format!("old line {i}")).collect::<Vec<_>>().join("\n");
-            let new_desc = (1..=30).map(|i| format!("new line {i}")).collect::<Vec<_>>().join("\n");
-            card.log_change(HistoryField::Description, "Edit description", Some(old_desc), Some(new_desc));
+            let old_desc = (1..=30)
+                .map(|i| format!("old line {i}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let new_desc = (1..=30)
+                .map(|i| format!("new line {i}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            card.log_change(
+                HistoryField::Description,
+                "Edit description",
+                Some(old_desc),
+                Some(new_desc),
+            );
             crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
             let editor = crate::board_editor::BoardEditor::load(&meta.id).unwrap();
             let board = editor.board();
@@ -462,7 +552,10 @@ mod tests {
             // Render once so max_scroll is computed based on layout.
             render_text(&d, board);
             let max_scroll = d.detail_max_scroll.get().unwrap();
-            assert!(max_scroll > 10, "expected long diff with max_scroll > 10, got {max_scroll}");
+            assert!(
+                max_scroll > 10,
+                "expected long diff with max_scroll > 10, got {max_scroll}"
+            );
 
             // Scroll down well past the bottom.
             for _ in 0..50 {
@@ -499,9 +592,20 @@ mod tests {
             let mut meta = crate::model::board::BoardMeta::new("Test".into());
             let list = crate::test_support::add_list(&mut meta, "L");
             let mut card = Card::new("Task".into());
-            let old_desc = (1..=20).map(|i| format!("old line {i}")).collect::<Vec<_>>().join("\n");
-            let new_desc = (1..=20).map(|i| format!("new line {i}")).collect::<Vec<_>>().join("\n");
-            card.log_change(HistoryField::Description, "Edit description", Some(old_desc), Some(new_desc));
+            let old_desc = (1..=20)
+                .map(|i| format!("old line {i}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let new_desc = (1..=20)
+                .map(|i| format!("new line {i}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            card.log_change(
+                HistoryField::Description,
+                "Edit description",
+                Some(old_desc),
+                Some(new_desc),
+            );
             crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
             let editor = crate::board_editor::BoardEditor::load(&meta.id).unwrap();
             let board = editor.board();
@@ -525,7 +629,10 @@ mod tests {
             d.handle_key(key(KeyCode::Down), Some(board));
             d.handle_key(key(KeyCode::Char('d')), Some(board));
             let out = d.handle_key(key(KeyCode::Char('y')), Some(board));
-            assert!(matches!(out.apply, Some(Command::DeleteHistoryEntry { index: 0, .. })));
+            assert!(matches!(
+                out.apply,
+                Some(Command::DeleteHistoryEntry { index: 0, .. })
+            ));
             assert_eq!(out.status.as_deref(), Some("Deleted history entry"));
             assert_eq!(d.selected, 1);
         });
@@ -546,9 +653,21 @@ mod tests {
     fn close_and_help_keys() {
         with_history_board(|board| {
             let mut d = CardHistory::new();
-            assert!(matches!(d.handle_key(key(KeyCode::Esc), Some(board)).follow, super::super::Follow::Close));
-            assert!(matches!(d.handle_key(key(KeyCode::Char('?')), Some(board)).follow, super::super::Follow::Help));
-            assert!(d.help().unwrap().rows.iter().any(|(k, _)| k.contains("Del")));
+            assert!(matches!(
+                d.handle_key(key(KeyCode::Esc), Some(board)).follow,
+                super::super::Follow::Close
+            ));
+            assert!(matches!(
+                d.handle_key(key(KeyCode::Char('?')), Some(board)).follow,
+                super::super::Follow::Help
+            ));
+            assert!(
+                d.help()
+                    .unwrap()
+                    .rows
+                    .iter()
+                    .any(|(k, _)| k.contains("Del"))
+            );
         });
     }
 }

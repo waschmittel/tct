@@ -267,9 +267,10 @@ impl App {
 
     pub fn on_tick(&mut self) {
         if let Some((_, instant)) = &self.status_message
-            && instant.elapsed() > Duration::from_secs(6) {
-                self.status_message = None;
-            }
+            && instant.elapsed() > Duration::from_secs(6)
+        {
+            self.status_message = None;
+        }
 
         if self.last_reload.elapsed() >= self.reload_interval && self.should_reload() {
             self.last_reload = Instant::now();
@@ -279,7 +280,10 @@ impl App {
 
     fn should_reload(&self) -> bool {
         self.editor.is_some()
-            && matches!(self.mode, AppMode::Normal | AppMode::Help | AppMode::CardDetail)
+            && matches!(
+                self.mode,
+                AppMode::Normal | AppMode::Help | AppMode::CardDetail
+            )
             && self.insert.is_none()
             && !self.grab_active
     }
@@ -313,12 +317,7 @@ impl App {
         let native_res = Clipboard::new()
             .and_then(|mut cb| cb.set_text(&text))
             .map_err(|e| e.to_string());
-        self.copy_to_clipboard_with(
-            &text,
-            what,
-            native_res,
-            &mut std::io::stdout().lock(),
-        );
+        self.copy_to_clipboard_with(&text, what, native_res, &mut std::io::stdout().lock());
     }
 
     fn copy_to_clipboard_with(
@@ -347,7 +346,10 @@ impl App {
             (
                 b.meta.id.clone(),
                 b.current_card_id().cloned(),
-                b.scroll_offset.iter().map(|c| c.get()).collect::<Vec<usize>>(),
+                b.scroll_offset
+                    .iter()
+                    .map(|c| c.get())
+                    .collect::<Vec<usize>>(),
             )
         }) else {
             return;
@@ -457,7 +459,9 @@ impl App {
     /// Ask where to save the PDF of the selected card — or, in a browser
     /// session, send it to the browser straight away.
     pub fn open_export_dialog(&mut self, theme: crate::export::Theme) {
-        let Some(card) = self.board().and_then(|b| b.current_card()) else { return };
+        let Some(card) = self.board().and_then(|b| b.current_card()) else {
+            return;
+        };
         if self.web_sink.is_some() {
             let card_id = card.id.clone();
             self.export_to_browser(&card_id, theme);
@@ -466,15 +470,27 @@ impl App {
         let (card_id, title) = (card.id.clone(), card.title.clone());
         let cwd = std::env::current_dir().unwrap_or_default();
         let start = self.export_dir.clone().unwrap_or_else(|| cwd.clone());
-        self.open_dialog(Box::new(crate::dialog::export_pdf::ExportPdf::new(card_id, title, theme, &start, cwd)));
+        self.open_dialog(Box::new(crate::dialog::export_pdf::ExportPdf::new(
+            card_id, title, theme, &start, cwd,
+        )));
     }
 
     /// Render the card and hand the PDF to the page over the terminal stream.
     /// Failures toast; nothing is written on the server.
-    fn export_to_browser(&mut self, card_id: &crate::model::id::CardId, theme: crate::export::Theme) {
+    fn export_to_browser(
+        &mut self,
+        card_id: &crate::model::id::CardId,
+        theme: crate::export::Theme,
+    ) {
         let Some(board) = self.board() else { return };
-        let Some(card) = board.cards.get(card_id) else { return };
-        let list = board.lists.iter().find(|l| l.id == card.list_id).map_or("", |l| l.name.as_str());
+        let Some(card) = board.cards.get(card_id) else {
+            return;
+        };
+        let list = board
+            .lists
+            .iter()
+            .find(|l| l.id == card.list_id)
+            .map_or("", |l| l.name.as_str());
         let file_name = crate::export::path::default_file_name(&card.title);
         let sent = crate::export::card_pdf(&board.meta, list, card, theme).and_then(|pdf| {
             let sink = self.web_sink.as_mut().expect("checked by the caller");
@@ -591,9 +607,9 @@ pub(crate) fn base64_encode(input: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::model::card::Card;
+    use crate::model::id::ListId;
     use crate::model::label::LabelColor;
     use crate::model::list::CardList;
-    use crate::model::id::ListId;
     use crate::storage::card_store;
     use crate::test_support::with_temp_dir;
 
@@ -610,7 +626,11 @@ mod tests {
         let cards_map: HashMap<_, _> = cards.into_iter().map(|c| (c.id.clone(), c)).collect();
         LoadedBoard {
             meta: BoardMeta::new("X".into()),
-            lists: vec![CardList { id: "l1".into(), name: "L".into(), card_ids }],
+            lists: vec![CardList {
+                id: "l1".into(),
+                name: "L".into(),
+                card_ids,
+            }],
             cards: cards_map,
             selected_list: 0,
             selected_card: vec![0],
@@ -961,7 +981,10 @@ mod tests {
             app.status_message.as_ref().map(|(m, _)| m.as_str()),
             Some("Copied title 'Fix login bug' to clipboard")
         );
-        assert!(osc_buf.is_empty(), "should not emit OSC 52 when native succeeds");
+        assert!(
+            osc_buf.is_empty(),
+            "should not emit OSC 52 when native succeeds"
+        );
     }
 
     #[test]
@@ -1008,7 +1031,10 @@ mod tests {
         struct FailingWriter;
         impl std::io::Write for FailingWriter {
             fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
-                Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, "pipe closed"))
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::BrokenPipe,
+                    "pipe closed",
+                ))
             }
             fn flush(&mut self) -> std::io::Result<()> {
                 Ok(())

@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
-use ratatui::Frame;
 
 use crate::app::{App, AppMode};
 use crate::insert::InsertSurface;
@@ -16,10 +16,19 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     .split(area);
 
     let title = Paragraph::new(Line::from(vec![
-        Span::styled(" TCT ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " TCT ",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::raw("- Terminal Card Tracker"),
     ]))
-    .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray)));
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::DarkGray)),
+    );
     frame.render_widget(title, chunks[0]);
 
     if app.boards.is_empty() {
@@ -36,11 +45,17 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             .map(|(i, b)| {
                 let board_color = b.accent_color.to_ratatui_color();
                 let style = if i == app.selected_board_idx {
-                    Style::default().fg(board_color).add_modifier(Modifier::BOLD)
+                    Style::default()
+                        .fg(board_color)
+                        .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(board_color)
                 };
-                let prefix = if i == app.selected_board_idx { ">" } else { " " };
+                let prefix = if i == app.selected_board_idx {
+                    ">"
+                } else {
+                    " "
+                };
                 ListItem::new(Line::from(Span::styled(
                     format!("{prefix} {}", b.name),
                     style,
@@ -48,8 +63,12 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             })
             .collect();
 
-        let list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray)).title(" Boards "));
+        let list = List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::DarkGray))
+                .title(" Boards "),
+        );
         let mut state = ListState::default().with_selected(Some(app.selected_board_idx));
         frame.render_stateful_widget(list, chunks[1], &mut state);
     }

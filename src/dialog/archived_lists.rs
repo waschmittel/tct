@@ -18,13 +18,7 @@ pub struct ArchivedLists {
 }
 
 impl Dialog for ArchivedLists {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        _board: Option<&LoadedBoard>,
-        accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, _board: Option<&LoadedBoard>, accent: Color) {
         let height = (self.lists.len() as u16 + 5)
             .min(area.height.saturating_sub(4))
             .max(6);
@@ -95,12 +89,11 @@ impl Dialog for ArchivedLists {
                     self.selected = self.lists.len().saturating_sub(1);
                 }
                 let name = list.name.clone();
-                let mut out =
-                    DialogOutcome::side_effect(DialogSideEffect::DeleteArchivedList {
-                        list_id: list.id,
-                        card_ids: list.card_ids,
-                    })
-                    .with_status(format!("Deleted list '{name}'"));
+                let mut out = DialogOutcome::side_effect(DialogSideEffect::DeleteArchivedList {
+                    list_id: list.id,
+                    card_ids: list.card_ids,
+                })
+                .with_status(format!("Deleted list '{name}'"));
                 if self.lists.is_empty() {
                     out = out.with_close();
                 }

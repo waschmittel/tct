@@ -1,16 +1,16 @@
 //! `tct cards <board>` subcommand: list/show/create/edit/archive/restore/delete cards.
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use chrono::NaiveDate;
 
 use super::lookup::{find_archived_card, find_board, find_card_in_lists, find_list};
 use super::util::{
     flag_value, flag_values2, has_flag, lists_and_cards, print_card_detail, print_card_line,
 };
-use crate::outln;
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
 use crate::export;
+use crate::outln;
 use crate::storage::card_store;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
@@ -93,7 +93,10 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let list_name = list.name.clone();
         let list_id = list.id.clone();
         let mut editor = BoardEditor::load(&board.id)?;
-        editor.apply(Command::AddCard { list_id, title: title.to_string() })?;
+        editor.apply(Command::AddCard {
+            list_id,
+            title: title.to_string(),
+        })?;
         let new_id = editor
             .last_added_card_id()
             .cloned()
@@ -106,7 +109,9 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
             .unwrap_or_else(|| title.to_string());
         outln!(
             "Created card '{}' in list '{}' on board '{}'.",
-            card_title, list_name, board.name
+            card_title,
+            list_name,
+            board.name
         );
     } else if let Some(card_partial) = flag_value(args, "--edit") {
         edit(args, board_partial, card_partial, by_id)?;
@@ -162,7 +167,12 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn edit(args: &[String], board_partial: &str, card_partial: &str, by_id: bool) -> anyhow::Result<()> {
+fn edit(
+    args: &[String],
+    board_partial: &str,
+    card_partial: &str,
+    by_id: bool,
+) -> anyhow::Result<()> {
     let board = find_board(board_partial, by_id)?;
     let (lists, all_cards) = lists_and_cards(&board);
     let (_, card) = find_card_in_lists(&lists, &all_cards, card_partial, false, by_id)?;
@@ -201,8 +211,13 @@ fn edit(args: &[String], board_partial: &str, card_partial: &str, by_id: bool) -
         })?;
     }
     match due_change {
-        Some(Some(d)) => editor.apply(Command::SetDueDate { card_id: card_id.clone(), date: d })?,
-        Some(None) => editor.apply(Command::ClearDueDate { card_id: card_id.clone() })?,
+        Some(Some(d)) => editor.apply(Command::SetDueDate {
+            card_id: card_id.clone(),
+            date: d,
+        })?,
+        Some(None) => editor.apply(Command::ClearDueDate {
+            card_id: card_id.clone(),
+        })?,
         None => {}
     }
     let title = editor

@@ -66,10 +66,20 @@ pub fn split_cells(line: &str) -> Vec<RawCell> {
         let inner = &chars[start..end];
         let lead = inner.iter().take_while(|c| c.is_whitespace()).count();
         if lead == inner.len() {
-            return RawCell { start, end, text_start: start, text_end: start };
+            return RawCell {
+                start,
+                end,
+                text_start: start,
+                text_end: start,
+            };
         }
         let trail = inner.iter().rev().take_while(|c| c.is_whitespace()).count();
-        RawCell { start, end, text_start: start + lead, text_end: end - trail }
+        RawCell {
+            start,
+            end,
+            text_start: start + lead,
+            text_end: end - trail,
+        }
     };
     let mut cells = Vec::new();
     let mut start = i;
@@ -85,14 +95,20 @@ pub fn split_cells(line: &str) -> Vec<RawCell> {
         }
         j += 1;
     }
-    if chars[start.min(chars.len())..].iter().any(|c| !c.is_whitespace()) {
+    if chars[start.min(chars.len())..]
+        .iter()
+        .any(|c| !c.is_whitespace())
+    {
         cells.push(cell(start, chars.len()));
     }
     cells
 }
 
 fn cell_text(line: &str, cell: &RawCell) -> String {
-    line.chars().skip(cell.text_start).take(cell.text_end - cell.text_start).collect()
+    line.chars()
+        .skip(cell.text_start)
+        .take(cell.text_end - cell.text_start)
+        .collect()
 }
 
 /// A delimiter row consists of `-` and `:` cells with at least one `-`. An
@@ -101,9 +117,14 @@ pub fn delimiter_aligns(line: &str) -> Option<Vec<Align>> {
     if !is_table_line(line) {
         return None;
     }
-    let hints: Vec<String> = split_cells(line).iter().map(|c| cell_text(line, c)).collect();
+    let hints: Vec<String> = split_cells(line)
+        .iter()
+        .map(|c| cell_text(line, c))
+        .collect();
     let valid = !hints.is_empty()
-        && hints.iter().all(|h| h.chars().all(|c| c == '-' || c == ':'))
+        && hints
+            .iter()
+            .all(|h| h.chars().all(|c| c == '-' || c == ':'))
         && hints.iter().any(|h| h.contains('-'));
     valid.then(|| hints.iter().map(|h| Align::from_hint(h)).collect())
 }
@@ -174,12 +195,22 @@ impl Table {
             .filter(|(i, _)| *i != 1)
             .map(|(_, l)| split_cells(l).iter().map(|c| cell_text(l, c)).collect())
             .collect();
-        let cols = rows.iter().map(Vec::len).chain([aligns.len()]).max().unwrap_or(1).max(1);
+        let cols = rows
+            .iter()
+            .map(Vec::len)
+            .chain([aligns.len()])
+            .max()
+            .unwrap_or(1)
+            .max(1);
         aligns.resize(cols, Align::None);
         for r in &mut rows {
             r.resize(cols, String::new());
         }
-        Some(Table { indent, aligns, rows })
+        Some(Table {
+            indent,
+            aligns,
+            rows,
+        })
     }
 
     /// A table of empty cells, ready to type into.
@@ -210,7 +241,10 @@ impl Table {
     /// left as well as on top. Readers (read view, PDF) style the first column
     /// like the header and leave the empty corner open.
     pub fn is_matrix(&self) -> bool {
-        self.rows.first().and_then(|r| r.first()).is_some_and(|c| c.trim().is_empty())
+        self.rows
+            .first()
+            .and_then(|r| r.first())
+            .is_some_and(|c| c.trim().is_empty())
     }
 
     pub fn render(&self) -> Rendered {
@@ -231,7 +265,11 @@ impl Table {
             let mut starts = Vec::new();
             for (c, text) in row.iter().enumerate() {
                 let gap = widths[c] - UnicodeWidthStr::width(text.as_str());
-                let align = if r == 0 { Align::Center } else { self.aligns[c] };
+                let align = if r == 0 {
+                    Align::Center
+                } else {
+                    self.aligns[c]
+                };
                 let (left, right) = match align {
                     Align::Right => (gap, 0),
                     Align::Center => (gap / 2, gap - gap / 2),
@@ -318,7 +356,11 @@ impl Table {
     pub fn swap_col(&mut self, col: usize, right: bool) -> Edit {
         let other = if right { col + 1 } else { col.wrapping_sub(1) };
         if other >= self.cols() {
-            return Edit::Refused(if right { "Already the last column" } else { "Already the first column" });
+            return Edit::Refused(if right {
+                "Already the last column"
+            } else {
+                "Already the first column"
+            });
         }
         self.aligns.swap(col, other);
         for r in &mut self.rows {
@@ -348,7 +390,9 @@ mod tests {
 
     #[test]
     fn empty_top_left_cell_makes_a_matrix() {
-        let parse = |l: &[&str]| Table::parse(&l.iter().map(|s| s.to_string()).collect::<Vec<_>>()).unwrap();
+        let parse = |l: &[&str]| {
+            Table::parse(&l.iter().map(|s| s.to_string()).collect::<Vec<_>>()).unwrap()
+        };
         assert!(parse(&["|  | a |", "|---|---|", "| r | 1 |"]).is_matrix());
         assert!(!parse(&["| h | a |", "|---|---|", "| r | 1 |"]).is_matrix());
     }
@@ -386,8 +430,16 @@ mod tests {
     #[test]
     fn alignment_hints_are_kept_and_applied() {
         assert_eq!(
-            render(&["| l | c | r | n |", "| :- | :-: | -: | - |", "| 1 | 2 | 3 | 4 |"]),
-            ["|  l  |  c  |  r  |  n  |", "| :-- | :-: | --: | --- |", "| 1   |  2  |   3 | 4   |"]
+            render(&[
+                "| l | c | r | n |",
+                "| :- | :-: | -: | - |",
+                "| 1 | 2 | 3 | 4 |"
+            ]),
+            [
+                "|  l  |  c  |  r  |  n  |",
+                "| :-- | :-: | --: | --- |",
+                "| 1   |  2  |   3 | 4   |"
+            ]
         );
     }
 
@@ -449,8 +501,13 @@ mod tests {
 
     #[test]
     fn swapping_moves_alignment_with_the_column_and_keeps_the_header_on_top() {
-        let mut t =
-            Table::parse(&lines(&["| a | b |", "| :- | -: |", "| 1 | 2 |", "| 3 | 4 |"])).unwrap();
+        let mut t = Table::parse(&lines(&[
+            "| a | b |",
+            "| :- | -: |",
+            "| 1 | 2 |",
+            "| 3 | 4 |",
+        ]))
+        .unwrap();
         assert_eq!(t.swap_col(0, true), Edit::Place(1));
         assert_eq!(t.aligns, [Align::Right, Align::Left]);
         assert_eq!(t.rows[1], ["2", "1"]);
@@ -468,7 +525,10 @@ mod tests {
                 t.aligns[0]
             })
             .collect();
-        assert_eq!(seen, [Align::Left, Align::Center, Align::Right, Align::None]);
+        assert_eq!(
+            seen,
+            [Align::Left, Align::Center, Align::Right, Align::None]
+        );
     }
 
     #[test]
@@ -478,7 +538,9 @@ mod tests {
 
     #[test]
     fn text_starts_point_at_the_cell_text() {
-        let r = Table::parse(&lines(&["| a | bb |", "| - | -: |"])).unwrap().render();
+        let r = Table::parse(&lines(&["| a | bb |", "| - | -: |"]))
+            .unwrap()
+            .render();
         assert_eq!(r.text_starts[0], [3, 8]);
         assert_eq!(r.lines[0].chars().nth(2), Some(' '));
         assert_eq!(r.lines[0].chars().nth(9), Some('b'));

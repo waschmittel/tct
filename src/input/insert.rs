@@ -55,9 +55,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         }
         InsertOutcome::Save(cmd) => {
             let status = match &cmd {
-                crate::command::Command::EditCardDescription { card_id, .. } => {
-                    Some(format!("Saved description of '{}'", card_title(app, card_id)))
-                }
+                crate::command::Command::EditCardDescription { card_id, .. } => Some(format!(
+                    "Saved description of '{}'",
+                    card_title(app, card_id)
+                )),
                 _ => None,
             };
             app.apply(cmd)?;
@@ -71,24 +72,25 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
                 crate::command::Command::AddCard { title, .. } => {
                     Some(format!("Added card '{title}'"))
                 }
-                crate::command::Command::AddList { name } => {
-                    Some(format!("Added list '{name}'"))
-                }
+                crate::command::Command::AddList { name } => Some(format!("Added list '{name}'")),
                 crate::command::Command::RenameList { name, .. } => {
                     Some(format!("Renamed list to '{name}'"))
                 }
                 crate::command::Command::EditCardTitle { title, .. } => {
                     Some(format!("Renamed card to '{title}'"))
                 }
-                crate::command::Command::SetDueDate { card_id, date } => {
-                    Some(format!("Due date of '{}' set to {date}", card_title(app, card_id)))
-                }
-                crate::command::Command::ClearDueDate { card_id } => {
-                    Some(format!("Cleared due date of '{}'", card_title(app, card_id)))
-                }
-                crate::command::Command::EditCardDescription { card_id, .. } => {
-                    Some(format!("Saved description of '{}'", card_title(app, card_id)))
-                }
+                crate::command::Command::SetDueDate { card_id, date } => Some(format!(
+                    "Due date of '{}' set to {date}",
+                    card_title(app, card_id)
+                )),
+                crate::command::Command::ClearDueDate { card_id } => Some(format!(
+                    "Cleared due date of '{}'",
+                    card_title(app, card_id)
+                )),
+                crate::command::Command::EditCardDescription { card_id, .. } => Some(format!(
+                    "Saved description of '{}'",
+                    card_title(app, card_id)
+                )),
                 crate::command::Command::AddChecklistItem { text, .. } => {
                     Some(format!("Added item '{text}'"))
                 }
@@ -145,7 +147,7 @@ mod tests {
     use crate::app::{App, AppMode};
     use crate::input::handle_input;
     use crate::model::card::Card;
-    
+
     use crate::storage::board_store;
     use crate::test_support::with_temp_dir;
 
@@ -154,7 +156,8 @@ mod tests {
     fn app_editing_description() -> App {
         let mut meta = board_store::create_board("Test".into()).unwrap();
         let list = crate::test_support::add_list(&mut meta, "To Do");
-        let mut card = Card::new("Card".into());        crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
+        let mut card = Card::new("Card".into());
+        crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
 
         let mut app = App::new(Some(meta.id)).unwrap();
         app.mode = AppMode::CardDetail;
@@ -200,7 +203,10 @@ mod tests {
             // "n" = keep editing.
             press(&mut app, KeyCode::Char('n'));
             assert!(matches!(app.mode, AppMode::Insert));
-            assert!(is_markdown_editor(&app), "resumed Insert mode has no handler");
+            assert!(
+                is_markdown_editor(&app),
+                "resumed Insert mode has no handler"
+            );
             // Regression guard: a key must still be handled (not frozen).
             press(&mut app, KeyCode::Char('z'));
             assert!(matches!(app.mode, AppMode::Insert));

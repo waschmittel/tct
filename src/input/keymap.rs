@@ -26,10 +26,7 @@ pub fn lookup<A: Copy>(map: &[Binding<A>], code: KeyCode, shift: bool) -> Option
 
 /// Help rows of one section, in table order, deduped (e.g. `"Up / Down"`
 /// appears once even though Up and Down are two bindings).
-pub fn help_rows<A: Copy>(
-    map: &[Binding<A>],
-    section: &str,
-) -> Vec<(&'static str, &'static str)> {
+pub fn help_rows<A: Copy>(map: &[Binding<A>], section: &str) -> Vec<(&'static str, &'static str)> {
     let mut rows: Vec<(&'static str, &'static str)> = Vec::new();
     for b in map.iter().filter(|b| b.section == section) {
         if !rows.iter().any(|(k, h)| *k == b.keys && *h == b.help) {
@@ -51,9 +48,30 @@ mod tests {
     }
 
     const MAP: &[Binding<A>] = &[
-        Binding { code: KeyCode::Up, shift: Some(false), action: A::X, keys: "Up / Down", help: "nav", section: "S" },
-        Binding { code: KeyCode::Down, shift: Some(false), action: A::Y, keys: "Up / Down", help: "nav", section: "S" },
-        Binding { code: KeyCode::Char('q'), shift: None, action: A::Z, keys: "q", help: "quit", section: "App" },
+        Binding {
+            code: KeyCode::Up,
+            shift: Some(false),
+            action: A::X,
+            keys: "Up / Down",
+            help: "nav",
+            section: "S",
+        },
+        Binding {
+            code: KeyCode::Down,
+            shift: Some(false),
+            action: A::Y,
+            keys: "Up / Down",
+            help: "nav",
+            section: "S",
+        },
+        Binding {
+            code: KeyCode::Char('q'),
+            shift: None,
+            action: A::Z,
+            keys: "q",
+            help: "quit",
+            section: "App",
+        },
     ];
 
     #[test]

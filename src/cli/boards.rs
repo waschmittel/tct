@@ -2,8 +2,8 @@
 
 use super::lookup::{find_archived_board, find_board};
 use super::util::{board_summary_counts, flag_value, has_flag};
-use crate::outln;
 use crate::board_directory;
+use crate::outln;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     if has_flag(args, "--archived") {
@@ -42,7 +42,10 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
                 let (lists, total_cards) = board_summary_counts(&board.id);
                 outln!(
                     "  [{}]  {:<30} {} lists, {} active cards",
-                    board.id, board.name, lists, total_cards
+                    board.id,
+                    board.name,
+                    lists,
+                    total_cards
                 );
             }
         }

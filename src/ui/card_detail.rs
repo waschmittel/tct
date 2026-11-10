@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
-use ratatui::Frame;
 
 use crate::app::{App, AppMode};
 use crate::insert::InsertSurface;
@@ -44,7 +44,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .min(max_width)
         .max(table_width.min(screen_max))
         .min(screen_max);
-    let height = (area.height * 80 / 100).max(20).min(area.height.saturating_sub(2));
+    let height = (area.height * 80 / 100)
+        .max(20)
+        .min(area.height.saturating_sub(2));
     let x = (area.width.saturating_sub(width)) / 2;
     let y = (area.height.saturating_sub(height)) / 2;
     let popup = Rect::new(x, y, width, height);
@@ -52,14 +54,15 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Clear, popup);
 
     // Detect "editing description" via the active insert handler.
-    let editing_desc_handler = if matches!(app.mode, AppMode::Insert | AppMode::Dialog | AppMode::Help) {
-        app.insert.as_ref().and_then(|h| {
-            h.as_any()
-                .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
-        })
-    } else {
-        None
-    };
+    let editing_desc_handler =
+        if matches!(app.mode, AppMode::Insert | AppMode::Dialog | AppMode::Help) {
+            app.insert.as_ref().and_then(|h| {
+                h.as_any()
+                    .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
+            })
+        } else {
+            None
+        };
 
     let title_display = if editing_desc_handler.is_some() {
         format!(" {} (editing description) ", card.title)
@@ -72,7 +75,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .border_style(Style::default().fg(accent));
     let stamp_style = Style::default().fg(accent);
     if board.meta.show_updated_date
-        && let Some(line) = card_widget::date_stamp(card.last_changed_at(), stamp_style, popup.width)
+        && let Some(line) =
+            card_widget::date_stamp(card.last_changed_at(), stamp_style, popup.width)
     {
         block = block.title_top(line);
     }
@@ -172,7 +176,11 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         let mut lines = Vec::new();
         for (ii, item) in card.checklist.iter().enumerate() {
             let is_active = ii == board.detail_item_idx;
-            let check = if item.completed { app.caps.check_mark() } else { " " };
+            let check = if item.completed {
+                app.caps.check_mark()
+            } else {
+                " "
+            };
             let style = if is_active {
                 Style::default().fg(accent).add_modifier(Modifier::BOLD)
             } else if item.completed {
@@ -256,11 +264,15 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let div_total = visible_sections.saturating_sub(1) * div_h;
 
     // Reserve full space for labels + due; they're small.
-    let bottom_h = (if show_labels { header_h + labels_full } else { 0 })
-        + (if show_due { header_h + due_full } else { 0 });
-    let fixed_top = top_pad
-        + (if show_checklist { header_h } else { 0 });
-    let available = inner.height.saturating_sub(fixed_top + div_total + bottom_h);
+    let bottom_h = (if show_labels {
+        header_h + labels_full
+    } else {
+        0
+    }) + (if show_due { header_h + due_full } else { 0 });
+    let fixed_top = top_pad + (if show_checklist { header_h } else { 0 });
+    let available = inner
+        .height
+        .saturating_sub(fixed_top + div_total + bottom_h);
 
     let desc_full = desc_lines.len() as u16;
     let ck_full = checklist_lines.len() as u16;
@@ -299,8 +311,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         // Description body (scrollbar on the right when it overflows)
         if desc_h > 0 && y < inner.y + inner.height {
             let desc_area = Rect::new(inner.x + PAD, y, md_inner_width, desc_h);
-            let desc_paragraph =
-                Paragraph::new(desc_lines.clone()).scroll((desc_scroll, 0));
+            let desc_paragraph = Paragraph::new(desc_lines.clone()).scroll((desc_scroll, 0));
             frame.render_widget(desc_paragraph, desc_area);
             if desc_full > desc_h {
                 let bar_area = Rect::new(popup.x, y, popup.width, desc_h);

@@ -125,8 +125,12 @@ impl InsertHandler for DatePicker {
         }
     }
 
-    fn surface(&self) -> InsertSurface { self.surface }
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn surface(&self) -> InsertSurface {
+        self.surface
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl DatePicker {
@@ -148,9 +152,7 @@ impl DatePicker {
                 card_id: self.card_id.clone(),
                 date,
             }),
-            None => InsertOutcome::CancelWithStatus(
-                "Invalid date format. Use YYYY-MM-DD".into(),
-            ),
+            None => InsertOutcome::CancelWithStatus("Invalid date format. Use YYYY-MM-DD".into()),
         }
     }
 
@@ -249,10 +251,19 @@ mod tests {
     #[test]
     fn comma_and_period_jump_a_year() {
         let mut p = make_picker();
-        p.handle_key(KeyEvent::new(KeyCode::Char('.'), KeyModifiers::empty()), None);
+        p.handle_key(
+            KeyEvent::new(KeyCode::Char('.'), KeyModifiers::empty()),
+            None,
+        );
         assert_eq!(p.picker_date, NaiveDate::from_ymd_opt(2027, 5, 18));
-        p.handle_key(KeyEvent::new(KeyCode::Char(','), KeyModifiers::empty()), None);
-        p.handle_key(KeyEvent::new(KeyCode::Char(','), KeyModifiers::empty()), None);
+        p.handle_key(
+            KeyEvent::new(KeyCode::Char(','), KeyModifiers::empty()),
+            None,
+        );
+        p.handle_key(
+            KeyEvent::new(KeyCode::Char(','), KeyModifiers::empty()),
+            None,
+        );
         assert_eq!(p.picker_date, NaiveDate::from_ymd_opt(2025, 5, 18));
         // The jump keys must never leak into the text buffer.
         assert_eq!(p.buffer, "2025-05-18");
@@ -262,7 +273,10 @@ mod tests {
     fn t_jumps_to_today() {
         let mut p = make_picker();
         p.picker_date = Some(NaiveDate::from_ymd_opt(1999, 1, 1).unwrap());
-        p.handle_key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()), None);
+        p.handle_key(
+            KeyEvent::new(KeyCode::Char('t'), KeyModifiers::empty()),
+            None,
+        );
         let today = chrono::Local::now().date_naive();
         assert_eq!(p.picker_date, Some(today));
     }
@@ -300,7 +314,10 @@ mod tests {
         p.buffer.clear();
         p.picker_date = None;
         let out = p.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()), None);
-        assert!(matches!(out, InsertOutcome::Confirm(Command::ClearDueDate { .. })));
+        assert!(matches!(
+            out,
+            InsertOutcome::Confirm(Command::ClearDueDate { .. })
+        ));
     }
 
     #[test]

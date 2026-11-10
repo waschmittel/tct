@@ -118,7 +118,10 @@ impl Card {
         let q = query.to_lowercase();
         self.title.to_lowercase().contains(&q)
             || self.description.to_lowercase().contains(&q)
-            || self.checklist.iter().any(|item| item.text.to_lowercase().contains(&q))
+            || self
+                .checklist
+                .iter()
+                .any(|item| item.text.to_lowercase().contains(&q))
             || self.label_ids.iter().any(|lid| {
                 board_labels
                     .iter()
@@ -172,7 +175,13 @@ impl Card {
         new: Option<String>,
     ) {
         let now = Utc::now();
-        self.history.push(HistoryEntry { at: now, action, field, old, new });
+        self.history.push(HistoryEntry {
+            at: now,
+            action,
+            field,
+            old,
+            new,
+        });
         let len = self.history.len();
         if len > HISTORY_LIMIT {
             self.history.drain(..len - HISTORY_LIMIT);
@@ -236,9 +245,18 @@ mod tests {
     fn checklist_progress_counts() {
         let mut card = Card::new("Test".into());
         card.checklist = vec![
-            ChecklistItem { text: "A".into(), completed: true },
-            ChecklistItem { text: "B".into(), completed: false },
-            ChecklistItem { text: "C".into(), completed: true },
+            ChecklistItem {
+                text: "A".into(),
+                completed: true,
+            },
+            ChecklistItem {
+                text: "B".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "C".into(),
+                completed: true,
+            },
         ];
         assert_eq!(card.checklist_progress(), Some((2, 3)));
     }
@@ -267,7 +285,10 @@ mod tests {
     #[test]
     fn search_matches_checklist() {
         let mut card = Card::new("Task".into());
-        card.checklist.push(ChecklistItem { text: "Deploy to staging".into(), completed: false });
+        card.checklist.push(ChecklistItem {
+            text: "Deploy to staging".into(),
+            completed: false,
+        });
         assert!(card.matches_search("deploy", &[]));
         assert!(card.matches_search("DEPLOY", &[]));
         assert!(!card.matches_search("production", &[]));
@@ -338,8 +359,14 @@ mod tests {
     fn checklist_progress_all_done() {
         let mut card = Card::new("Test".into());
         card.checklist = vec![
-            ChecklistItem { text: "A".into(), completed: true },
-            ChecklistItem { text: "B".into(), completed: true },
+            ChecklistItem {
+                text: "A".into(),
+                completed: true,
+            },
+            ChecklistItem {
+                text: "B".into(),
+                completed: true,
+            },
         ];
         assert_eq!(card.checklist_progress(), Some((2, 2)));
     }
@@ -348,8 +375,14 @@ mod tests {
     fn checklist_progress_none_done() {
         let mut card = Card::new("Test".into());
         card.checklist = vec![
-            ChecklistItem { text: "A".into(), completed: false },
-            ChecklistItem { text: "B".into(), completed: false },
+            ChecklistItem {
+                text: "A".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "B".into(),
+                completed: false,
+            },
         ];
         assert_eq!(card.checklist_progress(), Some((0, 2)));
     }
@@ -358,9 +391,18 @@ mod tests {
     fn checklist_as_markdown_mixed() {
         let mut card = Card::new("Task".into());
         card.checklist = vec![
-            ChecklistItem { text: "Reproduce".into(), completed: true },
-            ChecklistItem { text: "Fix".into(), completed: false },
-            ChecklistItem { text: "Test".into(), completed: true },
+            ChecklistItem {
+                text: "Reproduce".into(),
+                completed: true,
+            },
+            ChecklistItem {
+                text: "Fix".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "Test".into(),
+                completed: true,
+            },
         ];
         let md = card.checklist_as_markdown();
         assert_eq!(md, "- [x] Reproduce\n- [ ] Fix\n- [x] Test");
@@ -375,16 +417,20 @@ mod tests {
     #[test]
     fn checklist_as_markdown_single_item() {
         let mut card = Card::new("Task".into());
-        card.checklist = vec![ChecklistItem { text: "alone".into(), completed: false }];
+        card.checklist = vec![ChecklistItem {
+            text: "alone".into(),
+            completed: false,
+        }];
         assert_eq!(card.checklist_as_markdown(), "- [ ] alone");
     }
 
     #[test]
     fn checklist_as_markdown_preserves_special_chars() {
         let mut card = Card::new("Task".into());
-        card.checklist = vec![
-            ChecklistItem { text: "with **bold** and `code`".into(), completed: true },
-        ];
+        card.checklist = vec![ChecklistItem {
+            text: "with **bold** and `code`".into(),
+            completed: true,
+        }];
         assert_eq!(
             card.checklist_as_markdown(),
             "- [x] with **bold** and `code`"
@@ -460,7 +506,12 @@ mod tests {
     #[test]
     fn log_change_records_field_and_values() {
         let mut card = Card::new("Task".into());
-        card.log_change(HistoryField::Title, "Edited title", Some("a".into()), Some("b".into()));
+        card.log_change(
+            HistoryField::Title,
+            "Edited title",
+            Some("a".into()),
+            Some("b".into()),
+        );
         let e = &card.history[0];
         assert_eq!(e.field, HistoryField::Title);
         assert_eq!((e.old.as_deref(), e.new.as_deref()), (Some("a"), Some("b")));
@@ -470,7 +521,10 @@ mod tests {
     fn log_checklist_snapshots_old_and_current_markdown() {
         let mut card = Card::new("Task".into());
         let old = card.checklist_as_markdown();
-        card.checklist.push(ChecklistItem { text: "x".into(), completed: true });
+        card.checklist.push(ChecklistItem {
+            text: "x".into(),
+            completed: true,
+        });
         card.log_checklist("Added", old);
         let e = &card.history[0];
         assert_eq!(e.field, HistoryField::Checklist);
@@ -500,7 +554,12 @@ mod tests {
     fn history_entry_round_trips_and_omits_absent_values() {
         let mut card = Card::new("Task".into());
         card.log("Archived");
-        card.log_change(HistoryField::DueDate, "Set", None, Some("2099-01-01".into()));
+        card.log_change(
+            HistoryField::DueDate,
+            "Set",
+            None,
+            Some("2099-01-01".into()),
+        );
         let json = serde_json::to_string(&card.history).unwrap();
         assert!(json.contains(r#""field":"due_date""#));
         assert_eq!(json.matches("\"old\"").count(), 0);

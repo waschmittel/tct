@@ -34,9 +34,12 @@ pub enum LabelColor {
     #[default]
     Cyan,
     #[serde(rename = "custom")]
-    Custom { r: u8, g: u8, b: u8 },
+    Custom {
+        r: u8,
+        g: u8,
+        b: u8,
+    },
 }
-
 
 impl LabelColor {
     pub fn to_ratatui_color(self) -> Color {
@@ -87,7 +90,11 @@ impl LabelColor {
                 let (h, s, l) = rgb_to_hsl(r, g, b);
                 let new_h = (h + 37.0) % 360.0;
                 let (nr, ng, nb) = hsl_to_rgb(new_h, s, l);
-                Self::Custom { r: nr, g: ng, b: nb }
+                Self::Custom {
+                    r: nr,
+                    g: ng,
+                    b: nb,
+                }
             }
         }
     }
@@ -224,7 +231,11 @@ mod tests {
 
     #[test]
     fn next_cycles_custom() {
-        let c = LabelColor::Custom { r: 170, g: 200, b: 255 };
+        let c = LabelColor::Custom {
+            r: 170,
+            g: 200,
+            b: 255,
+        };
         let n = c.next();
         assert!(matches!(n, LabelColor::Custom { .. }));
         assert_ne!(c, n);
@@ -239,7 +250,11 @@ mod tests {
 
     #[test]
     fn custom_color_serde_roundtrip() {
-        let c = LabelColor::Custom { r: 12, g: 34, b: 250 };
+        let c = LabelColor::Custom {
+            r: 12,
+            g: 34,
+            b: 250,
+        };
         let json = serde_json::to_string(&c).unwrap();
         let back: LabelColor = serde_json::from_str(&json).unwrap();
         assert_eq!(c, back);
@@ -248,9 +263,14 @@ mod tests {
     #[test]
     fn named_color_serde_roundtrip() {
         for c in [
-            LabelColor::Red, LabelColor::Orange, LabelColor::Yellow,
-            LabelColor::Green, LabelColor::Blue, LabelColor::Purple,
-            LabelColor::Pink, LabelColor::Cyan,
+            LabelColor::Red,
+            LabelColor::Orange,
+            LabelColor::Yellow,
+            LabelColor::Green,
+            LabelColor::Blue,
+            LabelColor::Purple,
+            LabelColor::Pink,
+            LabelColor::Cyan,
         ] {
             let json = serde_json::to_string(&c).unwrap();
             let back: LabelColor = serde_json::from_str(&json).unwrap();
@@ -275,9 +295,21 @@ mod tests {
     fn pastel_collision_avoids_existing_customs() {
         // Pre-existing custom colors at fixed hues
         let existing = vec![
-            LabelColor::Custom { r: 255, g: 100, b: 100 }, // reddish
-            LabelColor::Custom { r: 100, g: 255, b: 100 }, // greenish
-            LabelColor::Custom { r: 100, g: 100, b: 255 }, // bluish
+            LabelColor::Custom {
+                r: 255,
+                g: 100,
+                b: 100,
+            }, // reddish
+            LabelColor::Custom {
+                r: 100,
+                g: 255,
+                b: 100,
+            }, // greenish
+            LabelColor::Custom {
+                r: 100,
+                g: 100,
+                b: 255,
+            }, // bluish
         ];
         let new = LabelColor::generate_pastel(&existing);
         let new_h = match new {
@@ -296,8 +328,12 @@ mod tests {
     #[test]
     fn pastel_seven_existing_returns_distinct() {
         let existing = vec![
-            LabelColor::Red, LabelColor::Orange, LabelColor::Yellow,
-            LabelColor::Green, LabelColor::Blue, LabelColor::Purple,
+            LabelColor::Red,
+            LabelColor::Orange,
+            LabelColor::Yellow,
+            LabelColor::Green,
+            LabelColor::Blue,
+            LabelColor::Purple,
             LabelColor::Pink,
         ];
         let new = LabelColor::generate_pastel(&existing);

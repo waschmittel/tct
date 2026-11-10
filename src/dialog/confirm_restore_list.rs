@@ -17,13 +17,7 @@ pub struct ConfirmRestoreList {
 }
 
 impl Dialog for ConfirmRestoreList {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        _board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, _board: Option<&LoadedBoard>, _accent: Color) {
         let name = self.list.name.as_str();
         super::common::render_confirm(
             frame,
@@ -52,10 +46,11 @@ impl Dialog for ConfirmRestoreList {
                 if lists.is_empty() {
                     out = out.with_close();
                 } else {
-                    out.follow = super::Follow::Open(Box::new(super::archived_lists::ArchivedLists {
-                        lists,
-                        selected,
-                    }));
+                    out.follow =
+                        super::Follow::Open(Box::new(super::archived_lists::ArchivedLists {
+                            lists,
+                            selected,
+                        }));
                 }
                 out
             }

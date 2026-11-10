@@ -16,13 +16,7 @@ pub struct ConfirmArchiveBoard {
 }
 
 impl Dialog for ConfirmArchiveBoard {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        _board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, _board: Option<&LoadedBoard>, _accent: Color) {
         super::common::render_confirm(
             frame,
             area,

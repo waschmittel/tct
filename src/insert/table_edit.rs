@@ -18,8 +18,7 @@ type Area = TextArea<'static>;
 const END: usize = usize::MAX;
 
 /// Hint shown while the `Ctrl+T` chord waits for its key.
-pub const CHORD_HINT: &str =
-    "Table: r/c add row/column after, R/C before, x/X delete row/column, arrows swap, a align, T delete table";
+pub const CHORD_HINT: &str = "Table: r/c add row/column after, R/C before, x/X delete row/column, arrows swap, a align, T delete table";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TableOp {
@@ -107,7 +106,10 @@ fn span_at(lines: &[String], row: usize) -> Option<Span> {
         end += 1;
     }
     let delimiter = (first + 1..=end).find(|&i| delimiter_aligns(&lines[i]).is_some())?;
-    (row >= delimiter - 1).then_some(Span { start: delimiter - 1, end })
+    (row >= delimiter - 1).then_some(Span {
+        start: delimiter - 1,
+        end,
+    })
 }
 
 /// A table with the cursor in it.
@@ -135,7 +137,13 @@ fn context(ta: &Area) -> Option<Context> {
     let line = row - span.start;
     let (cell, off) = locate(&lines[row], col);
     let off = if line == 1 { 0 } else { off };
-    Some(Context { span, cell: cell.min(table.cols() - 1), table, line, off })
+    Some(Context {
+        span,
+        cell: cell.min(table.cols() - 1),
+        table,
+        line,
+        off,
+    })
 }
 
 pub(crate) fn in_table(ta: &Area) -> bool {
@@ -184,7 +192,10 @@ struct Target {
 fn put(ta: &mut Area, span: Span, table: &Table, target: Target) -> Span {
     let rendered = table.render();
     replace_lines(ta, span, &rendered.lines);
-    let new_span = Span { start: span.start, end: span.start + rendered.lines.len() - 1 };
+    let new_span = Span {
+        start: span.start,
+        end: span.start + rendered.lines.len() - 1,
+    };
     let starts = &rendered.text_starts[target.line];
     let cell = target.cell.min(starts.len() - 1);
     let text_len = if target.line == 1 {
@@ -193,7 +204,10 @@ fn put(ta: &mut Area, span: Span, table: &Table, target: Target) -> Span {
         table.rows[row_of_line(target.line)][cell].chars().count()
     };
     let col = starts[cell] + target.off.min(text_len);
-    ta.move_cursor(CursorMove::Jump((new_span.start + target.line) as u16, col as u16));
+    ta.move_cursor(CursorMove::Jump(
+        (new_span.start + target.line) as u16,
+        col as u16,
+    ));
     new_span
 }
 
@@ -285,7 +299,16 @@ pub(crate) fn reformat_at_cursor(ta: &mut Area) -> bool {
             text.push_str(&" ".repeat(ctx.off - len));
         }
     }
-    put(ta, ctx.span, &ctx.table, Target { line: ctx.line, cell: ctx.cell, off: ctx.off });
+    put(
+        ta,
+        ctx.span,
+        &ctx.table,
+        Target {
+            line: ctx.line,
+            cell: ctx.cell,
+            off: ctx.off,
+        },
+    );
     true
 }
 
@@ -303,7 +326,16 @@ pub(crate) fn map_cell_text(ta: &mut Area, f: impl FnOnce(&str) -> Option<String
         return false;
     };
     ctx.table.rows[row][ctx.cell] = new;
-    put(ta, ctx.span, &ctx.table, Target { line: ctx.line, cell: ctx.cell, off: END });
+    put(
+        ta,
+        ctx.span,
+        &ctx.table,
+        Target {
+            line: ctx.line,
+            cell: ctx.cell,
+            off: END,
+        },
+    );
     true
 }
 
@@ -349,13 +381,31 @@ pub(crate) fn tab(ta: &mut Area, backwards: bool) -> bool {
             ctx.table.insert_row(last_row, true);
             (last_row + 1, 0)
         };
-        put(ta, ctx.span, &ctx.table, Target { line: line_of_row(row), cell, off: END });
+        put(
+            ta,
+            ctx.span,
+            &ctx.table,
+            Target {
+                line: line_of_row(row),
+                cell,
+                off: END,
+            },
+        );
     });
     true
 }
 
 fn leave_above(ta: &mut Area, span: Span, table: &Table) {
-    put(ta, span, table, Target { line: 0, cell: 0, off: END });
+    put(
+        ta,
+        span,
+        table,
+        Target {
+            line: 0,
+            cell: 0,
+            off: END,
+        },
+    );
     if span.start > 0 {
         let len = ta.lines()[span.start - 1].chars().count();
         ta.move_cursor(CursorMove::Jump((span.start - 1) as u16, len as u16));
@@ -370,9 +420,27 @@ pub(crate) fn enter(ta: &mut Area) -> bool {
         grouped(ta, None, |ta| {
             let row = ctx.row();
             if row + 1 < ctx.table.rows.len() {
-                put(ta, ctx.span, &ctx.table, Target { line: line_of_row(row + 1), cell: ctx.cell, off: END });
+                put(
+                    ta,
+                    ctx.span,
+                    &ctx.table,
+                    Target {
+                        line: line_of_row(row + 1),
+                        cell: ctx.cell,
+                        off: END,
+                    },
+                );
             } else {
-                let span = put(ta, ctx.span, &ctx.table, Target { line: ctx.line, cell: ctx.cell, off: END });
+                let span = put(
+                    ta,
+                    ctx.span,
+                    &ctx.table,
+                    Target {
+                        line: ctx.line,
+                        cell: ctx.cell,
+                        off: END,
+                    },
+                );
                 leave_below(ta, span);
             }
         });
@@ -401,7 +469,19 @@ fn header_to_table(ta: &mut Area) -> bool {
     let indent: String = chars.iter().take_while(|c| c.is_whitespace()).collect();
     let table = Table::from_header(&indent, header);
     grouped(ta, None, |ta| {
-        put(ta, Span { start: row, end: row }, &table, Target { line: 2, cell: 0, off: END });
+        put(
+            ta,
+            Span {
+                start: row,
+                end: row,
+            },
+            &table,
+            Target {
+                line: 2,
+                cell: 0,
+                off: END,
+            },
+        );
     });
     true
 }
@@ -423,12 +503,18 @@ pub(crate) fn insert_skeleton(ta: &mut Area) {
             ta.move_cursor(CursorMove::Jump(row as u16, 0));
             row
         } else {
-            ta.move_cursor(CursorMove::Jump(row as u16, lines[row].chars().count() as u16));
+            ta.move_cursor(CursorMove::Jump(
+                row as u16,
+                lines[row].chars().count() as u16,
+            ));
             text.insert_str(0, "\n\n");
             row + 2
         };
         ta.insert_str(text);
-        ta.move_cursor(CursorMove::Jump(table_row as u16, rendered.text_starts[0][0] as u16));
+        ta.move_cursor(CursorMove::Jump(
+            table_row as u16,
+            rendered.text_starts[0][0] as u16,
+        ));
     });
 }
 
@@ -464,9 +550,21 @@ pub(crate) fn run_op(ta: &mut Area, op: TableOp) -> Option<String> {
             }
             Edit::Place(n) => {
                 let target = match (moves_row, op) {
-                    (true, _) => Target { line: line_of_row(n), cell, off: END },
-                    (false, TableOp::CycleAlign) => Target { line: ctx.line, cell, off: ctx.off },
-                    (false, _) => Target { line: ctx.line, cell: n, off: END },
+                    (true, _) => Target {
+                        line: line_of_row(n),
+                        cell,
+                        off: END,
+                    },
+                    (false, TableOp::CycleAlign) => Target {
+                        line: ctx.line,
+                        cell,
+                        off: ctx.off,
+                    },
+                    (false, _) => Target {
+                        line: ctx.line,
+                        cell: n,
+                        off: END,
+                    },
                 };
                 put(ta, ctx.span, &ctx.table, target);
                 None
@@ -484,12 +582,14 @@ fn remove_table(ta: &mut Area, span: Span) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::insert::markdown_editor::MarkdownEditor;
     use crate::insert::InsertHandler;
+    use crate::insert::markdown_editor::MarkdownEditor;
 
     fn editor(text: &str, row: usize, col: usize) -> MarkdownEditor {
         let mut e = MarkdownEditor::new("card1".into(), text);
-        e.input.textarea.move_cursor(CursorMove::Jump(row as u16, col as u16));
+        e.input
+            .textarea
+            .move_cursor(CursorMove::Jump(row as u16, col as u16));
         e
     }
 
@@ -599,7 +699,12 @@ mod tests {
         press(&mut e, KeyCode::Tab);
         assert_eq!(
             lines(&e),
-            ["|  a  |  b  |", "| --- | --- |", "| 1   | 2   |", "|     |     |"]
+            [
+                "|  a  |  b  |",
+                "| --- | --- |",
+                "| 1   | 2   |",
+                "|     |     |"
+            ]
         );
         assert_eq!(cursor(&e), (3, 2));
     }
@@ -627,7 +732,16 @@ mod tests {
     fn enter_in_the_last_row_leaves_the_table_downwards() {
         let mut e = editor(T, 2, 3);
         press(&mut e, KeyCode::Enter);
-        assert_eq!(lines(&e), [&"|  a  |  b  |"[..], "| --- | --- |", "| 1   | 2   |", "", ""]);
+        assert_eq!(
+            lines(&e),
+            [
+                &"|  a  |  b  |"[..],
+                "| --- | --- |",
+                "| 1   | 2   |",
+                "",
+                ""
+            ]
+        );
         assert_eq!(cursor(&e), (4, 0));
 
         let mut e = editor(&format!("{T}\nafter"), 2, 3);
@@ -660,7 +774,15 @@ mod tests {
         key(&mut e, KeyCode::Char('t'), KeyModifiers::CONTROL);
         assert_eq!(
             lines(&e),
-            ["intro", "", "|     |     |", "| --- | --- |", "|     |     |", "", "after"]
+            [
+                "intro",
+                "",
+                "|     |     |",
+                "| --- | --- |",
+                "|     |     |",
+                "",
+                "after"
+            ]
         );
         assert_eq!(cursor(&e), (2, 3));
 
@@ -725,9 +847,17 @@ mod tests {
     #[test]
     fn alt_arrows_swap_and_alt_shift_arrows_add_and_delete() {
         let mut e = editor(T, 0, 3);
-        key(&mut e, KeyCode::Right, KeyModifiers::ALT | KeyModifiers::SHIFT);
+        key(
+            &mut e,
+            KeyCode::Right,
+            KeyModifiers::ALT | KeyModifiers::SHIFT,
+        );
         assert_eq!(lines(&e)[0], "|  a  |     |  b  |");
-        key(&mut e, KeyCode::Left, KeyModifiers::ALT | KeyModifiers::SHIFT);
+        key(
+            &mut e,
+            KeyCode::Left,
+            KeyModifiers::ALT | KeyModifiers::SHIFT,
+        );
         assert_eq!(lines(&e)[0], "|  a  |  b  |");
         let mut e = editor(T, 0, 3);
         key(&mut e, KeyCode::Right, KeyModifiers::ALT);
@@ -746,7 +876,10 @@ mod tests {
         let mut e = editor(T, 0, 3);
         key(&mut e, KeyCode::Char('t'), KeyModifiers::CONTROL);
         let out = e.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::empty()), None);
-        assert!(matches!(out, crate::insert::InsertOutcome::StayWithStatus(None)));
+        assert!(matches!(
+            out,
+            crate::insert::InsertOutcome::StayWithStatus(None)
+        ));
         type_str(&mut e, "z");
         assert_eq!(lines(&e)[0], "| az  |  b  |");
     }

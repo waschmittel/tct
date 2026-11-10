@@ -9,8 +9,8 @@
 //! dialogs (timestamps) — both would churn snapshots.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::backend::TestBackend;
 use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 
 use crate::app::{App, AppMode};
 use crate::model::card::{Card, ChecklistItem};
@@ -42,7 +42,9 @@ fn render_to_string(app: &App) -> String {
 fn render_to_string_sized(app: &App, width: u16, height: u16) -> String {
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend).unwrap();
-    terminal.draw(|frame| crate::ui::render(frame, app)).unwrap();
+    terminal
+        .draw(|frame| crate::ui::render(frame, app))
+        .unwrap();
     buffer_to_string(terminal.backend().buffer())
 }
 
@@ -68,9 +70,18 @@ fn seed_demo_board() -> BoardId {
     c1.description = "Token expires too early.\n\n- check refresh\n- add test".into();
     c1.label_ids.push(label_id);
     c1.checklist = vec![
-        ChecklistItem { text: "Reproduce".into(), completed: true },
-        ChecklistItem { text: "Write failing test".into(), completed: false },
-        ChecklistItem { text: "Fix".into(), completed: false },
+        ChecklistItem {
+            text: "Reproduce".into(),
+            completed: true,
+        },
+        ChecklistItem {
+            text: "Write failing test".into(),
+            completed: false,
+        },
+        ChecklistItem {
+            text: "Fix".into(),
+            completed: false,
+        },
     ];
     let c2 = Card::new("Redesign dashboard".into());
     let c3 = Card::new("Ship release notes".into());
@@ -376,7 +387,6 @@ fn snapshot_description_editor_scrollbar() {
     });
 }
 
-
 #[test]
 fn snapshot_description_editor() {
     with_temp_dir(|| {
@@ -491,7 +501,10 @@ fn snapshot_card_detail_multiline_quote() {
     with_temp_dir(|| {
         let id = seed_demo_board();
         let mut app = App::new(Some(id)).unwrap();
-        set_description(&mut app, "Intro.\n\n>>>\nA multiline quote with a line long enough to wrap across the popup and show that wrapped lines get no indent.\n\nSecond paragraph.\n>>>\n\nAfter.");
+        set_description(
+            &mut app,
+            "Intro.\n\n>>>\nA multiline quote with a line long enough to wrap across the popup and show that wrapped lines get no indent.\n\nSecond paragraph.\n>>>\n\nAfter.",
+        );
         press(&mut app, KeyCode::Enter);
         assert_eq!(app.mode, AppMode::CardDetail);
         insta::assert_snapshot!(render_to_string(&app));
@@ -678,7 +691,9 @@ fn linux_tty_render_has_no_rgb_and_visible_selection() {
 
         let backend = TestBackend::new(WIDTH, HEIGHT);
         let mut terminal = Terminal::new(backend).unwrap();
-        terminal.draw(|frame| crate::ui::render(frame, &app)).unwrap();
+        terminal
+            .draw(|frame| crate::ui::render(frame, &app))
+            .unwrap();
         let buffer = terminal.backend().buffer();
 
         use ratatui::style::Color;
@@ -692,7 +707,10 @@ fn linux_tty_render_has_no_rgb_and_visible_selection() {
                 selection_bg_cells += 1;
             }
         }
-        assert!(selection_bg_cells > 0, "selected card background not visible");
+        assert!(
+            selection_bg_cells > 0,
+            "selected card background not visible"
+        );
     });
 }
 
@@ -996,8 +1014,6 @@ fn snapshot_archived_cards_dialog() {
 /// between keys and description, in a popup no taller than its rows.
 #[test]
 fn dialog_help_pages_are_compact_and_unwrapped() {
-    use crate::model::board::BoardMeta;
-    use crate::model::list::CardList;
     use crate::dialog::{
         Dialog, archived_boards::ArchivedBoards, archived_cards::ArchivedCards,
         archived_lists::ArchivedLists, card_history::CardHistory,
@@ -1007,6 +1023,8 @@ fn dialog_help_pages_are_compact_and_unwrapped() {
         confirm_restore_list::ConfirmRestoreList, label_manager::LabelManager,
         label_picker::LabelPicker,
     };
+    use crate::model::board::BoardMeta;
+    use crate::model::list::CardList;
     with_temp_dir(|| {
         let id = seed_demo_board();
         let dialogs: Vec<Box<dyn Dialog>> = vec![
@@ -1031,10 +1049,22 @@ fn dialog_help_pages_are_compact_and_unwrapped() {
             }),
             Box::new(CardHistory::new()),
             Box::new(LabelPicker { selected_idx: 0 }),
-            Box::new(LabelManager { selected_idx: 0, from_picker: false }),
-            Box::new(ArchivedCards { cards: vec![], selected: 0 }),
-            Box::new(ArchivedLists { lists: vec![], selected: 0 }),
-            Box::new(ArchivedBoards { boards: vec![], selected: 0 }),
+            Box::new(LabelManager {
+                selected_idx: 0,
+                from_picker: false,
+            }),
+            Box::new(ArchivedCards {
+                cards: vec![],
+                selected: 0,
+            }),
+            Box::new(ArchivedLists {
+                lists: vec![],
+                selected: 0,
+            }),
+            Box::new(ArchivedBoards {
+                boards: vec![],
+                selected: 0,
+            }),
         ];
         for dialog in dialogs {
             let help = dialog.help().expect("dialog has a help page");
@@ -1046,17 +1076,27 @@ fn dialog_help_pages_are_compact_and_unwrapped() {
             let text = render_to_string(&app);
 
             for (keys, desc) in &help.rows {
-                let line = text
-                    .lines()
-                    .find(|l| l.contains(desc))
-                    .unwrap_or_else(|| panic!("{}: '{desc}' wrapped or missing\n{text}", help.title));
-                let k = line.find(keys).unwrap_or_else(|| panic!("{}: '{keys}' missing", help.title));
+                let line = text.lines().find(|l| l.contains(desc)).unwrap_or_else(|| {
+                    panic!("{}: '{desc}' wrapped or missing\n{text}", help.title)
+                });
+                let k = line
+                    .find(keys)
+                    .unwrap_or_else(|| panic!("{}: '{keys}' missing", help.title));
                 let gap = &line[k + keys.len()..line.find(desc).unwrap()];
-                assert!(gap.starts_with("  "), "{}: keys crowd '{desc}'\n{text}", help.title);
+                assert!(
+                    gap.starts_with("  "),
+                    "{}: keys crowd '{desc}'\n{text}",
+                    help.title
+                );
             }
             let top = text.lines().position(|l| l.contains(help.title)).unwrap();
             let bottom = text.lines().position(|l| l.contains("Esc:close")).unwrap();
-            assert_eq!(bottom - top, help.rows.len() + 2, "{}: popup height", help.title);
+            assert_eq!(
+                bottom - top,
+                help.rows.len() + 2,
+                "{}: popup height",
+                help.title
+            );
         }
     });
 }
@@ -1086,18 +1126,33 @@ fn card_detail_shows_date_stamps_in_accent_color() {
         press(&mut app, KeyCode::Char('d'));
         let text = render_to_string(&app);
         let rows: Vec<&str> = text.lines().collect();
-        let top = rows.iter().find(|r| r.contains("┌ Fix login flow")).expect("popup top");
+        let top = rows
+            .iter()
+            .find(|r| r.contains("┌ Fix login flow"))
+            .expect("popup top");
         assert!(top.contains("2021-03-04"), "{text}");
         // The board card behind the popup carries a stamp too: the popup's is lowest.
-        let bottom = rows.iter().rev().find(|r| r.contains("2020-01-02")).expect("created stamp");
-        assert!(top.contains(" 2021-03-04 ┐") && bottom.contains(" 2020-01-02 ┘"), "{text}");
+        let bottom = rows
+            .iter()
+            .rev()
+            .find(|r| r.contains("2020-01-02"))
+            .expect("created stamp");
+        assert!(
+            top.contains(" 2021-03-04 ┐") && bottom.contains(" 2020-01-02 ┘"),
+            "{text}"
+        );
 
         let backend = TestBackend::new(WIDTH, HEIGHT);
         let mut terminal = Terminal::new(backend).unwrap();
-        terminal.draw(|frame| crate::ui::render(frame, &app)).unwrap();
+        terminal
+            .draw(|frame| crate::ui::render(frame, &app))
+            .unwrap();
         let buf = terminal.backend().buffer();
         let y = rows.iter().rposition(|r| r.contains("2020-01-02")).unwrap() as u16;
-        let x = rows[y as usize].find("2020-01-02").map(|b| rows[y as usize][..b].chars().count()).unwrap() as u16;
+        let x = rows[y as usize]
+            .find("2020-01-02")
+            .map(|b| rows[y as usize][..b].chars().count())
+            .unwrap() as u16;
         assert_eq!(buf[(x, y)].fg, app.accent_color());
     });
 }
@@ -1106,7 +1161,9 @@ fn seed_long_list_board() -> BoardId {
     let mut meta = crate::model::board::BoardMeta::new("Long".into());
     board_store::save_board(&meta).unwrap();
     let list = crate::test_support::add_list(&mut meta, "Backlog");
-    let mut cards: Vec<Card> = (1..=12).map(|i| Card::new(format!("Card {i:02}"))).collect();
+    let mut cards: Vec<Card> = (1..=12)
+        .map(|i| Card::new(format!("Card {i:02}")))
+        .collect();
     crate::test_support::put_cards(&meta.id, &list, &mut cards);
     meta.id
 }
@@ -1303,9 +1360,13 @@ fn scroll_thumb_uses_accent_on_the_selected_list_and_gray_on_others() {
         board_store::save_board(&meta).unwrap();
         let long = crate::test_support::add_list(&mut meta, "Long");
         let other = crate::test_support::add_list(&mut meta, "Other");
-        let mut cards: Vec<Card> = (1..=12).map(|i| Card::new(format!("Card {i:02}"))).collect();
+        let mut cards: Vec<Card> = (1..=12)
+            .map(|i| Card::new(format!("Card {i:02}")))
+            .collect();
         crate::test_support::put_cards(&meta.id, &long, &mut cards);
-        let mut more: Vec<Card> = (1..=12).map(|i| Card::new(format!("Other {i:02}"))).collect();
+        let mut more: Vec<Card> = (1..=12)
+            .map(|i| Card::new(format!("Other {i:02}")))
+            .collect();
         crate::test_support::put_cards(&meta.id, &other, &mut more);
 
         let app = App::new(Some(meta.id.clone())).unwrap();
@@ -1319,7 +1380,10 @@ fn scroll_thumb_uses_accent_on_the_selected_list_and_gray_on_others() {
                 .map(|(x, y)| buf[(x, y)].fg)
         };
         assert_eq!(thumb_fg(0, WIDTH / 2), Some(app.accent_color()));
-        assert_eq!(thumb_fg(WIDTH / 2, WIDTH), Some(ratatui::style::Color::Gray));
+        assert_eq!(
+            thumb_fg(WIDTH / 2, WIDTH),
+            Some(ratatui::style::Color::Gray)
+        );
     });
 }
 
@@ -1330,19 +1394,30 @@ fn dialogs_from_card_detail_keep_the_detail_visible() {
         let id = seed_demo_board();
         let mut app = App::new(Some(id)).unwrap();
         let card_id = app.board().unwrap().current_card_id().unwrap().clone();
-        app.board_mut().unwrap().cards.get_mut(&card_id).unwrap().due_date =
-            Some(chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap());
+        app.board_mut()
+            .unwrap()
+            .cards
+            .get_mut(&card_id)
+            .unwrap()
+            .due_date = Some(chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap());
         press(&mut app, KeyCode::Enter);
         assert_eq!(app.mode, AppMode::CardDetail);
 
         // (The history dialog is large enough to cover the description.)
         for (key, dialog_text) in [('U', "Clear due date of"), ('l', "Labels")] {
-            let shift = if key.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+            let shift = if key.is_ascii_uppercase() {
+                KeyModifiers::SHIFT
+            } else {
+                KeyModifiers::NONE
+            };
             crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char(key), shift)).unwrap();
             assert_eq!(app.mode, AppMode::Dialog, "{key}");
             let text = render_to_string(&app);
             assert!(text.contains(dialog_text), "{key}: dialog missing\n{text}");
-            assert!(text.contains("Token expires too early."), "{key}: detail hidden\n{text}");
+            assert!(
+                text.contains("Token expires too early."),
+                "{key}: detail hidden\n{text}"
+            );
             press(&mut app, KeyCode::Esc);
             assert_eq!(app.mode, AppMode::CardDetail);
         }
@@ -1382,8 +1457,13 @@ fn help_from_card_detail_keeps_the_detail_visible() {
         press(&mut app, KeyCode::Char('?'));
         assert_eq!(app.mode, AppMode::Help);
         let text = render_to_string(&app);
-        assert!(text.contains("Help —") && text.contains("Fix login flow"), "{text}");
-        assert!(text.contains("Labels"), "dialog hidden under its help\n{text}");
-
+        assert!(
+            text.contains("Help —") && text.contains("Fix login flow"),
+            "{text}"
+        );
+        assert!(
+            text.contains("Labels"),
+            "dialog hidden under its help\n{text}"
+        );
     });
 }

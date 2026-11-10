@@ -6,13 +6,13 @@ use std::collections::HashMap;
 
 use chrono::Utc;
 
-use crate::{errln, outln};
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
 use crate::model::id::{BoardId, CardId};
 use crate::model::label::{Label, LabelColor};
 use crate::model::list::CardList;
 use crate::storage::{board_store, card_store};
+use crate::{errln, outln};
 
 // ── Argument parsing ──────────────────────────────────────────────────────────
 
@@ -106,7 +106,8 @@ pub(super) fn print_card_line(idx: usize, card: &Card, labels: &[Label]) {
     };
     outln!(
         "    {idx}. [{}]  {}{label_str}{due_str}{checklist_str}",
-        card.id, card.title
+        card.id,
+        card.title
     );
 }
 

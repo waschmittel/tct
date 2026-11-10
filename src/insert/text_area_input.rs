@@ -51,10 +51,16 @@ mod tests {
             input.textarea.move_cursor(tui_textarea::CursorMove::End);
         }
         let mut terminal = Terminal::new(TestBackend::new(width + 1, 4)).unwrap();
-        terminal.draw(|f| f.render_widget(&input.textarea, f.area())).unwrap();
+        terminal
+            .draw(|f| f.render_widget(&input.textarea, f.area()))
+            .unwrap();
         let buf = terminal.backend().buffer().clone();
         (0..4)
-            .map(|y| (0..width + 1).map(|x| buf[(x, y)].symbol().to_string()).collect::<String>())
+            .map(|y| {
+                (0..width + 1)
+                    .map(|x| buf[(x, y)].symbol().to_string())
+                    .collect::<String>()
+            })
             .collect()
     }
 
@@ -128,7 +134,9 @@ mod tests {
     fn cursor_navigation_and_typing_work_on_indented_rows() {
         let mut input = TextAreaInput::from_initial("- aaa bbb ccc ddd");
         let mut terminal = Terminal::new(TestBackend::new(11, 4)).unwrap();
-        terminal.draw(|f| f.render_widget(&input.textarea, f.area())).unwrap();
+        terminal
+            .draw(|f| f.render_widget(&input.textarea, f.area()))
+            .unwrap();
         // Cursor starts at (0,0); move down one visual row, then to its end.
         input.textarea.move_cursor(tui_textarea::CursorMove::Down);
         input.textarea.move_cursor(tui_textarea::CursorMove::End);
@@ -136,21 +144,29 @@ mod tests {
         input.textarea.move_cursor(tui_textarea::CursorMove::Up);
         input.textarea.insert_char('X');
         assert!(input.current_text().starts_with("- aaa bbb"));
-        assert_eq!(input.current_text().chars().filter(|c| *c == 'X').count(), 1);
+        assert_eq!(
+            input.current_text().chars().filter(|c| *c == 'X').count(),
+            1
+        );
     }
 
     #[test]
     fn cursor_navigation_and_typing_work_on_citation_indented_rows() {
         let mut input = TextAreaInput::from_initial("> aaa bbb ccc ddd");
         let mut terminal = Terminal::new(TestBackend::new(11, 4)).unwrap();
-        terminal.draw(|f| f.render_widget(&input.textarea, f.area())).unwrap();
+        terminal
+            .draw(|f| f.render_widget(&input.textarea, f.area()))
+            .unwrap();
         input.textarea.move_cursor(tui_textarea::CursorMove::Down);
         input.textarea.move_cursor(tui_textarea::CursorMove::End);
         assert_eq!(input.textarea.cursor(), (0, 17));
         input.textarea.move_cursor(tui_textarea::CursorMove::Up);
         input.textarea.insert_char('X');
         assert!(input.current_text().starts_with("> aaa bbb"));
-        assert_eq!(input.current_text().chars().filter(|c| *c == 'X').count(), 1);
+        assert_eq!(
+            input.current_text().chars().filter(|c| *c == 'X').count(),
+            1
+        );
     }
 
     #[test]

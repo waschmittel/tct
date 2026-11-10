@@ -12,19 +12,8 @@ use crate::app::LoadedBoard;
 pub struct ConfirmCancelEdit;
 
 impl Dialog for ConfirmCancelEdit {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        _board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
-        super::common::render_confirm(
-            frame,
-            area,
-            "Discard Changes",
-            "Discard unsaved changes?",
-        );
+    fn render(&self, frame: &mut Frame, area: Rect, _board: Option<&LoadedBoard>, _accent: Color) {
+        super::common::render_confirm(frame, area, "Discard Changes", "Discard unsaved changes?");
     }
 
     fn handle_key(&mut self, key: KeyEvent, _board: Option<&LoadedBoard>) -> DialogOutcome {

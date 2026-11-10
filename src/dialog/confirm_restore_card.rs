@@ -16,13 +16,7 @@ pub struct ConfirmRestoreCard {
 }
 
 impl Dialog for ConfirmRestoreCard {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        _board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, _board: Option<&LoadedBoard>, _accent: Color) {
         let name = self.card.title.as_str();
         super::common::render_confirm(frame, area, "Restore Card", &format!("Restore '{name}'?"));
     }
@@ -47,10 +41,11 @@ impl Dialog for ConfirmRestoreCard {
                 if cards.is_empty() {
                     out = out.with_close();
                 } else {
-                    out.follow = super::Follow::Open(Box::new(super::archived_cards::ArchivedCards {
-                        cards,
-                        selected,
-                    }));
+                    out.follow =
+                        super::Follow::Open(Box::new(super::archived_cards::ArchivedCards {
+                            cards,
+                            selected,
+                        }));
                 }
                 out
             }

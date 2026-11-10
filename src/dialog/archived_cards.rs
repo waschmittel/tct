@@ -18,13 +18,7 @@ pub struct ArchivedCards {
 }
 
 impl Dialog for ArchivedCards {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        _board: Option<&LoadedBoard>,
-        accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, _board: Option<&LoadedBoard>, accent: Color) {
         let height = (self.cards.len() as u16 + 4)
             .min(area.height.saturating_sub(4))
             .max(6);
@@ -96,9 +90,9 @@ impl Dialog for ArchivedCards {
                 if self.selected > 0 && self.selected >= self.cards.len() {
                     self.selected = self.cards.len().saturating_sub(1);
                 }
-                let mut out = DialogOutcome::side_effect(
-                    DialogSideEffect::DeleteArchivedCard { card_id: card.id },
-                )
+                let mut out = DialogOutcome::side_effect(DialogSideEffect::DeleteArchivedCard {
+                    card_id: card.id,
+                })
                 .with_status(format!("Deleted card '{title}'"));
                 if self.cards.is_empty() {
                     out = out.with_close();

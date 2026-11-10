@@ -7,7 +7,7 @@ use crate::dialog::{
     label_manager::LabelManager, label_picker::LabelPicker,
 };
 use crate::insert::{
-    date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor, InsertSurface,
+    InsertSurface, date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor,
 };
 
 use super::keymap::{self, Binding};
@@ -46,38 +46,234 @@ pub enum Action {
 /// help overlay renders from this table.
 pub static KEYMAP: &[Binding<Action>] = &[
     // Card
-    Binding { code: KeyCode::Char('t'), shift: None, action: Action::EditTitle, keys: "t", help: "Edit title", section: "Card" },
-    Binding { code: KeyCode::Char('e'), shift: None, action: Action::EditDescription, keys: "e", help: "Edit description", section: "Card" },
-    Binding { code: KeyCode::PageUp, shift: None, action: Action::ScrollUp, keys: "PgUp/PgDn ←/→", help: "Scroll description", section: "Card" },
-    Binding { code: KeyCode::PageDown, shift: None, action: Action::ScrollDown, keys: "PgUp/PgDn ←/→", help: "Scroll description", section: "Card" },
-    Binding { code: KeyCode::Left, shift: None, action: Action::ScrollUp, keys: "PgUp/PgDn ←/→", help: "Scroll description", section: "Card" },
-    Binding { code: KeyCode::Right, shift: None, action: Action::ScrollDown, keys: "PgUp/PgDn ←/→", help: "Scroll description", section: "Card" },
-    Binding { code: KeyCode::Char('y'), shift: None, action: Action::CopyDescription, keys: "y", help: "Copy description", section: "Card" },
-    Binding { code: KeyCode::Char('Y'), shift: None, action: Action::CopyChecklist, keys: "Y", help: "Copy checklist (md)", section: "Card" },
-    Binding { code: KeyCode::Char('h'), shift: None, action: Action::HistoryDialog, keys: "h", help: "View change history", section: "Card" },
-    Binding { code: KeyCode::Char('p'), shift: None, action: Action::ExportPdf, keys: "p", help: "Export as PDF", section: "Card" },
-    Binding { code: KeyCode::Char('P'), shift: None, action: Action::ExportPdfColor, keys: "P", help: "Export as color PDF", section: "Card" },
+    Binding {
+        code: KeyCode::Char('t'),
+        shift: None,
+        action: Action::EditTitle,
+        keys: "t",
+        help: "Edit title",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('e'),
+        shift: None,
+        action: Action::EditDescription,
+        keys: "e",
+        help: "Edit description",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::PageUp,
+        shift: None,
+        action: Action::ScrollUp,
+        keys: "PgUp/PgDn ←/→",
+        help: "Scroll description",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::PageDown,
+        shift: None,
+        action: Action::ScrollDown,
+        keys: "PgUp/PgDn ←/→",
+        help: "Scroll description",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Left,
+        shift: None,
+        action: Action::ScrollUp,
+        keys: "PgUp/PgDn ←/→",
+        help: "Scroll description",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Right,
+        shift: None,
+        action: Action::ScrollDown,
+        keys: "PgUp/PgDn ←/→",
+        help: "Scroll description",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('y'),
+        shift: None,
+        action: Action::CopyDescription,
+        keys: "y",
+        help: "Copy description",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('Y'),
+        shift: None,
+        action: Action::CopyChecklist,
+        keys: "Y",
+        help: "Copy checklist (md)",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('h'),
+        shift: None,
+        action: Action::HistoryDialog,
+        keys: "h",
+        help: "View change history",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('p'),
+        shift: None,
+        action: Action::ExportPdf,
+        keys: "p",
+        help: "Export as PDF",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('P'),
+        shift: None,
+        action: Action::ExportPdfColor,
+        keys: "P",
+        help: "Export as color PDF",
+        section: "Card",
+    },
     // Checklist
-    Binding { code: KeyCode::Up, shift: Some(false), action: Action::ItemUp, keys: "Up / Down", help: "Navigate items", section: "Checklist" },
-    Binding { code: KeyCode::Down, shift: Some(false), action: Action::ItemDown, keys: "Up / Down", help: "Navigate items", section: "Checklist" },
-    Binding { code: KeyCode::Up, shift: Some(true), action: Action::ReorderItemUp, keys: "Shift+Up/Down", help: "Reorder item", section: "Checklist" },
-    Binding { code: KeyCode::Down, shift: Some(true), action: Action::ReorderItemDown, keys: "Shift+Up/Down", help: "Reorder item", section: "Checklist" },
-    Binding { code: KeyCode::Char(' '), shift: None, action: Action::ToggleItem, keys: "Space", help: "Toggle item", section: "Checklist" },
-    Binding { code: KeyCode::Char('a'), shift: None, action: Action::AddItem, keys: "a", help: "Add item", section: "Checklist" },
-    Binding { code: KeyCode::Enter, shift: None, action: Action::EditItem, keys: "Enter", help: "Edit item", section: "Checklist" },
-    Binding { code: KeyCode::Char('x'), shift: None, action: Action::DeleteItem, keys: "x", help: "Delete item", section: "Checklist" },
+    Binding {
+        code: KeyCode::Up,
+        shift: Some(false),
+        action: Action::ItemUp,
+        keys: "Up / Down",
+        help: "Navigate items",
+        section: "Checklist",
+    },
+    Binding {
+        code: KeyCode::Down,
+        shift: Some(false),
+        action: Action::ItemDown,
+        keys: "Up / Down",
+        help: "Navigate items",
+        section: "Checklist",
+    },
+    Binding {
+        code: KeyCode::Up,
+        shift: Some(true),
+        action: Action::ReorderItemUp,
+        keys: "Shift+Up/Down",
+        help: "Reorder item",
+        section: "Checklist",
+    },
+    Binding {
+        code: KeyCode::Down,
+        shift: Some(true),
+        action: Action::ReorderItemDown,
+        keys: "Shift+Up/Down",
+        help: "Reorder item",
+        section: "Checklist",
+    },
+    Binding {
+        code: KeyCode::Char(' '),
+        shift: None,
+        action: Action::ToggleItem,
+        keys: "Space",
+        help: "Toggle item",
+        section: "Checklist",
+    },
+    Binding {
+        code: KeyCode::Char('a'),
+        shift: None,
+        action: Action::AddItem,
+        keys: "a",
+        help: "Add item",
+        section: "Checklist",
+    },
+    Binding {
+        code: KeyCode::Enter,
+        shift: None,
+        action: Action::EditItem,
+        keys: "Enter",
+        help: "Edit item",
+        section: "Checklist",
+    },
+    Binding {
+        code: KeyCode::Char('x'),
+        shift: None,
+        action: Action::DeleteItem,
+        keys: "x",
+        help: "Delete item",
+        section: "Checklist",
+    },
     // Labels & Due
-    Binding { code: KeyCode::Char('l'), shift: None, action: Action::AssignLabels, keys: "l", help: "Assign / remove labels", section: "Labels & Due" },
-    Binding { code: KeyCode::Char('L'), shift: None, action: Action::ManageLabels, keys: "L", help: "Manage labels", section: "Labels & Due" },
-    Binding { code: KeyCode::Char('u'), shift: None, action: Action::SetDueDate, keys: "u", help: "Set due date", section: "Labels & Due" },
-    Binding { code: KeyCode::Char('U'), shift: None, action: Action::ClearDueDate, keys: "U", help: "Clear due date", section: "Labels & Due" },
+    Binding {
+        code: KeyCode::Char('l'),
+        shift: None,
+        action: Action::AssignLabels,
+        keys: "l",
+        help: "Assign / remove labels",
+        section: "Labels & Due",
+    },
+    Binding {
+        code: KeyCode::Char('L'),
+        shift: None,
+        action: Action::ManageLabels,
+        keys: "L",
+        help: "Manage labels",
+        section: "Labels & Due",
+    },
+    Binding {
+        code: KeyCode::Char('u'),
+        shift: None,
+        action: Action::SetDueDate,
+        keys: "u",
+        help: "Set due date",
+        section: "Labels & Due",
+    },
+    Binding {
+        code: KeyCode::Char('U'),
+        shift: None,
+        action: Action::ClearDueDate,
+        keys: "U",
+        help: "Clear due date",
+        section: "Labels & Due",
+    },
     // View
-    Binding { code: KeyCode::Char('c'), shift: None, action: Action::ToggleCreatedDate, keys: "c", help: "Show/hide created date", section: "View" },
-    Binding { code: KeyCode::Char('d'), shift: None, action: Action::ToggleUpdatedDate, keys: "d", help: "Show/hide updated date", section: "View" },
+    Binding {
+        code: KeyCode::Char('c'),
+        shift: None,
+        action: Action::ToggleCreatedDate,
+        keys: "c",
+        help: "Show/hide created date",
+        section: "View",
+    },
+    Binding {
+        code: KeyCode::Char('d'),
+        shift: None,
+        action: Action::ToggleUpdatedDate,
+        keys: "d",
+        help: "Show/hide updated date",
+        section: "View",
+    },
     // App
-    Binding { code: KeyCode::Esc, shift: None, action: Action::Close, keys: "Esc", help: "Close", section: "App" },
-    Binding { code: KeyCode::Char('?'), shift: None, action: Action::Help, keys: "?", help: "Help", section: "App" },
-    Binding { code: KeyCode::Char('q'), shift: None, action: Action::Quit, keys: "q", help: "Quit", section: "App" },
+    Binding {
+        code: KeyCode::Esc,
+        shift: None,
+        action: Action::Close,
+        keys: "Esc",
+        help: "Close",
+        section: "App",
+    },
+    Binding {
+        code: KeyCode::Char('?'),
+        shift: None,
+        action: Action::Help,
+        keys: "?",
+        help: "Help",
+        section: "App",
+    },
+    Binding {
+        code: KeyCode::Char('q'),
+        shift: None,
+        action: Action::Quit,
+        keys: "q",
+        help: "Quit",
+        section: "App",
+    },
 ];
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
@@ -111,127 +307,149 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         Action::ReorderItemDown => {
             if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned()
-                && let Some(card) = board.cards.get(&card_id) {
-                    let ii = board.detail_item_idx;
-                    if ii + 1 < card.checklist.len() {
-                        app.apply(Command::ReorderChecklistItem {
-                            card_id,
-                            from: ii,
-                            to: ii + 1,
-                        })?;
-                    }
+                && let Some(card) = board.cards.get(&card_id)
+            {
+                let ii = board.detail_item_idx;
+                if ii + 1 < card.checklist.len() {
+                    app.apply(Command::ReorderChecklistItem {
+                        card_id,
+                        from: ii,
+                        to: ii + 1,
+                    })?;
                 }
+            }
         }
         Action::ReorderItemUp => {
             if let Some(board) = app.board()
-                && let Some(card_id) = board.current_card_id().cloned() {
-                    let ii = board.detail_item_idx;
-                    if ii > 0 {
-                        app.apply(Command::ReorderChecklistItem {
-                            card_id,
-                            from: ii,
-                            to: ii - 1,
-                        })?;
-                    }
+                && let Some(card_id) = board.current_card_id().cloned()
+            {
+                let ii = board.detail_item_idx;
+                if ii > 0 {
+                    app.apply(Command::ReorderChecklistItem {
+                        card_id,
+                        from: ii,
+                        to: ii - 1,
+                    })?;
                 }
+            }
         }
         Action::ToggleItem => {
             if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned()
-                && let Some(card) = board.cards.get(&card_id) {
-                    let ii = board.detail_item_idx;
-                    if ii < card.checklist.len() {
-                        app.apply(Command::ToggleChecklistItem { card_id, item_idx: ii })?;
-                    }
+                && let Some(card) = board.cards.get(&card_id)
+            {
+                let ii = board.detail_item_idx;
+                if ii < card.checklist.len() {
+                    app.apply(Command::ToggleChecklistItem {
+                        card_id,
+                        item_idx: ii,
+                    })?;
                 }
+            }
         }
         Action::AddItem => {
-            if let Some(card_id) =
-                app.board().and_then(|b| b.current_card_id().cloned())
-            {
+            if let Some(card_id) = app.board().and_then(|b| b.current_card_id().cloned()) {
                 app.start_insert(Box::new(line_editor::NewChecklistItem::new(card_id)));
             }
         }
         Action::DeleteItem => {
             if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned()
-                && let Some(card) = board.cards.get(&card_id) {
-                    let ii = board.detail_item_idx;
-                    if ii < card.checklist.len() {
-                        app.apply(Command::RemoveChecklistItem { card_id, item_idx: ii })?;
-                    }
+                && let Some(card) = board.cards.get(&card_id)
+            {
+                let ii = board.detail_item_idx;
+                if ii < card.checklist.len() {
+                    app.apply(Command::RemoveChecklistItem {
+                        card_id,
+                        item_idx: ii,
+                    })?;
                 }
+            }
         }
         Action::EditItem => {
             if let Some(board) = app.board()
                 && let Some(card_id) = board.current_card_id().cloned()
-                && let Some(card) = board.cards.get(&card_id) {
-                    let ii = board.detail_item_idx;
-                    if let Some(item) = card.checklist.get(ii) {
-                        let text = item.text.clone();
-                        app.start_insert(Box::new(line_editor::EditChecklistItem::new(
-                            card_id, ii, &text,
-                        )));
-                    }
+                && let Some(card) = board.cards.get(&card_id)
+            {
+                let ii = board.detail_item_idx;
+                if let Some(item) = card.checklist.get(ii) {
+                    let text = item.text.clone();
+                    app.start_insert(Box::new(line_editor::EditChecklistItem::new(
+                        card_id, ii, &text,
+                    )));
                 }
+            }
         }
         Action::EditDescription => {
             if let Some(board) = app.board()
-                && let Some(card) = board.current_card() {
-                    let desc = card.description.clone();
-                    let card_id = card.id.clone();
-                    app.start_insert(Box::new(MarkdownEditor::new(card_id, &desc)));
-                }
+                && let Some(card) = board.current_card()
+            {
+                let desc = card.description.clone();
+                let card_id = card.id.clone();
+                app.start_insert(Box::new(MarkdownEditor::new(card_id, &desc)));
+            }
         }
         Action::EditTitle => {
             if let Some(board) = app.board()
-                && let Some(card) = board.current_card() {
-                    let title = card.title.clone();
-                    let card_id = card.id.clone();
-                    app.start_insert(Box::new(line_editor::EditCardTitle::new(
-                        card_id, &title, false,
-                    )));
-                }
+                && let Some(card) = board.current_card()
+            {
+                let title = card.title.clone();
+                let card_id = card.id.clone();
+                app.start_insert(Box::new(line_editor::EditCardTitle::new(
+                    card_id, &title, false,
+                )));
+            }
         }
         Action::CopyDescription => {
             if let Some(board) = app.board()
-                && let Some(card) = board.current_card() {
-                    let desc = card.description.clone();
-                    let what = format!("description of '{}'", card.title);
-                    app.copy_to_clipboard(desc, &what);
-                }
+                && let Some(card) = board.current_card()
+            {
+                let desc = card.description.clone();
+                let what = format!("description of '{}'", card.title);
+                app.copy_to_clipboard(desc, &what);
+            }
         }
         Action::CopyChecklist => {
             if let Some(board) = app.board()
-                && let Some(card) = board.current_card() {
-                    if card.checklist.is_empty() {
-                        app.set_status("Checklist is empty".into());
-                    } else {
-                        let md = card.checklist_as_markdown();
-                        let what = format!("checklist of '{}'", card.title);
-                        app.copy_to_clipboard(md, &what);
-                    }
+                && let Some(card) = board.current_card()
+            {
+                if card.checklist.is_empty() {
+                    app.set_status("Checklist is empty".into());
+                } else {
+                    let md = card.checklist_as_markdown();
+                    let what = format!("checklist of '{}'", card.title);
+                    app.copy_to_clipboard(md, &what);
                 }
+            }
         }
         Action::AssignLabels => {
             if let Some(board) = app.board()
-                && board.current_card_id().is_some() {
-                    app.open_dialog(Box::new(LabelPicker { selected_idx: 0 }));
-                }
+                && board.current_card_id().is_some()
+            {
+                app.open_dialog(Box::new(LabelPicker { selected_idx: 0 }));
+            }
         }
         Action::ManageLabels => {
-            app.open_dialog(Box::new(LabelManager { selected_idx: 0, from_picker: false }));
+            app.open_dialog(Box::new(LabelManager {
+                selected_idx: 0,
+                from_picker: false,
+            }));
         }
         Action::SetDueDate => {
             if let Some(board) = app.board()
-                && let Some(card) = board.current_card() {
-                    let date_str = card
-                        .due_date
-                        .map(|d| d.format("%Y-%m-%d").to_string())
-                        .unwrap_or_default();
-                    let card_id = card.id.clone();
-                    app.start_insert(Box::new(DatePicker::new(card_id, &date_str, InsertSurface::CardDetail)));
-                }
+                && let Some(card) = board.current_card()
+            {
+                let date_str = card
+                    .due_date
+                    .map(|d| d.format("%Y-%m-%d").to_string())
+                    .unwrap_or_default();
+                let card_id = card.id.clone();
+                app.start_insert(Box::new(DatePicker::new(
+                    card_id,
+                    &date_str,
+                    InsertSurface::CardDetail,
+                )));
+            }
         }
         Action::ToggleCreatedDate => super::normal::toggle_created_date(app)?,
         Action::ToggleUpdatedDate => super::normal::toggle_updated_date(app)?,
@@ -244,9 +462,10 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         }
         Action::HistoryDialog => {
             if let Some(board) = app.board()
-                && board.current_card_id().is_some() {
-                    app.open_dialog(Box::new(CardHistory::new()));
-                }
+                && board.current_card_id().is_some()
+            {
+                app.open_dialog(Box::new(CardHistory::new()));
+            }
         }
         Action::ExportPdf => app.open_export_dialog(crate::export::Theme::Mono),
         Action::ExportPdfColor => app.open_export_dialog(crate::export::Theme::Color),
@@ -266,7 +485,7 @@ mod tests {
     use super::*;
     use crate::app::{App, AppMode};
     use crate::model::card::{Card, ChecklistItem};
-    
+
     use crate::storage::board_store;
     use crate::test_support::with_temp_dir;
 
@@ -275,11 +494,21 @@ mod tests {
         let list = crate::test_support::add_list(&mut meta, "To Do");
         let mut card = Card::new("Card".into());
         card.checklist = vec![
-            ChecklistItem { text: "a".into(), completed: false },
-            ChecklistItem { text: "b".into(), completed: false },
-            ChecklistItem { text: "c".into(), completed: false },
+            ChecklistItem {
+                text: "a".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "b".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "c".into(),
+                completed: false,
+            },
         ];
-        card.due_date = Some(chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap());        crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
+        card.due_date = Some(chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap());
+        crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
 
         let mut app = App::new(Some(meta.id)).unwrap();
         app.mode = AppMode::CardDetail;
@@ -382,8 +611,19 @@ mod tests {
             let mut app = setup_card_detail();
             press_shift(&mut app, KeyCode::Char('U'));
             assert!(matches!(app.mode, AppMode::Dialog));
-            assert!(app.board().unwrap().current_card().unwrap().due_date.is_some());
-            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty())).unwrap();
+            assert!(
+                app.board()
+                    .unwrap()
+                    .current_card()
+                    .unwrap()
+                    .due_date
+                    .is_some()
+            );
+            crate::input::handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty()),
+            )
+            .unwrap();
             let card = app.board().unwrap().current_card().unwrap();
             assert!(card.due_date.is_none());
             // Card history should include "Cleared due date"
@@ -396,9 +636,20 @@ mod tests {
         with_temp_dir(|| {
             let mut app = setup_card_detail();
             press_shift(&mut app, KeyCode::Char('U'));
-            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty())).unwrap();
+            crate::input::handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()),
+            )
+            .unwrap();
             assert!(matches!(app.mode, AppMode::CardDetail));
-            assert!(app.board().unwrap().current_card().unwrap().due_date.is_some());
+            assert!(
+                app.board()
+                    .unwrap()
+                    .current_card()
+                    .unwrap()
+                    .due_date
+                    .is_some()
+            );
         });
     }
 
@@ -456,15 +707,29 @@ mod tests {
             let mut app = setup_card_detail();
             press_shift(&mut app, KeyCode::Char('U'));
             let send = |app: &mut App, c| {
-                crate::input::handle_input(app, KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty())).unwrap()
+                crate::input::handle_input(
+                    app,
+                    KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()),
+                )
+                .unwrap()
             };
             send(&mut app, 'y');
-            assert_eq!(app.board().unwrap().current_card().unwrap().history.len(), 1);
+            assert_eq!(
+                app.board().unwrap().current_card().unwrap().history.len(),
+                1
+            );
             send(&mut app, 'h');
             send(&mut app, 'x');
             send(&mut app, 'y');
             assert!(matches!(app.mode, AppMode::Dialog));
-            assert!(app.board().unwrap().current_card().unwrap().history.is_empty());
+            assert!(
+                app.board()
+                    .unwrap()
+                    .current_card()
+                    .unwrap()
+                    .history
+                    .is_empty()
+            );
         });
     }
 
@@ -583,10 +848,7 @@ mod tests {
 }
 
 fn scroll_description(app: &mut App, step: usize, down: bool) {
-    let max_scroll = app
-        .board()
-        .map(|b| b.detail_max_scroll.get())
-        .unwrap_or(0);
+    let max_scroll = app.board().map(|b| b.detail_max_scroll.get()).unwrap_or(0);
     if let Some(editor) = &mut app.editor {
         editor.scroll_detail(step, down, max_scroll);
     }

@@ -125,7 +125,8 @@ pub fn toggle(ta: &mut Area, want: usize) {
     } else {
         let chars: Vec<char> = ta.lines()[row].chars().collect();
         let span = enclosing(&chars, col);
-        let edit = span.and_then(|(cs, ce)| toggle_range(&chars, cs, ce, want).map(|e| (e, cs, ce)));
+        let edit =
+            span.and_then(|(cs, ce)| toggle_range(&chars, cs, ce, want).map(|e| (e, cs, ce)));
         if let Some((edit, cs, ce)) = edit {
             apply(ta, row, &edit);
             let at = edit.content + col.clamp(cs, ce) - cs;
@@ -167,7 +168,10 @@ mod tests {
 
     #[test]
     fn selection_excludes_surrounding_whitespace() {
-        assert_eq!(run("one two three four", 3, 14, BOLD), "one **two three** four");
+        assert_eq!(
+            run("one two three four", 3, 14, BOLD),
+            "one **two three** four"
+        );
     }
 
     #[test]

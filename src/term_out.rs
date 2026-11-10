@@ -67,6 +67,9 @@ mod tests {
 
     #[test]
     fn keeps_ordinary_and_wide_text() {
-        assert_eq!(sanitize("Fix login bug — 日本語 🙂"), "Fix login bug — 日本語 🙂");
+        assert_eq!(
+            sanitize("Fix login bug — 日本語 🙂"),
+            "Fix login bug — 日本語 🙂"
+        );
     }
 }

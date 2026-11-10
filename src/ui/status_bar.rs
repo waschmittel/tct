@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 
 use crate::app::{App, AppMode};
 
@@ -33,7 +33,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 .is_some()
             {
                 format!("{title}  ?:help")
-            } else if h.as_any()
+            } else if h
+                .as_any()
                 .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
                 .is_some()
             {
@@ -47,10 +48,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     };
 
     let hints: &str = match &app.mode {
-        AppMode::BoardSelector
-        | AppMode::Normal
-        | AppMode::CardDetail
-        | AppMode::Dialog => "?:help",
+        AppMode::BoardSelector | AppMode::Normal | AppMode::CardDetail | AppMode::Dialog => {
+            "?:help"
+        }
         AppMode::Insert => insert_hint.as_deref().unwrap_or(""),
         AppMode::Command | AppMode::Help => "",
     };

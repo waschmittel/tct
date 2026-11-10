@@ -21,13 +21,21 @@ pub enum StorageError {
     },
     #[error("refusing to follow a symlink: {path}\n  hint: {hint}")]
     Symlink { path: String, hint: &'static str },
-    #[error("data directory is version {found}, but this tct reads version {supported}\n  hint: it was written by a newer tct. Upgrade, or point TCT_DATA_DIR at a different directory.")]
+    #[error(
+        "data directory is version {found}, but this tct reads version {supported}\n  hint: it was written by a newer tct. Upgrade, or point TCT_DATA_DIR at a different directory."
+    )]
     VersionTooNew { found: u32, supported: u32 },
-    #[error("data directory is version {found}, but this tct reads version {supported}\n  hint: the format it uses is no longer readable. Convert it with the tct version that wrote it, or start a fresh data directory.")]
+    #[error(
+        "data directory is version {found}, but this tct reads version {supported}\n  hint: the format it uses is no longer readable. Convert it with the tct version that wrote it, or start a fresh data directory."
+    )]
     VersionTooOld { found: u32, supported: u32 },
-    #[error("unreadable version file: {found:?}\n  hint: .tct/.version must hold a single integer.")]
+    #[error(
+        "unreadable version file: {found:?}\n  hint: .tct/.version must hold a single integer."
+    )]
     VersionUnreadable { found: String },
-    #[error("tct data directory {path} does not exist\n  hint: run `tct init` to create it (or point TCT_DATA_DIR at an existing directory).")]
+    #[error(
+        "tct data directory {path} does not exist\n  hint: run `tct init` to create it (or point TCT_DATA_DIR at an existing directory)."
+    )]
     NotInitialized { path: String },
     #[error("Board not found: {0}")]
     BoardNotFound(String),

@@ -2,9 +2,9 @@
 
 use super::lookup::{find_board, find_list};
 use super::util::{count_active, flag_value, flag_values2, has_flag, lists_and_cards};
-use crate::outln;
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
+use crate::outln;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args
@@ -38,7 +38,9 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let board = find_board(board_partial, by_id)?;
         let board_name = board.name.clone();
         let mut editor = BoardEditor::load(&board.id)?;
-        editor.apply(Command::AddList { name: name.to_string() })?;
+        editor.apply(Command::AddList {
+            name: name.to_string(),
+        })?;
         outln!("Created list '{}' on board '{}'.", name, board_name);
     } else if let Some((list_partial, new_name)) = flag_values2(args, "--rename") {
         let board = find_board(board_partial, by_id)?;
@@ -46,7 +48,10 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let list = find_list(&lists, list_partial, by_id)?.clone();
         let old_name = list.name.clone();
         let mut editor = BoardEditor::load(&board.id)?;
-        editor.apply(Command::RenameList { list_id: list.id, name: new_name.to_string() })?;
+        editor.apply(Command::RenameList {
+            list_id: list.id,
+            name: new_name.to_string(),
+        })?;
         outln!("Renamed list '{old_name}' to '{new_name}'.");
     } else if let Some(list_partial) = flag_value(args, "--archive") {
         let board = find_board(board_partial, by_id)?;

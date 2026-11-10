@@ -5,7 +5,7 @@ use crate::model::board::BoardMeta;
 use crate::model::id::BoardId;
 
 use super::paths;
-use super::{atomic_write, Result, StorageError};
+use super::{Result, StorageError, atomic_write};
 
 /// Written into every data directory [`create_data_dir`] sets up; kept as a
 /// file for easy editing.
@@ -26,7 +26,9 @@ pub fn open_data_dir() -> Result<()> {
     } else if paths::is_home_fallback() {
         create_data_dir(&dir)
     } else {
-        Err(StorageError::NotInitialized { path: dir.display().to_string() })
+        Err(StorageError::NotInitialized {
+            path: dir.display().to_string(),
+        })
     }
 }
 
@@ -147,7 +149,10 @@ pub fn load_board(board_id: &BoardId) -> Result<BoardMeta> {
 pub fn save_board(meta: &BoardMeta) -> Result<()> {
     // The id is the directory name and is not in the file, so an unstamped
     // board would silently write itself over the boards directory itself.
-    debug_assert!(!meta.id.is_empty(), "board id must be stamped before saving");
+    debug_assert!(
+        !meta.id.is_empty(),
+        "board id must be stamped before saving"
+    );
     let dir = paths::board_dir(&meta.id);
     fs::create_dir_all(&dir)?;
     let json = serde_json::to_string_pretty(meta)?;
@@ -185,7 +190,10 @@ mod tests {
             let missing = paths::base_dir().join("typo");
             unsafe { std::env::set_var("TCT_DATA_DIR", &missing) };
 
-            assert!(matches!(open_data_dir(), Err(StorageError::NotInitialized { .. })));
+            assert!(matches!(
+                open_data_dir(),
+                Err(StorageError::NotInitialized { .. })
+            ));
             assert!(!missing.exists());
 
             init_data_dir().unwrap();
@@ -213,12 +221,21 @@ mod tests {
 
         std::env::set_current_dir(old_cwd).unwrap();
         unsafe {
-            match old_home { Some(h) => std::env::set_var("HOME", h), None => std::env::remove_var("HOME") }
-            if let Some(d) = old_data { std::env::set_var("TCT_DATA_DIR", d) }
+            match old_home {
+                Some(h) => std::env::set_var("HOME", h),
+                None => std::env::remove_var("HOME"),
+            }
+            if let Some(d) = old_data {
+                std::env::set_var("TCT_DATA_DIR", d)
+            }
         }
         result.unwrap();
         again.unwrap();
-        assert!(first.unwrap().contains("https://github.com/waschmittel/tct"));
+        assert!(
+            first
+                .unwrap()
+                .contains("https://github.com/waschmittel/tct")
+        );
     }
 
     #[test]
@@ -226,7 +243,11 @@ mod tests {
         with_temp_dir(|| {
             assert!(init_data_dir().unwrap());
             let readme = paths::base_dir().join("README.md");
-            assert!(fs::read_to_string(&readme).unwrap().contains("https://github.com/waschmittel/tct"));
+            assert!(
+                fs::read_to_string(&readme)
+                    .unwrap()
+                    .contains("https://github.com/waschmittel/tct")
+            );
 
             fs::write(&readme, "mine").unwrap();
             init_data_dir().unwrap();
@@ -376,8 +397,11 @@ mod tests {
         });
         let board_dir = paths::boards_dir().join(dir);
         fs::create_dir_all(&board_dir).unwrap();
-        fs::write(board_dir.join("board.json"), serde_json::to_string_pretty(&json).unwrap())
-            .unwrap();
+        fs::write(
+            board_dir.join("board.json"),
+            serde_json::to_string_pretty(&json).unwrap(),
+        )
+        .unwrap();
     }
 
     #[test]
@@ -447,7 +471,10 @@ mod tests {
 
             let raw = fs::read_to_string(paths::board_meta_path(&board.id)).unwrap();
             let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
-            assert!(json.get("id").is_none(), "id should not be persisted: {raw}");
+            assert!(
+                json.get("id").is_none(),
+                "id should not be persisted: {raw}"
+            );
             assert_eq!(load_board(&board.id).unwrap().id, board.id);
         });
     }

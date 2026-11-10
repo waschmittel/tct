@@ -5,11 +5,11 @@ use crate::command::{Command, MoveDir};
 use crate::dialog::{
     archived_cards::ArchivedCards, archived_lists::ArchivedLists, card_history::CardHistory,
     confirm_archive_card::ConfirmArchiveCard, confirm_archive_list::ConfirmArchiveList,
-    confirm_clear_due_date::ConfirmClearDueDate,
-    label_manager::LabelManager, label_picker::LabelPicker,
+    confirm_clear_due_date::ConfirmClearDueDate, label_manager::LabelManager,
+    label_picker::LabelPicker,
 };
 use crate::insert::{
-    date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor, InsertSurface,
+    InsertSurface, date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor,
 };
 
 use super::keymap::{self, Binding};
@@ -63,58 +63,359 @@ pub enum Action {
 /// help overlay renders from this table.
 pub static KEYMAP: &[Binding<Action>] = &[
     // Navigation
-    Binding { code: KeyCode::Left, shift: Some(false), action: Action::SelectListLeft, keys: "Left / Right", help: "Switch lists", section: "Navigation" },
-    Binding { code: KeyCode::Right, shift: Some(false), action: Action::SelectListRight, keys: "Left / Right", help: "Switch lists", section: "Navigation" },
-    Binding { code: KeyCode::Up, shift: Some(false), action: Action::SelectCardUp, keys: "Up / Down", help: "Navigate cards", section: "Navigation" },
-    Binding { code: KeyCode::Down, shift: Some(false), action: Action::SelectCardDown, keys: "Up / Down", help: "Navigate cards", section: "Navigation" },
-    Binding { code: KeyCode::Char('g'), shift: None, action: Action::JumpFirstCard, keys: "g / G", help: "First / last card", section: "Navigation" },
-    Binding { code: KeyCode::Char('G'), shift: None, action: Action::JumpLastCard, keys: "g / G", help: "First / last card", section: "Navigation" },
-    Binding { code: KeyCode::Char('j'), shift: None, action: Action::SwitchBoardPrev, keys: "j/k or ,/.", help: "Prev / next board", section: "Navigation" },
-    Binding { code: KeyCode::Char('k'), shift: None, action: Action::SwitchBoardNext, keys: "j/k or ,/.", help: "Prev / next board", section: "Navigation" },
-    Binding { code: KeyCode::Char(','), shift: None, action: Action::SwitchBoardPrev, keys: "j/k or ,/.", help: "Prev / next board", section: "Navigation" },
-    Binding { code: KeyCode::Char('.'), shift: None, action: Action::SwitchBoardNext, keys: "j/k or ,/.", help: "Prev / next board", section: "Navigation" },
-    Binding { code: KeyCode::Enter, shift: None, action: Action::OpenCardDetail, keys: "Enter", help: "Open card detail", section: "Navigation" },
+    Binding {
+        code: KeyCode::Left,
+        shift: Some(false),
+        action: Action::SelectListLeft,
+        keys: "Left / Right",
+        help: "Switch lists",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Right,
+        shift: Some(false),
+        action: Action::SelectListRight,
+        keys: "Left / Right",
+        help: "Switch lists",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Up,
+        shift: Some(false),
+        action: Action::SelectCardUp,
+        keys: "Up / Down",
+        help: "Navigate cards",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Down,
+        shift: Some(false),
+        action: Action::SelectCardDown,
+        keys: "Up / Down",
+        help: "Navigate cards",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Char('g'),
+        shift: None,
+        action: Action::JumpFirstCard,
+        keys: "g / G",
+        help: "First / last card",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Char('G'),
+        shift: None,
+        action: Action::JumpLastCard,
+        keys: "g / G",
+        help: "First / last card",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Char('j'),
+        shift: None,
+        action: Action::SwitchBoardPrev,
+        keys: "j/k or ,/.",
+        help: "Prev / next board",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Char('k'),
+        shift: None,
+        action: Action::SwitchBoardNext,
+        keys: "j/k or ,/.",
+        help: "Prev / next board",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Char(','),
+        shift: None,
+        action: Action::SwitchBoardPrev,
+        keys: "j/k or ,/.",
+        help: "Prev / next board",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Char('.'),
+        shift: None,
+        action: Action::SwitchBoardNext,
+        keys: "j/k or ,/.",
+        help: "Prev / next board",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Enter,
+        shift: None,
+        action: Action::OpenCardDetail,
+        keys: "Enter",
+        help: "Open card detail",
+        section: "Navigation",
+    },
     // Card
-    Binding { code: KeyCode::Char('t'), shift: None, action: Action::EditTitle, keys: "t", help: "Quick-edit title", section: "Card" },
-    Binding { code: KeyCode::Char('e'), shift: None, action: Action::EditDescription, keys: "e", help: "Edit description", section: "Card" },
-    Binding { code: KeyCode::Char('y'), shift: None, action: Action::CopyTitle, keys: "y", help: "Copy title", section: "Card" },
-    Binding { code: KeyCode::Char('n'), shift: None, action: Action::NewCard, keys: "n", help: "New card", section: "Card" },
-    Binding { code: KeyCode::Char('a'), shift: None, action: Action::ArchiveCard, keys: "a", help: "Archive card", section: "Card" },
-    Binding { code: KeyCode::Char('v'), shift: None, action: Action::ViewArchivedCards, keys: "v", help: "View archived cards", section: "Card" },
-    Binding { code: KeyCode::Char('h'), shift: None, action: Action::CardHistoryDialog, keys: "h", help: "View change history", section: "Card" },
-    Binding { code: KeyCode::Char('p'), shift: None, action: Action::ExportPdf, keys: "p", help: "Export as PDF", section: "Card" },
-    Binding { code: KeyCode::Char('P'), shift: None, action: Action::ExportPdfColor, keys: "P", help: "Export as color PDF", section: "Card" },
+    Binding {
+        code: KeyCode::Char('t'),
+        shift: None,
+        action: Action::EditTitle,
+        keys: "t",
+        help: "Quick-edit title",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('e'),
+        shift: None,
+        action: Action::EditDescription,
+        keys: "e",
+        help: "Edit description",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('y'),
+        shift: None,
+        action: Action::CopyTitle,
+        keys: "y",
+        help: "Copy title",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('n'),
+        shift: None,
+        action: Action::NewCard,
+        keys: "n",
+        help: "New card",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('a'),
+        shift: None,
+        action: Action::ArchiveCard,
+        keys: "a",
+        help: "Archive card",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('v'),
+        shift: None,
+        action: Action::ViewArchivedCards,
+        keys: "v",
+        help: "View archived cards",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('h'),
+        shift: None,
+        action: Action::CardHistoryDialog,
+        keys: "h",
+        help: "View change history",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('p'),
+        shift: None,
+        action: Action::ExportPdf,
+        keys: "p",
+        help: "Export as PDF",
+        section: "Card",
+    },
+    Binding {
+        code: KeyCode::Char('P'),
+        shift: None,
+        action: Action::ExportPdfColor,
+        keys: "P",
+        help: "Export as color PDF",
+        section: "Card",
+    },
     // Move. Grab mode exists because the Linux console (and vhs) never
     // transmits modifiers on arrow keys — Shift+arrows can't be the only
     // way to move cards.
-    Binding { code: KeyCode::Left, shift: Some(true), action: Action::MoveCardLeft, keys: "Shift+Left/Right", help: "Move to adjacent list", section: "Move" },
-    Binding { code: KeyCode::Right, shift: Some(true), action: Action::MoveCardRight, keys: "Shift+Left/Right", help: "Move to adjacent list", section: "Move" },
-    Binding { code: KeyCode::Up, shift: Some(true), action: Action::MoveCardUp, keys: "Shift+Up/Down", help: "Move within list", section: "Move" },
-    Binding { code: KeyCode::Down, shift: Some(true), action: Action::MoveCardDown, keys: "Shift+Up/Down", help: "Move within list", section: "Move" },
-    Binding { code: KeyCode::Char('m'), shift: None, action: Action::GrabCard, keys: "m", help: "Grab/drop card (arrows)", section: "Move" },
+    Binding {
+        code: KeyCode::Left,
+        shift: Some(true),
+        action: Action::MoveCardLeft,
+        keys: "Shift+Left/Right",
+        help: "Move to adjacent list",
+        section: "Move",
+    },
+    Binding {
+        code: KeyCode::Right,
+        shift: Some(true),
+        action: Action::MoveCardRight,
+        keys: "Shift+Left/Right",
+        help: "Move to adjacent list",
+        section: "Move",
+    },
+    Binding {
+        code: KeyCode::Up,
+        shift: Some(true),
+        action: Action::MoveCardUp,
+        keys: "Shift+Up/Down",
+        help: "Move within list",
+        section: "Move",
+    },
+    Binding {
+        code: KeyCode::Down,
+        shift: Some(true),
+        action: Action::MoveCardDown,
+        keys: "Shift+Up/Down",
+        help: "Move within list",
+        section: "Move",
+    },
+    Binding {
+        code: KeyCode::Char('m'),
+        shift: None,
+        action: Action::GrabCard,
+        keys: "m",
+        help: "Grab/drop card (arrows)",
+        section: "Move",
+    },
     // Lists
-    Binding { code: KeyCode::Char('N'), shift: None, action: Action::NewList, keys: "N", help: "New list", section: "Lists" },
-    Binding { code: KeyCode::Char('r'), shift: None, action: Action::RenameList, keys: "r", help: "Rename list", section: "Lists" },
-    Binding { code: KeyCode::Char('A'), shift: None, action: Action::ArchiveList, keys: "A", help: "Archive list", section: "Lists" },
-    Binding { code: KeyCode::Char('V'), shift: None, action: Action::ViewArchivedLists, keys: "V", help: "View archived lists", section: "Lists" },
-    Binding { code: KeyCode::Char('<'), shift: None, action: Action::MoveListLeft, keys: "< / >", help: "Reorder list", section: "Lists" },
-    Binding { code: KeyCode::Char('>'), shift: None, action: Action::MoveListRight, keys: "< / >", help: "Reorder list", section: "Lists" },
+    Binding {
+        code: KeyCode::Char('N'),
+        shift: None,
+        action: Action::NewList,
+        keys: "N",
+        help: "New list",
+        section: "Lists",
+    },
+    Binding {
+        code: KeyCode::Char('r'),
+        shift: None,
+        action: Action::RenameList,
+        keys: "r",
+        help: "Rename list",
+        section: "Lists",
+    },
+    Binding {
+        code: KeyCode::Char('A'),
+        shift: None,
+        action: Action::ArchiveList,
+        keys: "A",
+        help: "Archive list",
+        section: "Lists",
+    },
+    Binding {
+        code: KeyCode::Char('V'),
+        shift: None,
+        action: Action::ViewArchivedLists,
+        keys: "V",
+        help: "View archived lists",
+        section: "Lists",
+    },
+    Binding {
+        code: KeyCode::Char('<'),
+        shift: None,
+        action: Action::MoveListLeft,
+        keys: "< / >",
+        help: "Reorder list",
+        section: "Lists",
+    },
+    Binding {
+        code: KeyCode::Char('>'),
+        shift: None,
+        action: Action::MoveListRight,
+        keys: "< / >",
+        help: "Reorder list",
+        section: "Lists",
+    },
     // Search & Filter
-    Binding { code: KeyCode::Char('/'), shift: None, action: Action::Search, keys: "/", help: "Search", section: "Search & Filter" },
-    Binding { code: KeyCode::Char('f'), shift: None, action: Action::FilterByLabel, keys: "f", help: "Filter by label", section: "Search & Filter" },
-    Binding { code: KeyCode::Char('F'), shift: None, action: Action::ClearFilters, keys: "F", help: "Clear filters", section: "Search & Filter" },
+    Binding {
+        code: KeyCode::Char('/'),
+        shift: None,
+        action: Action::Search,
+        keys: "/",
+        help: "Search",
+        section: "Search & Filter",
+    },
+    Binding {
+        code: KeyCode::Char('f'),
+        shift: None,
+        action: Action::FilterByLabel,
+        keys: "f",
+        help: "Filter by label",
+        section: "Search & Filter",
+    },
+    Binding {
+        code: KeyCode::Char('F'),
+        shift: None,
+        action: Action::ClearFilters,
+        keys: "F",
+        help: "Clear filters",
+        section: "Search & Filter",
+    },
     // Labels & Due
-    Binding { code: KeyCode::Char('l'), shift: None, action: Action::AssignLabels, keys: "l", help: "Assign / remove labels", section: "Labels & Due" },
-    Binding { code: KeyCode::Char('L'), shift: None, action: Action::ManageLabels, keys: "L", help: "Manage labels", section: "Labels & Due" },
-    Binding { code: KeyCode::Char('u'), shift: None, action: Action::SetDueDate, keys: "u", help: "Set due date", section: "Labels & Due" },
-    Binding { code: KeyCode::Char('U'), shift: None, action: Action::ClearDueDate, keys: "U", help: "Clear due date", section: "Labels & Due" },
+    Binding {
+        code: KeyCode::Char('l'),
+        shift: None,
+        action: Action::AssignLabels,
+        keys: "l",
+        help: "Assign / remove labels",
+        section: "Labels & Due",
+    },
+    Binding {
+        code: KeyCode::Char('L'),
+        shift: None,
+        action: Action::ManageLabels,
+        keys: "L",
+        help: "Manage labels",
+        section: "Labels & Due",
+    },
+    Binding {
+        code: KeyCode::Char('u'),
+        shift: None,
+        action: Action::SetDueDate,
+        keys: "u",
+        help: "Set due date",
+        section: "Labels & Due",
+    },
+    Binding {
+        code: KeyCode::Char('U'),
+        shift: None,
+        action: Action::ClearDueDate,
+        keys: "U",
+        help: "Clear due date",
+        section: "Labels & Due",
+    },
     // View
-    Binding { code: KeyCode::Char('c'), shift: None, action: Action::ToggleCreatedDate, keys: "c", help: "Show/hide created date", section: "View" },
-    Binding { code: KeyCode::Char('d'), shift: None, action: Action::ToggleUpdatedDate, keys: "d", help: "Show/hide updated date", section: "View" },
+    Binding {
+        code: KeyCode::Char('c'),
+        shift: None,
+        action: Action::ToggleCreatedDate,
+        keys: "c",
+        help: "Show/hide created date",
+        section: "View",
+    },
+    Binding {
+        code: KeyCode::Char('d'),
+        shift: None,
+        action: Action::ToggleUpdatedDate,
+        keys: "d",
+        help: "Show/hide updated date",
+        section: "View",
+    },
     // App
-    Binding { code: KeyCode::Char('b'), shift: None, action: Action::CloseBoard, keys: "b", help: "Back to selector", section: "App" },
-    Binding { code: KeyCode::Char('?'), shift: None, action: Action::Help, keys: "?", help: "Help", section: "App" },
-    Binding { code: KeyCode::Char('q'), shift: None, action: Action::Quit, keys: "q", help: "Quit", section: "App" },
+    Binding {
+        code: KeyCode::Char('b'),
+        shift: None,
+        action: Action::CloseBoard,
+        keys: "b",
+        help: "Back to selector",
+        section: "App",
+    },
+    Binding {
+        code: KeyCode::Char('?'),
+        shift: None,
+        action: Action::Help,
+        keys: "?",
+        help: "Help",
+        section: "App",
+    },
+    Binding {
+        code: KeyCode::Char('q'),
+        shift: None,
+        action: Action::Quit,
+        keys: "q",
+        help: "Quit",
+        section: "App",
+    },
 ];
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
@@ -222,36 +523,40 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         Action::SwitchBoardNext => cycle_open_board(app, 1)?,
         Action::OpenCardDetail => {
             if let Some(editor) = &mut app.editor
-                && editor.board().current_card_id().is_some() {
-                    editor.reset_detail_cursor();
-                    app.mode = AppMode::CardDetail;
-                }
+                && editor.board().current_card_id().is_some()
+            {
+                editor.reset_detail_cursor();
+                app.mode = AppMode::CardDetail;
+            }
         }
         Action::CopyTitle => {
             if let Some(board) = app.board()
-                && let Some(card) = board.current_card() {
-                    let title = card.title.clone();
-                    let what = format!("title '{title}'");
-                    app.copy_to_clipboard(title, &what);
-                }
+                && let Some(card) = board.current_card()
+            {
+                let title = card.title.clone();
+                let what = format!("title '{title}'");
+                app.copy_to_clipboard(title, &what);
+            }
         }
         Action::EditDescription => {
             if let Some(board) = app.board()
-                && let Some(card) = board.current_card() {
-                    let desc = card.description.clone();
-                    let card_id = card.id.clone();
-                    app.start_insert(Box::new(MarkdownEditor::new(card_id, &desc)));
-                }
+                && let Some(card) = board.current_card()
+            {
+                let desc = card.description.clone();
+                let card_id = card.id.clone();
+                app.start_insert(Box::new(MarkdownEditor::new(card_id, &desc)));
+            }
         }
         Action::EditTitle => {
             if let Some(board) = app.board()
-                && let Some(card) = board.current_card() {
-                    let title = card.title.clone();
-                    let card_id = card.id.clone();
-                    app.start_insert(Box::new(line_editor::EditCardTitle::new(
-                        card_id, &title, true,
-                    )));
-                }
+                && let Some(card) = board.current_card()
+            {
+                let title = card.title.clone();
+                let card_id = card.id.clone();
+                app.start_insert(Box::new(line_editor::EditCardTitle::new(
+                    card_id, &title, true,
+                )));
+            }
         }
         Action::NewCard => {
             if app.editor.is_some() {
@@ -265,25 +570,28 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         }
         Action::RenameList => {
             if let Some(board) = app.board()
-                && let Some(list) = board.lists.get(board.selected_list) {
-                    let name = list.name.clone();
-                    let list_id = list.id.clone();
-                    app.start_insert(Box::new(line_editor::RenameList::new(list_id, &name)));
-                }
+                && let Some(list) = board.lists.get(board.selected_list)
+            {
+                let name = list.name.clone();
+                let list_id = list.id.clone();
+                app.start_insert(Box::new(line_editor::RenameList::new(list_id, &name)));
+            }
         }
         Action::ArchiveList => {
             if let Some(board) = app.board()
-                && !board.lists.is_empty() {
-                    app.open_dialog(Box::new(ConfirmArchiveList));
-                }
+                && !board.lists.is_empty()
+            {
+                app.open_dialog(Box::new(ConfirmArchiveList));
+            }
         }
         Action::MoveListLeft => move_list_in_direction(app, MoveDir::Left)?,
         Action::MoveListRight => move_list_in_direction(app, MoveDir::Right)?,
         Action::ArchiveCard => {
             if let Some(board) = app.board()
-                && board.current_card_id().is_some() {
-                    app.open_dialog(Box::new(ConfirmArchiveCard));
-                }
+                && board.current_card_id().is_some()
+            {
+                app.open_dialog(Box::new(ConfirmArchiveCard));
+            }
         }
         Action::ViewArchivedCards => {
             if let Some(editor) = &app.editor {
@@ -329,29 +637,39 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         }
         Action::AssignLabels => {
             if let Some(board) = app.board()
-                && board.current_card_id().is_some() {
-                    app.open_dialog(Box::new(LabelPicker { selected_idx: 0 }));
-                }
+                && board.current_card_id().is_some()
+            {
+                app.open_dialog(Box::new(LabelPicker { selected_idx: 0 }));
+            }
         }
         Action::ManageLabels => {
-            app.open_dialog(Box::new(LabelManager { selected_idx: 0, from_picker: false }));
+            app.open_dialog(Box::new(LabelManager {
+                selected_idx: 0,
+                from_picker: false,
+            }));
         }
         Action::SetDueDate => {
             if let Some(board) = app.board()
-                && let Some(card) = board.current_card() {
-                    let date_str = card
-                        .due_date
-                        .map(|d| d.format("%Y-%m-%d").to_string())
-                        .unwrap_or_default();
-                    let card_id = card.id.clone();
-                    app.start_insert(Box::new(DatePicker::new(card_id, &date_str, InsertSurface::BoardView)));
-                }
+                && let Some(card) = board.current_card()
+            {
+                let date_str = card
+                    .due_date
+                    .map(|d| d.format("%Y-%m-%d").to_string())
+                    .unwrap_or_default();
+                let card_id = card.id.clone();
+                app.start_insert(Box::new(DatePicker::new(
+                    card_id,
+                    &date_str,
+                    InsertSurface::BoardView,
+                )));
+            }
         }
         Action::CardHistoryDialog => {
             if let Some(board) = app.board()
-                && board.current_card_id().is_some() {
-                    app.open_dialog(Box::new(CardHistory::new()));
-                }
+                && board.current_card_id().is_some()
+            {
+                app.open_dialog(Box::new(CardHistory::new()));
+            }
         }
         Action::ExportPdf => app.open_export_dialog(crate::export::Theme::Mono),
         Action::ExportPdfColor => app.open_export_dialog(crate::export::Theme::Color),
@@ -373,7 +691,10 @@ pub(super) fn toggle_created_date(app: &mut App) -> anyhow::Result<()> {
     if let Some(board) = app.board() {
         let show = !board.meta.show_created_date;
         app.apply(Command::SetShowCreatedDate { show })?;
-        app.set_status(format!("Created dates {}", if show { "shown" } else { "hidden" }));
+        app.set_status(format!(
+            "Created dates {}",
+            if show { "shown" } else { "hidden" }
+        ));
     }
     Ok(())
 }
@@ -382,7 +703,10 @@ pub(super) fn toggle_updated_date(app: &mut App) -> anyhow::Result<()> {
     if let Some(board) = app.board() {
         let show = !board.meta.show_updated_date;
         app.apply(Command::SetShowUpdatedDate { show })?;
-        app.set_status(format!("Updated dates {}", if show { "shown" } else { "hidden" }));
+        app.set_status(format!(
+            "Updated dates {}",
+            if show { "shown" } else { "hidden" }
+        ));
     }
     Ok(())
 }
@@ -398,10 +722,7 @@ fn move_list_in_direction(app: &mut App, direction: MoveDir) -> anyhow::Result<(
 }
 
 fn move_card_in_direction(app: &mut App, direction: MoveDir) -> anyhow::Result<()> {
-    let card_id = match app
-        .board()
-        .and_then(|b| b.current_card_id().cloned())
-    {
+    let card_id = match app.board().and_then(|b| b.current_card_id().cloned()) {
         Some(id) => id,
         None => return Ok(()),
     };
@@ -415,7 +736,7 @@ mod tests {
     use crate::app::App;
     use crate::model::board::BoardMeta;
     use crate::model::card::Card;
-    
+
     use crate::storage::{board_store, card_store};
     use crate::test_support::with_temp_dir;
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
@@ -442,9 +763,7 @@ mod tests {
     fn three_boards_first_open() -> (App, Vec<BoardMeta>) {
         let metas: Vec<BoardMeta> = ["A", "B", "C"]
             .iter()
-            .map(|n| {
-                board_store::create_board((*n).into()).unwrap()
-            })
+            .map(|n| board_store::create_board((*n).into()).unwrap())
             .collect();
         let app = App::new(Some(metas[0].id.clone())).unwrap();
         (app, metas)
@@ -685,7 +1004,10 @@ mod tests {
             handle(&mut app, key(KeyCode::Char('n'))).unwrap();
             assert!(app.grab_active);
             assert!(matches!(app.mode, AppMode::Normal));
-            assert!(app.insert.is_none(), "grab must not open the new-card insert");
+            assert!(
+                app.insert.is_none(),
+                "grab must not open the new-card insert"
+            );
         });
     }
 
@@ -720,7 +1042,12 @@ mod tests {
             let mut meta = board_store::create_board("Board".into()).unwrap();
             let list = crate::test_support::add_list(&mut meta, "TODO");
             // top (visible), arch, arch, bottom (visible) — in card_ids order.
-            let titles_archived = [("top", false), ("a1", true), ("a2", true), ("bottom", false)];
+            let titles_archived = [
+                ("top", false),
+                ("a1", true),
+                ("a2", true),
+                ("bottom", false),
+            ];
             let mut cards: Vec<Card> = titles_archived
                 .iter()
                 .map(|(t, archived)| {
@@ -749,7 +1076,11 @@ mod tests {
                 .into_iter()
                 .map(|i| board.lists[0].card_ids[i].clone())
                 .collect();
-            assert_eq!(visible, vec![ids[3].clone(), ids[0].clone()], "bottom moved above top");
+            assert_eq!(
+                visible,
+                vec![ids[3].clone(), ids[0].clone()],
+                "bottom moved above top"
+            );
             assert_eq!(board.current_card_id(), Some(&ids[3]), "selection follows");
         });
     }
@@ -848,8 +1179,20 @@ mod tests {
                 card_store::save_card(&meta.id, card).unwrap();
             }
             handle(&mut app, shift_key(KeyCode::Char('U'))).unwrap();
-            assert!(app.board().unwrap().cards.get(&cid).unwrap().due_date.is_some());
-            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty())).unwrap();
+            assert!(
+                app.board()
+                    .unwrap()
+                    .cards
+                    .get(&cid)
+                    .unwrap()
+                    .due_date
+                    .is_some()
+            );
+            crate::input::handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty()),
+            )
+            .unwrap();
             let board = app.board().unwrap();
             assert!(board.cards.get(&cid).unwrap().due_date.is_none());
             // Verify persisted
@@ -1031,31 +1374,49 @@ mod tests {
 
             let mut app = App::new(Some(meta_a.id.clone())).unwrap();
             assert_eq!(open_board_id(&app), meta_a.id);
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[0].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[0].id
+            );
 
             // Move down to focus A2
             handle(&mut app, key(KeyCode::Down)).unwrap();
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[1].id
+            );
 
             // Switch to Board B with 'k'
             handle(&mut app, key(KeyCode::Char('k'))).unwrap();
             assert_eq!(open_board_id(&app), meta_b.id);
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[0].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_b[0].id
+            );
 
             // Move down twice on Board B to focus B3
             handle(&mut app, key(KeyCode::Down)).unwrap();
             handle(&mut app, key(KeyCode::Down)).unwrap();
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[2].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_b[2].id
+            );
 
             // Switch back to Board A with 'j' — should restore A2 as focused
             handle(&mut app, key(KeyCode::Char('j'))).unwrap();
             assert_eq!(open_board_id(&app), meta_a.id);
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[1].id
+            );
 
             // Switch back to Board B with 'k' — should restore B3 as focused
             handle(&mut app, key(KeyCode::Char('k'))).unwrap();
             assert_eq!(open_board_id(&app), meta_b.id);
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[2].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_b[2].id
+            );
         });
     }
 
@@ -1090,7 +1451,10 @@ mod tests {
             handle(&mut app, key(KeyCode::Up)).unwrap();
             terminal.draw(|f| crate::ui::render(f, &app)).unwrap();
             assert_eq!(app.board().unwrap().scroll_offset[0].get(), scroll_a);
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[13].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[13].id
+            );
 
             // Switch to Board B with 'k'
             handle(&mut app, key(KeyCode::Char('k'))).unwrap();
@@ -1101,13 +1465,19 @@ mod tests {
             // Switch back to Board A with 'j'
             handle(&mut app, key(KeyCode::Char('j'))).unwrap();
             assert_eq!(open_board_id(&app), meta_a.id);
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[13].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[13].id
+            );
             assert_eq!(app.board().unwrap().scroll_offset[0].get(), scroll_a);
 
             // Press Up on Board A: moves focus up, does not scroll viewport
             handle(&mut app, key(KeyCode::Up)).unwrap();
             terminal.draw(|f| crate::ui::render(f, &app)).unwrap();
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[12].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[12].id
+            );
             assert_eq!(app.board().unwrap().scroll_offset[0].get(), scroll_a);
         });
     }
@@ -1128,7 +1498,10 @@ mod tests {
             let mut app = App::new(Some(meta_a.id.clone())).unwrap();
             // Focus A2 on Board A
             handle(&mut app, key(KeyCode::Down)).unwrap();
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[1].id
+            );
 
             // Close Board A to return to selector
             handle(&mut app, key(KeyCode::Char('b'))).unwrap();
@@ -1138,11 +1511,17 @@ mod tests {
             app.selected_board_idx = 1;
             crate::input::board_selector_input::handle(&mut app, key(KeyCode::Enter)).unwrap();
             assert_eq!(open_board_id(&app), meta_b.id);
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[0].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_b[0].id
+            );
 
             // Focus B2 on Board B
             handle(&mut app, key(KeyCode::Down)).unwrap();
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[1].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_b[1].id
+            );
 
             // Close Board B to selector
             handle(&mut app, key(KeyCode::Char('b'))).unwrap();
@@ -1152,14 +1531,20 @@ mod tests {
             app.selected_board_idx = 0;
             crate::input::board_selector_input::handle(&mut app, key(KeyCode::Enter)).unwrap();
             assert_eq!(open_board_id(&app), meta_a.id);
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[1].id
+            );
 
             // Close Board A and re-open Board B
             handle(&mut app, key(KeyCode::Char('b'))).unwrap();
             app.selected_board_idx = 1;
             crate::input::board_selector_input::handle(&mut app, key(KeyCode::Enter)).unwrap();
             assert_eq!(open_board_id(&app), meta_b.id);
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_b[1].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_b[1].id
+            );
         });
     }
 
@@ -1179,7 +1564,10 @@ mod tests {
             let mut app = App::new(Some(meta_a.id.clone())).unwrap();
             // Focus A2
             handle(&mut app, key(KeyCode::Down)).unwrap();
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[1].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[1].id
+            );
 
             // Switch to Board B
             handle(&mut app, key(KeyCode::Char('k'))).unwrap();
@@ -1192,7 +1580,10 @@ mod tests {
             handle(&mut app, key(KeyCode::Char('j'))).unwrap();
             assert_eq!(open_board_id(&app), meta_a.id);
             // Gracefully falls back to A1
-            assert_eq!(app.board().unwrap().current_card_id().unwrap(), &cards_a[0].id);
+            assert_eq!(
+                app.board().unwrap().current_card_id().unwrap(),
+                &cards_a[0].id
+            );
         });
     }
 

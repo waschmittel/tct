@@ -52,9 +52,16 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
 }
 
 /// Export failures are shown as a toast; they are not worth crashing the TUI for.
-fn export_card_pdf(app: &mut App, card_id: &crate::model::id::CardId, path: &std::path::Path, theme: crate::export::Theme) {
+fn export_card_pdf(
+    app: &mut App,
+    card_id: &crate::model::id::CardId,
+    path: &std::path::Path,
+    theme: crate::export::Theme,
+) {
     let Some(board) = app.board() else { return };
-    let Some(card) = board.cards.get(card_id) else { return };
+    let Some(card) = board.cards.get(card_id) else {
+        return;
+    };
     let list = board
         .lists
         .iter()
@@ -81,7 +88,11 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
                 editor.delete_archived_list(&list_id, &card_ids)?;
             }
         }
-        DialogSideEffect::ExportCardPdf { card_id, path, theme } => export_card_pdf(app, &card_id, &path, theme),
+        DialogSideEffect::ExportCardPdf {
+            card_id,
+            path,
+            theme,
+        } => export_card_pdf(app, &card_id, &path, theme),
         DialogSideEffect::DeleteArchivedCard { card_id } => {
             if let Some(editor) = &mut app.editor {
                 editor.delete_archived_card(&card_id)?;
@@ -101,7 +112,10 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
                 }
             }
         }
-        DialogSideEffect::ConfigureSelectedBoard { color, new_card_position } => {
+        DialogSideEffect::ConfigureSelectedBoard {
+            color,
+            new_card_position,
+        } => {
             if let Some(board) = app.boards.get(app.selected_board_idx) {
                 let id = board.id.clone();
                 crate::board_directory::configure_board(&id, color, new_card_position)?;
@@ -211,8 +225,16 @@ mod tests {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
         let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
-        terminal.draw(|frame| crate::ui::render(frame, app)).unwrap();
-        terminal.backend().buffer().content().iter().map(|c| c.symbol()).collect()
+        terminal
+            .draw(|frame| crate::ui::render(frame, app))
+            .unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol())
+            .collect()
     }
 
     fn shift(app: &mut App, c: char) {
@@ -254,10 +276,18 @@ mod tests {
 
             shift(&mut app, 'P');
             press(&mut app, KeyCode::Enter);
-            assert_eq!(app.mode, AppMode::Dialog, "the existing file asks before overwriting");
+            assert_eq!(
+                app.mode,
+                AppMode::Dialog,
+                "the existing file asks before overwriting"
+            );
             press(&mut app, KeyCode::Enter);
             assert_eq!(app.mode, AppMode::Normal);
-            assert_ne!(std::fs::read(&file).unwrap(), mono, "overwritten with the color export");
+            assert_ne!(
+                std::fs::read(&file).unwrap(),
+                mono,
+                "overwritten with the color export"
+            );
             let names: Vec<_> = std::fs::read_dir(out.path()).unwrap().flatten().collect();
             assert_eq!(names.len(), 1, "no second file");
         });
@@ -281,11 +311,22 @@ mod tests {
             assert_eq!(app.mode, AppMode::Normal, "no save dialog in the browser");
             let parts = crate::export::web::tests::parse(&sink.0.borrow());
             assert!(!parts.is_empty());
-            assert!(parts.iter().all(|(_, total, name, _)| *total == parts.len() && name == "web-card.pdf"));
+            assert!(
+                parts
+                    .iter()
+                    .all(|(_, total, name, _)| *total == parts.len() && name == "web-card.pdf")
+            );
             let pdf: Vec<u8> = parts.into_iter().flat_map(|p| p.3).collect();
             assert!(pdf.starts_with(b"%PDF-"));
-            assert_eq!(app.status_message.as_ref().unwrap().0, "Sent web-card.pdf to your browser");
-            assert_eq!(std::fs::read_dir(out.path()).unwrap().count(), 0, "nothing is written on the server");
+            assert_eq!(
+                app.status_message.as_ref().unwrap().0,
+                "Sent web-card.pdf to your browser"
+            );
+            assert_eq!(
+                std::fs::read_dir(out.path()).unwrap().count(),
+                0,
+                "nothing is written on the server"
+            );
         });
     }
 
@@ -294,14 +335,24 @@ mod tests {
         with_temp_dir(|| {
             let (mut app, sink) = web_app("Web card");
             press(&mut app, KeyCode::Char('p'));
-            let mono: Vec<u8> = crate::export::web::tests::parse(&sink.0.borrow()).into_iter().flat_map(|p| p.3).collect();
+            let mono: Vec<u8> = crate::export::web::tests::parse(&sink.0.borrow())
+                .into_iter()
+                .flat_map(|p| p.3)
+                .collect();
             sink.0.borrow_mut().clear();
 
             press(&mut app, KeyCode::Enter);
             assert_eq!(app.mode, AppMode::CardDetail);
-            handle_input(&mut app, KeyEvent::new(KeyCode::Char('P'), KeyModifiers::SHIFT)).unwrap();
+            handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('P'), KeyModifiers::SHIFT),
+            )
+            .unwrap();
             assert_eq!(app.mode, AppMode::CardDetail);
-            let color: Vec<u8> = crate::export::web::tests::parse(&sink.0.borrow()).into_iter().flat_map(|p| p.3).collect();
+            let color: Vec<u8> = crate::export::web::tests::parse(&sink.0.borrow())
+                .into_iter()
+                .flat_map(|p| p.3)
+                .collect();
             assert!(color.starts_with(b"%PDF-"));
             assert_ne!(color, mono);
         });
@@ -323,7 +374,13 @@ mod tests {
             app.web_sink = Some(Box::new(Broken));
             press(&mut app, KeyCode::Char('p'));
             assert_eq!(app.mode, AppMode::Normal);
-            assert!(app.status_message.as_ref().unwrap().0.starts_with("Export failed:"));
+            assert!(
+                app.status_message
+                    .as_ref()
+                    .unwrap()
+                    .0
+                    .starts_with("Export failed:")
+            );
         });
     }
 
@@ -348,9 +405,21 @@ mod tests {
             app.export_dir = Some(out.path().to_path_buf());
             press(&mut app, KeyCode::Char('p'));
             std::fs::remove_dir_all(out.path()).unwrap();
-            handle_input(&mut app, KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty())).unwrap();
-            handle_input(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
-            assert_eq!(app.mode, AppMode::Dialog, "folder check keeps the dialog open");
+            handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('x'), KeyModifiers::empty()),
+            )
+            .unwrap();
+            handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()),
+            )
+            .unwrap();
+            assert_eq!(
+                app.mode,
+                AppMode::Dialog,
+                "folder check keeps the dialog open"
+            );
         });
     }
 }

@@ -17,13 +17,7 @@ pub struct LabelPicker {
 }
 
 impl Dialog for LabelPicker {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        board: Option<&LoadedBoard>,
-        accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, board: Option<&LoadedBoard>, accent: Color) {
         let board = match board {
             Some(b) => b,
             None => return,
@@ -126,8 +120,11 @@ impl Dialog for LabelPicker {
             }
             KeyCode::Enter | KeyCode::Char(' ') => {
                 if let Some(board) = board {
-                    let label_id =
-                        board.meta.labels.get(self.selected_idx).map(|l| l.id.clone());
+                    let label_id = board
+                        .meta
+                        .labels
+                        .get(self.selected_idx)
+                        .map(|l| l.id.clone());
                     let card_id = board.current_card_id().cloned();
                     if let (Some(lid), Some(cid)) = (label_id, card_id) {
                         return DialogOutcome::apply(Command::ToggleLabel {

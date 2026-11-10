@@ -92,12 +92,14 @@ impl ColorPicker {
     fn back_to_manager(&self) -> Option<Box<dyn Dialog>> {
         match &self.target {
             ColorTarget::BoardAccent => None,
-            ColorTarget::Label { label_idx, from_picker, .. } => {
-                Some(Box::new(super::label_manager::LabelManager {
-                    selected_idx: *label_idx,
-                    from_picker: *from_picker,
-                }))
-            }
+            ColorTarget::Label {
+                label_idx,
+                from_picker,
+                ..
+            } => Some(Box::new(super::label_manager::LabelManager {
+                selected_idx: *label_idx,
+                from_picker: *from_picker,
+            })),
         }
     }
 
@@ -114,7 +116,14 @@ impl ColorPicker {
         }
     }
 
-    fn slider_line(&self, idx: usize, label_text: &str, frac: f64, value: String, accent: Color) -> Line<'static> {
+    fn slider_line(
+        &self,
+        idx: usize,
+        label_text: &str,
+        frac: f64,
+        value: String,
+        accent: Color,
+    ) -> Line<'static> {
         let filled = ((frac * BAR_WIDTH as f64).round() as usize).min(BAR_WIDTH);
         let bar: String = "█".repeat(filled) + &"░".repeat(BAR_WIDTH - filled);
         let selected = idx == self.field;
@@ -144,7 +153,9 @@ impl ColorPicker {
         let active_style = if selected {
             Style::default().fg(accent).add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
         };
         let inactive_style = Style::default().fg(Color::DarkGray);
 
@@ -189,14 +200,35 @@ impl Dialog for ColorPicker {
         let swatch_bg = Color::Rgb(r, g, b);
 
         let mut lines = vec![
-            self.slider_line(0, "Hue", self.h / 360.0, format!("{:>3}°", self.h.round() as i32), accent),
-            self.slider_line(1, "Saturation", self.s, format!("{:>3}%", (self.s * 100.0).round() as i32), accent),
-            self.slider_line(2, "Lightness", self.l, format!("{:>3}%", (self.l * 100.0).round() as i32), accent),
+            self.slider_line(
+                0,
+                "Hue",
+                self.h / 360.0,
+                format!("{:>3}°", self.h.round() as i32),
+                accent,
+            ),
+            self.slider_line(
+                1,
+                "Saturation",
+                self.s,
+                format!("{:>3}%", (self.s * 100.0).round() as i32),
+                accent,
+            ),
+            self.slider_line(
+                2,
+                "Lightness",
+                self.l,
+                format!("{:>3}%", (self.l * 100.0).round() as i32),
+                accent,
+            ),
             Line::raw(""),
             Line::from(vec![
                 Span::styled("  Preview   ", Style::default().fg(Color::White)),
                 Span::styled(" ".repeat(BAR_WIDTH), Style::default().bg(swatch_bg)),
-                Span::styled(format!("  #{r:02X}{g:02X}{b:02X}"), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("  #{r:02X}{g:02X}{b:02X}"),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
         ];
 
@@ -209,7 +241,11 @@ impl Dialog for ColorPicker {
     }
 
     fn handle_key(&mut self, key: KeyEvent, _board: Option<&LoadedBoard>) -> DialogOutcome {
-        let max_field = if self.new_card_position.is_some() { 3 } else { 2 };
+        let max_field = if self.new_card_position.is_some() {
+            3
+        } else {
+            2
+        };
         match key.code {
             KeyCode::Up if self.field > 0 => {
                 self.field -= 1;
@@ -294,8 +330,14 @@ impl Dialog for ColorPicker {
             ColorTarget::BoardAccent => Some(super::DialogHelp {
                 title: " Help — Board Configuration ",
                 rows: vec![
-                    ("Up / Down", "Select field (hue, saturation, lightness, new items)"),
-                    ("Left / Right", "Adjust selected field / change new items position"),
+                    (
+                        "Up / Down",
+                        "Select field (hue, saturation, lightness, new items)",
+                    ),
+                    (
+                        "Left / Right",
+                        "Adjust selected field / change new items position",
+                    ),
                     ("Space", "Toggle new items (when selected)"),
                     ("Enter", "Apply configuration"),
                     ("Esc", "Cancel"),
@@ -333,7 +375,11 @@ mod tests {
     #[test]
     fn seeds_from_color_and_roundtrips() {
         let picker = ColorPicker::for_board(
-            LabelColor::Custom { r: 170, g: 200, b: 255 },
+            LabelColor::Custom {
+                r: 170,
+                g: 200,
+                b: 255,
+            },
             NewCardPosition::Bottom,
         );
         match picker.current_color() {
@@ -420,7 +466,10 @@ mod tests {
         let mut p = ColorPicker::for_board(LabelColor::Cyan, NewCardPosition::Top);
         let out = p.handle_key(key(KeyCode::Enter), None);
         match out.side_effect {
-            Some(DialogSideEffect::ConfigureSelectedBoard { color, new_card_position }) => {
+            Some(DialogSideEffect::ConfigureSelectedBoard {
+                color,
+                new_card_position,
+            }) => {
                 assert_eq!(color, p.current_color());
                 assert_eq!(new_card_position, NewCardPosition::Top);
             }

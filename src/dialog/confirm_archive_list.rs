@@ -12,13 +12,7 @@ use crate::command::Command;
 pub struct ConfirmArchiveList;
 
 impl Dialog for ConfirmArchiveList {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, board: Option<&LoadedBoard>, _accent: Color) {
         let name = board
             .and_then(|b| b.lists.get(b.selected_list))
             .map(|l| l.name.as_str())

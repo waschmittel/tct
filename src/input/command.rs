@@ -31,4 +31,3 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
     }
     Ok(())
 }
-

@@ -14,7 +14,7 @@
 
 use std::path::Path;
 
-use super::{paths, read_unlinked, Result, StorageError};
+use super::{Result, StorageError, paths, read_unlinked};
 
 /// The format this binary reads and writes.
 ///
@@ -53,7 +53,9 @@ fn read_version(path: &Path) -> Result<Option<u32>> {
     raw.trim()
         .parse::<u32>()
         .map(Some)
-        .map_err(|_| StorageError::VersionUnreadable { found: raw.trim().to_string() })
+        .map_err(|_| StorageError::VersionUnreadable {
+            found: raw.trim().to_string(),
+        })
 }
 
 fn stamp() -> Result<()> {
@@ -92,7 +94,10 @@ mod tests {
 
             let err = ensure_compatible().unwrap_err();
 
-            assert!(matches!(err, StorageError::VersionTooNew { found: 2, .. }), "{err}");
+            assert!(
+                matches!(err, StorageError::VersionTooNew { found: 2, .. }),
+                "{err}"
+            );
         });
     }
 
@@ -103,7 +108,10 @@ mod tests {
 
             let err = ensure_compatible().unwrap_err();
 
-            assert!(matches!(err, StorageError::VersionTooOld { found: 0, .. }), "{err}");
+            assert!(
+                matches!(err, StorageError::VersionTooOld { found: 0, .. }),
+                "{err}"
+            );
         });
     }
 
@@ -114,7 +122,10 @@ mod tests {
 
             let err = ensure_compatible().unwrap_err();
 
-            assert!(matches!(err, StorageError::VersionUnreadable { .. }), "{err}");
+            assert!(
+                matches!(err, StorageError::VersionUnreadable { .. }),
+                "{err}"
+            );
         });
     }
 

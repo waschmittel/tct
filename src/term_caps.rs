@@ -36,12 +36,18 @@ pub struct TermCaps {
 impl TermCaps {
     /// Modern emulator: truecolor, full glyph repertoire.
     pub fn full() -> Self {
-        Self { color: ColorSupport::TrueColor, rich_glyphs: true }
+        Self {
+            color: ColorSupport::TrueColor,
+            rich_glyphs: true,
+        }
     }
 
     /// Linux console: 16 colors, console-font glyphs only.
     pub fn linux_tty() -> Self {
-        Self { color: ColorSupport::Ansi16, rich_glyphs: false }
+        Self {
+            color: ColorSupport::Ansi16,
+            rich_glyphs: false,
+        }
     }
 
     /// Detect from the environment. `TERM=linux` wins (the console cannot
@@ -63,7 +69,11 @@ impl TermCaps {
             .map(|c| c.contains("truecolor") || c.contains("24bit"))
             .unwrap_or(false);
         Self {
-            color: if truecolor { ColorSupport::TrueColor } else { ColorSupport::Ansi256 },
+            color: if truecolor {
+                ColorSupport::TrueColor
+            } else {
+                ColorSupport::Ansi256
+            },
             rich_glyphs: true,
         }
     }
@@ -82,7 +92,11 @@ impl TermCaps {
     /// Border of the selected card. Heavy box-drawing glyphs are missing
     /// from console fonts; double-line glyphs are in every VGA font.
     pub fn selected_border_type(&self) -> BorderType {
-        if self.rich_glyphs { BorderType::Thick } else { BorderType::Double }
+        if self.rich_glyphs {
+            BorderType::Thick
+        } else {
+            BorderType::Double
+        }
     }
 
     /// Scrollbar thumb glyph. Left half block has a width between the full
@@ -179,7 +193,11 @@ fn nearest_cube_level(v: u8) -> usize {
 /// Nearest xterm-256 index: best of the 6×6×6 cube and the grayscale ramp
 /// (232–255, values 8..=238 in steps of 10).
 fn nearest_indexed(r: u8, g: u8, b: u8) -> u8 {
-    let (qr, qg, qb) = (nearest_cube_level(r), nearest_cube_level(g), nearest_cube_level(b));
+    let (qr, qg, qb) = (
+        nearest_cube_level(r),
+        nearest_cube_level(g),
+        nearest_cube_level(b),
+    );
     let cube_idx = (16 + 36 * qr + 6 * qg + qb) as u8;
     let cube_rgb = (CUBE_LEVELS[qr], CUBE_LEVELS[qg], CUBE_LEVELS[qb]);
 
@@ -201,7 +219,11 @@ fn indexed_to_rgb(i: u8) -> (u8, u8, u8) {
         0..=15 => ANSI16[i as usize].1,
         16..=231 => {
             let c = i as usize - 16;
-            (CUBE_LEVELS[c / 36], CUBE_LEVELS[c / 6 % 6], CUBE_LEVELS[c % 6])
+            (
+                CUBE_LEVELS[c / 36],
+                CUBE_LEVELS[c / 6 % 6],
+                CUBE_LEVELS[c % 6],
+            )
         }
         232..=255 => {
             let v = 8 + 10 * (i - 232);
@@ -261,13 +283,19 @@ mod tests {
     fn ansi256_quantizes_rgb_to_indexed() {
         // Exact cube color maps onto the cube…
         assert_eq!(
-            TermCaps { color: ColorSupport::Ansi256, rich_glyphs: true }
-                .adapt_color(Color::Rgb(95, 135, 175)),
+            TermCaps {
+                color: ColorSupport::Ansi256,
+                rich_glyphs: true
+            }
+            .adapt_color(Color::Rgb(95, 135, 175)),
             Color::Indexed(16 + 36 + 6 * 2 + 3)
         );
         // …and near-grays land on the grayscale ramp.
-        let c = TermCaps { color: ColorSupport::Ansi256, rich_glyphs: true }
-            .adapt_color(Color::Rgb(40, 40, 42));
+        let c = TermCaps {
+            color: ColorSupport::Ansi256,
+            rich_glyphs: true,
+        }
+        .adapt_color(Color::Rgb(40, 40, 42));
         match c {
             Color::Indexed(i) => assert!((232..=255).contains(&i), "expected gray ramp, got {i}"),
             other => panic!("expected Indexed, got {other:?}"),
@@ -301,7 +329,10 @@ mod tests {
         assert_eq!(TermCaps::full().check_mark(), "✓");
         assert_eq!(TermCaps::linux_tty().check_mark(), "x");
         assert_eq!(TermCaps::full().selected_border_type(), BorderType::Thick);
-        assert_eq!(TermCaps::linux_tty().selected_border_type(), BorderType::Double);
+        assert_eq!(
+            TermCaps::linux_tty().selected_border_type(),
+            BorderType::Double
+        );
         assert_eq!(TermCaps::full().scrollbar_thumb(), "▌");
         assert_eq!(TermCaps::linux_tty().scrollbar_thumb(), "▌");
     }
@@ -310,7 +341,14 @@ mod tests {
     fn adapt_buffer_leaves_no_rgb_behind() {
         use ratatui::style::Style;
         let mut buf = Buffer::empty(ratatui::layout::Rect::new(0, 0, 4, 1));
-        buf.set_string(0, 0, "test", Style::default().fg(Color::Rgb(1, 2, 3)).bg(Color::Rgb(4, 5, 6)));
+        buf.set_string(
+            0,
+            0,
+            "test",
+            Style::default()
+                .fg(Color::Rgb(1, 2, 3))
+                .bg(Color::Rgb(4, 5, 6)),
+        );
         TermCaps::linux_tty().adapt_buffer(&mut buf);
         for cell in buf.content.iter() {
             assert!(!matches!(cell.fg, Color::Rgb(..)));

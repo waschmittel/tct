@@ -29,12 +29,19 @@ pub fn send(out: &mut dyn Write, file_name: &str, pdf: &[u8]) -> anyhow::Result<
         bail!("nothing to send");
     }
     if pdf.len() > MAX_PDF_BYTES {
-        bail!("PDF is too large to send ({} MB)", pdf.len() / (1024 * 1024));
+        bail!(
+            "PDF is too large to send ({} MB)",
+            pdf.len() / (1024 * 1024)
+        );
     }
     let name = base64_encode(file_name.as_bytes());
     let total = pdf.len().div_ceil(CHUNK_BYTES).max(1);
     for (index, chunk) in pdf.chunks(CHUNK_BYTES).enumerate() {
-        write!(out, "\x1b]{OSC_CODE};{index};{total};{name};{}\x07", base64_encode(chunk))?;
+        write!(
+            out,
+            "\x1b]{OSC_CODE};{index};{total};{name};{}\x07",
+            base64_encode(chunk)
+        )?;
     }
     out.flush()?;
     Ok(())
@@ -101,7 +108,10 @@ pub(crate) mod tests {
     fn the_wire_format_is_pinned_for_the_browser_side() {
         let mut out = Vec::new();
         send(&mut out, "a b.pdf", b"%PDF-1.7\n").unwrap();
-        assert_eq!(String::from_utf8(out).unwrap(), "\x1b]7733;0;1;YSBiLnBkZg==;JVBERi0xLjcK\x07");
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            "\x1b]7733;0;1;YSBiLnBkZg==;JVBERi0xLjcK\x07"
+        );
     }
 
     #[test]

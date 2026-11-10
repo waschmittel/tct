@@ -1,13 +1,13 @@
 //! `tct search` subcommand: find cards across all (or filtered) boards.
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use regex::Regex;
 
 use super::util::{flag_value, flag_values_all, has_flag, lists_and_cards, print_card_line};
-use crate::outln;
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
 use crate::model::label::Label;
+use crate::outln;
 use crate::storage::board_store;
 
 pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
@@ -84,7 +84,10 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
             if !matching.is_empty() {
                 outln!(
                     "\n  Board: {} [{}]  List: {} [{}]",
-                    board.name, board.id, list.name, list.id
+                    board.name,
+                    board.id,
+                    list.name,
+                    list.id
                 );
                 for card in &matching {
                     total += 1;

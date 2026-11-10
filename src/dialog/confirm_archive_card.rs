@@ -15,13 +15,7 @@ use crate::command::Command;
 pub struct ConfirmArchiveCard;
 
 impl Dialog for ConfirmArchiveCard {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, board: Option<&LoadedBoard>, _accent: Color) {
         let name = board
             .and_then(|b| b.current_card())
             .map(|c| c.title.as_str())

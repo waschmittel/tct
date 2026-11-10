@@ -18,13 +18,7 @@ pub struct ArchivedBoards {
 }
 
 impl Dialog for ArchivedBoards {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        _board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, _board: Option<&LoadedBoard>, _accent: Color) {
         let height = (self.boards.len() as u16 + 5)
             .min(area.height.saturating_sub(4))
             .max(6);
@@ -59,7 +53,9 @@ impl Dialog for ArchivedBoards {
             let prefix = if is_selected { "» " } else { "  " };
             let board_color = board.accent_color.to_ratatui_color();
             let style = if is_selected {
-                Style::default().fg(board_color).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(board_color)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(board_color)
             };
@@ -84,11 +80,13 @@ impl Dialog for ArchivedBoards {
             }
             KeyCode::Enter if self.selected < self.boards.len() => {
                 let board = self.boards[self.selected].clone();
-                DialogOutcome::open(Box::new(super::confirm_restore_board::ConfirmRestoreBoard {
-                    board,
-                    boards: self.boards.clone(),
-                    selected: self.selected,
-                }))
+                DialogOutcome::open(Box::new(
+                    super::confirm_restore_board::ConfirmRestoreBoard {
+                        board,
+                        boards: self.boards.clone(),
+                        selected: self.selected,
+                    },
+                ))
             }
             KeyCode::Char('x') if self.selected < self.boards.len() => {
                 let board = self.boards.remove(self.selected);
@@ -96,11 +94,9 @@ impl Dialog for ArchivedBoards {
                 if self.selected > 0 && self.selected >= self.boards.len() {
                     self.selected = self.boards.len().saturating_sub(1);
                 }
-                let mut out = DialogOutcome::side_effect(
-                    DialogSideEffect::DeleteArchivedBoard {
-                        board_id: board.id,
-                    },
-                )
+                let mut out = DialogOutcome::side_effect(DialogSideEffect::DeleteArchivedBoard {
+                    board_id: board.id,
+                })
                 .with_status(format!("Deleted board '{name}'"));
                 if self.boards.is_empty() {
                     out = out.with_close_to(crate::app::AppMode::BoardSelector);

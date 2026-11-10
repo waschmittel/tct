@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
-use ratatui::Frame;
 
 use crate::model::card::Card;
 use crate::model::label::Label;
@@ -107,7 +107,11 @@ pub fn card_lines(
     );
 
     let resolved = card.resolved_labels(board_labels);
-    lines.extend(super::labels::label_lines(&resolved, width as usize, dimmed));
+    lines.extend(super::labels::label_lines(
+        &resolved,
+        width as usize,
+        dimmed,
+    ));
 
     let mut info = vec![];
     if let Some(due) = &card.due_date {
@@ -220,7 +224,10 @@ mod due_label_tests {
     #[test]
     fn other_years_show_the_year() {
         assert_eq!(due_label(d(2027, 1, 5), d(2026, 10, 16)), "2027-01-05");
-        assert_eq!(due_label(d(2025, 12, 31), d(2026, 10, 16)), "2025-12-31 (-289d)");
+        assert_eq!(
+            due_label(d(2025, 12, 31), d(2026, 10, 16)),
+            "2025-12-31 (-289d)"
+        );
     }
 
     #[test]
@@ -251,14 +258,31 @@ mod tests {
         let mut card = Card::new("Task".into());
         card.created_at = chrono::Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
         card.log("Edited");
-        card.history.last_mut().unwrap().at = chrono::Utc.with_ymd_and_hms(2021, 3, 4, 12, 0, 0).unwrap();
+        card.history.last_mut().unwrap().at =
+            chrono::Utc.with_ymd_and_hms(2021, 3, 4, 12, 0, 0).unwrap();
         let mut terminal = Terminal::new(TestBackend::new(width, 5)).unwrap();
         terminal
-            .draw(|f| render(f, f.area(), &card, false, false, &[], Color::Cyan, TermCaps::full(), stamps))
+            .draw(|f| {
+                render(
+                    f,
+                    f.area(),
+                    &card,
+                    false,
+                    false,
+                    &[],
+                    Color::Cyan,
+                    TermCaps::full(),
+                    stamps,
+                )
+            })
             .unwrap();
         let buf = terminal.backend().buffer().clone();
         (0..5)
-            .map(|y| (0..width).map(|x| buf[(x, y)].symbol().to_string()).collect::<String>())
+            .map(|y| {
+                (0..width)
+                    .map(|x| buf[(x, y)].symbol().to_string())
+                    .collect::<String>()
+            })
             .collect()
     }
 
@@ -278,8 +302,18 @@ mod tests {
         terminal
             .draw(|f| {
                 render(
-                    f, f.area(), &card, false, true, &[], Color::Cyan, TermCaps::full(),
-                    DateStamps { created: true, updated: false },
+                    f,
+                    f.area(),
+                    &card,
+                    false,
+                    true,
+                    &[],
+                    Color::Cyan,
+                    TermCaps::full(),
+                    DateStamps {
+                        created: true,
+                        updated: false,
+                    },
                 )
             })
             .unwrap();
@@ -296,8 +330,18 @@ mod tests {
             terminal
                 .draw(|f| {
                     render(
-                        f, f.area(), &card, selected, false, &[], accent, TermCaps::full(),
-                        DateStamps { created: true, updated: false },
+                        f,
+                        f.area(),
+                        &card,
+                        selected,
+                        false,
+                        &[],
+                        accent,
+                        TermCaps::full(),
+                        DateStamps {
+                            created: true,
+                            updated: false,
+                        },
                     )
                 })
                 .unwrap();
@@ -316,27 +360,57 @@ mod tests {
 
     #[test]
     fn updated_date_sits_in_the_top_right_of_the_frame() {
-        let rows = frame_rows(DateStamps { created: false, updated: true }, 30);
-        assert!(rows[0].trim_end().ends_with("┐") && rows[0].contains(" 2021-03-04 ┐"), "{rows:?}");
+        let rows = frame_rows(
+            DateStamps {
+                created: false,
+                updated: true,
+            },
+            30,
+        );
+        assert!(
+            rows[0].trim_end().ends_with("┐") && rows[0].contains(" 2021-03-04 ┐"),
+            "{rows:?}"
+        );
         assert!(!rows[4].contains("2020"), "{rows:?}");
     }
 
     #[test]
     fn created_date_sits_in_the_bottom_right_of_the_frame() {
-        let rows = frame_rows(DateStamps { created: true, updated: false }, 30);
+        let rows = frame_rows(
+            DateStamps {
+                created: true,
+                updated: false,
+            },
+            30,
+        );
         assert!(rows[4].contains(" 2020-01-02 ┘"), "{rows:?}");
         assert!(!rows[0].contains("2021"), "{rows:?}");
     }
 
     #[test]
     fn both_stamps_together() {
-        let rows = frame_rows(DateStamps { created: true, updated: true }, 30);
-        assert!(rows[0].contains("2021-03-04") && rows[4].contains("2020-01-02"), "{rows:?}");
+        let rows = frame_rows(
+            DateStamps {
+                created: true,
+                updated: true,
+            },
+            30,
+        );
+        assert!(
+            rows[0].contains("2021-03-04") && rows[4].contains("2020-01-02"),
+            "{rows:?}"
+        );
     }
 
     #[test]
     fn stamps_are_skipped_when_the_card_is_too_narrow() {
-        let rows = frame_rows(DateStamps { created: true, updated: true }, 12);
+        let rows = frame_rows(
+            DateStamps {
+                created: true,
+                updated: true,
+            },
+            12,
+        );
         assert!(rows.iter().all(|r| !r.contains("20")), "{rows:?}");
     }
 
@@ -396,8 +470,8 @@ mod tests {
     #[test]
     fn no_blank_row_at_computed_card_height() {
         use crate::term_caps::TermCaps;
-        use ratatui::backend::TestBackend;
         use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
 
         let names = [
             "Qualität",
@@ -427,11 +501,7 @@ mod tests {
             }];
             for area_w in 8u16..60 {
                 let inner_w = area_w.saturating_sub(2);
-                let h = crate::ui::widgets::list_widget::card_height(
-                    &card,
-                    &board_labels,
-                    inner_w,
-                );
+                let h = crate::ui::widgets::list_widget::card_height(&card, &board_labels, inner_w);
                 let backend = TestBackend::new(area_w, h);
                 let mut terminal = Terminal::new(backend).unwrap();
                 terminal

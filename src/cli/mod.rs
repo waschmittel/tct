@@ -137,8 +137,15 @@ fn init(rest: &[String]) -> anyhow::Result<()> {
         bail!("init takes no arguments (got '{extra}'); set TCT_DATA_DIR to pick the folder");
     }
     let existed = crate::storage::board_store::init_data_dir()?;
-    let verb = if existed { "Reinitialized existing" } else { "Initialized empty" };
-    crate::outln!("{verb} tct data directory in {}", crate::storage::paths::base_dir().display());
+    let verb = if existed {
+        "Reinitialized existing"
+    } else {
+        "Initialized empty"
+    };
+    crate::outln!(
+        "{verb} tct data directory in {}",
+        crate::storage::paths::base_dir().display()
+    );
     Ok(())
 }
 

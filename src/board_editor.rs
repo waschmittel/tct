@@ -161,7 +161,11 @@ impl BoardEditor {
     /// Test-only constructor for in-memory fixtures (no disk).
     #[cfg(test)]
     pub fn from_loaded(board: LoadedBoard) -> Self {
-        Self { board, last_added_card_id: None, diagnostics: Vec::new() }
+        Self {
+            board,
+            last_added_card_id: None,
+            diagnostics: Vec::new(),
+        }
     }
 
     pub fn board(&self) -> &LoadedBoard {
@@ -232,7 +236,11 @@ impl BoardEditor {
         let Some(&cur_raw) = base.get(cur_ord) else {
             return;
         };
-        if let Some(&next_raw) = self.board.visible_cards(li, search).iter().find(|&&i| i > cur_raw)
+        if let Some(&next_raw) = self
+            .board
+            .visible_cards(li, search)
+            .iter()
+            .find(|&&i| i > cur_raw)
             && let Some(ord) = base.iter().position(|&r| r == next_raw)
         {
             self.board.selected_card[li] = ord;
@@ -248,8 +256,12 @@ impl BoardEditor {
         let Some(&cur_raw) = base.get(cur_ord) else {
             return;
         };
-        if let Some(&prev_raw) =
-            self.board.visible_cards(li, search).iter().rev().find(|&&i| i < cur_raw)
+        if let Some(&prev_raw) = self
+            .board
+            .visible_cards(li, search)
+            .iter()
+            .rev()
+            .find(|&&i| i < cur_raw)
             && let Some(ord) = base.iter().position(|&r| r == prev_raw)
         {
             self.board.selected_card[li] = ord;
@@ -276,7 +288,11 @@ impl BoardEditor {
         for li in 0..self.board.lists.len() {
             if let Some(&raw) = self.board.visible_cards(li, Some(query)).first() {
                 self.board.selected_list = li;
-                if let Some(ord) = self.board.visible_cards(li, None).iter().position(|&r| r == raw)
+                if let Some(ord) = self
+                    .board
+                    .visible_cards(li, None)
+                    .iter()
+                    .position(|&r| r == raw)
                 {
                     self.board.selected_card[li] = ord;
                 }
@@ -298,7 +314,11 @@ impl BoardEditor {
                 continue;
             };
             if let Some(q) = search {
-                if !self.board.visible_cards(li, Some(q)).contains(&visible_all[ord]) {
+                if !self
+                    .board
+                    .visible_cards(li, Some(q))
+                    .contains(&visible_all[ord])
+                {
                     continue;
                 }
             }
@@ -347,7 +367,6 @@ impl BoardEditor {
             current.saturating_sub(step)
         };
     }
-
 
     /// Stage a card into the in-memory model without staging a write. Used
     /// when callers need to bring an archived card into scope before
@@ -505,14 +524,21 @@ impl BoardEditor {
                 let card = self.card_mut(&card_id)?;
                 let action = format!("Added checklist item '{text}'");
                 let old = card.checklist_as_markdown();
-                card.checklist.push(ChecklistItem { text, completed: false });
+                card.checklist.push(ChecklistItem {
+                    text,
+                    completed: false,
+                });
                 card.log_checklist(action, old);
                 let last = card.checklist.len() - 1;
                 pending.push(PendingWrite::Card(card.clone()));
                 // Detail cursor follows the new item.
                 self.board.detail_item_idx = last;
             }
-            Command::EditChecklistItem { card_id, item_idx, text } => {
+            Command::EditChecklistItem {
+                card_id,
+                item_idx,
+                text,
+            } => {
                 let card = self.card_mut(&card_id)?;
                 let old_checklist = card.checklist_as_markdown();
                 let item = card
@@ -552,9 +578,7 @@ impl BoardEditor {
             Command::RemoveChecklistItem { card_id, item_idx } => {
                 let card = self.card_mut(&card_id)?;
                 if item_idx >= card.checklist.len() {
-                    return Err(BoardEditorError::Invariant(
-                        "checklist index out of range",
-                    ));
+                    return Err(BoardEditorError::Invariant("checklist index out of range"));
                 }
                 let old = card.checklist_as_markdown();
                 let removed = card.checklist.remove(item_idx);
@@ -570,9 +594,7 @@ impl BoardEditor {
                 let card = self.card_mut(&card_id)?;
                 let len = card.checklist.len();
                 if from >= len || to >= len {
-                    return Err(BoardEditorError::Invariant(
-                        "checklist index out of range",
-                    ));
+                    return Err(BoardEditorError::Invariant("checklist index out of range"));
                 }
                 if from != to {
                     let old = card.checklist_as_markdown();
@@ -600,13 +622,17 @@ impl BoardEditor {
                         id: label_id.to_string(),
                     })?;
                 let board_labels = &self.board.meta.labels;
-                let card = self
-                    .board
-                    .cards
-                    .get_mut(&card_id)
-                    .ok_or(BoardEditorError::NotFound { kind: "card", id: card_id.to_string() })?;
+                let card =
+                    self.board
+                        .cards
+                        .get_mut(&card_id)
+                        .ok_or(BoardEditorError::NotFound {
+                            kind: "card",
+                            id: card_id.to_string(),
+                        })?;
                 let old = card.label_names_text(board_labels);
-                let action = if let Some(pos) = card.label_ids.iter().position(|id| *id == label_id) {
+                let action = if let Some(pos) = card.label_ids.iter().position(|id| *id == label_id)
+                {
                     card.label_ids.remove(pos);
                     format!("Removed label '{label_name}'")
                 } else {
@@ -671,7 +697,11 @@ impl BoardEditor {
                 self.move_card(&card_id, direction, &mut pending)?;
             }
             Command::AddList { name } => {
-                let meta = ListMeta { id: ListId::generate(), name, archived: false };
+                let meta = ListMeta {
+                    id: ListId::generate(),
+                    name,
+                    archived: false,
+                };
                 self.board.lists.push(CardList {
                     id: meta.id.clone(),
                     name: meta.name.clone(),
@@ -922,7 +952,10 @@ impl BoardEditor {
             ));
         }
         if n > 0 && b.selected_list >= n {
-            return Err(format!("selected_list {} out of range (lists: {n})", b.selected_list));
+            return Err(format!(
+                "selected_list {} out of range (lists: {n})",
+                b.selected_list
+            ));
         }
         for i in 0..n {
             let count = b.visible_card_count(i);
@@ -1013,7 +1046,12 @@ impl BoardEditor {
             .lists
             .iter()
             .enumerate()
-            .find_map(|(li, l)| l.card_ids.iter().position(|id| id == card_id).map(|ci| (li, ci)))
+            .find_map(|(li, l)| {
+                l.card_ids
+                    .iter()
+                    .position(|id| id == card_id)
+                    .map(|ci| (li, ci))
+            })
             .ok_or_else(|| BoardEditorError::NotFound {
                 kind: "card",
                 id: card_id.to_string(),
@@ -1035,7 +1073,9 @@ impl BoardEditor {
                         if vp == 0 {
                             return Ok(());
                         }
-                        let prev = (vp >= 2).then(|| self.pos_of_raw(src_idx, vis[vp - 2])).flatten();
+                        let prev = (vp >= 2)
+                            .then(|| self.pos_of_raw(src_idx, vis[vp - 2]))
+                            .flatten();
                         let next = self.pos_of_raw(src_idx, vis[vp - 1]);
                         crate::model::rank::between(prev, next)
                     }
@@ -1079,7 +1119,9 @@ impl BoardEditor {
                 let prev = (insert_vp > 0)
                     .then(|| self.pos_of_raw(dst, vis_dst[insert_vp - 1]))
                     .flatten();
-                let next = vis_dst.get(insert_vp).and_then(|&r| self.pos_of_raw(dst, r));
+                let next = vis_dst
+                    .get(insert_vp)
+                    .and_then(|&r| self.pos_of_raw(dst, r));
                 let new_pos = crate::model::rank::between(prev, next);
                 let dst_list_id = self.board.lists[dst].id.clone();
                 if let Some(card) = self.board.cards.get_mut(card_id) {
@@ -1180,7 +1222,11 @@ mod tests {
     fn seed_board_with_card() -> (BoardMeta, CardId) {
         let mut meta = BoardMeta::new("Test".into());
         let list_id = ListId::generate();
-        meta.lists.push(ListMeta { id: list_id.clone(), name: "Backlog".into(), archived: false });
+        meta.lists.push(ListMeta {
+            id: list_id.clone(),
+            name: "Backlog".into(),
+            archived: false,
+        });
         let mut card = Card::new("Task".into());
         card.list_id = list_id;
         card.position = 1.0;
@@ -1240,7 +1286,11 @@ mod tests {
         with_temp_dir(|| {
             let (meta, card_id) = seed_board_with_card();
             let mut editor = BoardEditor::load(&meta.id).unwrap();
-            editor.apply(Command::ArchiveCard { card_id: card_id.clone() }).unwrap();
+            editor
+                .apply(Command::ArchiveCard {
+                    card_id: card_id.clone(),
+                })
+                .unwrap();
 
             let card = editor.board().cards.get(&card_id).unwrap();
             assert!(card.archived);
@@ -1257,8 +1307,16 @@ mod tests {
         with_temp_dir(|| {
             let (meta, card_id) = seed_board_with_card();
             let mut editor = BoardEditor::load(&meta.id).unwrap();
-            editor.apply(Command::ArchiveCard { card_id: card_id.clone() }).unwrap();
-            editor.apply(Command::RestoreCard { card_id: card_id.clone() }).unwrap();
+            editor
+                .apply(Command::ArchiveCard {
+                    card_id: card_id.clone(),
+                })
+                .unwrap();
+            editor
+                .apply(Command::RestoreCard {
+                    card_id: card_id.clone(),
+                })
+                .unwrap();
 
             let card = editor.board().cards.get(&card_id).unwrap();
             assert!(!card.archived);
@@ -1277,7 +1335,11 @@ mod tests {
         with_temp_dir(|| {
             let mut meta = BoardMeta::new("Test".into());
             let lid = ListId::generate();
-            meta.lists.push(ListMeta { id: lid.clone(), name: "TODO".into(), archived: false });
+            meta.lists.push(ListMeta {
+                id: lid.clone(),
+                name: "TODO".into(),
+                archived: false,
+            });
             board_store::save_board(&meta).unwrap();
 
             // Visible "top" (pos -1), archived (0, 1), visible "bottom" (pos 2).
@@ -1299,7 +1361,12 @@ mod tests {
             let vis = editor.board().visible_cards(0, None);
             assert_eq!(vis.len(), 2);
 
-            editor.apply(Command::MoveCard { card_id: bottom.clone(), direction: MoveDir::Up }).unwrap();
+            editor
+                .apply(Command::MoveCard {
+                    card_id: bottom.clone(),
+                    direction: MoveDir::Up,
+                })
+                .unwrap();
 
             let visible_order = |ed: &BoardEditor| -> Vec<CardId> {
                 ed.board()
@@ -1308,12 +1375,20 @@ mod tests {
                     .map(|i| ed.board().lists[0].card_ids[i].clone())
                     .collect()
             };
-            assert_eq!(visible_order(&editor), vec![bottom.clone(), top.clone()], "bottom moved above top");
+            assert_eq!(
+                visible_order(&editor),
+                vec![bottom.clone(), top.clone()],
+                "bottom moved above top"
+            );
             // Selection follows the moved card.
             assert_eq!(editor.board().current_card_id(), Some(&bottom));
 
             editor.reload().unwrap();
-            assert_eq!(visible_order(&editor), vec![bottom.clone(), top.clone()], "survives reload");
+            assert_eq!(
+                visible_order(&editor),
+                vec![bottom.clone(), top.clone()],
+                "survives reload"
+            );
         });
     }
 
@@ -1323,8 +1398,16 @@ mod tests {
             let mut meta = BoardMeta::new("Test".into());
             let la = ListId::generate();
             let lb = ListId::generate();
-            meta.lists.push(ListMeta { id: la.clone(), name: "A".into(), archived: false });
-            meta.lists.push(ListMeta { id: lb.clone(), name: "B".into(), archived: false });
+            meta.lists.push(ListMeta {
+                id: la.clone(),
+                name: "A".into(),
+                archived: false,
+            });
+            meta.lists.push(ListMeta {
+                id: lb.clone(),
+                name: "B".into(),
+                archived: false,
+            });
             board_store::save_board(&meta).unwrap();
             let mut a = Vec::new();
             for (i, t) in ["a0", "a1", "a2"].iter().enumerate() {
@@ -1338,28 +1421,63 @@ mod tests {
             assert_eq!(editor.board().lists[0].card_ids, a);
 
             // Down, then reload.
-            editor.apply(Command::MoveCard { card_id: a[0].clone(), direction: MoveDir::Down }).unwrap();
+            editor
+                .apply(Command::MoveCard {
+                    card_id: a[0].clone(),
+                    direction: MoveDir::Down,
+                })
+                .unwrap();
             let mem = editor.board().lists[0].card_ids.clone();
             assert_eq!(mem, vec![a[1].clone(), a[0].clone(), a[2].clone()]);
             editor.reload().unwrap();
-            assert_eq!(editor.board().lists[0].card_ids, mem, "down survives reload");
+            assert_eq!(
+                editor.board().lists[0].card_ids,
+                mem,
+                "down survives reload"
+            );
 
             // Up brings it back.
-            editor.apply(Command::MoveCard { card_id: a[0].clone(), direction: MoveDir::Up }).unwrap();
+            editor
+                .apply(Command::MoveCard {
+                    card_id: a[0].clone(),
+                    direction: MoveDir::Up,
+                })
+                .unwrap();
             editor.reload().unwrap();
             assert_eq!(editor.board().lists[0].card_ids, a, "up survives reload");
 
             // Right: a0 -> list B.
-            editor.apply(Command::MoveCard { card_id: a[0].clone(), direction: MoveDir::Right }).unwrap();
+            editor
+                .apply(Command::MoveCard {
+                    card_id: a[0].clone(),
+                    direction: MoveDir::Right,
+                })
+                .unwrap();
             editor.reload().unwrap();
-            assert_eq!(editor.board().lists[0].card_ids, vec![a[1].clone(), a[2].clone()], "src after right");
-            assert_eq!(editor.board().lists[1].card_ids, vec![a[0].clone()], "dst after right");
+            assert_eq!(
+                editor.board().lists[0].card_ids,
+                vec![a[1].clone(), a[2].clone()],
+                "src after right"
+            );
+            assert_eq!(
+                editor.board().lists[1].card_ids,
+                vec![a[0].clone()],
+                "dst after right"
+            );
             assert_eq!(editor.board().cards[&a[0]].list_id, lb);
 
             // Left: a0 back to list A.
-            editor.apply(Command::MoveCard { card_id: a[0].clone(), direction: MoveDir::Left }).unwrap();
+            editor
+                .apply(Command::MoveCard {
+                    card_id: a[0].clone(),
+                    direction: MoveDir::Left,
+                })
+                .unwrap();
             editor.reload().unwrap();
-            assert!(editor.board().lists[1].card_ids.is_empty(), "dst empty after left");
+            assert!(
+                editor.board().lists[1].card_ids.is_empty(),
+                "dst empty after left"
+            );
             assert!(editor.board().lists[0].card_ids.contains(&a[0]));
         });
     }
@@ -1377,7 +1495,11 @@ mod tests {
     fn editor_with_cards(titles: &[&str]) -> (BoardEditor, ListId, Vec<CardId>) {
         let mut meta = BoardMeta::new("Test".into());
         let lid = ListId::generate();
-        meta.lists.push(ListMeta { id: lid.clone(), name: "L".into(), archived: false });
+        meta.lists.push(ListMeta {
+            id: lid.clone(),
+            name: "L".into(),
+            archived: false,
+        });
         board_store::save_board(&meta).unwrap();
         let ids_v = titles
             .iter()
@@ -1404,9 +1526,21 @@ mod tests {
             })
             .unwrap();
             let label_id = ed.board().meta.labels[0].id.clone();
-            ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id }).unwrap();
-            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "u".into() }).unwrap();
-            ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: "x".into() }).unwrap();
+            ed.apply(Command::ToggleLabel {
+                card_id: id.clone(),
+                label_id,
+            })
+            .unwrap();
+            ed.apply(Command::EditCardTitle {
+                card_id: id.clone(),
+                title: "u".into(),
+            })
+            .unwrap();
+            ed.apply(Command::AddChecklistItem {
+                card_id: id.clone(),
+                text: "x".into(),
+            })
+            .unwrap();
             ed.reload().unwrap();
 
             let h = &ed.board().cards[&id].history;
@@ -1414,7 +1548,10 @@ mod tests {
             assert_eq!(h[0].old.as_deref(), Some(""));
             assert_eq!(h[0].new.as_deref(), Some("foo"));
             assert_eq!(h[1].field, HistoryField::Title);
-            assert_eq!((h[1].old.as_deref(), h[1].new.as_deref()), (Some("t"), Some("u")));
+            assert_eq!(
+                (h[1].old.as_deref(), h[1].new.as_deref()),
+                (Some("t"), Some("u"))
+            );
             assert_eq!(h[2].field, HistoryField::Checklist);
             assert_eq!(h[2].old.as_deref(), Some(""));
             assert_eq!(h[2].new.as_deref(), Some("- [ ] x"));
@@ -1426,16 +1563,32 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, _, ids) = editor_with_cards(&["t"]);
             let id = ids[0].clone();
-            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "a".into() }).unwrap();
-            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "b".into() }).unwrap();
-            ed.apply(Command::DeleteHistoryEntry { card_id: id.clone(), index: 0 }).unwrap();
+            ed.apply(Command::EditCardTitle {
+                card_id: id.clone(),
+                title: "a".into(),
+            })
+            .unwrap();
+            ed.apply(Command::EditCardTitle {
+                card_id: id.clone(),
+                title: "b".into(),
+            })
+            .unwrap();
+            ed.apply(Command::DeleteHistoryEntry {
+                card_id: id.clone(),
+                index: 0,
+            })
+            .unwrap();
             ed.reload().unwrap();
             let h = &ed.board().cards[&id].history;
             assert_eq!(h.len(), 1);
             assert_eq!(h[0].new.as_deref(), Some("b"));
-            assert!(ed
-                .apply(Command::DeleteHistoryEntry { card_id: id, index: 5 })
-                .is_err());
+            assert!(
+                ed.apply(Command::DeleteHistoryEntry {
+                    card_id: id,
+                    index: 5
+                })
+                .is_err()
+            );
         });
     }
 
@@ -1446,18 +1599,45 @@ mod tests {
             let id = ids[0].clone();
             let d1 = chrono::NaiveDate::from_ymd_opt(2099, 1, 1).unwrap();
             let d2 = chrono::NaiveDate::from_ymd_opt(2099, 2, 2).unwrap();
-            ed.apply(Command::EditCardDescription { card_id: id.clone(), body: "hi".into() }).unwrap();
-            ed.apply(Command::SetDueDate { card_id: id.clone(), date: d1 }).unwrap();
-            ed.apply(Command::SetDueDate { card_id: id.clone(), date: d2 }).unwrap();
-            ed.apply(Command::ClearDueDate { card_id: id.clone() }).unwrap();
+            ed.apply(Command::EditCardDescription {
+                card_id: id.clone(),
+                body: "hi".into(),
+            })
+            .unwrap();
+            ed.apply(Command::SetDueDate {
+                card_id: id.clone(),
+                date: d1,
+            })
+            .unwrap();
+            ed.apply(Command::SetDueDate {
+                card_id: id.clone(),
+                date: d2,
+            })
+            .unwrap();
+            ed.apply(Command::ClearDueDate {
+                card_id: id.clone(),
+            })
+            .unwrap();
             let h = &ed.board().cards[&id].history;
             assert_eq!(h.len(), 4);
             assert_eq!(h[0].field, HistoryField::Description);
-            assert_eq!((h[0].old.as_deref(), h[0].new.as_deref()), (Some(""), Some("hi")));
-            assert_eq!((h[1].old.as_deref(), h[1].new.as_deref()), (None, Some("2099-01-01")));
-            assert_eq!((h[2].old.as_deref(), h[2].new.as_deref()), (Some("2099-01-01"), Some("2099-02-02")));
+            assert_eq!(
+                (h[0].old.as_deref(), h[0].new.as_deref()),
+                (Some(""), Some("hi"))
+            );
+            assert_eq!(
+                (h[1].old.as_deref(), h[1].new.as_deref()),
+                (None, Some("2099-01-01"))
+            );
+            assert_eq!(
+                (h[2].old.as_deref(), h[2].new.as_deref()),
+                (Some("2099-01-01"), Some("2099-02-02"))
+            );
             assert_eq!(h[3].field, HistoryField::DueDate);
-            assert_eq!((h[3].old.as_deref(), h[3].new.as_deref()), (Some("2099-02-02"), None));
+            assert_eq!(
+                (h[3].old.as_deref(), h[3].new.as_deref()),
+                (Some("2099-02-02"), None)
+            );
         });
     }
 
@@ -1466,9 +1646,20 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, _, ids) = editor_with_cards(&["t"]);
             let id = ids[0].clone();
-            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "t".into() }).unwrap();
-            ed.apply(Command::EditCardDescription { card_id: id.clone(), body: String::new() }).unwrap();
-            ed.apply(Command::ClearDueDate { card_id: id.clone() }).unwrap();
+            ed.apply(Command::EditCardTitle {
+                card_id: id.clone(),
+                title: "t".into(),
+            })
+            .unwrap();
+            ed.apply(Command::EditCardDescription {
+                card_id: id.clone(),
+                body: String::new(),
+            })
+            .unwrap();
+            ed.apply(Command::ClearDueDate {
+                card_id: id.clone(),
+            })
+            .unwrap();
             assert!(ed.board().cards[&id].history.is_empty());
         });
     }
@@ -1479,19 +1670,50 @@ mod tests {
             let (mut ed, _, ids) = editor_with_cards(&["t"]);
             let id = ids[0].clone();
             for text in ["a", "b"] {
-                ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: text.into() }).unwrap();
+                ed.apply(Command::AddChecklistItem {
+                    card_id: id.clone(),
+                    text: text.into(),
+                })
+                .unwrap();
             }
-            ed.apply(Command::ToggleChecklistItem { card_id: id.clone(), item_idx: 0 }).unwrap();
-            ed.apply(Command::EditChecklistItem { card_id: id.clone(), item_idx: 1, text: "c".into() }).unwrap();
-            ed.apply(Command::ReorderChecklistItem { card_id: id.clone(), from: 1, to: 0 }).unwrap();
-            ed.apply(Command::RemoveChecklistItem { card_id: id.clone(), item_idx: 0 }).unwrap();
+            ed.apply(Command::ToggleChecklistItem {
+                card_id: id.clone(),
+                item_idx: 0,
+            })
+            .unwrap();
+            ed.apply(Command::EditChecklistItem {
+                card_id: id.clone(),
+                item_idx: 1,
+                text: "c".into(),
+            })
+            .unwrap();
+            ed.apply(Command::ReorderChecklistItem {
+                card_id: id.clone(),
+                from: 1,
+                to: 0,
+            })
+            .unwrap();
+            ed.apply(Command::RemoveChecklistItem {
+                card_id: id.clone(),
+                item_idx: 0,
+            })
+            .unwrap();
             let h = &ed.board().cards[&id].history;
             assert_eq!(h.len(), 6);
             assert!(h.iter().all(|e| e.field == HistoryField::Checklist));
             let pair = |i: usize| (h[i].old.clone().unwrap(), h[i].new.clone().unwrap());
-            assert_eq!(pair(2), ("- [ ] a\n- [ ] b".into(), "- [x] a\n- [ ] b".into()));
-            assert_eq!(pair(3), ("- [x] a\n- [ ] b".into(), "- [x] a\n- [ ] c".into()));
-            assert_eq!(pair(4), ("- [x] a\n- [ ] c".into(), "- [ ] c\n- [x] a".into()));
+            assert_eq!(
+                pair(2),
+                ("- [ ] a\n- [ ] b".into(), "- [x] a\n- [ ] b".into())
+            );
+            assert_eq!(
+                pair(3),
+                ("- [x] a\n- [ ] b".into(), "- [x] a\n- [ ] c".into())
+            );
+            assert_eq!(
+                pair(4),
+                ("- [x] a\n- [ ] c".into(), "- [ ] c\n- [x] a".into())
+            );
             assert_eq!(pair(5), ("- [ ] c\n- [x] a".into(), "- [x] a".into()));
         });
     }
@@ -1508,10 +1730,17 @@ mod tests {
             .unwrap();
             let label_id = ed.board().meta.labels[0].id.clone();
             for _ in 0..2 {
-                ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id: label_id.clone() }).unwrap();
+                ed.apply(Command::ToggleLabel {
+                    card_id: id.clone(),
+                    label_id: label_id.clone(),
+                })
+                .unwrap();
             }
             let h = &ed.board().cards[&id].history;
-            assert_eq!((h[1].old.as_deref(), h[1].new.as_deref()), (Some("foo"), Some("")));
+            assert_eq!(
+                (h[1].old.as_deref(), h[1].new.as_deref()),
+                (Some("foo"), Some(""))
+            );
             assert_eq!(h[1].action, "Removed label 'foo'");
         });
     }
@@ -1520,10 +1749,13 @@ mod tests {
     fn date_stamp_commands_set_independently_and_persist() {
         with_temp_dir(|| {
             let (mut ed, _, _) = editor_with_cards(&["t"]);
-            ed.apply(Command::SetShowCreatedDate { show: true }).unwrap();
+            ed.apply(Command::SetShowCreatedDate { show: true })
+                .unwrap();
             assert!(ed.board().meta.show_created_date && !ed.board().meta.show_updated_date);
-            ed.apply(Command::SetShowUpdatedDate { show: true }).unwrap();
-            ed.apply(Command::SetShowCreatedDate { show: false }).unwrap();
+            ed.apply(Command::SetShowUpdatedDate { show: true })
+                .unwrap();
+            ed.apply(Command::SetShowCreatedDate { show: false })
+                .unwrap();
             ed.reload().unwrap();
             assert!(!ed.board().meta.show_created_date && ed.board().meta.show_updated_date);
         });
@@ -1533,9 +1765,13 @@ mod tests {
     fn delete_history_entry_unknown_card_errors() {
         with_temp_dir(|| {
             let (mut ed, _, _) = editor_with_cards(&["t"]);
-            assert!(ed
-                .apply(Command::DeleteHistoryEntry { card_id: "nope".into(), index: 0 })
-                .is_err());
+            assert!(
+                ed.apply(Command::DeleteHistoryEntry {
+                    card_id: "nope".into(),
+                    index: 0
+                })
+                .is_err()
+            );
         });
     }
 
@@ -1543,14 +1779,23 @@ mod tests {
     fn new_card_position_command_persists_across_reload() {
         with_temp_dir(|| {
             let (mut ed, _, _) = editor_with_cards(&["t"]);
-            assert_eq!(ed.board().meta.new_card_position, crate::model::board::NewCardPosition::Bottom);
+            assert_eq!(
+                ed.board().meta.new_card_position,
+                crate::model::board::NewCardPosition::Bottom
+            );
             ed.apply(Command::SetNewCardPosition {
                 position: crate::model::board::NewCardPosition::Top,
             })
             .unwrap();
-            assert_eq!(ed.board().meta.new_card_position, crate::model::board::NewCardPosition::Top);
+            assert_eq!(
+                ed.board().meta.new_card_position,
+                crate::model::board::NewCardPosition::Top
+            );
             ed.reload().unwrap();
-            assert_eq!(ed.board().meta.new_card_position, crate::model::board::NewCardPosition::Top);
+            assert_eq!(
+                ed.board().meta.new_card_position,
+                crate::model::board::NewCardPosition::Top
+            );
         });
     }
 
@@ -1562,7 +1807,11 @@ mod tests {
                 position: crate::model::board::NewCardPosition::Top,
             })
             .unwrap();
-            ed.apply(Command::AddCard { list_id: lid.clone(), title: "fresh_top".into() }).unwrap();
+            ed.apply(Command::AddCard {
+                list_id: lid.clone(),
+                title: "fresh_top".into(),
+            })
+            .unwrap();
             let new_id = ed.last_added_card_id().cloned().unwrap();
             assert_eq!(ed.board().lists[0].card_ids.first(), Some(&new_id));
             assert_eq!(ed.board().selected_card[0], 0);
@@ -1572,7 +1821,11 @@ mod tests {
             assert_eq!(ed.board().lists[0].card_ids.first(), Some(&new_id));
 
             // Add another one at top
-            ed.apply(Command::AddCard { list_id: lid.clone(), title: "even_newer".into() }).unwrap();
+            ed.apply(Command::AddCard {
+                list_id: lid.clone(),
+                title: "even_newer".into(),
+            })
+            .unwrap();
             let newest_id = ed.last_added_card_id().cloned().unwrap();
             assert_eq!(ed.board().lists[0].card_ids.first(), Some(&newest_id));
             assert_eq!(ed.board().lists[0].card_ids[1], new_id);
@@ -1584,7 +1837,11 @@ mod tests {
     fn add_card_persists_across_reload() {
         with_temp_dir(|| {
             let (mut ed, lid, _) = editor_with_cards(&["existing"]);
-            ed.apply(Command::AddCard { list_id: lid.clone(), title: "fresh".into() }).unwrap();
+            ed.apply(Command::AddCard {
+                list_id: lid.clone(),
+                title: "fresh".into(),
+            })
+            .unwrap();
             let new_id = ed.last_added_card_id().cloned().unwrap();
             ed.reload().unwrap();
             assert_eq!(ed.board().cards[&new_id].title, "fresh");
@@ -1599,8 +1856,16 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, _, c) = editor_with_cards(&["orig"]);
             let id = c[0].clone();
-            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "renamed".into() }).unwrap();
-            ed.apply(Command::EditCardDescription { card_id: id.clone(), body: "body text".into() }).unwrap();
+            ed.apply(Command::EditCardTitle {
+                card_id: id.clone(),
+                title: "renamed".into(),
+            })
+            .unwrap();
+            ed.apply(Command::EditCardDescription {
+                card_id: id.clone(),
+                body: "body text".into(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert_eq!(ed.board().cards[&id].title, "renamed");
             assert_eq!(ed.board().cards[&id].description, "body text");
@@ -1613,10 +1878,17 @@ mod tests {
             let (mut ed, _, c) = editor_with_cards(&["task"]);
             let id = c[0].clone();
             let date = chrono::NaiveDate::from_ymd_opt(2026, 7, 1).unwrap();
-            ed.apply(Command::SetDueDate { card_id: id.clone(), date }).unwrap();
+            ed.apply(Command::SetDueDate {
+                card_id: id.clone(),
+                date,
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert_eq!(ed.board().cards[&id].due_date, Some(date));
-            ed.apply(Command::ClearDueDate { card_id: id.clone() }).unwrap();
+            ed.apply(Command::ClearDueDate {
+                card_id: id.clone(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert_eq!(ed.board().cards[&id].due_date, None);
         });
@@ -1627,10 +1899,16 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, lid, c) = editor_with_cards(&["task"]);
             let id = c[0].clone();
-            ed.apply(Command::ArchiveCard { card_id: id.clone() }).unwrap();
+            ed.apply(Command::ArchiveCard {
+                card_id: id.clone(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert!(ed.board().cards[&id].archived);
-            ed.apply(Command::RestoreCard { card_id: id.clone() }).unwrap();
+            ed.apply(Command::RestoreCard {
+                card_id: id.clone(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert!(!ed.board().cards[&id].archived);
             // Still a member of its original list, hence visible again.
@@ -1644,22 +1922,55 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, _, c) = editor_with_cards(&["task"]);
             let id = c[0].clone();
-            ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: "one".into() }).unwrap();
-            ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: "two".into() }).unwrap();
-            ed.apply(Command::AddChecklistItem { card_id: id.clone(), text: "three".into() }).unwrap();
-            ed.apply(Command::ToggleChecklistItem { card_id: id.clone(), item_idx: 0 }).unwrap();
-            ed.apply(Command::EditChecklistItem { card_id: id.clone(), item_idx: 1, text: "TWO".into() }).unwrap();
-            ed.apply(Command::ReorderChecklistItem { card_id: id.clone(), from: 2, to: 0 }).unwrap();
+            ed.apply(Command::AddChecklistItem {
+                card_id: id.clone(),
+                text: "one".into(),
+            })
+            .unwrap();
+            ed.apply(Command::AddChecklistItem {
+                card_id: id.clone(),
+                text: "two".into(),
+            })
+            .unwrap();
+            ed.apply(Command::AddChecklistItem {
+                card_id: id.clone(),
+                text: "three".into(),
+            })
+            .unwrap();
+            ed.apply(Command::ToggleChecklistItem {
+                card_id: id.clone(),
+                item_idx: 0,
+            })
+            .unwrap();
+            ed.apply(Command::EditChecklistItem {
+                card_id: id.clone(),
+                item_idx: 1,
+                text: "TWO".into(),
+            })
+            .unwrap();
+            ed.apply(Command::ReorderChecklistItem {
+                card_id: id.clone(),
+                from: 2,
+                to: 0,
+            })
+            .unwrap();
             ed.reload().unwrap();
             let cl = &ed.board().cards[&id].checklist;
             let names: Vec<&str> = cl.iter().map(|i| i.text.as_str()).collect();
             assert_eq!(names, vec!["three", "one", "TWO"], "order after reorder");
             // "one" was completed; it is now at index 1 after the reorder.
             assert!(cl[1].completed);
-            ed.apply(Command::RemoveChecklistItem { card_id: id.clone(), item_idx: 0 }).unwrap();
+            ed.apply(Command::RemoveChecklistItem {
+                card_id: id.clone(),
+                item_idx: 0,
+            })
+            .unwrap();
             ed.reload().unwrap();
-            let names: Vec<&str> =
-                ed.board().cards[&id].checklist.iter().map(|i| i.text.as_str()).collect();
+            let names: Vec<&str> = ed.board().cards[&id]
+                .checklist
+                .iter()
+                .map(|i| i.text.as_str())
+                .collect();
             assert_eq!(names, vec!["one", "TWO"]);
         });
     }
@@ -1669,12 +1980,24 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, _, c) = editor_with_cards(&["task"]);
             let id = c[0].clone();
-            ed.apply(Command::DefineLabel { name: "urgent".into(), color: LabelColor::Red }).unwrap();
+            ed.apply(Command::DefineLabel {
+                name: "urgent".into(),
+                color: LabelColor::Red,
+            })
+            .unwrap();
             let lbl = ed.board().meta.labels[0].id.clone();
-            ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id: lbl.clone() }).unwrap();
+            ed.apply(Command::ToggleLabel {
+                card_id: id.clone(),
+                label_id: lbl.clone(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert_eq!(ed.board().cards[&id].label_ids, vec![lbl.clone()]);
-            ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id: lbl.clone() }).unwrap();
+            ed.apply(Command::ToggleLabel {
+                card_id: id.clone(),
+                label_id: lbl.clone(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert!(ed.board().cards[&id].label_ids.is_empty());
         });
@@ -1685,15 +2008,33 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, _, c) = editor_with_cards(&["task"]);
             let id = c[0].clone();
-            ed.apply(Command::DefineLabel { name: "temp".into(), color: LabelColor::Green }).unwrap();
+            ed.apply(Command::DefineLabel {
+                name: "temp".into(),
+                color: LabelColor::Green,
+            })
+            .unwrap();
             let lbl = ed.board().meta.labels[0].id.clone();
-            ed.apply(Command::ToggleLabel { card_id: id.clone(), label_id: lbl.clone() }).unwrap();
-            ed.apply(Command::DeleteLabel { label_id: lbl.clone() }).unwrap();
+            ed.apply(Command::ToggleLabel {
+                card_id: id.clone(),
+                label_id: lbl.clone(),
+            })
+            .unwrap();
+            ed.apply(Command::DeleteLabel {
+                label_id: lbl.clone(),
+            })
+            .unwrap();
             // Lazy prune: the dead id is shed on the card's next save.
-            ed.apply(Command::EditCardTitle { card_id: id.clone(), title: "touched".into() }).unwrap();
+            ed.apply(Command::EditCardTitle {
+                card_id: id.clone(),
+                title: "touched".into(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert!(ed.board().meta.labels.is_empty());
-            assert!(ed.board().cards[&id].label_ids.is_empty(), "dead label id pruned on save");
+            assert!(
+                ed.board().cards[&id].label_ids.is_empty(),
+                "dead label id pruned on save"
+            );
         });
     }
 
@@ -1701,11 +2042,27 @@ mod tests {
     fn label_meta_commands_persist_across_reload() {
         with_temp_dir(|| {
             let (mut ed, _, _) = editor_with_cards(&["task"]);
-            ed.apply(Command::DefineLabel { name: "a".into(), color: LabelColor::Red }).unwrap();
-            ed.apply(Command::DefineLabel { name: "b".into(), color: LabelColor::Green }).unwrap();
+            ed.apply(Command::DefineLabel {
+                name: "a".into(),
+                color: LabelColor::Red,
+            })
+            .unwrap();
+            ed.apply(Command::DefineLabel {
+                name: "b".into(),
+                color: LabelColor::Green,
+            })
+            .unwrap();
             let a = ed.board().meta.labels[0].id.clone();
-            ed.apply(Command::RenameLabel { label_id: a.clone(), name: "alpha".into() }).unwrap();
-            ed.apply(Command::SetLabelColor { label_id: a.clone(), color: LabelColor::Blue }).unwrap();
+            ed.apply(Command::RenameLabel {
+                label_id: a.clone(),
+                name: "alpha".into(),
+            })
+            .unwrap();
+            ed.apply(Command::SetLabelColor {
+                label_id: a.clone(),
+                color: LabelColor::Blue,
+            })
+            .unwrap();
             ed.apply(Command::ReorderLabels { from: 0, to: 1 }).unwrap();
             ed.reload().unwrap();
             // After reorder, "alpha" (the renamed/recolored one) is last.
@@ -1721,15 +2078,26 @@ mod tests {
     fn list_commands_persist_across_reload() {
         with_temp_dir(|| {
             let (mut ed, lid, _) = editor_with_cards(&["task"]);
-            ed.apply(Command::AddList { name: "Second".into() }).unwrap();
-            ed.apply(Command::RenameList { list_id: lid.clone(), name: "First".into() }).unwrap();
+            ed.apply(Command::AddList {
+                name: "Second".into(),
+            })
+            .unwrap();
+            ed.apply(Command::RenameList {
+                list_id: lid.clone(),
+                name: "First".into(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert_eq!(ed.board().lists.len(), 2);
             assert_eq!(ed.board().lists[0].name, "First");
             assert_eq!(ed.board().lists[1].name, "Second");
 
             // Reorder: move "First" right (down the meta order).
-            ed.apply(Command::MoveList { list_id: lid.clone(), direction: MoveDir::Right }).unwrap();
+            ed.apply(Command::MoveList {
+                list_id: lid.clone(),
+                direction: MoveDir::Right,
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert_eq!(ed.board().lists[0].name, "Second");
             assert_eq!(ed.board().lists[1].name, "First");
@@ -1740,14 +2108,23 @@ mod tests {
     fn archive_then_restore_list_persists_across_reload() {
         with_temp_dir(|| {
             let (mut ed, lid, _) = editor_with_cards(&["task"]);
-            ed.apply(Command::AddList { name: "Keep".into() }).unwrap();
-            ed.apply(Command::ArchiveList { list_id: lid.clone() }).unwrap();
+            ed.apply(Command::AddList {
+                name: "Keep".into(),
+            })
+            .unwrap();
+            ed.apply(Command::ArchiveList {
+                list_id: lid.clone(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             // Active view excludes the archived list.
             assert_eq!(ed.board().lists.len(), 1);
             assert_eq!(ed.board().lists[0].name, "Keep");
 
-            ed.apply(Command::RestoreList { list_id: lid.clone() }).unwrap();
+            ed.apply(Command::RestoreList {
+                list_id: lid.clone(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert_eq!(ed.board().lists.len(), 2);
             assert!(ed.board().lists.iter().any(|l| l.id == lid));
@@ -1759,16 +2136,28 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, _, _) = editor_with_cards(&["task"]);
             let bid = ed.board().meta.id.clone();
-            ed.apply(Command::RenameBoard { name: "Renamed Board".into() }).unwrap();
-            ed.apply(Command::SetAccentColor { color: LabelColor::Blue }).unwrap();
+            ed.apply(Command::RenameBoard {
+                name: "Renamed Board".into(),
+            })
+            .unwrap();
+            ed.apply(Command::SetAccentColor {
+                color: LabelColor::Blue,
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert_eq!(ed.board().meta.name, "Renamed Board");
             assert_eq!(ed.board().meta.accent_color, LabelColor::Blue);
 
-            ed.apply(Command::ArchiveBoard { board_id: bid.clone() }).unwrap();
+            ed.apply(Command::ArchiveBoard {
+                board_id: bid.clone(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert!(ed.board().meta.archived);
-            ed.apply(Command::RestoreBoard { board_id: bid.clone() }).unwrap();
+            ed.apply(Command::RestoreBoard {
+                board_id: bid.clone(),
+            })
+            .unwrap();
             ed.reload().unwrap();
             assert!(!ed.board().meta.archived);
         });
@@ -1785,7 +2174,11 @@ mod tests {
         let cards_map: HashMap<_, _> = cards.into_iter().map(|c| (c.id.clone(), c)).collect();
         LoadedBoard {
             meta: BoardMeta::new("X".into()),
-            lists: vec![CardList { id: "l".into(), name: "L".into(), card_ids }],
+            lists: vec![CardList {
+                id: "l".into(),
+                name: "L".into(),
+                card_ids,
+            }],
             cards: cards_map,
             selected_list: 0,
             selected_card: vec![0],
@@ -1801,7 +2194,11 @@ mod tests {
     fn invariant_board(mutate: impl FnOnce(&mut LoadedBoard)) -> BoardEditor {
         let list_id = ListId::parse("lst00001").unwrap();
         let mut meta = BoardMeta::new("X".into());
-        meta.lists.push(ListMeta { id: list_id.clone(), name: "L".into(), archived: false });
+        meta.lists.push(ListMeta {
+            id: list_id.clone(),
+            name: "L".into(),
+            archived: false,
+        });
         let mut card = fixed_card("c0000001", "a");
         card.list_id = list_id;
         card.position = 1.0;
@@ -1898,8 +2295,13 @@ mod tests {
             let (meta, _) = seed_board_with_card();
             let mut editor = BoardEditor::load(&meta.id).unwrap();
             let bogus = CardId::generate();
-            let err = editor.apply(Command::ArchiveCard { card_id: bogus }).unwrap_err();
-            assert!(matches!(err, BoardEditorError::NotFound { kind: "card", .. }));
+            let err = editor
+                .apply(Command::ArchiveCard { card_id: bogus })
+                .unwrap_err();
+            assert!(matches!(
+                err,
+                BoardEditorError::NotFound { kind: "card", .. }
+            ));
         });
     }
 

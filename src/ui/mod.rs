@@ -42,7 +42,12 @@ pub fn render(frame: &mut Frame, app: &App) {
         && app
             .dialog
             .as_ref()
-            .map(|d| matches!(d.background(), crate::dialog::DialogBackground::BoardSelector))
+            .map(|d| {
+                matches!(
+                    d.background(),
+                    crate::dialog::DialogBackground::BoardSelector
+                )
+            })
             .unwrap_or(false);
 
     let insert_over_selector = matches!(&app.mode, AppMode::Insert)
@@ -65,8 +70,8 @@ pub fn render(frame: &mut Frame, app: &App) {
             // Help pops over whatever it was opened from: the card detail
             // (directly, over its editor, or under a dialog) and a live
             // dialog stay visible underneath.
-            let over_card_detail = matches!(effective_mode, AppMode::CardDetail)
-                || dialog_over_card_detail(app);
+            let over_card_detail =
+                matches!(effective_mode, AppMode::CardDetail) || dialog_over_card_detail(app);
             if over_card_detail && !dialog_over_selector {
                 card_detail::render(frame, area, app);
             }
@@ -132,12 +137,7 @@ fn render_status_toast(frame: &mut Frame, area: ratatui::layout::Rect, app: &App
         msg.clone()
     };
     let width = text.chars().count() as u16 + 2;
-    let rect = ratatui::layout::Rect::new(
-        area.x + area.width - width,
-        area.y,
-        width,
-        1,
-    );
+    let rect = ratatui::layout::Rect::new(area.x + area.width - width, area.y, width, 1);
     let toast = Paragraph::new(Span::styled(
         format!(" {text} "),
         Style::default().fg(Color::Yellow),
@@ -146,7 +146,12 @@ fn render_status_toast(frame: &mut Frame, area: ratatui::layout::Rect, app: &App
 }
 
 fn dialog_help_key_width(dh: &crate::dialog::DialogHelp) -> usize {
-    dh.rows.iter().map(|(k, _)| k.chars().count()).max().unwrap_or(0) + 2
+    dh.rows
+        .iter()
+        .map(|(k, _)| k.chars().count())
+        .max()
+        .unwrap_or(0)
+        + 2
 }
 
 fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
@@ -172,7 +177,6 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
     // Help opened from inside a dialog (`?` → `Follow::Help`): the dialog
     // declares its own reference rows via `Dialog::help()`.
     let dialog_help = app.dialog.as_ref().and_then(|d| d.help());
-
 
     // Help opened over a live insert handler (`?` → `InsertOutcome::Help`).
     // A dialog takes precedence: a dialog over insert (e.g. the discard
@@ -213,7 +217,10 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
 
     // Keys column: fixed width on the mode pages (fits "Shift+Left/Right"), sized to the longest key
     // on a dialog page so long key lists never crowd the description.
-    let key_width = dialog_help.as_ref().map(dialog_help_key_width).unwrap_or(18);
+    let key_width = dialog_help
+        .as_ref()
+        .map(dialog_help_key_width)
+        .unwrap_or(18);
 
     let header = |s: &str| -> Line<'static> {
         Line::from(Span::styled(
@@ -417,14 +424,8 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             .split(inner)
     };
 
-    frame.render_widget(
-        Paragraph::new(left).wrap(Wrap { trim: false }),
-        columns[0],
-    );
-    frame.render_widget(
-        Paragraph::new(right).wrap(Wrap { trim: false }),
-        columns[1],
-    );
+    frame.render_widget(Paragraph::new(left).wrap(Wrap { trim: false }), columns[0]);
+    frame.render_widget(Paragraph::new(right).wrap(Wrap { trim: false }), columns[1]);
 }
 
 #[cfg(test)]
@@ -449,7 +450,16 @@ mod tests {
 
         let layouts: &[(&[&str], Vec<&'static str>)] = &[
             (
-                &["Navigation", "Card", "Move", "Lists", "Search & Filter", "Labels & Due", "View", "App"],
+                &[
+                    "Navigation",
+                    "Card",
+                    "Move",
+                    "Lists",
+                    "Search & Filter",
+                    "Labels & Due",
+                    "View",
+                    "App",
+                ],
                 sections(crate::input::normal::KEYMAP),
             ),
             (
@@ -483,17 +493,19 @@ mod tests {
             // With board loaded, only board-name insert handlers force the
             // selector background; other handlers use the BoardView.
             let board_meta = crate::model::board::BoardMeta::new("Test".into());
-            app.editor = Some(crate::board_editor::BoardEditor::from_loaded(crate::app::LoadedBoard {
-                meta: board_meta,
-                lists: vec![],
-                cards: std::collections::HashMap::new(),
-                selected_list: 0,
-                selected_card: vec![],
-                scroll_offset: vec![],
-                detail_item_idx: 0,
-                detail_scroll: 0,
-                detail_max_scroll: std::cell::Cell::new(0),
-            }));
+            app.editor = Some(crate::board_editor::BoardEditor::from_loaded(
+                crate::app::LoadedBoard {
+                    meta: board_meta,
+                    lists: vec![],
+                    cards: std::collections::HashMap::new(),
+                    selected_list: 0,
+                    selected_card: vec![],
+                    scroll_offset: vec![],
+                    detail_item_idx: 0,
+                    detail_scroll: 0,
+                    detail_max_scroll: std::cell::Cell::new(0),
+                },
+            ));
 
             // NewBoardName → BoardSelector surface
             app.insert = Some(Box::new(crate::insert::line_editor::NewBoardName::new()));

@@ -35,7 +35,10 @@ pub struct InAlert {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Block {
     Blank,
-    Heading { level: u8, runs: Vec<Run> },
+    Heading {
+        level: u8,
+        runs: Vec<Run>,
+    },
     Text {
         /// Nesting depth of a list item (two source spaces per level).
         level: usize,
@@ -94,7 +97,10 @@ pub fn parse(markdown: &str) -> Vec<Block> {
         if is_table_line(line)
             && let Some(len) = table_block_len(&lines[idx..])
         {
-            let owned: Vec<String> = lines[idx..idx + len].iter().map(|l| l.to_string()).collect();
+            let owned: Vec<String> = lines[idx..idx + len]
+                .iter()
+                .map(|l| l.to_string())
+                .collect();
             if let Some(table) = Table::parse(&owned) {
                 blocks.push(Block::Table(table));
                 prev_cite = false;
@@ -197,11 +203,16 @@ fn parse_line(line: &str) -> Block {
         return Block::Blank;
     }
     if let Some((level, rest)) = heading(line) {
-        return Block::Heading { level, runs: inline(rest, Style::default()) };
+        return Block::Heading {
+            level,
+            runs: inline(rest, Style::default()),
+        };
     }
 
     let trimmed = line.trim_start();
-    let indent = line[..line.len() - trimmed.len()].replace('\t', "    ").len();
+    let indent = line[..line.len() - trimmed.len()]
+        .replace('\t', "    ")
+        .len();
 
     if let Some(marker_len) = citation_marker_len(trimmed) {
         let quote_depth = trimmed[..marker_len].matches('>').count();
@@ -213,7 +224,10 @@ fn parse_line(line: &str) -> Block {
             runs: inline(&trimmed[marker_len..], Style::default()),
         };
     }
-    if let Some(rest) = trimmed.strip_prefix("- ").or_else(|| trimmed.strip_prefix("* ")) {
+    if let Some(rest) = trimmed
+        .strip_prefix("- ")
+        .or_else(|| trimmed.strip_prefix("* "))
+    {
         let marker = if indent >= 2 { "◦" } else { "•" };
         return list_item(indent, marker.to_string(), rest);
     }
@@ -246,7 +260,9 @@ fn heading(line: &str) -> Option<(u8, &str)> {
     if !(1..=6).contains(&hashes) {
         return None;
     }
-    line[hashes..].strip_prefix(' ').map(|rest| (hashes as u8, rest))
+    line[hashes..]
+        .strip_prefix(' ')
+        .map(|rest| (hashes as u8, rest))
 }
 
 /// Split `text` into styled runs; `base` is the style of unmarked text.
@@ -258,7 +274,10 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
 
     let flush = |plain: &mut String, runs: &mut Vec<Run>| {
         if !plain.is_empty() {
-            runs.push(Run { text: std::mem::take(plain), style: base });
+            runs.push(Run {
+                text: std::mem::take(plain),
+                style: base,
+            });
         }
     };
 
@@ -281,7 +300,10 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
                 "*" => style.italic = true,
                 _ => style.code = true,
             }
-            runs.push(Run { text: chars[i + len..end].iter().collect(), style });
+            runs.push(Run {
+                text: chars[i + len..end].iter().collect(),
+                style,
+            });
             i = end + len;
             continue;
         }
@@ -295,9 +317,7 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
 fn find_close(chars: &[char], from: usize, marker: &str, single_star: bool) -> Option<usize> {
     let pat: Vec<char> = marker.chars().collect();
     (from..chars.len()).find(|&i| {
-        chars[i..].starts_with(&pat)
-            && i > from
-            && !(single_star && chars.get(i + 1) == Some(&'*'))
+        chars[i..].starts_with(&pat) && i > from && !(single_star && chars.get(i + 1) == Some(&'*'))
     })
 }
 
@@ -323,7 +343,10 @@ mod tests {
     fn triple_star_is_bold_italic() {
         let runs = inline("a ***b*** c", Style::default());
         assert_eq!(plain(&runs), "a b c");
-        assert!(runs.iter().any(|r| r.text == "b" && r.style.bold && r.style.italic));
+        assert!(
+            runs.iter()
+                .any(|r| r.text == "b" && r.style.bold && r.style.italic)
+        );
     }
 
     #[test]
@@ -429,6 +452,9 @@ mod tests {
 
     #[test]
     fn unterminated_fence_runs_to_the_end() {
-        assert_eq!(parse("```\na\nb"), vec![Block::Code(vec!["a".into(), "b".into()])]);
+        assert_eq!(
+            parse("```\na\nb"),
+            vec![Block::Code(vec!["a".into(), "b".into()])]
+        );
     }
 }

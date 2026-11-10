@@ -33,13 +33,17 @@ pub fn create(name: String) -> anyhow::Result<BoardMeta> {
 
 pub fn archive(board_id: &BoardId) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
-    editor.apply(Command::ArchiveBoard { board_id: board_id.clone() })?;
+    editor.apply(Command::ArchiveBoard {
+        board_id: board_id.clone(),
+    })?;
     Ok(())
 }
 
 pub fn restore(board_id: &BoardId) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
-    editor.apply(Command::RestoreBoard { board_id: board_id.clone() })?;
+    editor.apply(Command::RestoreBoard {
+        board_id: board_id.clone(),
+    })?;
     Ok(())
 }
 
@@ -73,7 +77,9 @@ pub fn configure_board(
 ) -> anyhow::Result<()> {
     let mut editor = BoardEditor::load(board_id)?;
     editor.apply(Command::SetAccentColor { color })?;
-    editor.apply(Command::SetNewCardPosition { position: new_card_position })?;
+    editor.apply(Command::SetNewCardPosition {
+        position: new_card_position,
+    })?;
     Ok(())
 }
 
@@ -123,7 +129,10 @@ mod tests {
 
             let listed = list().unwrap();
 
-            assert_eq!(listed.iter().map(|b| b.name.as_str()).collect::<Vec<_>>(), ["First", "Second"]);
+            assert_eq!(
+                listed.iter().map(|b| b.name.as_str()).collect::<Vec<_>>(),
+                ["First", "Second"]
+            );
             assert!(second.position > first.position);
         });
     }

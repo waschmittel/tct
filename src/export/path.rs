@@ -18,7 +18,10 @@ pub fn default_file_name(title: &str) -> String {
     }
     let slug: String = slug.trim_end_matches('-').chars().take(MAX_SLUG).collect();
     let slug = slug.trim_end_matches('-');
-    format!("{}.{EXTENSION}", if slug.is_empty() { "card" } else { slug })
+    format!(
+        "{}.{EXTENSION}",
+        if slug.is_empty() { "card" } else { slug }
+    )
 }
 
 /// Where `typed` points. Relative paths start at `cwd`, `~` is the home
@@ -43,12 +46,18 @@ pub fn resolve(typed: &str, cwd: &Path, file_name: &str) -> PathBuf {
 
 /// `dir` as typed into the input: absolute, `~` for the home directory, trailing `/`.
 pub fn display_dir(dir: &Path) -> String {
-    let shown = match dirs::home_dir().and_then(|home| dir.strip_prefix(home).ok().map(Path::to_path_buf)) {
+    let shown = match dirs::home_dir()
+        .and_then(|home| dir.strip_prefix(home).ok().map(Path::to_path_buf))
+    {
         Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
         Some(rest) => format!("~/{}", rest.display()),
         None => dir.display().to_string(),
     };
-    if shown.ends_with('/') { shown } else { format!("{shown}/") }
+    if shown.ends_with('/') {
+        shown
+    } else {
+        format!("{shown}/")
+    }
 }
 
 /// The directory one level above the typed directory `dir` (which ends in `/` or is empty).
@@ -84,22 +93,36 @@ pub fn suggestions(typed: &str, cwd: &Path) -> Vec<Entry> {
         .filter_map(|e| {
             let name = e.file_name().into_string().ok()?;
             let is_dir = e.path().is_dir();
-            let is_pdf = Path::new(&name).extension().is_some_and(|x| x.eq_ignore_ascii_case(EXTENSION));
+            let is_pdf = Path::new(&name)
+                .extension()
+                .is_some_and(|x| x.eq_ignore_ascii_case(EXTENSION));
             let visible = !name.starts_with('.') || prefix.starts_with('.');
             (visible && (is_dir || is_pdf) && name.to_lowercase().starts_with(&prefix_lower))
                 .then_some(Entry { name, is_dir })
         })
         .collect();
-    entries.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    entries.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
     if prefix.is_empty() || prefix == "." {
-        entries.insert(0, Entry { name: "..".into(), is_dir: true });
+        entries.insert(
+            0,
+            Entry {
+                name: "..".into(),
+                is_dir: true,
+            },
+        );
     }
     entries
 }
 
 /// Split at the last `/`: the directory part (with its slash) and the name typed after it.
 pub fn split_dir(typed: &str) -> (&str, &str) {
-    typed.rsplit_once('/').map_or(("", typed), |(_, name)| typed.split_at(typed.len() - name.len()))
+    typed.rsplit_once('/').map_or(("", typed), |(_, name)| {
+        typed.split_at(typed.len() - name.len())
+    })
 }
 
 fn resolve_dir(dir: &str, cwd: &Path) -> PathBuf {
@@ -131,7 +154,10 @@ mod tests {
         assert_eq!(resolve("x.pdf", cwd, "c.pdf"), cwd.join("x.pdf"));
         assert_eq!(resolve("sub", cwd, "c.pdf"), cwd.join("sub/c.pdf"));
         assert_eq!(resolve("new/", cwd, "c.pdf"), cwd.join("new/c.pdf"));
-        assert_eq!(resolve("/abs/x.pdf", cwd, "c.pdf"), PathBuf::from("/abs/x.pdf"));
+        assert_eq!(
+            resolve("/abs/x.pdf", cwd, "c.pdf"),
+            PathBuf::from("/abs/x.pdf")
+        );
     }
 
     #[test]
@@ -144,7 +170,10 @@ mod tests {
         std::fs::write(cwd.join("a.pdf"), b"").unwrap();
         std::fs::write(cwd.join("b.txt"), b"").unwrap();
         let names = |typed: &str| -> Vec<String> {
-            suggestions(typed, cwd).into_iter().map(|e| e.name).collect()
+            suggestions(typed, cwd)
+                .into_iter()
+                .map(|e| e.name)
+                .collect()
         };
         assert_eq!(names(""), ["..", "data", "docs", "a.pdf"]);
         assert_eq!(names("d"), ["data", "docs"]);

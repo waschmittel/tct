@@ -38,7 +38,9 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Help flag (check before anything else so it always works)
-    if args.iter().any(|a| a == "--help" || a == "-h") || args.first().map(|a| a.as_str()) == Some("help") {
+    if args.iter().any(|a| a == "--help" || a == "-h")
+        || args.first().map(|a| a.as_str()) == Some("help")
+    {
         cli::print_help();
         return Ok(());
     }
@@ -108,9 +110,9 @@ fn run_app(
 #[cfg(test)]
 mod tests {
     use crate::model::card::{Card, ChecklistItem};
-    use crate::model::label::{Label, LabelColor};
     use crate::model::id::{CardId, ListId};
-    
+    use crate::model::label::{Label, LabelColor};
+
     use crate::storage::{board_store, card_store};
     #[allow(unused_imports)]
     use regex::Regex;
@@ -170,8 +172,14 @@ mod tests {
             let mut card = Card::new("Fix bug".into());
             card.description = "Important fix".into();
             card.label_ids.push(label_id.clone());
-            card.checklist.push(ChecklistItem { text: "Reproduce".into(), completed: true });
-            card.checklist.push(ChecklistItem { text: "Fix".into(), completed: false });
+            card.checklist.push(ChecklistItem {
+                text: "Reproduce".into(),
+                completed: true,
+            });
+            card.checklist.push(ChecklistItem {
+                text: "Fix".into(),
+                completed: false,
+            });
 
             card_store::save_card(&board.id, &card).unwrap();
             let loaded = card_store::load_card(&board.id, &card.id).unwrap();
@@ -221,8 +229,14 @@ mod tests {
 
         let mut card1 = Card::new("Fix login bug".into());
         card1.description = "Auth token expires too early".into();
-        card1.checklist.push(ChecklistItem { text: "Reproduce issue".into(), completed: false });
-        card1.checklist.push(ChecklistItem { text: "Write failing test".into(), completed: false });
+        card1.checklist.push(ChecklistItem {
+            text: "Reproduce issue".into(),
+            completed: false,
+        });
+        card1.checklist.push(ChecklistItem {
+            text: "Write failing test".into(),
+            completed: false,
+        });
 
         let mut card2 = Card::new("Redesign dashboard".into());
         card2.description = "New layout with login metrics".into();
@@ -377,10 +391,18 @@ mod tests {
             let mut board2 = board_store::create_board("Beta".into()).unwrap();
 
             let list1 = crate::test_support::add_list(&mut board1, "Work");
-            crate::test_support::put_cards(&board1.id, &list1, &mut [Card::new("Shared query term".into())]);
+            crate::test_support::put_cards(
+                &board1.id,
+                &list1,
+                &mut [Card::new("Shared query term".into())],
+            );
 
             let list2 = crate::test_support::add_list(&mut board2, "Tasks");
-            crate::test_support::put_cards(&board2.id, &list2, &mut [Card::new("Another shared query term".into())]);
+            crate::test_support::put_cards(
+                &board2.id,
+                &list2,
+                &mut [Card::new("Another shared query term".into())],
+            );
 
             run_search(&["search", "shared query"]).unwrap();
         });
@@ -419,9 +441,18 @@ mod tests {
     fn checklist_reorder_basic() {
         let mut card = Card::new("Test".into());
         card.checklist = vec![
-            ChecklistItem { text: "A".into(), completed: false },
-            ChecklistItem { text: "B".into(), completed: false },
-            ChecklistItem { text: "C".into(), completed: false },
+            ChecklistItem {
+                text: "A".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "B".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "C".into(),
+                completed: false,
+            },
         ];
 
         // Swap A↔B (move index 0 down)
@@ -435,8 +466,14 @@ mod tests {
     fn checklist_reorder_move_up() {
         let mut card = Card::new("Test".into());
         card.checklist = vec![
-            ChecklistItem { text: "A".into(), completed: true },
-            ChecklistItem { text: "B".into(), completed: false },
+            ChecklistItem {
+                text: "A".into(),
+                completed: true,
+            },
+            ChecklistItem {
+                text: "B".into(),
+                completed: false,
+            },
         ];
 
         // Move B up: swap indices 1 and 0
@@ -452,8 +489,14 @@ mod tests {
     fn checklist_reorder_at_top_is_noop() {
         let mut card = Card::new("Test".into());
         card.checklist = vec![
-            ChecklistItem { text: "A".into(), completed: false },
-            ChecklistItem { text: "B".into(), completed: false },
+            ChecklistItem {
+                text: "A".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "B".into(),
+                completed: false,
+            },
         ];
         let idx = 0usize;
         // Cannot move up from top (idx == 0)
@@ -468,8 +511,14 @@ mod tests {
     fn checklist_reorder_at_bottom_is_noop() {
         let mut card = Card::new("Test".into());
         card.checklist = vec![
-            ChecklistItem { text: "A".into(), completed: false },
-            ChecklistItem { text: "B".into(), completed: false },
+            ChecklistItem {
+                text: "A".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "B".into(),
+                completed: false,
+            },
         ];
         let idx = 1usize;
         // Cannot move down from last
@@ -497,9 +546,18 @@ mod tests {
             let board = board_store::create_board("Board".into()).unwrap();
             let mut card = Card::new("Task".into());
             card.checklist = vec![
-                ChecklistItem { text: "First".into(), completed: false },
-                ChecklistItem { text: "Second".into(), completed: true },
-                ChecklistItem { text: "Third".into(), completed: false },
+                ChecklistItem {
+                    text: "First".into(),
+                    completed: false,
+                },
+                ChecklistItem {
+                    text: "Second".into(),
+                    completed: true,
+                },
+                ChecklistItem {
+                    text: "Third".into(),
+                    completed: false,
+                },
             ];
             card_store::save_card(&board.id, &card).unwrap();
 
@@ -595,7 +653,10 @@ mod tests {
     #[test]
     fn search_matches_checklist_text() {
         let mut card = Card::new("Task".into());
-        card.checklist.push(ChecklistItem { text: "Deploy to staging".into(), completed: false });
+        card.checklist.push(ChecklistItem {
+            text: "Deploy to staging".into(),
+            completed: false,
+        });
 
         assert!(card.matches_search("deploy", &[]));
         assert!(card.matches_search("DEPLOY", &[]));
@@ -637,8 +698,14 @@ mod tests {
         use regex::Regex;
 
         let mut card = Card::new("Task".into());
-        card.checklist.push(ChecklistItem { text: "step 1: prepare".into(), completed: false });
-        card.checklist.push(ChecklistItem { text: "step 2: execute".into(), completed: false });
+        card.checklist.push(ChecklistItem {
+            text: "step 1: prepare".into(),
+            completed: false,
+        });
+        card.checklist.push(ChecklistItem {
+            text: "step 2: execute".into(),
+            completed: false,
+        });
 
         let re = Regex::new(r"step \d+:").unwrap();
         assert!(card_matches_regex_pub(&card, &re, &[]));
@@ -763,8 +830,16 @@ mod tests {
         let mut meta = BoardMeta::new("Board".into());
         let la = ListId::generate();
         let lb = ListId::generate();
-        meta.lists.push(ListMeta { id: la.clone(), name: "A".into(), archived: false });
-        meta.lists.push(ListMeta { id: lb.clone(), name: "B".into(), archived: false });
+        meta.lists.push(ListMeta {
+            id: la.clone(),
+            name: "A".into(),
+            archived: false,
+        });
+        meta.lists.push(ListMeta {
+            id: lb.clone(),
+            name: "B".into(),
+            archived: false,
+        });
         board_store::save_board(&meta).unwrap();
         let save = |titles: &[&str], lid: &ListId| {
             titles
@@ -789,14 +864,26 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, a, b) = two_list_editor(&["a0", "a1", "a2"], &["b0"]);
             // Move a1 (visible slot 1) right into list B.
-            ed.apply(Command::MoveCard { card_id: a[1].clone(), direction: MoveDir::Right })
-                .unwrap();
-            assert_eq!(ed.board().lists[0].card_ids, vec![a[0].clone(), a[2].clone()]);
-            assert_eq!(ed.board().lists[1].card_ids, vec![b[0].clone(), a[1].clone()]);
+            ed.apply(Command::MoveCard {
+                card_id: a[1].clone(),
+                direction: MoveDir::Right,
+            })
+            .unwrap();
+            assert_eq!(
+                ed.board().lists[0].card_ids,
+                vec![a[0].clone(), a[2].clone()]
+            );
+            assert_eq!(
+                ed.board().lists[1].card_ids,
+                vec![b[0].clone(), a[1].clone()]
+            );
             assert_eq!(ed.board().cards[&a[1]].list_id, ed.board().lists[1].id);
             // Persisted.
             ed.reload().unwrap();
-            assert_eq!(ed.board().lists[1].card_ids, vec![b[0].clone(), a[1].clone()]);
+            assert_eq!(
+                ed.board().lists[1].card_ids,
+                vec![b[0].clone(), a[1].clone()]
+            );
         });
     }
 
@@ -805,11 +892,20 @@ mod tests {
         with_temp_dir(|| {
             let (mut ed, a, b) = two_list_editor(&["a0", "a1", "a2", "a3", "a4"], &["b0", "b1"]);
             // a4 is at visible slot 4; list B has only 2 slots → lands at end.
-            ed.apply(Command::MoveCard { card_id: a[4].clone(), direction: MoveDir::Right })
-                .unwrap();
-            assert_eq!(ed.board().lists[1].card_ids, vec![b[0].clone(), b[1].clone(), a[4].clone()]);
+            ed.apply(Command::MoveCard {
+                card_id: a[4].clone(),
+                direction: MoveDir::Right,
+            })
+            .unwrap();
+            assert_eq!(
+                ed.board().lists[1].card_ids,
+                vec![b[0].clone(), b[1].clone(), a[4].clone()]
+            );
             ed.reload().unwrap();
-            assert_eq!(ed.board().lists[1].card_ids, vec![b[0].clone(), b[1].clone(), a[4].clone()]);
+            assert_eq!(
+                ed.board().lists[1].card_ids,
+                vec![b[0].clone(), b[1].clone(), a[4].clone()]
+            );
         });
     }
 }

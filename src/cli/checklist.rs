@@ -1,20 +1,18 @@
 //! `tct checklist <board> <card>` subcommand.
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 
 use super::lookup::{find_board, find_card_in_lists};
 use super::util::{flag_value, fmt_progress, lists_and_cards};
-use crate::outln;
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
+use crate::outln;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args
         .first()
         .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Usage: tct checklist <board> <card> [--add|--toggle|--delete ...]"
-            )
+            anyhow::anyhow!("Usage: tct checklist <board> <card> [--add|--toggle|--delete ...]")
         })?
         .as_str();
     let card_partial = args
@@ -30,7 +28,10 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let card_id = card.id.clone();
         let card_title = card.title.clone();
         let mut editor = BoardEditor::load(&board.id)?;
-        editor.apply(Command::AddChecklistItem { card_id, text: text.to_string() })?;
+        editor.apply(Command::AddChecklistItem {
+            card_id,
+            text: text.to_string(),
+        })?;
         outln!("Added checklist item '{}' to card '{}'.", text, card_title);
     } else if let Some(n_str) = flag_value(args, "--toggle") {
         let n: usize = n_str
@@ -47,7 +48,10 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let item_text = card.checklist[idx].text.clone();
         let card_id = card.id.clone();
         let mut editor = BoardEditor::load(&board.id)?;
-        editor.apply(Command::ToggleChecklistItem { card_id: card_id.clone(), item_idx: idx })?;
+        editor.apply(Command::ToggleChecklistItem {
+            card_id: card_id.clone(),
+            item_idx: idx,
+        })?;
         let new_state = editor
             .board()
             .cards
@@ -74,7 +78,10 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let removed_text = card.checklist[idx].text.clone();
         let card_id = card.id.clone();
         let mut editor = BoardEditor::load(&board.id)?;
-        editor.apply(Command::RemoveChecklistItem { card_id, item_idx: idx })?;
+        editor.apply(Command::RemoveChecklistItem {
+            card_id,
+            item_idx: idx,
+        })?;
         outln!("Deleted checklist item '{removed_text}'.");
     } else {
         // Default: show checklist

@@ -44,7 +44,11 @@ pub(super) fn resolve_one_ref<'a, T>(
                 .iter()
                 .map(|x| format!("{} [{}]", name_of(x), id_of(x)))
                 .collect();
-            bail!("Multiple {}s match '{partial}': {}.", entity, descs.join(", "))
+            bail!(
+                "Multiple {}s match '{partial}': {}.",
+                entity,
+                descs.join(", ")
+            )
         }
     }
 }
@@ -77,7 +81,11 @@ pub(super) fn resolve_one_owned<T>(
                 .iter()
                 .map(|x| format!("{} [{}]", name_of(x), id_of(x)))
                 .collect();
-            bail!("Multiple {}s match '{partial}': {}.", entity, descs.join(", "))
+            bail!(
+                "Multiple {}s match '{partial}': {}.",
+                entity,
+                descs.join(", ")
+            )
         }
     }
 }

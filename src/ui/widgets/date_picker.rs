@@ -1,9 +1,9 @@
 use chrono::{Datelike, NaiveDate};
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
-use ratatui::Frame;
 
 pub fn render(
     frame: &mut Frame,
@@ -178,4 +178,3 @@ fn days_in_month(year: i32, month: u32) -> u32 {
     let first_next = NaiveDate::from_ymd_opt(ny, nm, 1).unwrap();
     first_next.pred_opt().unwrap().day()
 }
-

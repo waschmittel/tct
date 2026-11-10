@@ -22,13 +22,7 @@ pub struct ConfirmDeleteLabel {
 }
 
 impl Dialog for ConfirmDeleteLabel {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, board: Option<&LoadedBoard>, _accent: Color) {
         let name = board
             .and_then(|b| b.meta.labels.get(self.label_idx))
             .map(|l| l.name.as_str())
@@ -53,10 +47,11 @@ impl Dialog for ConfirmDeleteLabel {
                 if let Some((label_id, name)) = target {
                     let mut out = DialogOutcome::apply(Command::DeleteLabel { label_id })
                         .with_status(format!("Deleted label '{name}'"));
-                    out.follow = super::Follow::Open(Box::new(super::label_manager::LabelManager {
-                        selected_idx: self.label_idx,
-                        from_picker: self.from_picker,
-                    }));
+                    out.follow =
+                        super::Follow::Open(Box::new(super::label_manager::LabelManager {
+                            selected_idx: self.label_idx,
+                            from_picker: self.from_picker,
+                        }));
                     out
                 } else {
                     DialogOutcome::open(Box::new(super::label_manager::LabelManager {

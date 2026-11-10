@@ -53,7 +53,9 @@ fn resolve() -> (PathBuf, bool) {
 
 /// A directory and not a symlink to one — `symlink_metadata` does not follow.
 fn is_real_dir(path: &std::path::Path) -> bool {
-    std::fs::symlink_metadata(path).map(|m| m.is_dir()).unwrap_or(false)
+    std::fs::symlink_metadata(path)
+        .map(|m| m.is_dir())
+        .unwrap_or(false)
 }
 
 /// Home-shortened display form of [`base_dir`], e.g. `~/.tct`.
@@ -87,7 +89,10 @@ pub fn version_path() -> PathBuf {
 /// can be empty (both come from a real path component), so this only guards
 /// against a future caller inventing one.
 pub fn board_dir(board_id: &BoardId) -> PathBuf {
-    debug_assert!(!board_id.is_empty(), "the empty id does not name a board directory");
+    debug_assert!(
+        !board_id.is_empty(),
+        "the empty id does not name a board directory"
+    );
     boards_dir().join(board_id.as_str())
 }
 
@@ -116,9 +121,18 @@ mod tests {
     fn shorten_home_replaces_only_a_home_prefix() {
         use std::path::Path;
         let home = Path::new("/home/me");
-        assert_eq!(shorten_home(Path::new("/home/me/.tct"), Some(home)), "~/.tct");
-        assert_eq!(shorten_home(Path::new("/srv/data"), Some(home)), "/srv/data");
-        assert_eq!(shorten_home(Path::new("/home/me/.tct"), None), "/home/me/.tct");
+        assert_eq!(
+            shorten_home(Path::new("/home/me/.tct"), Some(home)),
+            "~/.tct"
+        );
+        assert_eq!(
+            shorten_home(Path::new("/srv/data"), Some(home)),
+            "/srv/data"
+        );
+        assert_eq!(
+            shorten_home(Path::new("/home/me/.tct"), None),
+            "/home/me/.tct"
+        );
     }
 
     #[test]
@@ -168,7 +182,10 @@ mod tests {
                 let card = CardId::parse(edge).unwrap();
                 let board_edge = BoardId::parse(edge).unwrap();
                 assert_eq!(board_dir(&board_edge).parent().unwrap(), boards_dir());
-                assert_eq!(card_path(&board, &card).parent().unwrap(), board_dir(&board));
+                assert_eq!(
+                    card_path(&board, &card).parent().unwrap(),
+                    board_dir(&board)
+                );
             }
         });
     }
@@ -196,7 +213,10 @@ mod tests {
         if let Some(dir) = data_dir {
             unsafe { std::env::set_var("TCT_DATA_DIR", dir) };
         }
-        assert!(!adopted.starts_with(&repo_path), "adopted the repo's symlinked .tct: {adopted:?}");
+        assert!(
+            !adopted.starts_with(&repo_path),
+            "adopted the repo's symlinked .tct: {adopted:?}"
+        );
     }
 
     /// The empty id is the one `ShortId` admits that is not a path component:
@@ -205,7 +225,10 @@ mod tests {
     fn the_empty_id_does_not_name_a_board_directory() {
         with_temp_dir(|| {
             let empty = BoardId::default();
-            assert_eq!(boards_dir().join(empty.as_str()).parent().unwrap(), base_dir());
+            assert_eq!(
+                boards_dir().join(empty.as_str()).parent().unwrap(),
+                base_dir()
+            );
         });
     }
 }

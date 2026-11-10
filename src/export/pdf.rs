@@ -7,13 +7,13 @@
 
 use anyhow::{Context, anyhow};
 use chrono::{Datelike, Local, Timelike};
-use krilla::{Document, SerializeSettings};
 use krilla::configure::{Archival, ConfigurationBuilder};
 use krilla::geom::{PathBuilder, Point, Rect};
 use krilla::metadata::Metadata;
 use krilla::page::PageSettings;
 use krilla::paint::{Fill, Stroke};
 use krilla::text::{Font, TextDirection};
+use krilla::{Document, SerializeSettings};
 use skrifa::charmap::Charmap;
 use skrifa::instance::{LocationRef, Size};
 use skrifa::metrics::GlyphMetrics;
@@ -70,7 +70,10 @@ impl Face {
             pdf: Font::new(data.into(), 0).ok_or_else(|| anyhow!("bundled font is unusable"))?,
             charmap: font.charmap(),
             metrics: font.glyph_metrics(Size::unscaled(), LocationRef::default()),
-            units_per_em: f32::from(font.metrics(Size::unscaled(), LocationRef::default()).units_per_em),
+            units_per_em: f32::from(
+                font.metrics(Size::unscaled(), LocationRef::default())
+                    .units_per_em,
+            ),
         })
     }
 
@@ -245,7 +248,12 @@ impl<'f> Flow<'f> {
     }
 
     fn new(fonts: &'f Fonts) -> Self {
-        Self { fonts, pages: vec![Vec::new()], y: MARGIN, measuring: false }
+        Self {
+            fonts,
+            pages: vec![Vec::new()],
+            y: MARGIN,
+            measuring: false,
+        }
     }
 
     /// Start a new page unless `build`'s output fits on one page but not on
@@ -260,7 +268,10 @@ impl<'f> Flow<'f> {
         if self.measuring {
             return;
         }
-        let mut scratch = Flow { measuring: true, ..Flow::new(self.fonts) };
+        let mut scratch = Flow {
+            measuring: true,
+            ..Flow::new(self.fonts)
+        };
         build(&mut scratch);
         let height = scratch.y - MARGIN;
         if scratch.pages.len() == 1 && height <= max {
@@ -269,7 +280,10 @@ impl<'f> Flow<'f> {
     }
 
     fn push(&mut self, op: Op) {
-        self.pages.last_mut().expect("a page always exists").push(op);
+        self.pages
+            .last_mut()
+            .expect("a page always exists")
+            .push(op);
     }
 
     fn need(&mut self, height: f32) {
@@ -316,7 +330,12 @@ impl<'f> Flow<'f> {
                     seg.text.push_str(text);
                     seg.w += w;
                 }
-                _ => line.push(Seg { text: text.to_string(), style, x: *x, w }),
+                _ => line.push(Seg {
+                    text: text.to_string(),
+                    style,
+                    x: *x,
+                    w,
+                }),
             }
             *x += w;
         };
@@ -382,7 +401,14 @@ impl<'f> Flow<'f> {
             });
             if seg.style.strike {
                 let y = baseline - size * 0.3;
-                self.push(Op::Line { x1: sx, y1: y, x2: sx + seg.w, y2: y, color, width: 0.6 });
+                self.push(Op::Line {
+                    x1: sx,
+                    y1: y,
+                    x2: sx + seg.w,
+                    y2: y,
+                    color,
+                    width: 0.6,
+                });
             }
         }
     }
@@ -398,13 +424,26 @@ impl<'f> Flow<'f> {
 
     fn rule(&mut self, color: Rgb, width: f32) {
         let y = self.y;
-        self.push(Op::Line { x1: MARGIN, y1: y, x2: PAGE_W - MARGIN, y2: y, color, width });
+        self.push(Op::Line {
+            x1: MARGIN,
+            y1: y,
+            x2: PAGE_W - MARGIN,
+            y2: y,
+            color,
+            width,
+        });
     }
 
     fn section_title(&mut self, title: &str) {
         self.need(40.0);
         self.y += 14.0;
-        let runs = [Run { text: title.to_uppercase(), style: Style { bold: true, ..Style::default() } }];
+        let runs = [Run {
+            text: title.to_uppercase(),
+            style: Style {
+                bold: true,
+                ..Style::default()
+            },
+        }];
         let thickness = 0.6;
         self.paragraph(&runs, 9.0, MARGIN, CONTENT_W, self.muted());
         self.y += 1.0;
@@ -451,7 +490,13 @@ impl<'f> Flow<'f> {
                     let size = [16.0, 14.0, 12.5, 11.0, 10.5, 10.0][usize::from(*level - 1)];
                     let bold: Vec<Run> = runs
                         .iter()
-                        .map(|r| Run { style: Style { bold: true, ..r.style }, ..r.clone() })
+                        .map(|r| Run {
+                            style: Style {
+                                bold: true,
+                                ..r.style
+                            },
+                            ..r.clone()
+                        })
                         .collect();
                     if !(title_above && i == 0) {
                         let section = &blocks[i..section_end(blocks, i)];
@@ -463,7 +508,10 @@ impl<'f> Flow<'f> {
                     self.y += size * 0.15;
                 }
                 Block::Text { .. } => {
-                    next = i + blocks[i..].iter().take_while(|b| matches!(b, Block::Text { .. })).count();
+                    next = i + blocks[i..]
+                        .iter()
+                        .take_while(|b| matches!(b, Block::Text { .. }))
+                        .count();
                     let paragraph = &blocks[i..next];
                     self.keep_together_up_to(KEEP_MAX, &|f| f.text_blocks(paragraph));
                     self.text_blocks(paragraph);
@@ -485,7 +533,13 @@ impl<'f> Flow<'f> {
     fn quoted(&self, runs: &[Run], quote_depth: usize) -> Vec<Run> {
         let italic = quote_depth > 0;
         runs.iter()
-            .map(|r| Run { style: Style { italic: italic || r.style.italic, ..r.style }, ..r.clone() })
+            .map(|r| Run {
+                style: Style {
+                    italic: italic || r.style.italic,
+                    ..r.style
+                },
+                ..r.clone()
+            })
             .collect()
     }
 
@@ -582,7 +636,14 @@ impl<'f> Flow<'f> {
                 for d in 0..quote_depth {
                     let bx = MARGIN + d as f32 * 12.0 + 3.0;
                     let y = self.y;
-                    self.push(Op::Line { x1: bx, y1: y, x2: bx, y2: y + height, color: self.rule_color(), width: 1.5 });
+                    self.push(Op::Line {
+                        x1: bx,
+                        y1: y,
+                        x2: bx,
+                        y2: y + height,
+                        color: self.rule_color(),
+                        width: 1.5,
+                    });
                 }
             }
             if let (Some(a), Some(bar)) = (alert, alert_color) {
@@ -611,7 +672,12 @@ impl<'f> Flow<'f> {
             {
                 let face_style = Style::default();
                 let w = self.fonts.face(face_style).width(marker, BODY);
-                let seg = Seg { text: marker.to_string(), style: face_style, x: 0.0, w };
+                let seg = Seg {
+                    text: marker.to_string(),
+                    style: face_style,
+                    x: 0.0,
+                    w,
+                };
                 let y = self.y;
                 let marker_color = if quote_depth > 0 {
                     self.muted()
@@ -628,7 +694,11 @@ impl<'f> Flow<'f> {
     /// Lines that must fit before line `i` of `n` may be drawn: no single
     /// line is left alone at the top or bottom of a page.
     fn lines_to_keep(i: usize, n: usize) -> usize {
-        if i == 0 || (n >= 4 && i + 2 == n) { n.min(2) } else { 1 }
+        if i == 0 || (n >= 4 && i + 2 == n) {
+            n.min(2)
+        } else {
+            1
+        }
     }
 
     /// Code keeps its line structure; lines wider than the block are broken
@@ -654,12 +724,22 @@ impl<'f> Flow<'f> {
         for (i, text) in rows.iter().enumerate() {
             self.need(Self::lines_to_keep(i, rows.len()) as f32 * height);
             let y = self.y;
-            self.push(Op::Rect { x: MARGIN, y, w: CONTENT_W, h: height, fill: Some(TINT), stroke: None });
+            self.push(Op::Rect {
+                x: MARGIN,
+                y,
+                w: CONTENT_W,
+                h: height,
+                fill: Some(TINT),
+                stroke: None,
+            });
             self.push(Op::Text {
                 x: MARGIN + 6.0,
                 y: y + size * 1.05,
                 text: text.clone(),
-                style: Style { code: true, ..Style::default() },
+                style: Style {
+                    code: true,
+                    ..Style::default()
+                },
                 size,
                 color: self.ink(),
             });
@@ -672,14 +752,23 @@ impl<'f> Flow<'f> {
     /// keeps its longest word and the rest of the width is shared out in
     /// proportion to how much more each column would like. The flag says
     /// whether every column got at least its longest word.
-    fn table_widths(&self, cells: &[Vec<Vec<Run>>], cols: usize, size: f32, pad: f32) -> (Vec<f32>, bool) {
+    fn table_widths(
+        &self,
+        cells: &[Vec<Vec<Run>>],
+        cols: usize,
+        size: f32,
+        pad: f32,
+    ) -> (Vec<f32>, bool) {
         let measure = |c: usize, f: &dyn Fn(&Self, &[Run]) -> f32| {
             cells.iter().map(|row| f(self, &row[c])).fold(0.0, f32::max) + 2.0 * pad
         };
         let natural: Vec<f32> = (0..cols)
             .map(|c| {
                 measure(c, &|s, runs| {
-                    s.wrap(runs, size, f32::MAX).iter().map(|l| l.last().map_or(0.0, |g| g.x + g.w)).fold(0.0, f32::max)
+                    s.wrap(runs, size, f32::MAX)
+                        .iter()
+                        .map(|l| l.last().map_or(0.0, |g| g.x + g.w))
+                        .fold(0.0, f32::max)
                 })
             })
             .collect();
@@ -692,18 +781,37 @@ impl<'f> Flow<'f> {
                 .map(|a| if let Atom::Word(_, _, w) = a { *w } else { 0.0 })
                 .fold(0.0, f32::max)
         };
-        let minimum: Vec<f32> = (0..cols).map(|c| measure(c, &longest_word).min(natural[c])).collect();
+        let minimum: Vec<f32> = (0..cols)
+            .map(|c| measure(c, &longest_word).min(natural[c]))
+            .collect();
         let min_total: f32 = minimum.iter().sum();
         if min_total >= CONTENT_W {
-            return (minimum.iter().map(|w| w * CONTENT_W / min_total).collect(), false);
+            return (
+                minimum.iter().map(|w| w * CONTENT_W / min_total).collect(),
+                false,
+            );
         }
         let wanted: f32 = natural.iter().zip(&minimum).map(|(n, m)| n - m).sum();
         let spare = CONTENT_W - min_total;
-        (minimum.iter().zip(&natural).map(|(m, n)| m + (n - m) * spare / wanted).collect(), true)
+        (
+            minimum
+                .iter()
+                .zip(&natural)
+                .map(|(m, n)| m + (n - m) * spare / wanted)
+                .collect(),
+            true,
+        )
     }
 
     fn rule_across(&mut self, y: f32, x: f32, width: f32, thickness: f32) {
-        self.push(Op::Line { x1: x, y1: y, x2: x + width, y2: y, color: self.ink(), width: thickness });
+        self.push(Op::Line {
+            x1: x,
+            y1: y,
+            x2: x + width,
+            y2: y,
+            color: self.ink(),
+            width: thickness,
+        });
     }
 
     /// Booktabs-like: heavy rules above and below, a light rule under the
@@ -723,7 +831,10 @@ impl<'f> Flow<'f> {
     ///   count; then the top and bottom rules are as thin as those separators.
     fn table(&mut self, table: &Table) {
         const PAD_Y: f32 = 2.5;
-        let header_style = Style { bold: true, ..Style::default() };
+        let header_style = Style {
+            bold: true,
+            ..Style::default()
+        };
         let matrix = table.is_matrix();
         let cells: Vec<Vec<Vec<Run>>> = table
             .rows
@@ -770,7 +881,16 @@ impl<'f> Flow<'f> {
         } else {
             (table.rows.len() > 7 || table.cols() > 3, false)
         };
-        let layout = TableLayout { widths: &widths, aligns: &table.aligns, left, size, pad: (pad_x, PAD_Y), col_lines, row_lines, matrix };
+        let layout = TableLayout {
+            widths: &widths,
+            aligns: &table.aligns,
+            left,
+            size,
+            pad: (pad_x, PAD_Y),
+            col_lines,
+            row_lines,
+            matrix,
+        };
 
         let first_rows = rows.iter().take(2).map(|(_, h)| h).sum::<f32>();
         self.need(first_rows + 2.0);
@@ -812,10 +932,20 @@ impl<'f> Flow<'f> {
     /// Rule under the header: light, but heavy in a matrix where it separates
     /// the column labels from the contents.
     fn header_rule(&mut self, t: &TableLayout, total: f32) {
-        self.rule_across(self.y, t.left, total, if t.matrix { HEAVY_RULE } else { MIDRULE });
+        self.rule_across(
+            self.y,
+            t.left,
+            total,
+            if t.matrix { HEAVY_RULE } else { MIDRULE },
+        );
     }
 
-    fn table_row(&mut self, (wrapped, row_h): &(Vec<Vec<Vec<Seg>>>, f32), header: bool, t: &TableLayout) {
+    fn table_row(
+        &mut self,
+        (wrapped, row_h): &(Vec<Vec<Vec<Seg>>>, f32),
+        header: bool,
+        t: &TableLayout,
+    ) {
         let top = self.y;
         let mut x = t.left;
         for (c, segs) in wrapped.iter().enumerate() {
@@ -841,7 +971,14 @@ impl<'f> Flow<'f> {
                 continue;
             }
             let width = if divider { HEAVY_RULE } else { MIDRULE };
-            self.push(Op::Line { x1: vx, y1: top, x2: vx, y2: top + row_h, color: self.ink(), width });
+            self.push(Op::Line {
+                x1: vx,
+                y1: top,
+                x2: vx,
+                y2: top + row_h,
+                color: self.ink(),
+                width,
+            });
         }
         self.y += row_h;
     }
@@ -850,7 +987,13 @@ impl<'f> Flow<'f> {
         const SIZE: f32 = 8.5;
         const H: f32 = 14.0;
         let mut x = MARGIN;
-        let plain = |text: &str| [Run { text: text.to_string(), style: Style::default() }].to_vec();
+        let plain = |text: &str| {
+            [Run {
+                text: text.to_string(),
+                style: Style::default(),
+            }]
+            .to_vec()
+        };
         for (name, color) in chips {
             let text = self.fonts.sans.clean(name);
             let w = self.fonts.sans.width(&text, SIZE) + 10.0;
@@ -860,11 +1003,29 @@ impl<'f> Flow<'f> {
             }
             self.need(H);
             let y = self.y;
-            let (fill, stroke) = if self.mono() { (None, Some(BLACK)) } else { (Some(*color), None) };
-            self.push(Op::Rect { x, y, w, h: H, fill, stroke });
+            let (fill, stroke) = if self.mono() {
+                (None, Some(BLACK))
+            } else {
+                (Some(*color), None)
+            };
+            self.push(Op::Rect {
+                x,
+                y,
+                w,
+                h: H,
+                fill,
+                stroke,
+            });
             let segs = self.wrap(&plain(&text), SIZE, w);
             if let Some(line) = segs.first() {
-                self.draw_line(line, x + 5.0, y + (H - SIZE * LEADING) / 2.0, SIZE, self.ink(), 0.0);
+                self.draw_line(
+                    line,
+                    x + 5.0,
+                    y + (H - SIZE * LEADING) / 2.0,
+                    SIZE,
+                    self.ink(),
+                    0.0,
+                );
             }
             x += w + 4.0;
         }
@@ -876,16 +1037,41 @@ impl<'f> Flow<'f> {
         let x = MARGIN + 18.0;
         for item in &card.checklist {
             let runs = blocks::inline(&item.text, Style::default());
-            let color = if item.completed { self.muted() } else { self.ink() };
+            let color = if item.completed {
+                self.muted()
+            } else {
+                self.ink()
+            };
             for (i, line) in self.wrap(&runs, BODY, CONTENT_W - 18.0).iter().enumerate() {
                 self.need(height);
                 let top = self.y;
                 if i == 0 {
                     let (bx, by) = (MARGIN + 2.0, top + 2.5);
-                    self.push(Op::Rect { x: bx, y: by, w: 8.0, h: 8.0, fill: None, stroke: Some(self.muted()) });
+                    self.push(Op::Rect {
+                        x: bx,
+                        y: by,
+                        w: 8.0,
+                        h: 8.0,
+                        fill: None,
+                        stroke: Some(self.muted()),
+                    });
                     if item.completed {
-                        self.push(Op::Line { x1: bx + 1.8, y1: by + 4.2, x2: bx + 3.4, y2: by + 6.0, color: self.ink(), width: 1.1 });
-                        self.push(Op::Line { x1: bx + 3.4, y1: by + 6.0, x2: bx + 6.4, y2: by + 1.6, color: self.ink(), width: 1.1 });
+                        self.push(Op::Line {
+                            x1: bx + 1.8,
+                            y1: by + 4.2,
+                            x2: bx + 3.4,
+                            y2: by + 6.0,
+                            color: self.ink(),
+                            width: 1.1,
+                        });
+                        self.push(Op::Line {
+                            x1: bx + 3.4,
+                            y1: by + 6.0,
+                            x2: bx + 6.4,
+                            y2: by + 1.6,
+                            color: self.ink(),
+                            width: 1.1,
+                        });
                     }
                 }
                 self.draw_line(line, x, top, BODY, color, 0.0);
@@ -924,7 +1110,14 @@ fn stamp(t: chrono::DateTime<chrono::Utc>) -> String {
 }
 
 /// Running header (from the second page on) and footer of page `n` of `total`.
-fn page_chrome(fonts: &Fonts, card: &Card, location: &str, created: &str, n: usize, total: usize) -> Vec<Op> {
+fn page_chrome(
+    fonts: &Fonts,
+    card: &Card,
+    location: &str,
+    created: &str,
+    n: usize,
+    total: usize,
+) -> Vec<Op> {
     let (muted, rule) = (MUTED, RULE);
     let small = |x: f32, y: f32, text: String| Op::Text {
         x,
@@ -939,7 +1132,11 @@ fn page_chrome(fonts: &Fonts, card: &Card, location: &str, created: &str, n: usi
     if n > 0 {
         let created_x = right_aligned(created);
         let room = created_x - MARGIN - 16.0;
-        chrome.push(small(MARGIN, HEADER_BASELINE, fit(&fonts.sans, &card.title, 8.0, room)));
+        chrome.push(small(
+            MARGIN,
+            HEADER_BASELINE,
+            fit(&fonts.sans, &card.title, 8.0, room),
+        ));
         chrome.push(small(created_x, HEADER_BASELINE, created.to_string()));
         chrome.push(Op::Line {
             x1: MARGIN,
@@ -952,7 +1149,11 @@ fn page_chrome(fonts: &Fonts, card: &Card, location: &str, created: &str, n: usi
     }
     let counter = format!("{} / {}", n + 1, total);
     let room = CONTENT_W - fonts.sans.width(&counter, 8.0) - 16.0;
-    chrome.push(small(MARGIN, FOOTER_BASELINE, fit(&fonts.sans, location, 8.0, room)));
+    chrome.push(small(
+        MARGIN,
+        FOOTER_BASELINE,
+        fit(&fonts.sans, location, 8.0, room),
+    ));
     chrome.push(small(right_aligned(&counter), FOOTER_BASELINE, counter));
     chrome
 }
@@ -1011,7 +1212,9 @@ fn emit(
         surface.finish();
         page.finish();
     }
-    document.finish().map_err(|e| anyhow!("PDF generation failed: {e:?}"))
+    document
+        .finish()
+        .map_err(|e| anyhow!("PDF generation failed: {e:?}"))
 }
 
 fn paint((r, g, b): Rgb) -> krilla::paint::Paint {
@@ -1020,9 +1223,19 @@ fn paint((r, g, b): Rgb) -> krilla::paint::Paint {
 
 fn draw_op(surface: &mut krilla::surface::Surface, fonts: &Fonts, op: &Op) -> anyhow::Result<()> {
     match op {
-        Op::Text { x, y, text, style, size, color } => {
+        Op::Text {
+            x,
+            y,
+            text,
+            style,
+            size,
+            color,
+        } => {
             surface.set_stroke(None);
-            surface.set_fill(Some(Fill { paint: paint(*color), ..Fill::default() }));
+            surface.set_fill(Some(Fill {
+                paint: paint(*color),
+                ..Fill::default()
+            }));
             surface.draw_text(
                 Point::from_xy(*x, *y),
                 fonts.face(*style).pdf.clone(),
@@ -1032,13 +1245,30 @@ fn draw_op(surface: &mut krilla::surface::Surface, fonts: &Fonts, op: &Op) -> an
                 TextDirection::Auto,
             );
         }
-        Op::Rect { x, y, w, h, fill, stroke } => {
-            let rect = Rect::from_xywh(*x, *y, *w, *h).ok_or_else(|| anyhow!("degenerate rectangle"))?;
+        Op::Rect {
+            x,
+            y,
+            w,
+            h,
+            fill,
+            stroke,
+        } => {
+            let rect =
+                Rect::from_xywh(*x, *y, *w, *h).ok_or_else(|| anyhow!("degenerate rectangle"))?;
             let mut path = PathBuilder::new();
             path.push_rect(rect);
-            let path = path.finish().ok_or_else(|| anyhow!("degenerate rectangle"))?;
-            surface.set_fill(fill.map(|c| Fill { paint: paint(c), ..Fill::default() }));
-            surface.set_stroke(stroke.map(|c| Stroke { paint: paint(c), width: 0.6, ..Stroke::default() }));
+            let path = path
+                .finish()
+                .ok_or_else(|| anyhow!("degenerate rectangle"))?;
+            surface.set_fill(fill.map(|c| Fill {
+                paint: paint(c),
+                ..Fill::default()
+            }));
+            surface.set_stroke(stroke.map(|c| Stroke {
+                paint: paint(c),
+                width: 0.6,
+                ..Stroke::default()
+            }));
             surface.draw_path(&path);
         }
         Op::Icon {
@@ -1086,7 +1316,11 @@ fn draw_op(surface: &mut krilla::surface::Surface, fonts: &Fonts, op: &Op) -> an
             path.line_to(*x2, *y2);
             let path = path.finish().ok_or_else(|| anyhow!("degenerate line"))?;
             surface.set_fill(None);
-            surface.set_stroke(Some(Stroke { paint: paint(*color), width: *width, ..Stroke::default() }));
+            surface.set_stroke(Some(Stroke {
+                paint: paint(*color),
+                width: *width,
+                ..Stroke::default()
+            }));
             surface.draw_path(&path);
         }
     }
@@ -1102,14 +1336,29 @@ fn layout<'f>(
 ) -> (Vec<Vec<Op>>, Vec<String>) {
     let mut flow = Flow::new(fonts);
 
-    let title = [Run { text: card.title.clone(), style: Style { bold: true, ..Style::default() } }];
+    let title = [Run {
+        text: card.title.clone(),
+        style: Style {
+            bold: true,
+            ..Style::default()
+        },
+    }];
     flow.paragraph(&title, 20.0, MARGIN, CONTENT_W, flow.ink());
     flow.y += 4.0;
-    let accent = if flow.mono() { BLACK } else { board.accent_color.to_rgb() };
+    let accent = if flow.mono() {
+        BLACK
+    } else {
+        board.accent_color.to_rgb()
+    };
     flow.rule(accent, 2.0);
     flow.y += 8.0;
 
-    let muted = |text: String| [Run { text, style: Style::default() }];
+    let muted = |text: String| {
+        [Run {
+            text,
+            style: Style::default(),
+        }]
+    };
     let mut facts = vec![format!("{} › {}", board.name, list)];
     if let Some(due) = card.due_date {
         facts.push(format!("Due {}", due.format("%Y-%m-%d")));
@@ -1117,7 +1366,13 @@ fn layout<'f>(
     if let Some((done, total)) = card.checklist_progress() {
         facts.push(format!("Checklist {done}/{total}"));
     }
-    flow.paragraph(&muted(facts.join("   ·   ")), 9.0, MARGIN, CONTENT_W, flow.muted());
+    flow.paragraph(
+        &muted(facts.join("   ·   ")),
+        9.0,
+        MARGIN,
+        CONTENT_W,
+        flow.muted(),
+    );
     let dates = format!(
         "Created {}   ·   Updated {}   ·   Status {}",
         stamp(card.created_at),
@@ -1187,20 +1442,32 @@ mod tests {
         let mut card = Card::new("Größe prüfen ✓ 😀".into());
         card.description = "# Plan\n\n- eins\n  - zwei\n> zitat\n\n```\ncode\n```\n\n| a | b |\n|---|--:|\n| 1 | 2 |".into();
         card.checklist = vec![
-            ChecklistItem { text: "offen".into(), completed: false },
-            ChecklistItem { text: "erledigt".into(), completed: true },
+            ChecklistItem {
+                text: "offen".into(),
+                completed: false,
+            },
+            ChecklistItem {
+                text: "erledigt".into(),
+                completed: true,
+            },
         ];
         let pdf = render(&board(), "To Do", &card, Theme::Color).unwrap();
         assert!(pdf.starts_with(b"%PDF-"));
         let text = String::from_utf8_lossy(&pdf);
-        assert!(text.contains("pdfaid:part"), "XMP must declare the PDF/A part");
+        assert!(
+            text.contains("pdfaid:part"),
+            "XMP must declare the PDF/A part"
+        );
         assert!(text.contains("<pdfaid:conformance>B"), "PDF/A level B");
     }
 
     #[test]
     fn long_cards_paginate() {
         let mut card = Card::new("Long".into());
-        card.description = (0..300).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+        card.description = (0..300)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
         let fonts = Fonts::load().unwrap();
         let (pages, _) = layout(&fonts, &board(), "L", &card, chrono::Utc::now());
         assert!(pages.len() >= 5, "got {} pages", pages.len());
@@ -1209,7 +1476,11 @@ mod tests {
     #[test]
     fn unbreakable_words_and_wide_tables_do_not_overflow() {
         let mut card = Card::new("x".repeat(400));
-        card.description = format!("{}\n\n| {} | b |\n|---|---|\n| c | d |", "y".repeat(500), "z".repeat(300));
+        card.description = format!(
+            "{}\n\n| {} | b |\n|---|---|\n| c | d |",
+            "y".repeat(500),
+            "z".repeat(300)
+        );
         render(&board(), "L", &card, Theme::Color).unwrap();
     }
 
@@ -1231,12 +1502,21 @@ mod tests {
         let (c, five) = (x_of("c").unwrap(), x_of("12345").unwrap());
         let width_c = fonts.sans.width("c", 9.5);
         let width_five = fonts.sans.width("12345", 9.5);
-        assert!((c + width_c - (five + width_five)).abs() < 0.5, "right-aligned cells share a right edge");
+        assert!(
+            (c + width_c - (five + width_five)).abs() < 0.5,
+            "right-aligned cells share a right edge"
+        );
     }
 
     fn texts(page: &[Op]) -> Vec<&str> {
         page.iter()
-            .filter_map(|op| if let Op::Text { text, .. } = op { Some(text.as_str()) } else { None })
+            .filter_map(|op| {
+                if let Op::Text { text, .. } = op {
+                    Some(text.as_str())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
@@ -1248,7 +1528,10 @@ mod tests {
     }
 
     fn lines(prefix: &str, n: usize) -> String {
-        (0..n).map(|i| format!("{prefix} {i}")).collect::<Vec<_>>().join("\n")
+        (0..n)
+            .map(|i| format!("{prefix} {i}"))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     fn laid_out(card: &Card) -> Vec<Vec<Op>> {
@@ -1259,7 +1542,11 @@ mod tests {
     #[test]
     fn a_level_one_section_that_fits_a_page_is_not_split() {
         let mut card = Card::new("T".into());
-        card.description = format!("{}\n\n# Section\n\n{}", lines("filler", 38), lines("body", 30));
+        card.description = format!(
+            "{}\n\n# Section\n\n{}",
+            lines("filler", 38),
+            lines("body", 30)
+        );
         let pages = laid_out(&card);
         let heading = page_of(&pages, "Section");
         assert_eq!(heading, 1, "section should start on a fresh page");
@@ -1269,12 +1556,22 @@ mod tests {
     #[test]
     fn oversized_sections_fall_back_to_keeping_their_subsections_whole() {
         let mut card = Card::new("T".into());
-        let subs: Vec<String> = (0..6).map(|n| format!("## Sub {n}\n\n{}", lines(&format!("s{n}"), 22))).collect();
+        let subs: Vec<String> = (0..6)
+            .map(|n| format!("## Sub {n}\n\n{}", lines(&format!("s{n}"), 22)))
+            .collect();
         card.description = format!("# Huge\n\n{}", subs.join("\n\n"));
         let pages = laid_out(&card);
-        assert_eq!(page_of(&pages, "Huge"), 0, "an oversized section starts where it is");
+        assert_eq!(
+            page_of(&pages, "Huge"),
+            0,
+            "an oversized section starts where it is"
+        );
         for n in 0..6 {
-            assert_eq!(page_of(&pages, &format!("Sub {n}")), page_of(&pages, &format!("s{n} 21")), "Sub {n} is split");
+            assert_eq!(
+                page_of(&pages, &format!("Sub {n}")),
+                page_of(&pages, &format!("s{n} 21")),
+                "Sub {n} is split"
+            );
         }
     }
 
@@ -1282,7 +1579,12 @@ mod tests {
     fn checklist_moves_to_a_fresh_page_when_it_would_not_fit() {
         let mut card = Card::new("T".into());
         card.description = lines("filler", 30);
-        card.checklist = (0..12).map(|i| ChecklistItem { text: format!("item {i}"), completed: false }).collect();
+        card.checklist = (0..12)
+            .map(|i| ChecklistItem {
+                text: format!("item {i}"),
+                completed: false,
+            })
+            .collect();
         let pages = laid_out(&card);
         assert_eq!(page_of(&pages, "CHECKLIST"), 1);
         assert_eq!(page_of(&pages, "item 11"), 1);
@@ -1292,7 +1594,10 @@ mod tests {
     fn checklist_stays_when_it_fits() {
         let mut card = Card::new("T".into());
         card.description = lines("filler", 5);
-        card.checklist = vec![ChecklistItem { text: "one".into(), completed: false }];
+        card.checklist = vec![ChecklistItem {
+            text: "one".into(),
+            completed: false,
+        }];
         assert_eq!(laid_out(&card).len(), 1);
     }
 
@@ -1305,8 +1610,14 @@ mod tests {
         let first = page_chrome(&fonts, &card, "Board › List", created, 0, 2);
         let second = page_chrome(&fonts, &card, "Board › List", created, 1, 2);
         assert!(texts(&first).contains(&"Board › List"));
-        assert!(!texts(&first).iter().any(|t| t.contains("My Card")), "title is not repeated in the footer");
-        assert!(!texts(&first).iter().any(|t| t.contains("Status")), "no header on page 1");
+        assert!(
+            !texts(&first).iter().any(|t| t.contains("My Card")),
+            "title is not repeated in the footer"
+        );
+        assert!(
+            !texts(&first).iter().any(|t| t.contains("Status")),
+            "no header on page 1"
+        );
         assert!(texts(&second).contains(&"My Card"));
         assert!(texts(&second).contains(&created));
         assert!(texts(&second).contains(&"2 / 2"));
@@ -1328,7 +1639,14 @@ mod tests {
     fn verticals(page: &[Op], weight: f32) -> Vec<(f32, f32, f32)> {
         page.iter()
             .filter_map(|op| match op {
-                Op::Line { x1, y1, x2, y2, width, .. } if x1 == x2 && *width == weight => Some((*x1, *y1, *y2)),
+                Op::Line {
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    width,
+                    ..
+                } if x1 == x2 && *width == weight => Some((*x1, *y1, *y2)),
                 _ => None,
             })
             .collect()
@@ -1338,7 +1656,14 @@ mod tests {
     fn rules(page: &[Op], weight: f32) -> Vec<(f32, f32, f32)> {
         page.iter()
             .filter_map(|op| match op {
-                Op::Line { x1, y1, x2, y2, width, .. } if y1 == y2 && *width == weight => Some((*y1, *x1, *x2)),
+                Op::Line {
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    width,
+                    ..
+                } if y1 == y2 && *width == weight => Some((*y1, *x1, *x2)),
                 _ => None,
             })
             .collect()
@@ -1352,7 +1677,10 @@ mod tests {
 
     #[test]
     fn matrix_first_column_is_bold_and_normal_tables_are_not() {
-        let bold = |page: &[Op], t: &str| page.iter().any(|op| matches!(op, Op::Text { text, style, .. } if text == t && style.bold));
+        let bold = |page: &[Op], t: &str| {
+            page.iter()
+                .any(|op| matches!(op, Op::Text { text, style, .. } if text == t && style.bold))
+        };
         let m = table_page("|  | A |\n|---|---|\n| row | 1 |");
         assert!(bold(&m, "row") && !bold(&m, "1") && bold(&m, "A"));
         let n = table_page("| H | A |\n|---|---|\n| row | 1 |");
@@ -1379,14 +1707,24 @@ mod tests {
         // With row separators the top rule starts right of the open corner.
         let r = table_page(&matrix(3, 8));
         let (thin, header) = (rules(&r, MIDRULE), rules(&r, HEAVY_RULE)[0]);
-        assert!(thin[0].1 > header.1 + 10.0, "top rule must start right of the corner");
+        assert!(
+            thin[0].1 > header.1 + 10.0,
+            "top rule must start right of the corner"
+        );
         assert_eq!(thin[0].2, header.2);
-        assert!(thin.last().unwrap().1 <= header.1 + 0.1, "the bottom rule stays whole");
+        assert!(
+            thin.last().unwrap().1 <= header.1 + 0.1,
+            "the bottom rule stays whole"
+        );
         // Wide matrix: left edge line is dropped on the header row only.
         let g = table_page(&matrix(5, 2));
         let thin = verticals(&g, MIDRULE);
         let left = thin.iter().map(|l| l.0).fold(f32::MAX, f32::min);
-        assert_eq!(thin.iter().filter(|l| l.0 == left).count(), 2, "left edge on the two body rows only");
+        assert_eq!(
+            thin.iter().filter(|l| l.0 == left).count(),
+            2,
+            "left edge on the two body rows only"
+        );
     }
 
     #[test]
@@ -1396,8 +1734,16 @@ mod tests {
         // column lines with only 2 content columns.
         assert_eq!(verticals(&m, HEAVY_RULE).len(), 3);
         assert!(verticals(&m, MIDRULE).is_empty());
-        assert_eq!(rules(&m, MIDRULE).len(), 0, "no row separators and no light header rule");
-        assert_eq!(rules(&m, HEAVY_RULE).len(), 1, "header rule only; no top or bottom border");
+        assert_eq!(
+            rules(&m, MIDRULE).len(),
+            0,
+            "no row separators and no light header rule"
+        );
+        assert_eq!(
+            rules(&m, HEAVY_RULE).len(),
+            1,
+            "header rule only; no top or bottom border"
+        );
     }
 
     #[test]
@@ -1424,7 +1770,11 @@ mod tests {
         let few = table_page(&matrix(3, 3));
         // Heavy: only the header rule remains in the long one.
         assert_eq!(rules(&many, HEAVY_RULE).len(), 1);
-        assert_eq!(rules(&few, HEAVY_RULE).len(), 1, "only the header rule: no outer borders");
+        assert_eq!(
+            rules(&few, HEAVY_RULE).len(),
+            1,
+            "only the header rule: no outer borders"
+        );
         assert!(rules(&few, MIDRULE).is_empty());
         // A normal table keeps its outer borders.
         let plain = table_page(&matrix(3, 3).replacen("|  |", "| H |", 1));
@@ -1448,7 +1798,11 @@ mod tests {
     fn a_short_table_is_not_split_across_pages() {
         let mut card = Card::new("T".into());
         let rows: Vec<String> = (0..10).map(|i| format!("| r{i} | {i} |")).collect();
-        card.description = format!("{}\n\n| Name | Qty |\n|---|--:|\n{}", lines("filler", 38), rows.join("\n"));
+        card.description = format!(
+            "{}\n\n| Name | Qty |\n|---|--:|\n{}",
+            lines("filler", 38),
+            rows.join("\n")
+        );
         let pages = laid_out(&card);
         assert_eq!(page_of(&pages, "Name"), page_of(&pages, "r9"));
         assert_eq!(page_of(&pages, "Name"), 1);
@@ -1457,7 +1811,12 @@ mod tests {
     #[test]
     fn short_code_blocks_and_paragraphs_are_kept_whole() {
         let mut card = Card::new("T".into());
-        card.description = format!("{}\n\n```\n{}\n```\n\n{}", lines("filler", 38), lines("code", 8), lines("para", 6));
+        card.description = format!(
+            "{}\n\n```\n{}\n```\n\n{}",
+            lines("filler", 38),
+            lines("code", 8),
+            lines("para", 6)
+        );
         let pages = laid_out(&card);
         assert_eq!(page_of(&pages, "code 0"), page_of(&pages, "code 7"));
         assert_eq!(page_of(&pages, "para 0"), page_of(&pages, "para 5"));
@@ -1469,7 +1828,10 @@ mod tests {
         for filler in 30..60 {
             card.description = format!("{}\n\n{}", lines("filler", filler), lines("para", 30));
             let pages = laid_out(&card);
-            let on_first = texts(&pages[0]).iter().filter(|t| t.starts_with("para")).count();
+            let on_first = texts(&pages[0])
+                .iter()
+                .filter(|t| t.starts_with("para"))
+                .count();
             assert_ne!(on_first, 1, "orphaned line with {filler} filler lines");
             assert_ne!(on_first, 29, "widow line with {filler} filler lines");
         }
@@ -1481,12 +1843,18 @@ mod tests {
         card.description = format!("```\n{}END\n```", "abcdefghij".repeat(40));
         let pages = laid_out(&card);
         let drawn: String = texts(&pages[0]).concat();
-        assert!(drawn.contains(&"abcdefghij".repeat(40)) && drawn.contains("END"), "code text was lost");
+        assert!(
+            drawn.contains(&"abcdefghij".repeat(40)) && drawn.contains("END"),
+            "code text was lost"
+        );
     }
 
     #[test]
     fn crowded_tables_shrink_padding_and_type_before_breaking_words() {
-        let (_, meta, card) = corner_cases().into_iter().find(|(n, _, _)| n.contains("wide-table")).unwrap();
+        let (_, meta, card) = corner_cases()
+            .into_iter()
+            .find(|(n, _, _)| n.contains("wide-table"))
+            .unwrap();
         let fonts = Fonts::load().unwrap();
         let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
         assert_eq!(count(&pages[0], "Column"), 10, "a header word was split");
@@ -1515,7 +1883,14 @@ mod tests {
         for (name, meta, card) in corner_cases() {
             let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
             for (n, page) in pages.iter().enumerate() {
-                let chrome = page_chrome(&fonts, &card, "B › L", "Status 2026-01-01 00:00", n, pages.len());
+                let chrome = page_chrome(
+                    &fonts,
+                    &card,
+                    "B › L",
+                    "Status 2026-01-01 00:00",
+                    n,
+                    pages.len(),
+                );
                 for op in page.iter().chain(&chrome) {
                     match op {
                         Op::Text { color, .. }
@@ -1544,7 +1919,9 @@ mod tests {
                     .enumerate()
                     .flat_map(|(n, page)| {
                         page.iter().filter_map(move |op| match op {
-                            Op::Text { text, x, y, .. } => Some((n, text.clone(), (*x * 10.0) as i32, (*y * 10.0) as i32)),
+                            Op::Text { text, x, y, .. } => {
+                                Some((n, text.clone(), (*x * 10.0) as i32, (*y * 10.0) as i32))
+                            }
                             _ => None,
                         })
                     })
@@ -1559,15 +1936,43 @@ mod tests {
         let mut card = Card::new("T".into());
         card.description = "`inline`\n\n```\none\n```\n\n> quoted".into();
         let mut meta = board();
-        meta.labels.push(crate::model::label::Label::new("urgent".into(), crate::model::label::LabelColor::Red));
+        meta.labels.push(crate::model::label::Label::new(
+            "urgent".into(),
+            crate::model::label::LabelColor::Red,
+        ));
         card.label_ids.push(meta.labels[0].id.clone());
         let fonts = Fonts::load_for(Theme::Mono).unwrap();
         let (pages, _) = layout(&fonts, &meta, "L", &card, chrono::Utc::now());
-        let outlined = pages[0].iter().filter(|op| matches!(op, Op::Rect { stroke: Some(_), fill: None, .. })).count();
+        let outlined = pages[0]
+            .iter()
+            .filter(|op| {
+                matches!(
+                    op,
+                    Op::Rect {
+                        stroke: Some(_),
+                        fill: None,
+                        ..
+                    }
+                )
+            })
+            .count();
         assert_eq!(outlined, 1, "only the label chip is outlined");
-        let tinted = pages[0].iter().filter(|op| matches!(op, Op::Rect { fill: Some(TINT), .. })).count();
+        let tinted = pages[0]
+            .iter()
+            .filter(|op| {
+                matches!(
+                    op,
+                    Op::Rect {
+                        fill: Some(TINT),
+                        ..
+                    }
+                )
+            })
+            .count();
         assert_eq!(tinted, 2, "inline code and the code block");
-        let gray_quote = pages[0].iter().any(|op| matches!(op, Op::Text { text, color, .. } if text == "quoted" && *color == MUTED));
+        let gray_quote = pages[0].iter().any(
+            |op| matches!(op, Op::Text { text, color, .. } if text == "quoted" && *color == MUTED),
+        );
         assert!(gray_quote, "quotes are gray");
     }
 
@@ -1587,25 +1992,44 @@ mod tests {
             card
         };
         let mut meta = board();
-        let colors = [LabelColor::Red, LabelColor::Blue, LabelColor::Green, LabelColor::Purple];
+        let colors = [
+            LabelColor::Red,
+            LabelColor::Blue,
+            LabelColor::Green,
+            LabelColor::Purple,
+        ];
         for i in 0..24 {
-            meta.labels.push(Label::new(format!("label number {i}"), colors[i % colors.len()]));
+            meta.labels.push(Label::new(
+                format!("label number {i}"),
+                colors[i % colors.len()],
+            ));
         }
 
         let mut cases = Vec::new();
         let mut showcase = plain("Release 2.0 — planning overview", SHOWCASE.into());
         showcase.label_ids = meta.labels.iter().take(3).map(|l| l.id.clone()).collect();
         showcase.due_date = chrono::NaiveDate::from_ymd_opt(2030, 6, 30);
-        showcase.checklist = [("Freeze the feature list", true), ("Write the migration guide", true), ("Run the load test", false), ("Tag the release", false)]
-            .into_iter()
-            .map(|(text, completed)| ChecklistItem { text: text.into(), completed })
-            .collect();
+        showcase.checklist = [
+            ("Freeze the feature list", true),
+            ("Write the migration guide", true),
+            ("Run the load test", false),
+            ("Tag the release", false),
+        ]
+        .into_iter()
+        .map(|(text, completed)| ChecklistItem {
+            text: text.into(),
+            completed,
+        })
+        .collect();
         cases.push(("00-showcase", meta.clone(), showcase));
         cases.push(("01-empty-card", meta.clone(), Card::new(String::new())));
         cases.push((
             "02-very-long-title",
             meta.clone(),
-            plain(&"An exceedingly long card title that has to wrap over several lines ".repeat(6), "Short.".into()),
+            plain(
+                &"An exceedingly long card title that has to wrap over several lines ".repeat(6),
+                "Short.".into(),
+            ),
         ));
         cases.push((
             "03-unicode-and-missing-glyphs",
@@ -1620,7 +2044,13 @@ mod tests {
             meta.clone(),
             plain(
                 "Unbreakable",
-                format!("{}\n\n- {}\n\n> {}\n\n`{}`", "x".repeat(300), "y".repeat(260), "z".repeat(260), "c".repeat(200)),
+                format!(
+                    "{}\n\n- {}\n\n> {}\n\n`{}`",
+                    "x".repeat(300),
+                    "y".repeat(260),
+                    "z".repeat(260),
+                    "c".repeat(200)
+                ),
             ),
         ));
         let wide_header: Vec<String> = (0..10).map(|i| format!("Column {i}")).collect();
@@ -1638,22 +2068,40 @@ mod tests {
                 ),
             ),
         ));
-        let rows: Vec<String> = (0..150).map(|i| format!("| item {i} | {} | {i}.50 |", "note ".repeat(i % 7 + 1))).collect();
+        let rows: Vec<String> = (0..150)
+            .map(|i| format!("| item {i} | {} | {i}.50 |", "note ".repeat(i % 7 + 1)))
+            .collect();
         cases.push((
             "06-long-table-repeats-header",
             meta.clone(),
-            plain("Long table", format!("| Item | Note | Price |\n|:--|:-:|--:|\n{}", rows.join("\n"))),
+            plain(
+                "Long table",
+                format!(
+                    "| Item | Note | Price |\n|:--|:-:|--:|\n{}",
+                    rows.join("\n")
+                ),
+            ),
         ));
         let mut hierarchy = String::from("# Overview\n\n");
         hierarchy.push_str(&lines("Overview line", 20));
         for chapter in 1..=3 {
             hierarchy.push_str(&format!("\n\n# Chapter {chapter}\n\n{}", lines("Intro", 4)));
             for part in 1..=3 {
-                hierarchy.push_str(&format!("\n\n## Part {chapter}.{part}\n\n{}", lines("Text", 14)));
-                hierarchy.push_str(&format!("\n\n### Detail {chapter}.{part}\n\n{}", lines("Detail", 6)));
+                hierarchy.push_str(&format!(
+                    "\n\n## Part {chapter}.{part}\n\n{}",
+                    lines("Text", 14)
+                ));
+                hierarchy.push_str(&format!(
+                    "\n\n### Detail {chapter}.{part}\n\n{}",
+                    lines("Detail", 6)
+                ));
             }
         }
-        cases.push(("07-heading-hierarchy", meta.clone(), plain("Heading hierarchy", hierarchy)));
+        cases.push((
+            "07-heading-hierarchy",
+            meta.clone(),
+            plain("Heading hierarchy", hierarchy),
+        ));
         cases.push((
             "08-lists-and-quotes",
             meta.clone(),
@@ -1677,7 +2125,11 @@ mod tests {
         let mut checklist = plain("Checklist page break", lines("filler", 30));
         checklist.checklist = (0..14)
             .map(|i| ChecklistItem {
-                text: if i == 3 { "a long checklist item ".repeat(12) } else { format!("item {i}") },
+                text: if i == 3 {
+                    "a long checklist item ".repeat(12)
+                } else {
+                    format!("item {i}")
+                },
                 completed: i % 3 == 0,
             })
             .collect();
@@ -1702,14 +2154,22 @@ mod tests {
                 "**bold** *italic* ***bold italic*** and ***unclosed\n\n- ***item*** with `code`\n\n> ***quoted*** text\n\n| ***head*** | **b** |\n|---|---|\n| *i* | ***both*** |\n\n***\n\n******".into(),
             ),
         ));
-        let mut matrix = String::from("A matrix has an empty top-left cell; its first column labels the rows.\n\n");
+        let mut matrix = String::from(
+            "A matrix has an empty top-left cell; its first column labels the rows.\n\n",
+        );
         matrix.push_str("|  | A | B |\n|---|:-:|--:|\n| **x** | 1 | 2 |\n| y | 3 | 4 |\n\n");
         matrix.push_str("Whitespace-only corner and emphasis in the labels:\n\n|   | north | south | east | west |\n|---|---|---|---|---|\n| *italic* | 1 | 2 | 3 | 4 |\n| ***both*** | 5 | 6 | 7 | 8 |\n| `code` | 9 | 10 | 11 | 12 |\n\n");
         matrix.push_str("Wrapping labels and cells, and empty row labels:\n\n|  | Short | Long |\n|---|---|---|\n| a row label that is long enough to wrap inside its column | x | a cell that is long enough to wrap as well, over several lines |\n|  | no label | still fine |\n\n");
         matrix.push_str("Header-only matrix and a one-column matrix:\n\n|  | only header |\n|---|---|\n\n|  |\n|---|\n| lonely |\n\n");
         matrix.push_str("Many rows: a grid with row separators, repeating its header across pages:\n\n|  | Q1 | Q2 | Q3 | Q4 |\n|---|--:|--:|--:|--:|\n");
         for i in 0..90 {
-            matrix.push_str(&format!("| region {i} | {} | {} | {} | {} |\n", i, i * 2, i * 3, i * 4));
+            matrix.push_str(&format!(
+                "| region {i} | {} | {} | {} | {} |\n",
+                i,
+                i * 2,
+                i * 3,
+                i * 4
+            ));
         }
         cases.push(("14-matrix", meta.clone(), plain("Matrix tables", matrix)));
         cases.push((
@@ -1915,7 +2375,8 @@ That is all — a last paragraph after the code block.
     fn corner_cases_render_as_valid_pdf_a() {
         for theme in THEMES {
             for (name, meta, card) in corner_cases() {
-                let pdf = render(&meta, "List", &card, theme).unwrap_or_else(|e| panic!("{name} {theme:?}: {e:#}"));
+                let pdf = render(&meta, "List", &card, theme)
+                    .unwrap_or_else(|e| panic!("{name} {theme:?}: {e:#}"));
                 assert!(pdf.starts_with(b"%PDF-"), "{name} {theme:?}");
             }
         }
@@ -1990,13 +2451,13 @@ That is all — a last paragraph after the code block.
     #[test]
     fn corner_cases_never_produce_blank_pages() {
         for theme in THEMES {
-        let fonts = Fonts::load_for(theme).unwrap();
-        for (name, meta, card) in corner_cases() {
-            let (pages, _) = layout(&fonts, &meta, "List", &card, chrono::Utc::now());
-            for (n, page) in pages.iter().enumerate() {
-                assert!(!page.is_empty(), "{name}: page {n} is blank");
+            let fonts = Fonts::load_for(theme).unwrap();
+            for (name, meta, card) in corner_cases() {
+                let (pages, _) = layout(&fonts, &meta, "List", &card, chrono::Utc::now());
+                for (n, page) in pages.iter().enumerate() {
+                    assert!(!page.is_empty(), "{name}: page {n} is blank");
+                }
             }
-        }
         }
     }
 
@@ -2018,7 +2479,10 @@ That is all — a last paragraph after the code block.
             let card = at_example_time(card);
             let a = render_at(&meta, "To Do", &card, Theme::Color, EXAMPLE_TIME).unwrap();
             let b = render_at(&meta, "To Do", &card, Theme::Color, EXAMPLE_TIME).unwrap();
-            assert!(a == b, "PDF output must not depend on anything but its input");
+            assert!(
+                a == b,
+                "PDF output must not depend on anything but its input"
+            );
         }
     }
 
@@ -2028,7 +2492,10 @@ That is all — a last paragraph after the code block.
     #[ignore = "writes files into docs/"]
     fn write_example_pdfs() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/export-examples");
-        for (theme, dir) in [(Theme::Mono, root.clone()), (Theme::Color, root.join("color"))] {
+        for (theme, dir) in [
+            (Theme::Mono, root.clone()),
+            (Theme::Color, root.join("color")),
+        ] {
             std::fs::create_dir_all(&dir).unwrap();
             for (name, meta, card) in corner_cases() {
                 // Color is shown by the showcase and the alerts only; the rest are monochrome.

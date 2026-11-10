@@ -28,7 +28,11 @@ impl<'a> MarkdownRenderer<'a> {
     /// `str::lines()`, which drops a trailing empty entry for a trailing '\n'
     /// — matching the existing description-text behavior.
     pub fn new(text: &'a str, width: usize, accent: Color) -> Self {
-        Self { text, width, accent }
+        Self {
+            text,
+            width,
+            accent,
+        }
     }
 
     pub fn render(&self) -> Rendered {
@@ -51,10 +55,7 @@ fn render_source_lines(source_lines: &[&str], width: usize, accent: Color) -> Re
         // Code fence / code block lines: no inline highlighting, no wrapping.
         if line_text.starts_with("```") {
             in_code_block = !in_code_block;
-            let span = Span::styled(
-                line_text.to_string(),
-                Style::default().fg(Color::DarkGray),
-            );
+            let span = Span::styled(line_text.to_string(), Style::default().fg(Color::DarkGray));
             lines.push(Line::from(vec![span]));
             continue;
         }
@@ -177,7 +178,10 @@ pub fn widest_table_line<'a>(lines: impl IntoIterator<Item = &'a str>) -> usize 
 fn render_table(block: &[&str], accent: Color) -> Vec<Line<'static>> {
     let owned: Vec<String> = block.iter().map(|l| l.to_string()).collect();
     let Some(table) = Table::parse(&owned) else {
-        return block.iter().map(|l| Line::from(highlight_line(l, accent))).collect();
+        return block
+            .iter()
+            .map(|l| Line::from(highlight_line(l, accent)))
+            .collect();
     };
     let matrix = table.is_matrix();
     table
@@ -205,7 +209,13 @@ fn row_line(line: &str, header: bool, matrix: bool, accent: Color) -> Line<'stat
         let mut text = String::new();
         let mut escaped = false;
         let bold = |pipes: usize| header || (matrix && pipes == 1);
-        let styled = |pipes: usize| if bold(pipes) { span.style.add_modifier(Modifier::BOLD) } else { span.style };
+        let styled = |pipes: usize| {
+            if bold(pipes) {
+                span.style.add_modifier(Modifier::BOLD)
+            } else {
+                span.style
+            }
+        };
         for c in span.content.chars() {
             if c == '|' && !escaped {
                 if !text.is_empty() {
@@ -237,7 +247,13 @@ fn rule_line(line: &str, matrix: bool) -> Line<'static> {
     let text: String = line
         .char_indices()
         .map(|(i, c)| match c {
-            '|' if Some(i) == first => if matrix { '┌' } else { '├' },
+            '|' if Some(i) == first => {
+                if matrix {
+                    '┌'
+                } else {
+                    '├'
+                }
+            }
             '|' if Some(i) == last => '┤',
             '|' => '┼',
             ' ' if first.is_none_or(|f| i < f) => ' ',
@@ -465,7 +481,10 @@ fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
     }
 
     if let Some(stripped) = owned.strip_prefix("# ") {
-        spans.push(Span::styled("# ".to_string(), Style::default().fg(Color::DarkGray)));
+        spans.push(Span::styled(
+            "# ".to_string(),
+            Style::default().fg(Color::DarkGray),
+        ));
         spans.push(Span::styled(
             stripped.to_string(),
             Style::default().fg(accent).add_modifier(Modifier::BOLD),
@@ -474,7 +493,10 @@ fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
     }
     for prefix in &["## ", "### ", "#### ", "##### ", "###### "] {
         if let Some(stripped) = owned.strip_prefix(prefix) {
-            spans.push(Span::styled(prefix.to_string(), Style::default().fg(Color::DarkGray)));
+            spans.push(Span::styled(
+                prefix.to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
             spans.push(Span::styled(
                 stripped.to_string(),
                 Style::default().fg(accent).add_modifier(Modifier::BOLD),
@@ -497,14 +519,19 @@ fn highlight_line(line: &str, accent: Color) -> Vec<Span<'static>> {
         ));
         spans.push(Span::styled(
             trimmed[marker_len..].to_string(),
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::ITALIC),
         ));
         return spans;
     }
 
     if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
         spans.push(Span::raw(indent_str));
-        spans.push(Span::styled(trimmed[..2].to_string(), Style::default().fg(accent)));
+        spans.push(Span::styled(
+            trimmed[..2].to_string(),
+            Style::default().fg(accent),
+        ));
         highlight_inline(&trimmed[2..], &mut spans);
         return spans;
     }
@@ -532,82 +559,126 @@ fn highlight_inline(text: &str, spans: &mut Vec<Span<'static>>) {
     let mut buf = String::new();
 
     while i < chars.len() {
-        if i + 2 < chars.len() && chars[i..i + 3] == ['*', '*', '*']
-            && let Some(end) = find_closing_triple(&chars, i + 3) {
-                if !buf.is_empty() {
-                    spans.push(Span::raw(std::mem::take(&mut buf)));
-                }
-                spans.push(Span::styled("***".to_string(), Style::default().fg(Color::DarkGray)));
-                let content: String = chars[i + 3..end].iter().collect();
-                spans.push(Span::styled(
-                    content,
-                    Style::default().add_modifier(Modifier::BOLD | Modifier::ITALIC),
-                ));
-                spans.push(Span::styled("***".to_string(), Style::default().fg(Color::DarkGray)));
-                i = end + 3;
-                continue;
+        if i + 2 < chars.len()
+            && chars[i..i + 3] == ['*', '*', '*']
+            && let Some(end) = find_closing_triple(&chars, i + 3)
+        {
+            if !buf.is_empty() {
+                spans.push(Span::raw(std::mem::take(&mut buf)));
             }
+            spans.push(Span::styled(
+                "***".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            let content: String = chars[i + 3..end].iter().collect();
+            spans.push(Span::styled(
+                content,
+                Style::default().add_modifier(Modifier::BOLD | Modifier::ITALIC),
+            ));
+            spans.push(Span::styled(
+                "***".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            i = end + 3;
+            continue;
+        }
 
-        if i + 1 < chars.len() && chars[i] == '*' && chars[i + 1] == '*'
-            && let Some(end) = find_closing(&chars, i + 2, &['*', '*']) {
-                if !buf.is_empty() {
-                    spans.push(Span::raw(std::mem::take(&mut buf)));
-                }
-                spans.push(Span::styled("**".to_string(), Style::default().fg(Color::DarkGray)));
-                let content: String = chars[i + 2..end].iter().collect();
-                spans.push(Span::styled(content, Style::default().add_modifier(Modifier::BOLD)));
-                spans.push(Span::styled("**".to_string(), Style::default().fg(Color::DarkGray)));
-                i = end + 2;
-                continue;
+        if i + 1 < chars.len()
+            && chars[i] == '*'
+            && chars[i + 1] == '*'
+            && let Some(end) = find_closing(&chars, i + 2, &['*', '*'])
+        {
+            if !buf.is_empty() {
+                spans.push(Span::raw(std::mem::take(&mut buf)));
             }
+            spans.push(Span::styled(
+                "**".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            let content: String = chars[i + 2..end].iter().collect();
+            spans.push(Span::styled(
+                content,
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+            spans.push(Span::styled(
+                "**".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            i = end + 2;
+            continue;
+        }
 
-        if i + 1 < chars.len() && chars[i] == '~' && chars[i + 1] == '~'
-            && let Some(end) = find_closing(&chars, i + 2, &['~', '~']) {
-                if !buf.is_empty() {
-                    spans.push(Span::raw(std::mem::take(&mut buf)));
-                }
-                spans.push(Span::styled("~~".to_string(), Style::default().fg(Color::DarkGray)));
-                let content: String = chars[i + 2..end].iter().collect();
-                spans.push(Span::styled(
-                    content,
-                    Style::default().add_modifier(Modifier::CROSSED_OUT),
-                ));
-                spans.push(Span::styled("~~".to_string(), Style::default().fg(Color::DarkGray)));
-                i = end + 2;
-                continue;
+        if i + 1 < chars.len()
+            && chars[i] == '~'
+            && chars[i + 1] == '~'
+            && let Some(end) = find_closing(&chars, i + 2, &['~', '~'])
+        {
+            if !buf.is_empty() {
+                spans.push(Span::raw(std::mem::take(&mut buf)));
             }
+            spans.push(Span::styled(
+                "~~".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            let content: String = chars[i + 2..end].iter().collect();
+            spans.push(Span::styled(
+                content,
+                Style::default().add_modifier(Modifier::CROSSED_OUT),
+            ));
+            spans.push(Span::styled(
+                "~~".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            i = end + 2;
+            continue;
+        }
 
-        if chars[i] == '*' && (i + 1 >= chars.len() || chars[i + 1] != '*')
-            && let Some(end) = find_closing_single(&chars, i + 1, '*') {
-                if !buf.is_empty() {
-                    spans.push(Span::raw(std::mem::take(&mut buf)));
-                }
-                spans.push(Span::styled("*".to_string(), Style::default().fg(Color::DarkGray)));
-                let content: String = chars[i + 1..end].iter().collect();
-                spans.push(Span::styled(
-                    content,
-                    Style::default().add_modifier(Modifier::ITALIC),
-                ));
-                spans.push(Span::styled("*".to_string(), Style::default().fg(Color::DarkGray)));
-                i = end + 1;
-                continue;
+        if chars[i] == '*'
+            && (i + 1 >= chars.len() || chars[i + 1] != '*')
+            && let Some(end) = find_closing_single(&chars, i + 1, '*')
+        {
+            if !buf.is_empty() {
+                spans.push(Span::raw(std::mem::take(&mut buf)));
             }
+            spans.push(Span::styled(
+                "*".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            let content: String = chars[i + 1..end].iter().collect();
+            spans.push(Span::styled(
+                content,
+                Style::default().add_modifier(Modifier::ITALIC),
+            ));
+            spans.push(Span::styled(
+                "*".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            i = end + 1;
+            continue;
+        }
 
         if chars[i] == '`'
-            && let Some(end) = find_closing_single(&chars, i + 1, '`') {
-                if !buf.is_empty() {
-                    spans.push(Span::raw(std::mem::take(&mut buf)));
-                }
-                spans.push(Span::styled("`".to_string(), Style::default().fg(Color::DarkGray)));
-                let content: String = chars[i + 1..end].iter().collect();
-                spans.push(Span::styled(
-                    content,
-                    Style::default().fg(Color::Green).bg(Color::Rgb(40, 40, 40)),
-                ));
-                spans.push(Span::styled("`".to_string(), Style::default().fg(Color::DarkGray)));
-                i = end + 1;
-                continue;
+            && let Some(end) = find_closing_single(&chars, i + 1, '`')
+        {
+            if !buf.is_empty() {
+                spans.push(Span::raw(std::mem::take(&mut buf)));
             }
+            spans.push(Span::styled(
+                "`".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            let content: String = chars[i + 1..end].iter().collect();
+            spans.push(Span::styled(
+                content,
+                Style::default().fg(Color::Green).bg(Color::Rgb(40, 40, 40)),
+            ));
+            spans.push(Span::styled(
+                "`".to_string(),
+                Style::default().fg(Color::DarkGray),
+            ));
+            i = end + 1;
+            continue;
+        }
 
         buf.push(chars[i]);
         i += 1;
@@ -627,8 +698,7 @@ fn find_closing(chars: &[char], start: usize, pattern: &[char]) -> Option<usize>
 }
 
 fn find_closing_triple(chars: &[char], start: usize) -> Option<usize> {
-    (start + 1..chars.len().saturating_sub(2))
-        .find(|&i| chars[i..i + 3] == ['*', '*', '*'])
+    (start + 1..chars.len().saturating_sub(2)).find(|&i| chars[i..i + 3] == ['*', '*', '*'])
 }
 
 fn find_closing_single(chars: &[char], start: usize, ch: char) -> Option<usize> {
@@ -663,10 +733,22 @@ mod tests {
     fn matrix_corner_is_open_and_first_column_bold() {
         let r = render("|  | x |\n|---|---|\n| row | 1 |", Color::Cyan, 10);
         let rows: Vec<String> = r.lines().iter().map(text).collect();
-        assert!(rows[0].starts_with(' ') && !rows[0].starts_with('│'), "no border left of the corner: {:?}", rows[0]);
-        assert!(rows[1].starts_with('┌'), "the open corner gets a corner glyph, not a tee: {:?}", rows[1]);
+        assert!(
+            rows[0].starts_with(' ') && !rows[0].starts_with('│'),
+            "no border left of the corner: {:?}",
+            rows[0]
+        );
+        assert!(
+            rows[1].starts_with('┌'),
+            "the open corner gets a corner glyph, not a tee: {:?}",
+            rows[1]
+        );
         assert!(rows[2].starts_with('│'));
-        let bold = |l: &Line, t: &str| l.spans.iter().any(|s| s.content.contains(t) && s.style.add_modifier.contains(Modifier::BOLD));
+        let bold = |l: &Line, t: &str| {
+            l.spans
+                .iter()
+                .any(|s| s.content.contains(t) && s.style.add_modifier.contains(Modifier::BOLD))
+        };
         assert!(bold(&r.lines()[2], "row") && !bold(&r.lines()[2], "1"));
         // A normal table keeps its left border and plain first column.
         let n = render("| h | x |\n|---|---|\n| row | 1 |", Color::Cyan, 10);
@@ -676,7 +758,11 @@ mod tests {
 
     #[test]
     fn table_rows_are_never_wrapped() {
-        let r = render("| aaaaaaaaaa | bbbbbbbbbb |\n| - | - |\n| c | d |", Color::Cyan, 8);
+        let r = render(
+            "| aaaaaaaaaa | bbbbbbbbbb |\n| - | - |\n| c | d |",
+            Color::Cyan,
+            8,
+        );
         assert_eq!(r.lines().len(), 3);
         assert_eq!(text(&r.lines()[0]), "│ aaaaaaaaaa │ bbbbbbbbbb │");
     }
@@ -715,7 +801,11 @@ mod tests {
     fn highlight_line_bold_italic() {
         let spans = highlight_line("a ***both*** b", Color::Cyan);
         let m = spans.iter().find(|s| s.content == "both").expect("span");
-        assert!(m.style.add_modifier.contains(Modifier::BOLD | Modifier::ITALIC));
+        assert!(
+            m.style
+                .add_modifier
+                .contains(Modifier::BOLD | Modifier::ITALIC)
+        );
     }
 
     #[test]
@@ -966,7 +1056,10 @@ mod tests {
         assert!(lines.len() > 1);
         assert!(lines[0].starts_with("> "));
         for l in &lines[1..] {
-            assert!(l.starts_with("  "), "citation continuation not indented: {l:?}");
+            assert!(
+                l.starts_with("  "),
+                "citation continuation not indented: {l:?}"
+            );
         }
         assert_fits(&lines, 25);
     }
@@ -1002,7 +1095,10 @@ mod tests {
                 let joined: String = lines.join(" ");
                 let got: Vec<&str> = joined.split_whitespace().collect();
                 let want: Vec<&str> = src.split_whitespace().collect();
-                assert_eq!(got, want, "text lost/changed (indent {indent}, width {width})");
+                assert_eq!(
+                    got, want,
+                    "text lost/changed (indent {indent}, width {width})"
+                );
             }
         }
     }

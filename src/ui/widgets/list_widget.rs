@@ -1,7 +1,7 @@
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders};
-use ratatui::Frame;
 
 use crate::app::App;
 use crate::model::card::Card;
@@ -14,9 +14,14 @@ use super::card_widget;
 /// column. Counts the exact lines the card widget renders (styles don't
 /// affect the count), so height and content can't drift apart.
 pub fn card_height(card: &Card, board_labels: &[Label], card_inner_width: u16) -> u16 {
-    let inner_lines =
-        card_widget::card_lines(card, board_labels, card_inner_width, Style::default(), false)
-            .len() as u16;
+    let inner_lines = card_widget::card_lines(
+        card,
+        board_labels,
+        card_inner_width,
+        Style::default(),
+        false,
+    )
+    .len() as u16;
     2 + inner_lines // 2 for borders
 }
 
@@ -215,12 +220,10 @@ pub fn render(
     if scroll_above > 0 {
         let label = format!("▲ +{scroll_above}");
         let w = label.chars().count() as u16 + 1;
-        let indicator = ratatui::widgets::Paragraph::new(
-            ratatui::text::Span::styled(
-                label,
-                Style::default().fg(accent).add_modifier(Modifier::BOLD),
-            ),
-        );
+        let indicator = ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
+            label,
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        ));
         let ind_area = Rect::new(inner.x + inner.width.saturating_sub(w), inner.y, w, 1);
         frame.render_widget(indicator, ind_area);
     }
@@ -228,12 +231,10 @@ pub fn render(
         let remaining = visible_cards.len() - scroll - rendered_count;
         let label = format!("▼ +{remaining}");
         let w = label.chars().count() as u16 + 1;
-        let indicator = ratatui::widgets::Paragraph::new(
-            ratatui::text::Span::styled(
-                label,
-                Style::default().fg(accent).add_modifier(Modifier::BOLD),
-            ),
-        );
+        let indicator = ratatui::widgets::Paragraph::new(ratatui::text::Span::styled(
+            label,
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        ));
         let y_pos = inner.y + inner.height.saturating_sub(1);
         let ind_area = Rect::new(inner.x + inner.width.saturating_sub(w), y_pos, w, 1);
         frame.render_widget(indicator, ind_area);
@@ -287,7 +288,10 @@ mod tests {
 
     #[test]
     fn card_height_counts_wrapped_title_and_labels() {
-        let label = Label::new("a rather long label".into(), crate::model::label::LabelColor::Red);
+        let label = Label::new(
+            "a rather long label".into(),
+            crate::model::label::LabelColor::Red,
+        );
         let mut card = Card::new("one two three four".into());
         card.label_ids = vec![label.id.clone()];
         card.description = "desc".into();

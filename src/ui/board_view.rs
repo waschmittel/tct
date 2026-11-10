@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use ratatui::Frame;
 
 use crate::app::{App, AppMode};
 use crate::insert::InsertSurface;
@@ -28,9 +28,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let mut title_spans = vec![
         Span::styled(
             format!(" {} ", board.meta.name),
-            Style::default()
-                .fg(accent)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!("({} lists)", board.lists.len()),
@@ -92,9 +90,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
                 dp.picker_date,
                 accent,
             );
-        } else if let (Some(buf), Some(cursor)) =
-            (handler.line_buffer(), handler.line_cursor())
-        {
+        } else if let (Some(buf), Some(cursor)) = (handler.line_buffer(), handler.line_cursor()) {
             render_input_overlay(frame, area, handler.title(), buf, cursor, accent);
         }
     }

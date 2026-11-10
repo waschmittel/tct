@@ -165,7 +165,11 @@ pub enum DialogSideEffect {
     },
     /// Write the PDF of a card to `path` and remember its folder for the
     /// next export.
-    ExportCardPdf { card_id: crate::model::id::CardId, path: std::path::PathBuf, theme: crate::export::Theme },
+    ExportCardPdf {
+        card_id: crate::model::id::CardId,
+        path: std::path::PathBuf,
+        theme: crate::export::Theme,
+    },
     /// Hard-delete an archived card.
     DeleteArchivedCard { card_id: crate::model::id::CardId },
     /// Restore an archived board: apply the RestoreBoard command via a
@@ -193,10 +197,7 @@ pub enum DialogSideEffect {
     /// Reorder labels in the board's label palette (direct mutation +
     /// persist; not a `Command` per ADR-0002 — label reorder is tied to
     /// UI selection).
-    ReorderLabels {
-        from: usize,
-        to: usize,
-    },
+    ReorderLabels { from: usize, to: usize },
     /// Start an Insert handler for a new label name. Opens the
     /// Insert mode; the resulting label will trigger a follow-up
     /// LabelManager dialog on confirm. `from_picker` is threaded
@@ -217,13 +218,7 @@ pub trait Dialog {
     /// [`LoadedBoard`] when relevant; some dialogs (e.g. archived-boards)
     /// don't need it and may receive a `None` from the caller — those
     /// dialogs render purely from their own state.
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        board: Option<&LoadedBoard>,
-        accent: Color,
-    );
+    fn render(&self, frame: &mut Frame, area: Rect, board: Option<&LoadedBoard>, accent: Color);
 
     /// Process a key event. The dialog may read the loaded board to
     /// resolve current selections (e.g. ConfirmArchiveCard looks up

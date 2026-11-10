@@ -20,13 +20,7 @@ pub struct LabelManager {
 }
 
 impl Dialog for LabelManager {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, board: Option<&LoadedBoard>, _accent: Color) {
         let board = match board {
             Some(b) => b,
             None => return,
@@ -97,9 +91,7 @@ impl Dialog for LabelManager {
         let shift = key.modifiers.contains(KeyModifiers::SHIFT);
 
         match (key.code, shift) {
-            (KeyCode::Down, false)
-                if label_count > 0 && self.selected_idx < label_count - 1 =>
-            {
+            (KeyCode::Down, false) if label_count > 0 && self.selected_idx < label_count - 1 => {
                 self.selected_idx += 1;
                 DialogOutcome::stay()
             }
@@ -174,12 +166,12 @@ impl Dialog for LabelManager {
                     DialogOutcome::stay()
                 }
             }
-            (KeyCode::Char('d'), _) if label_count > 0 => DialogOutcome::open(Box::new(
-                super::confirm_delete_label::ConfirmDeleteLabel {
+            (KeyCode::Char('d'), _) if label_count > 0 => {
+                DialogOutcome::open(Box::new(super::confirm_delete_label::ConfirmDeleteLabel {
                     label_idx: self.selected_idx,
                     from_picker: self.from_picker,
-                },
-            )),
+                }))
+            }
             (KeyCode::Char('?'), _) => DialogOutcome::help(),
             (KeyCode::Esc, _) => {
                 if self.from_picker {
@@ -241,14 +233,20 @@ mod tests {
 
     #[test]
     fn esc_from_picker_reopens_picker() {
-        let mut mgr = LabelManager { selected_idx: 0, from_picker: true };
+        let mut mgr = LabelManager {
+            selected_idx: 0,
+            from_picker: true,
+        };
         let outcome = press(&mut mgr, KeyCode::Esc, None);
         assert!(matches!(outcome.follow, Follow::Open(_)));
     }
 
     #[test]
     fn esc_without_picker_origin_closes_and_restores_origin_mode() {
-        let mut mgr = LabelManager { selected_idx: 0, from_picker: false };
+        let mut mgr = LabelManager {
+            selected_idx: 0,
+            from_picker: false,
+        };
         let outcome = press(&mut mgr, KeyCode::Esc, None);
         assert!(matches!(outcome.follow, Follow::Close));
     }
@@ -256,7 +254,10 @@ mod tests {
     #[test]
     fn d_opens_delete_confirmation() {
         let board = board_with_label();
-        let mut mgr = LabelManager { selected_idx: 0, from_picker: false };
+        let mut mgr = LabelManager {
+            selected_idx: 0,
+            from_picker: false,
+        };
         let outcome = press(&mut mgr, KeyCode::Char('d'), Some(&board));
         assert!(matches!(outcome.follow, Follow::Open(_)));
     }
@@ -264,14 +265,20 @@ mod tests {
     #[test]
     fn x_is_not_bound() {
         let board = board_with_label();
-        let mut mgr = LabelManager { selected_idx: 0, from_picker: false };
+        let mut mgr = LabelManager {
+            selected_idx: 0,
+            from_picker: false,
+        };
         let outcome = press(&mut mgr, KeyCode::Char('x'), Some(&board));
         assert!(matches!(outcome.follow, Follow::Stay));
     }
 
     #[test]
     fn question_mark_shows_dialog_help() {
-        let mut mgr = LabelManager { selected_idx: 0, from_picker: false };
+        let mut mgr = LabelManager {
+            selected_idx: 0,
+            from_picker: false,
+        };
         let outcome = press(&mut mgr, KeyCode::Char('?'), None);
         assert!(matches!(outcome.follow, Follow::Help));
         assert!(mgr.help().is_some());
@@ -280,7 +287,10 @@ mod tests {
     #[test]
     fn capital_c_opens_color_picker_for_selected_label() {
         let board = board_with_label();
-        let mut mgr = LabelManager { selected_idx: 0, from_picker: false };
+        let mut mgr = LabelManager {
+            selected_idx: 0,
+            from_picker: false,
+        };
         let outcome = press(&mut mgr, KeyCode::Char('C'), Some(&board));
         assert!(matches!(outcome.follow, Follow::Open(_)));
     }

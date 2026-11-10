@@ -42,7 +42,11 @@ pub fn ordered_card_ids(list_id: &ListId, cards: &HashMap<CardId, Card>) -> Vec<
 /// Build the in-memory `CardList`s for a board from its `ListMeta` definitions
 /// and the full Card map. When `archived` is false, returns the active Lists in
 /// board order; when true, returns the archived Lists.
-pub fn build_lists(meta: &BoardMeta, cards: &HashMap<CardId, Card>, archived: bool) -> Vec<CardList> {
+pub fn build_lists(
+    meta: &BoardMeta,
+    cards: &HashMap<CardId, Card>,
+    archived: bool,
+) -> Vec<CardList> {
     meta.lists
         .iter()
         .filter(|lm| lm.archived == archived)

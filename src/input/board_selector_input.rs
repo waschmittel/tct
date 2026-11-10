@@ -31,21 +31,112 @@ pub enum Action {
 /// the help overlay renders from this table.
 pub static KEYMAP: &[Binding<Action>] = &[
     // Navigation
-    Binding { code: KeyCode::Up, shift: Some(false), action: Action::SelectUp, keys: "Up / Down", help: "Navigate boards", section: "Navigation" },
-    Binding { code: KeyCode::Down, shift: Some(false), action: Action::SelectDown, keys: "Up / Down", help: "Navigate boards", section: "Navigation" },
-    Binding { code: KeyCode::Up, shift: Some(true), action: Action::MoveBoardUp, keys: "Shift+Up/Down", help: "Reorder board", section: "Navigation" },
-    Binding { code: KeyCode::Down, shift: Some(true), action: Action::MoveBoardDown, keys: "Shift+Up/Down", help: "Reorder board", section: "Navigation" },
-    Binding { code: KeyCode::Enter, shift: None, action: Action::OpenBoard, keys: "Enter", help: "Open board", section: "Navigation" },
+    Binding {
+        code: KeyCode::Up,
+        shift: Some(false),
+        action: Action::SelectUp,
+        keys: "Up / Down",
+        help: "Navigate boards",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Down,
+        shift: Some(false),
+        action: Action::SelectDown,
+        keys: "Up / Down",
+        help: "Navigate boards",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Up,
+        shift: Some(true),
+        action: Action::MoveBoardUp,
+        keys: "Shift+Up/Down",
+        help: "Reorder board",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Down,
+        shift: Some(true),
+        action: Action::MoveBoardDown,
+        keys: "Shift+Up/Down",
+        help: "Reorder board",
+        section: "Navigation",
+    },
+    Binding {
+        code: KeyCode::Enter,
+        shift: None,
+        action: Action::OpenBoard,
+        keys: "Enter",
+        help: "Open board",
+        section: "Navigation",
+    },
     // Actions
-    Binding { code: KeyCode::Char('n'), shift: None, action: Action::NewBoard, keys: "n", help: "New board", section: "Actions" },
-    Binding { code: KeyCode::Char('r'), shift: None, action: Action::RenameBoard, keys: "r", help: "Rename board", section: "Actions" },
-    Binding { code: KeyCode::Char('c'), shift: None, action: Action::CycleAccentColor, keys: "c", help: "Cycle accent color", section: "Actions" },
-    Binding { code: KeyCode::Char('C'), shift: None, action: Action::BoardConfiguration, keys: "C", help: "Board configuration", section: "Actions" },
-    Binding { code: KeyCode::Char('a'), shift: None, action: Action::ArchiveBoard, keys: "a", help: "Archive board", section: "Actions" },
-    Binding { code: KeyCode::Char('v'), shift: None, action: Action::ViewArchived, keys: "v", help: "View archived", section: "Actions" },
+    Binding {
+        code: KeyCode::Char('n'),
+        shift: None,
+        action: Action::NewBoard,
+        keys: "n",
+        help: "New board",
+        section: "Actions",
+    },
+    Binding {
+        code: KeyCode::Char('r'),
+        shift: None,
+        action: Action::RenameBoard,
+        keys: "r",
+        help: "Rename board",
+        section: "Actions",
+    },
+    Binding {
+        code: KeyCode::Char('c'),
+        shift: None,
+        action: Action::CycleAccentColor,
+        keys: "c",
+        help: "Cycle accent color",
+        section: "Actions",
+    },
+    Binding {
+        code: KeyCode::Char('C'),
+        shift: None,
+        action: Action::BoardConfiguration,
+        keys: "C",
+        help: "Board configuration",
+        section: "Actions",
+    },
+    Binding {
+        code: KeyCode::Char('a'),
+        shift: None,
+        action: Action::ArchiveBoard,
+        keys: "a",
+        help: "Archive board",
+        section: "Actions",
+    },
+    Binding {
+        code: KeyCode::Char('v'),
+        shift: None,
+        action: Action::ViewArchived,
+        keys: "v",
+        help: "View archived",
+        section: "Actions",
+    },
     // App
-    Binding { code: KeyCode::Char('?'), shift: None, action: Action::Help, keys: "?", help: "Help", section: "App" },
-    Binding { code: KeyCode::Char('q'), shift: None, action: Action::Quit, keys: "q", help: "Quit", section: "App" },
+    Binding {
+        code: KeyCode::Char('?'),
+        shift: None,
+        action: Action::Help,
+        keys: "?",
+        help: "Help",
+        section: "App",
+    },
+    Binding {
+        code: KeyCode::Char('q'),
+        shift: None,
+        action: Action::Quit,
+        keys: "q",
+        help: "Quit",
+        section: "App",
+    },
 ];
 
 pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
@@ -275,7 +366,8 @@ mod tests {
             let mut app = App::new(None).unwrap();
 
             let send = |app: &mut App, code: KeyCode| {
-                crate::input::handle_input(app, KeyEvent::new(code, KeyModifiers::empty())).unwrap();
+                crate::input::handle_input(app, KeyEvent::new(code, KeyModifiers::empty()))
+                    .unwrap();
             };
 
             // Press C to open Board Configuration
@@ -297,7 +389,10 @@ mod tests {
                 app.status_message.as_ref().map(|(m, _)| m.as_str()),
                 Some("Board configuration saved")
             );
-            assert_eq!(app.boards[0].new_card_position, crate::model::board::NewCardPosition::Top);
+            assert_eq!(
+                app.boards[0].new_card_position,
+                crate::model::board::NewCardPosition::Top
+            );
 
             // Open the board
             send(&mut app, KeyCode::Enter);
@@ -310,14 +405,25 @@ mod tests {
             );
 
             // Add a list
-            app.apply(crate::command::Command::AddList { name: "Todo".into() }).unwrap();
+            app.apply(crate::command::Command::AddList {
+                name: "Todo".into(),
+            })
+            .unwrap();
             let list_id = app.board().unwrap().lists[0].id.clone();
 
             // Add first card
-            app.apply(crate::command::Command::AddCard { list_id: list_id.clone(), title: "first".into() }).unwrap();
+            app.apply(crate::command::Command::AddCard {
+                list_id: list_id.clone(),
+                title: "first".into(),
+            })
+            .unwrap();
 
             // Add second card
-            app.apply(crate::command::Command::AddCard { list_id, title: "second".into() }).unwrap();
+            app.apply(crate::command::Command::AddCard {
+                list_id,
+                title: "second".into(),
+            })
+            .unwrap();
 
             // "second" should be at index 0, "first" at index 1
             let board = app.board().unwrap();
@@ -369,7 +475,11 @@ mod tests {
             // Archive the board: 'a' opens ConfirmArchiveBoard, 'y' confirms
             press(&mut app, KeyCode::Char('a'));
             assert!(matches!(app.mode, AppMode::Dialog));
-            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty())).unwrap();
+            crate::input::handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty()),
+            )
+            .unwrap();
             assert_eq!(app.mode, AppMode::BoardSelector);
             assert!(app.boards.is_empty());
 
@@ -378,17 +488,33 @@ mod tests {
             assert_eq!(app.mode, AppMode::Dialog);
 
             // Press Enter to restore: opens ConfirmRestoreBoard dialog
-            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
+            crate::input::handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()),
+            )
+            .unwrap();
             assert_eq!(app.mode, AppMode::Dialog);
 
             // Cancel with 'n'
-            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty())).unwrap();
+            crate::input::handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('n'), KeyModifiers::empty()),
+            )
+            .unwrap();
             assert_eq!(app.mode, AppMode::Dialog);
             assert!(app.boards.is_empty());
 
             // Press Enter then 'y' to confirm restore
-            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())).unwrap();
-            crate::input::handle_input(&mut app, KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty())).unwrap();
+            crate::input::handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Enter, KeyModifiers::empty()),
+            )
+            .unwrap();
+            crate::input::handle_input(
+                &mut app,
+                KeyEvent::new(KeyCode::Char('y'), KeyModifiers::empty()),
+            )
+            .unwrap();
             assert_eq!(app.mode, AppMode::BoardSelector);
             assert_eq!(app.boards.len(), 1);
             assert_eq!(app.boards[0].id, board_id);

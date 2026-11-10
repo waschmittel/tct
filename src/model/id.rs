@@ -37,7 +37,11 @@ pub struct InvalidId {
 }
 
 fn validate(kind: &'static str, value: &str) -> Result<(), InvalidId> {
-    let invalid = |reason| InvalidId { kind, value: value.to_string(), reason };
+    let invalid = |reason| InvalidId {
+        kind,
+        value: value.to_string(),
+        reason,
+    };
     if value.len() > MAX_LEN {
         return Err(invalid("longer than 64 characters"));
     }
@@ -45,7 +49,9 @@ fn validate(kind: &'static str, value: &str) -> Result<(), InvalidId> {
         .bytes()
         .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
     {
-        return Err(invalid("only ASCII letters, digits, '-' and '_' are allowed"));
+        return Err(invalid(
+            "only ASCII letters, digits, '-' and '_' are allowed",
+        ));
     }
     Ok(())
 }
@@ -149,10 +155,26 @@ macro_rules! define_id {
     };
 }
 
-define_id!(BoardId, "board", "Identifies a Board — and names the directory its `board.json` lives in.");
-define_id!(CardId, "card", "Identifies a Card — and names its `card-<id>.json` file.");
-define_id!(ListId, "list", "Identifies a List within its Board's inline `lists`.");
-define_id!(LabelId, "label", "Identifies a Label within its Board's inline `labels`.");
+define_id!(
+    BoardId,
+    "board",
+    "Identifies a Board — and names the directory its `board.json` lives in."
+);
+define_id!(
+    CardId,
+    "card",
+    "Identifies a Card — and names its `card-<id>.json` file."
+);
+define_id!(
+    ListId,
+    "list",
+    "Identifies a List within its Board's inline `lists`."
+);
+define_id!(
+    LabelId,
+    "label",
+    "Identifies a Label within its Board's inline `labels`."
+);
 
 #[cfg(test)]
 mod tests {
@@ -174,7 +196,14 @@ mod tests {
 
     #[test]
     fn parse_accepts_id_charset() {
-        for ok in ["abc123", "with-dash", "with_underscore", "A1", "", &"x".repeat(MAX_LEN)] {
+        for ok in [
+            "abc123",
+            "with-dash",
+            "with_underscore",
+            "A1",
+            "",
+            &"x".repeat(MAX_LEN),
+        ] {
             assert!(CardId::parse(ok).is_ok(), "should accept {ok:?}");
         }
     }

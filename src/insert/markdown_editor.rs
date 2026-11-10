@@ -7,8 +7,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui_textarea::CursorMove;
 
 use super::alert_edit;
-use super::line_input::has_ctrl_or_cmd;
 use super::emphasis;
+use super::line_input::has_ctrl_or_cmd;
 use super::table_edit::{self, grouped};
 use super::text_area_input::TextAreaInput;
 use super::{InsertHandler, InsertOutcome, InsertSurface};
@@ -52,9 +52,15 @@ impl InsertHandler for MarkdownEditor {
         InsertOutcome::Stay
     }
 
-    fn surface(&self) -> InsertSurface { InsertSurface::CardDetail }
-    fn title(&self) -> &str { "Edit Description" }
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn surface(&self) -> InsertSurface {
+        InsertSurface::CardDetail
+    }
+    fn title(&self) -> &str {
+        "Edit Description"
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl MarkdownEditor {
@@ -203,17 +209,23 @@ impl MarkdownEditor {
                 InsertOutcome::StayWithStatus(Some(alert_edit::CHORD_HINT.into()))
             }
             (KeyCode::Char('b'), m) if has_ctrl_or_cmd(m) => {
-                grouped(&mut self.input.textarea, None, |ta| emphasis::toggle(ta, emphasis::BOLD));
+                grouped(&mut self.input.textarea, None, |ta| {
+                    emphasis::toggle(ta, emphasis::BOLD)
+                });
                 InsertOutcome::Stay
             }
             // Ctrl+I is Tab on a terminal, so italic lives on Ctrl+E (emphasis); Cmd+I
             // still reaches here as 'i' on terminals that report Super.
             (KeyCode::Char('e' | 'i'), m) if has_ctrl_or_cmd(m) => {
-                grouped(&mut self.input.textarea, None, |ta| emphasis::toggle(ta, emphasis::ITALIC));
+                grouped(&mut self.input.textarea, None, |ta| {
+                    emphasis::toggle(ta, emphasis::ITALIC)
+                });
                 InsertOutcome::Stay
             }
             (KeyCode::Char('k'), m) if has_ctrl_or_cmd(m) => {
-                grouped(&mut self.input.textarea, None, |ta| wrap_selection_or_insert(ta, "`", "`"));
+                grouped(&mut self.input.textarea, None, |ta| {
+                    wrap_selection_or_insert(ta, "`", "`")
+                });
                 InsertOutcome::Stay
             }
             (KeyCode::Char('l'), m) if has_ctrl_or_cmd(m) => {
@@ -263,7 +275,9 @@ impl MarkdownEditor {
     fn type_key(&mut self, key: KeyEvent) {
         let ta = &mut self.input.textarea;
         if matches!(key.code, KeyCode::Char(_))
-            && !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+            && !key
+                .modifiers
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
         {
             table_edit::snap_into_row(ta);
         }
@@ -307,7 +321,9 @@ pub(crate) fn handle_enter_in_list(textarea: &mut tui_textarea::TextArea<'static
         textarea.insert_newline();
         return;
     }
-    if let Some(num_str) = trimmed.strip_suffix(". ").or_else(|| trimmed.strip_suffix('.'))
+    if let Some(num_str) = trimmed
+        .strip_suffix(". ")
+        .or_else(|| trimmed.strip_suffix('.'))
         && num_str.parse::<u64>().is_ok()
     {
         textarea.move_cursor(CursorMove::Head);
@@ -382,7 +398,11 @@ pub(crate) fn handle_enter_in_list(textarea: &mut tui_textarea::TextArea<'static
 /// Break the current line at the cursor (`col`) and start the new line with
 /// `prefix`, moving the text after the cursor into the new list item. Spaces
 /// right after the cursor are dropped so the item text doesn't start with a gap.
-fn split_line_for_new_item(textarea: &mut tui_textarea::TextArea<'static>, col: usize, prefix: &str) {
+fn split_line_for_new_item(
+    textarea: &mut tui_textarea::TextArea<'static>,
+    col: usize,
+    prefix: &str,
+) {
     let (row, _) = textarea.cursor();
     let leading_spaces = textarea
         .lines()
@@ -528,7 +548,10 @@ fn parse_marker(trimmed: &str) -> Option<(Marker, usize)> {
             return Some((Marker::Numbered, dot + 2));
         }
     }
-    if let Some(num_str) = trimmed.strip_suffix('.').filter(|s| s.parse::<u64>().is_ok()) {
+    if let Some(num_str) = trimmed
+        .strip_suffix('.')
+        .filter(|s| s.parse::<u64>().is_ok())
+    {
         return Some((Marker::Numbered, num_str.chars().count() + 1));
     }
     if let Some(marker_len) = crate::ui::markdown::citation_marker_len(trimmed) {
@@ -557,7 +580,6 @@ fn sibling_marker(lines: &[String], row: usize, indent: usize) -> Option<Marker>
     }
     None
 }
-
 
 pub(crate) fn renumber_all(textarea: &mut tui_textarea::TextArea<'static>) {
     let lines = textarea.lines().to_vec();
@@ -649,7 +671,12 @@ mod tests {
     }
 
     fn editor_lines(e: &MarkdownEditor) -> Vec<String> {
-        e.input.textarea.lines().iter().map(|s| s.to_string()).collect()
+        e.input
+            .textarea
+            .lines()
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     }
 
     fn editor_cursor(e: &MarkdownEditor) -> (usize, usize) {
@@ -673,7 +700,10 @@ mod tests {
     fn typing_after_entering_edit_mode_appends() {
         let mut e = make_editor("abc\ndef");
         press(&mut e, KeyCode::Char('X'));
-        assert_eq!(editor_lines(&e), vec!["abc".to_string(), "defX".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["abc".to_string(), "defX".to_string()]
+        );
     }
 
     #[test]
@@ -684,7 +714,10 @@ mod tests {
             InsertOutcome::Help
         ));
         assert!(matches!(
-            e.handle_key(KeyEvent::new(KeyCode::Char('h'), KeyModifiers::CONTROL), None),
+            e.handle_key(
+                KeyEvent::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
+                None
+            ),
             InsertOutcome::Help
         ));
         assert!(matches!(
@@ -692,7 +725,10 @@ mod tests {
             InsertOutcome::Help
         ));
         assert!(matches!(
-            e.handle_key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::CONTROL), None),
+            e.handle_key(
+                KeyEvent::new(KeyCode::Char('?'), KeyModifiers::CONTROL),
+                None
+            ),
             InsertOutcome::Help
         ));
         // Typing bare 'h' or '?' appends text into buffer
@@ -710,13 +746,19 @@ mod tests {
         }
         assert!(e.input.textarea.is_selecting());
         // Copy with Ctrl+C
-        e.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL), None);
+        e.handle_key(
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            None,
+        );
         assert_eq!(e.input.textarea.yank_text(), "world");
         assert_eq!(editor_lines(&e), vec!["hello world".to_string()]);
 
         // Paste at end with Ctrl+V
         e.input.textarea.move_cursor(CursorMove::End);
-        e.handle_key(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL), None);
+        e.handle_key(
+            KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL),
+            None,
+        );
         assert_eq!(editor_lines(&e), vec!["hello worldworld".to_string()]);
     }
 
@@ -729,13 +771,19 @@ mod tests {
         }
         assert!(e.input.textarea.is_selecting());
         // Cut with Ctrl+X
-        e.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL), None);
+        e.handle_key(
+            KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL),
+            None,
+        );
         assert_eq!(e.input.textarea.yank_text(), " world");
         assert_eq!(editor_lines(&e), vec!["hello".to_string()]);
 
         // Paste at end with Ctrl+V
         e.input.textarea.move_cursor(CursorMove::End);
-        e.handle_key(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL), None);
+        e.handle_key(
+            KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL),
+            None,
+        );
         assert_eq!(editor_lines(&e), vec!["hello world".to_string()]);
     }
 
@@ -784,7 +832,10 @@ mod tests {
         for _ in 0..6 {
             e1.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::SHIFT), None);
         }
-        e1.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL), None);
+        e1.handle_key(
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            None,
+        );
 
         let mut e2 = make_editor("dest: ");
         e2.paste_from_clipboard();
@@ -800,7 +851,10 @@ mod tests {
         }
         assert!(e.input.textarea.is_selecting());
         // Bold the selection
-        e.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL), None);
+        e.handle_key(
+            KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL),
+            None,
+        );
         assert_eq!(editor_lines(&e), vec!["format **me** please".to_string()]);
     }
 
@@ -848,7 +902,11 @@ mod tests {
         e.handle_paste("- item 1\n- item 2");
         assert_eq!(
             editor_lines(&e),
-            vec!["title".to_string(), "- item 1".to_string(), "- item 2".to_string()]
+            vec![
+                "title".to_string(),
+                "- item 1".to_string(),
+                "- item 2".to_string()
+            ]
         );
     }
 
@@ -895,7 +953,9 @@ mod tests {
     }
 
     fn cursor_at(e: &mut MarkdownEditor, row: usize, col: usize) {
-        e.input.textarea.move_cursor(CursorMove::Jump(row as u16, col as u16));
+        e.input
+            .textarea
+            .move_cursor(CursorMove::Jump(row as u16, col as u16));
     }
 
     #[test]
@@ -905,7 +965,11 @@ mod tests {
         press(&mut e, KeyCode::Enter);
         assert_eq!(
             editor_lines(&e),
-            vec!["- hello".to_string(), "- world".to_string(), "- next".to_string()]
+            vec![
+                "- hello".to_string(),
+                "- world".to_string(),
+                "- next".to_string()
+            ]
         );
         assert_eq!(editor_cursor(&e), (1, 2));
     }
@@ -915,7 +979,10 @@ mod tests {
         let mut e = make_editor("* abcdef");
         cursor_at(&mut e, 0, 5); // "* abc|def"
         press(&mut e, KeyCode::Enter);
-        assert_eq!(editor_lines(&e), vec!["* abc".to_string(), "* def".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["* abc".to_string(), "* def".to_string()]
+        );
         assert_eq!(editor_cursor(&e), (1, 2));
     }
 
@@ -924,7 +991,10 @@ mod tests {
         let mut e = make_editor("- text");
         cursor_at(&mut e, 0, 2);
         press(&mut e, KeyCode::Enter);
-        assert_eq!(editor_lines(&e), vec!["- ".to_string(), "- text".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["- ".to_string(), "- text".to_string()]
+        );
         assert_eq!(editor_cursor(&e), (1, 2));
     }
 
@@ -933,7 +1003,10 @@ mod tests {
         let mut e = make_editor("   - one two");
         cursor_at(&mut e, 0, 8); // "   - one| two"
         press(&mut e, KeyCode::Enter);
-        assert_eq!(editor_lines(&e), vec!["   - one".to_string(), "   - two".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["   - one".to_string(), "   - two".to_string()]
+        );
         assert_eq!(editor_cursor(&e), (1, 5));
     }
 
@@ -944,7 +1017,11 @@ mod tests {
         press(&mut e, KeyCode::Enter);
         assert_eq!(
             editor_lines(&e),
-            vec!["1. hello".to_string(), "2. world".to_string(), "3. next".to_string()]
+            vec![
+                "1. hello".to_string(),
+                "2. world".to_string(),
+                "3. next".to_string()
+            ]
         );
         assert_eq!(editor_cursor(&e), (1, 3));
     }
@@ -956,7 +1033,12 @@ mod tests {
         press(&mut e, KeyCode::Enter);
         assert_eq!(
             editor_lines(&e),
-            vec!["intro".to_string(), "".to_string(), "1. a".to_string(), "2. b".to_string()]
+            vec![
+                "intro".to_string(),
+                "".to_string(),
+                "1. a".to_string(),
+                "2. b".to_string()
+            ]
         );
     }
 
@@ -967,7 +1049,10 @@ mod tests {
 
         press(&mut e, KeyCode::Enter);
 
-        assert_eq!(editor_lines(&e), vec!["- first".to_string(), "- ".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["- first".to_string(), "- ".to_string()]
+        );
     }
 
     #[test]
@@ -975,7 +1060,10 @@ mod tests {
         let mut e = make_editor("> first quote");
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::Enter);
-        assert_eq!(editor_lines(&e), vec!["> first quote".to_string(), "> ".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["> first quote".to_string(), "> ".to_string()]
+        );
         assert_eq!(editor_cursor(&e), (1, 2));
     }
 
@@ -1066,7 +1154,11 @@ mod tests {
         press(&mut e, KeyCode::Enter);
         assert_eq!(
             editor_lines(&e),
-            vec!["> hello".to_string(), "> world".to_string(), "> next".to_string()]
+            vec![
+                "> hello".to_string(),
+                "> world".to_string(),
+                "> next".to_string()
+            ]
         );
         assert_eq!(editor_cursor(&e), (1, 2));
     }
@@ -1128,7 +1220,10 @@ mod tests {
         let mut e = make_editor("1. first");
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::Enter);
-        assert_eq!(editor_lines(&e), vec!["1. first".to_string(), "2. ".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["1. first".to_string(), "2. ".to_string()]
+        );
     }
 
     #[test]
@@ -1139,7 +1234,12 @@ mod tests {
         press(&mut e, KeyCode::Enter);
         assert_eq!(
             editor_lines(&e),
-            vec!["1. a".to_string(), "2. ".to_string(), "3. b".to_string(), "4. c".to_string(),]
+            vec![
+                "1. a".to_string(),
+                "2. ".to_string(),
+                "3. b".to_string(),
+                "4. c".to_string(),
+            ]
         );
         assert_eq!(editor_cursor(&e), (1, 3));
     }
@@ -1201,7 +1301,12 @@ mod tests {
         press(&mut e, KeyCode::Enter);
         assert_eq!(
             editor_lines(&e),
-            vec!["1. a".to_string(), "2. ".to_string(), "3. b".to_string(), "4. c".to_string(),]
+            vec![
+                "1. a".to_string(),
+                "2. ".to_string(),
+                "3. b".to_string(),
+                "4. c".to_string(),
+            ]
         );
         assert_eq!(editor_cursor(&e), (1, 3));
     }
@@ -1214,7 +1319,12 @@ mod tests {
         press(&mut e, KeyCode::Enter);
         assert_eq!(
             editor_lines(&e),
-            vec!["3. a".to_string(), "4. ".to_string(), "5. b".to_string(), "6. c".to_string(),]
+            vec![
+                "3. a".to_string(),
+                "4. ".to_string(),
+                "5. b".to_string(),
+                "6. c".to_string(),
+            ]
         );
     }
 
@@ -1281,7 +1391,10 @@ mod tests {
         e.input.textarea.move_cursor(CursorMove::Bottom);
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::Tab);
-        assert_eq!(editor_lines(&e), vec!["1. parent".to_string(), "   1. child".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["1. parent".to_string(), "   1. child".to_string()]
+        );
     }
 
     #[test]
@@ -1306,7 +1419,10 @@ mod tests {
         e.input.textarea.move_cursor(CursorMove::Bottom);
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::Tab);
-        assert_eq!(editor_lines(&e), vec!["- a".to_string(), "   - b".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["- a".to_string(), "   - b".to_string()]
+        );
     }
 
     #[test]
@@ -1315,7 +1431,10 @@ mod tests {
         e.input.textarea.move_cursor(CursorMove::Bottom);
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::BackTab);
-        assert_eq!(editor_lines(&e), vec!["1. parent".to_string(), "2. child".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["1. parent".to_string(), "2. child".to_string()]
+        );
     }
 
     #[test]
@@ -1338,7 +1457,10 @@ mod tests {
         e3.input.textarea.move_cursor(CursorMove::Bottom);
         e3.input.textarea.move_cursor(CursorMove::End);
         press(&mut e3, KeyCode::BackTab);
-        assert_eq!(editor_lines(&e3), vec!["- first".to_string(), "second".to_string()]);
+        assert_eq!(
+            editor_lines(&e3),
+            vec!["- first".to_string(), "second".to_string()]
+        );
         assert_eq!(editor_cursor(&e3), (1, 6));
     }
 
@@ -1455,7 +1577,9 @@ mod tests {
 
     fn nest_at(initial: &str, row: usize, col: usize) -> MarkdownEditor {
         let mut e = make_editor(initial);
-        e.input.textarea.move_cursor(CursorMove::Jump(row as u16, col as u16));
+        e.input
+            .textarea
+            .move_cursor(CursorMove::Jump(row as u16, col as u16));
         press(&mut e, KeyCode::Tab);
         e
     }
@@ -1495,7 +1619,11 @@ mod tests {
         let e = nest_at("- a\n   * x\n- b", 2, 3);
         assert_eq!(
             editor_lines(&e),
-            vec!["- a".to_string(), "   * x".to_string(), "   * b".to_string()]
+            vec![
+                "- a".to_string(),
+                "   * x".to_string(),
+                "   * b".to_string()
+            ]
         );
     }
 
@@ -1511,7 +1639,10 @@ mod tests {
         let e = nest_at("1. a\n   - x\n\n2. b", 3, 4);
         assert_eq!(editor_lines(&e)[3], "   1. b");
         let e = nest_at("- a\n1. b", 1, 4);
-        assert_eq!(editor_lines(&e), vec!["- a".to_string(), "   1. b".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["- a".to_string(), "   1. b".to_string()]
+        );
     }
 
     #[test]
@@ -1528,7 +1659,9 @@ mod tests {
 
     fn unnest_at(initial: &str, row: usize, col: usize) -> MarkdownEditor {
         let mut e = make_editor(initial);
-        e.input.textarea.move_cursor(CursorMove::Jump(row as u16, col as u16));
+        e.input
+            .textarea
+            .move_cursor(CursorMove::Jump(row as u16, col as u16));
         press(&mut e, KeyCode::BackTab);
         e
     }
@@ -1536,7 +1669,10 @@ mod tests {
     #[test]
     fn shift_tab_numbered_child_of_bullet_becomes_bullet() {
         let e = unnest_at("- parent\n   1. child", 1, 12);
-        assert_eq!(editor_lines(&e), vec!["- parent".to_string(), "- child".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["- parent".to_string(), "- child".to_string()]
+        );
         assert_eq!(editor_cursor(&e), (1, 7));
     }
 
@@ -1594,7 +1730,10 @@ mod tests {
     #[test]
     fn shift_tab_without_a_parent_item_keeps_scheme() {
         let e = unnest_at("intro\n   - a", 1, 5);
-        assert_eq!(editor_lines(&e), vec!["intro".to_string(), "- a".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["intro".to_string(), "- a".to_string()]
+        );
         let e = unnest_at("\n   1. a", 1, 6);
         assert_eq!(editor_lines(&e), vec!["".to_string(), "1. a".to_string()]);
     }
@@ -1619,7 +1758,10 @@ mod tests {
         e.input.textarea.move_cursor(CursorMove::Down);
         e.input.textarea.move_cursor(CursorMove::Head);
         press(&mut e, KeyCode::Backspace);
-        assert_eq!(editor_lines(&e), vec!["1. a2. b".to_string(), "2. c".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["1. a2. b".to_string(), "2. c".to_string()]
+        );
     }
 
     #[test]
@@ -1628,7 +1770,10 @@ mod tests {
         e.input.textarea.move_cursor(CursorMove::Top);
         e.input.textarea.move_cursor(CursorMove::End);
         press(&mut e, KeyCode::Char('x'));
-        assert_eq!(editor_lines(&e), vec!["1. ax".to_string(), "5. b".to_string()]);
+        assert_eq!(
+            editor_lines(&e),
+            vec!["1. ax".to_string(), "5. b".to_string()]
+        );
     }
 
     #[test]
@@ -1637,7 +1782,10 @@ mod tests {
         press(&mut e, KeyCode::Char('!'));
         assert!(e.input.is_modified());
 
-        let out = e.handle_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL), None);
+        let out = e.handle_key(
+            KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
+            None,
+        );
         match out {
             InsertOutcome::Save(Command::EditCardDescription { card_id, body }) => {
                 assert_eq!(card_id, "card1");
@@ -1658,7 +1806,10 @@ mod tests {
         let mut e = make_editor("initial");
         press(&mut e, KeyCode::Char('!'));
 
-        let out = e.handle_key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL), None);
+        let out = e.handle_key(
+            KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+            None,
+        );
         match out {
             InsertOutcome::Confirm(Command::EditCardDescription { card_id, body }) => {
                 assert_eq!(card_id, "card1");

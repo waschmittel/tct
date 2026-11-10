@@ -6,7 +6,7 @@ use crate::model::card::Card;
 use crate::model::id::{BoardId, CardId};
 
 use super::paths;
-use super::{atomic_write, Result, StorageError};
+use super::{Result, StorageError, atomic_write};
 
 /// The only place a `Card` is deserialized: `card_id` comes from the file name
 /// and is stamped onto the result, because a Card's file name *is* its id
@@ -218,7 +218,10 @@ mod tests {
 
             let raw = std::fs::read_to_string(paths::card_path(&board.id, &card.id)).unwrap();
             let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
-            assert!(json.get("id").is_none(), "id should not be persisted: {raw}");
+            assert!(
+                json.get("id").is_none(),
+                "id should not be persisted: {raw}"
+            );
             assert_eq!(load_card(&board.id, &card.id).unwrap().id, card.id);
         });
     }
@@ -238,7 +241,6 @@ mod tests {
             assert!(cards.contains_key(&good.id));
         });
     }
-
 }
 
 /// The Card ids a board's directory holds, taken from the `card-<id>.json`
@@ -272,7 +274,10 @@ fn read_cards(board_id: &BoardId, keep: impl Fn(&Card) -> bool) -> Result<Vec<Ca
             Ok(card) if keep(&card) => cards.push(card),
             Ok(_) => {}
             Err(e) if super::skip_corrupt() => {
-                errln!("tct: skipping {}: {e}", paths::card_path(board_id, &id).display());
+                errln!(
+                    "tct: skipping {}: {e}",
+                    paths::card_path(board_id, &id).display()
+                );
             }
             Err(e) => return Err(e),
         }

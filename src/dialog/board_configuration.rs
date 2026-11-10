@@ -2,4 +2,3 @@
 
 #[allow(unused_imports)]
 pub use super::color_picker::BoardConfiguration;
-

@@ -38,7 +38,13 @@ pub struct ExportPdf {
 
 impl ExportPdf {
     /// `start_dir` is where the input begins (last export folder, else `cwd`).
-    pub fn new(card_id: CardId, card_title: String, theme: Theme, start_dir: &Path, cwd: PathBuf) -> Self {
+    pub fn new(
+        card_id: CardId,
+        card_title: String,
+        theme: Theme,
+        start_dir: &Path,
+        cwd: PathBuf,
+    ) -> Self {
         let file_name = path::default_file_name(&card_title);
         let mut dialog = Self {
             card_id,
@@ -86,7 +92,11 @@ impl ExportPdf {
         let Some(first) = names.first() else { return };
         let mut common: String = first.name.clone();
         for entry in &names[1..] {
-            let shared = common.chars().zip(entry.name.chars()).take_while(|(a, b)| a == b).count();
+            let shared = common
+                .chars()
+                .zip(entry.name.chars())
+                .take_while(|(a, b)| a == b)
+                .count();
             common = common.chars().take(shared).collect();
         }
         let typed_len = typed.chars().count();
@@ -147,9 +157,20 @@ impl Dialog for ExportPdf {
         );
         frame.render_widget(Clear, popup);
 
-        let title: String = self.card_title.chars().take(width.saturating_sub(18) as usize).collect();
+        let title: String = self
+            .card_title
+            .chars()
+            .take(width.saturating_sub(18) as usize)
+            .collect();
         let block = Block::default()
-            .title(format!(" Export PDF{} — {title} ", if self.theme == Theme::Mono { " (mono)" } else { " (color)" }))
+            .title(format!(
+                " Export PDF{} — {title} ",
+                if self.theme == Theme::Mono {
+                    " (mono)"
+                } else {
+                    " (color)"
+                }
+            ))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(accent));
         let inner = block.inner(popup);
@@ -161,7 +182,11 @@ impl Dialog for ExportPdf {
         let visible_w = inner.width as usize;
         let scroll = (cursor_col + 1).saturating_sub(visible_w);
         let (_, typed_name) = path::split_dir(buffer);
-        let ghost = if typed_name.is_empty() { self.file_name.as_str() } else { "" };
+        let ghost = if typed_name.is_empty() {
+            self.file_name.as_str()
+        } else {
+            ""
+        };
         let mut input_line = vec![Span::raw(buffer.chars().skip(scroll).collect::<String>())];
         input_line.push(Span::styled(ghost.to_string(), dim));
         frame.render_widget(
@@ -172,8 +197,15 @@ impl Dialog for ExportPdf {
 
         let mut divider = "─".repeat(inner.width as usize);
         if self.entries.len() > LISTING_ROWS {
-            let counter = format!(" {}/{} ", self.selected.map_or(0, |i| i + 1), self.entries.len());
-            let keep = divider.chars().count().saturating_sub(counter.chars().count() + 1);
+            let counter = format!(
+                " {}/{} ",
+                self.selected.map_or(0, |i| i + 1),
+                self.entries.len()
+            );
+            let keep = divider
+                .chars()
+                .count()
+                .saturating_sub(counter.chars().count() + 1);
             divider = format!("{}{counter}─", "─".repeat(keep));
         }
         frame.render_widget(
@@ -181,7 +213,9 @@ impl Dialog for ExportPdf {
             Rect::new(inner.x, inner.y + 1, inner.width, 1),
         );
 
-        let first = self.selected.map_or(0, |i| i.saturating_sub(LISTING_ROWS - 1));
+        let first = self
+            .selected
+            .map_or(0, |i| i.saturating_sub(LISTING_ROWS - 1));
         let mut lines: Vec<Line> = self
             .entries
             .iter()
@@ -189,7 +223,11 @@ impl Dialog for ExportPdf {
             .skip(first)
             .take(LISTING_ROWS)
             .map(|(i, entry)| {
-                let label = if entry.is_dir { format!("{}/", entry.name) } else { entry.name.clone() };
+                let label = if entry.is_dir {
+                    format!("{}/", entry.name)
+                } else {
+                    entry.name.clone()
+                };
                 let style = if entry.is_dir {
                     Style::default().fg(accent)
                 } else {
@@ -197,7 +235,12 @@ impl Dialog for ExportPdf {
                 };
                 if Some(i) == self.selected {
                     Line::from(vec![
-                        Span::styled("» ", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                        Span::styled(
+                            "» ",
+                            Style::default()
+                                .fg(Color::White)
+                                .add_modifier(Modifier::BOLD),
+                        ),
                         Span::styled(label, style.add_modifier(Modifier::BOLD)),
                     ])
                 } else {
@@ -215,7 +258,10 @@ impl Dialog for ExportPdf {
 
         if let Some(notice) = &self.notice {
             frame.render_widget(
-                Paragraph::new(Span::styled(notice.clone(), Style::default().fg(Color::Yellow))),
+                Paragraph::new(Span::styled(
+                    notice.clone(),
+                    Style::default().fg(Color::Yellow),
+                )),
                 Rect::new(inner.x, inner.y + 2 + rows as u16, inner.width, 1),
             );
         }
@@ -223,7 +269,9 @@ impl Dialog for ExportPdf {
 
     fn handle_key(&mut self, key: KeyEvent, _board: Option<&LoadedBoard>) -> DialogOutcome {
         self.notice = None;
-        let plain = !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
+        let plain = !key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
         match key.code {
             KeyCode::F(1) => return DialogOutcome::help(),
             KeyCode::Esc if self.selected.is_some() => {
@@ -278,7 +326,13 @@ mod tests {
     }
 
     fn dialog(dir: &Path) -> ExportPdf {
-        ExportPdf::new(CardId::generate(), "My Card".into(), Theme::Mono, dir, dir.to_path_buf())
+        ExportPdf::new(
+            CardId::generate(),
+            "My Card".into(),
+            Theme::Mono,
+            dir,
+            dir.to_path_buf(),
+        )
     }
 
     fn type_text(d: &mut ExportPdf, text: &str) {
@@ -306,7 +360,13 @@ mod tests {
     #[test]
     fn the_dialog_passes_the_theme_on_and_names_the_file_after_the_card() {
         let tmp = tempfile::tempdir().unwrap();
-        let mut d = ExportPdf::new(CardId::generate(), "My Card".into(), Theme::Mono, tmp.path(), tmp.path().to_path_buf());
+        let mut d = ExportPdf::new(
+            CardId::generate(),
+            "My Card".into(),
+            Theme::Mono,
+            tmp.path(),
+            tmp.path().to_path_buf(),
+        );
         let out = d.handle_key(key(KeyCode::Enter), None);
         match out.side_effect {
             Some(DialogSideEffect::ExportCardPdf { path, theme, .. }) => {
@@ -315,7 +375,13 @@ mod tests {
             }
             _ => panic!("expected an export"),
         }
-        let mut d = ExportPdf::new(CardId::generate(), "My Card".into(), Theme::Color, tmp.path(), tmp.path().to_path_buf());
+        let mut d = ExportPdf::new(
+            CardId::generate(),
+            "My Card".into(),
+            Theme::Color,
+            tmp.path(),
+            tmp.path().to_path_buf(),
+        );
         match d.handle_key(key(KeyCode::Enter), None).side_effect {
             Some(DialogSideEffect::ExportCardPdf { path, theme, .. }) => {
                 assert_eq!(path, tmp.path().join("my-card.pdf"));
@@ -444,12 +510,24 @@ mod tests {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
 
-        let d = ExportPdf::new(CardId::generate(), "My Card".into(), Theme::Color, Path::new("/"), PathBuf::from("/"));
+        let d = ExportPdf::new(
+            CardId::generate(),
+            "My Card".into(),
+            Theme::Color,
+            Path::new("/"),
+            PathBuf::from("/"),
+        );
         let mut terminal = Terminal::new(TestBackend::new(90, 20)).unwrap();
         terminal
             .draw(|f| d.render(f, f.area(), None, Color::Cyan))
             .unwrap();
-        let row: String = terminal.backend().buffer().content().iter().map(|c| c.symbol()).collect();
+        let row: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|c| c.symbol())
+            .collect();
         assert!(row.contains("/my-card.pdf"), "{row}");
     }
 
@@ -457,7 +535,10 @@ mod tests {
     fn f1_opens_help() {
         let tmp = tempfile::tempdir().unwrap();
         let mut d = dialog(tmp.path());
-        assert!(matches!(d.handle_key(key(KeyCode::F(1)), None).follow, Follow::Help));
+        assert!(matches!(
+            d.handle_key(key(KeyCode::F(1)), None).follow,
+            Follow::Help
+        ));
         assert!(d.help().is_some());
     }
 }

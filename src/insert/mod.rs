@@ -91,11 +91,7 @@ pub enum InsertSideEffect {
 /// concerns confined to `ui::`.
 pub trait InsertHandler {
     /// Process a key event.
-    fn handle_key(
-        &mut self,
-        key: KeyEvent,
-        board: Option<&LoadedBoard>,
-    ) -> InsertOutcome;
+    fn handle_key(&mut self, key: KeyEvent, board: Option<&LoadedBoard>) -> InsertOutcome;
 
     /// Process a paste event (bracketed paste).
     fn handle_paste(&mut self, _text: &str) -> InsertOutcome {

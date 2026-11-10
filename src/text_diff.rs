@@ -70,10 +70,7 @@ pub fn collapse_unchanged<'a>(diff: Vec<(DiffKind, &'a str)>) -> Vec<(DiffKind, 
     out
 }
 
-fn flush_same_run<'a>(
-    same_run: &mut Vec<&'a str>,
-    out: &mut Vec<(DiffKind, &'a str)>,
-) {
+fn flush_same_run<'a>(same_run: &mut Vec<&'a str>, out: &mut Vec<(DiffKind, &'a str)>) {
     if same_run.len() >= COLLAPSE_THRESHOLD {
         out.push((DiffKind::Same, same_run[0]));
         out.push((DiffKind::Same, "..."));
@@ -90,7 +87,11 @@ pub fn diff_lines_collapsed<'a>(old: &'a str, new: &'a str) -> Vec<(DiffKind, &'
 }
 
 fn lines(s: &str) -> Vec<&str> {
-    if s.is_empty() { Vec::new() } else { s.split('\n').collect() }
+    if s.is_empty() {
+        Vec::new()
+    } else {
+        s.split('\n').collect()
+    }
 }
 
 #[cfg(test)]
@@ -107,7 +108,13 @@ mod tests {
     fn added_and_removed_lines() {
         assert_eq!(
             diff_lines("a\nb\nc", "a\nx\nc\nd"),
-            vec![(Same, "a"), (Removed, "b"), (Added, "x"), (Same, "c"), (Added, "d")]
+            vec![
+                (Same, "a"),
+                (Removed, "b"),
+                (Added, "x"),
+                (Same, "c"),
+                (Added, "d")
+            ]
         );
     }
 
@@ -166,18 +173,23 @@ mod tests {
 
         // 10 lines: first line, "...", last line
         let ten: Vec<(DiffKind, &str)> = (1..=10)
-            .map(|i| (Same, match i {
-                1 => "line1",
-                2 => "line2",
-                3 => "line3",
-                4 => "line4",
-                5 => "line5",
-                6 => "line6",
-                7 => "line7",
-                8 => "line8",
-                9 => "line9",
-                _ => "line10",
-            }))
+            .map(|i| {
+                (
+                    Same,
+                    match i {
+                        1 => "line1",
+                        2 => "line2",
+                        3 => "line3",
+                        4 => "line4",
+                        5 => "line5",
+                        6 => "line6",
+                        7 => "line7",
+                        8 => "line8",
+                        9 => "line9",
+                        _ => "line10",
+                    },
+                )
+            })
             .collect();
         assert_eq!(
             collapse_unchanged(ten),

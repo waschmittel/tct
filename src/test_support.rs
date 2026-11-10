@@ -28,7 +28,11 @@ pub fn with_temp_dir<F: FnOnce()>(f: F) {
 /// Append a List to `meta` and persist the Board. Returns the List's id.
 pub fn add_list(meta: &mut BoardMeta, name: &str) -> ListId {
     let id = ListId::generate();
-    meta.lists.push(ListMeta { id: id.clone(), name: name.to_string(), archived: false });
+    meta.lists.push(ListMeta {
+        id: id.clone(),
+        name: name.to_string(),
+        archived: false,
+    });
     board_store::save_board(meta).unwrap();
     id
 }

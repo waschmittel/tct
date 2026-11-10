@@ -17,13 +17,7 @@ pub struct ConfirmRestoreBoard {
 }
 
 impl Dialog for ConfirmRestoreBoard {
-    fn render(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        _board: Option<&LoadedBoard>,
-        _accent: Color,
-    ) {
+    fn render(&self, frame: &mut Frame, area: Rect, _board: Option<&LoadedBoard>, _accent: Color) {
         super::common::render_confirm(
             frame,
             area,
@@ -46,17 +40,17 @@ impl Dialog for ConfirmRestoreBoard {
                 } else {
                     self.selected
                 };
-                let mut out = DialogOutcome::side_effect(
-                    DialogSideEffect::RestoreArchivedBoard { board_id },
-                )
-                .with_status(format!("Restored board '{name}'"));
+                let mut out =
+                    DialogOutcome::side_effect(DialogSideEffect::RestoreArchivedBoard { board_id })
+                        .with_status(format!("Restored board '{name}'"));
                 if boards.is_empty() {
                     out = out.with_close_to(crate::app::AppMode::BoardSelector);
                 } else {
-                    out.follow = super::Follow::Open(Box::new(super::archived_boards::ArchivedBoards {
-                        boards,
-                        selected,
-                    }));
+                    out.follow =
+                        super::Follow::Open(Box::new(super::archived_boards::ArchivedBoards {
+                            boards,
+                            selected,
+                        }));
                 }
                 out
             }

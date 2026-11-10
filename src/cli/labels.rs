@@ -2,18 +2,16 @@
 
 use super::lookup::{find_board, find_card_in_lists, find_label};
 use super::util::{flag_value, flag_values2, label_color_name, lists_and_cards};
-use crate::outln;
 use crate::board_editor::BoardEditor;
 use crate::command::Command;
 use crate::model::label::LabelColor;
+use crate::outln;
 
 pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
     let board_partial = args
         .first()
         .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Usage: tct labels <board> [--create|--delete|--assign|--remove ...]"
-            )
+            anyhow::anyhow!("Usage: tct labels <board> [--create|--delete|--assign|--remove ...]")
         })?
         .as_str();
 
@@ -23,7 +21,10 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         let existing: Vec<_> = board.labels.iter().map(|l| l.color).collect();
         let color = LabelColor::generate_pastel(&existing);
         let mut editor = BoardEditor::load(&board.id)?;
-        editor.apply(Command::DefineLabel { name: name.to_string(), color })?;
+        editor.apply(Command::DefineLabel {
+            name: name.to_string(),
+            color,
+        })?;
         outln!("Created label '{name}' on board '{}'.", board_name);
     } else if let Some(label_partial) = flag_value(args, "--delete") {
         let board = find_board(board_partial, by_id)?;
@@ -41,7 +42,8 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         if card.label_ids.contains(&label.id) {
             outln!(
                 "Label '{}' already assigned to card '{}'.",
-                label.name, card.title
+                label.name,
+                card.title
             );
         } else {
             let card_title = card.title.clone();
@@ -61,7 +63,8 @@ pub(super) fn run(args: &[String], by_id: bool) -> anyhow::Result<()> {
         if !card.label_ids.contains(&label.id) {
             outln!(
                 "Label '{}' is not assigned to card '{}'.",
-                label.name, card.title
+                label.name,
+                card.title
             );
         } else {
             let card_title = card.title.clone();

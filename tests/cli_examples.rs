@@ -51,7 +51,11 @@ fn extract_id(output: &str) -> String {
             let rest = &search[start + 1..];
             if let Some(end) = rest.find(']') {
                 let candidate = &rest[..end];
-                if candidate.len() == 8 && candidate.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')) {
+                if candidate.len() == 8
+                    && candidate
+                        .chars()
+                        .all(|c| matches!(c, '0'..='9' | 'a'..='f'))
+                {
                     last = Some(candidate.to_string());
                 }
                 search = &rest[end + 1..];
@@ -99,7 +103,10 @@ fn boards_archive_restore_delete() {
 
     ok(&tmp, &["boards", "--archive", "My Project"]);
     let out = ok(&tmp, &["boards", "--delete", "My Project"]);
-    assert!(out.contains("Permanently deleted board 'My Project'"), "{out}");
+    assert!(
+        out.contains("Permanently deleted board 'My Project'"),
+        "{out}"
+    );
 
     let out = ok(&tmp, &["boards"]);
     assert!(out.contains("No active boards"), "{out}");
@@ -113,7 +120,10 @@ fn lists_create_rename_delete() {
     ok(&tmp, &["boards", "--create", "Proj"]);
 
     let out = ok(&tmp, &["lists", "Proj", "--create", "To Do"]);
-    assert!(out.contains("Created list 'To Do' on board 'Proj'"), "{out}");
+    assert!(
+        out.contains("Created list 'To Do' on board 'Proj'"),
+        "{out}"
+    );
 
     let out = ok(&tmp, &["lists", "Proj"]);
     assert!(out.contains("To Do"), "{out}");
@@ -145,7 +155,10 @@ fn cards_create_list_show_edit() {
     ok(&tmp, &["lists", "Proj", "--create", "Done"]);
 
     let out = ok(&tmp, &["cards", "Proj", "--create", "To Do", "Fix the bug"]);
-    assert!(out.contains("Created card 'Fix the bug' in list 'To Do' on board 'Proj'"), "{out}");
+    assert!(
+        out.contains("Created card 'Fix the bug' in list 'To Do' on board 'Proj'"),
+        "{out}"
+    );
 
     let out = ok(&tmp, &["cards", "Proj"]);
     assert!(out.contains("Fix the bug"), "{out}");
@@ -157,7 +170,19 @@ fn cards_create_list_show_edit() {
     assert!(out.contains("Card:"), "{out}");
     assert!(out.contains("Fix the bug"), "{out}");
 
-    let out = ok(&tmp, &["cards", "Proj", "--edit", "Fix", "--title", "Fix login bug", "--due", "2099-12-31"]);
+    let out = ok(
+        &tmp,
+        &[
+            "cards",
+            "Proj",
+            "--edit",
+            "Fix",
+            "--title",
+            "Fix login bug",
+            "--due",
+            "2099-12-31",
+        ],
+    );
     assert!(out.contains("Updated card 'Fix login bug'"), "{out}");
 
     let out = ok(&tmp, &["cards", "Proj", "--show", "Fix"]);
@@ -195,10 +220,19 @@ fn checklist_add_toggle_delete() {
     ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
     ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Write docs"]);
 
-    let out = ok(&tmp, &["checklist", "Proj", "Write docs", "--add", "Draft outline"]);
-    assert!(out.contains("Added checklist item 'Draft outline' to card 'Write docs'"), "{out}");
+    let out = ok(
+        &tmp,
+        &["checklist", "Proj", "Write docs", "--add", "Draft outline"],
+    );
+    assert!(
+        out.contains("Added checklist item 'Draft outline' to card 'Write docs'"),
+        "{out}"
+    );
 
-    ok(&tmp, &["checklist", "Proj", "Write docs", "--add", "Write content"]);
+    ok(
+        &tmp,
+        &["checklist", "Proj", "Write docs", "--add", "Write content"],
+    );
 
     let out = ok(&tmp, &["checklist", "Proj", "Write docs"]);
     assert!(out.contains("Draft outline"), "{out}");
@@ -212,7 +246,10 @@ fn checklist_add_toggle_delete() {
     assert!(out.contains("[x]"), "{out}");
 
     let out = ok(&tmp, &["checklist", "Proj", "Write docs", "--delete", "2"]);
-    assert!(out.contains("Deleted checklist item 'Write content'"), "{out}");
+    assert!(
+        out.contains("Deleted checklist item 'Write content'"),
+        "{out}"
+    );
 
     let out = ok(&tmp, &["checklist", "Proj", "Write docs"]);
     assert!(!out.contains("Write content"), "{out}");
@@ -238,7 +275,10 @@ fn labels_create_assign_remove_delete() {
     assert!(out.contains("urgent"), "{out}");
 
     let out = ok(&tmp, &["labels", "Proj", "--assign", "Fix bug", "bug"]);
-    assert!(out.contains("Assigned label 'bug' to card 'Fix bug'"), "{out}");
+    assert!(
+        out.contains("Assigned label 'bug' to card 'Fix bug'"),
+        "{out}"
+    );
 
     // Label visible in card detail
     let out = ok(&tmp, &["cards", "Proj", "--show", "Fix bug"]);
@@ -246,7 +286,10 @@ fn labels_create_assign_remove_delete() {
     assert!(out.contains("bug"), "{out}");
 
     let out = ok(&tmp, &["labels", "Proj", "--remove", "Fix bug", "bug"]);
-    assert!(out.contains("Removed label 'bug' from card 'Fix bug'"), "{out}");
+    assert!(
+        out.contains("Removed label 'bug' from card 'Fix bug'"),
+        "{out}"
+    );
 
     let out = ok(&tmp, &["labels", "Proj", "--delete", "urgent"]);
     assert!(out.contains("Deleted label 'urgent'"), "{out}");
@@ -287,7 +330,6 @@ fn by_id_board_and_list() {
     // Show card by ID
     let out = ok(&tmp, &["cards", &board_id, "--show", &card_id, "--by-id"]);
     assert!(out.contains("My task"), "{out}");
-
 }
 
 #[test]
@@ -347,7 +389,10 @@ fn checklist_toggle_out_of_range_errors() {
     ok(&tmp, &["boards", "--create", "Proj"]);
     ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
     ok(&tmp, &["cards", "Proj", "--create", "Tasks", "My card"]);
-    ok(&tmp, &["checklist", "Proj", "My card", "--add", "only item"]);
+    ok(
+        &tmp,
+        &["checklist", "Proj", "My card", "--add", "only item"],
+    );
 
     let e = fail(&tmp, &["checklist", "Proj", "My card", "--toggle", "99"]);
     assert!(e.contains("out of range"), "{e}");
@@ -373,7 +418,10 @@ fn cards_edit_no_fields_errors() {
     ok(&tmp, &["cards", "Proj", "--create", "Tasks", "My card"]);
 
     let e = fail(&tmp, &["cards", "Proj", "--edit", "My card"]);
-    assert!(e.contains("--title") || e.contains("--description") || e.contains("--due"), "{e}");
+    assert!(
+        e.contains("--title") || e.contains("--description") || e.contains("--due"),
+        "{e}"
+    );
 }
 
 #[test]
@@ -490,7 +538,10 @@ fn cards_edit_due_invalid_date_errors() {
     ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
     ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
 
-    let e = fail(&tmp, &["cards", "Proj", "--edit", "Card", "--due", "not-a-date"]);
+    let e = fail(
+        &tmp,
+        &["cards", "Proj", "--edit", "Card", "--due", "not-a-date"],
+    );
     assert!(e.contains("Invalid date format"), "{e}");
 }
 
@@ -501,7 +552,17 @@ fn cards_edit_description() {
     ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
     ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
 
-    ok(&tmp, &["cards", "Proj", "--edit", "Card", "--description", "new desc text"]);
+    ok(
+        &tmp,
+        &[
+            "cards",
+            "Proj",
+            "--edit",
+            "Card",
+            "--description",
+            "new desc text",
+        ],
+    );
     let out = ok(&tmp, &["cards", "Proj", "--show", "Card"]);
     assert!(out.contains("new desc text"), "{out}");
 }
@@ -513,7 +574,10 @@ fn cards_edit_due_clear_via_none() {
     ok(&tmp, &["lists", "Proj", "--create", "Tasks"]);
     ok(&tmp, &["cards", "Proj", "--create", "Tasks", "Card"]);
 
-    ok(&tmp, &["cards", "Proj", "--edit", "Card", "--due", "2099-01-01"]);
+    ok(
+        &tmp,
+        &["cards", "Proj", "--edit", "Card", "--due", "2099-01-01"],
+    );
     let out = ok(&tmp, &["cards", "Proj", "--show", "Card"]);
     assert!(out.contains("2099-01-01"), "{out}");
 
@@ -603,8 +667,10 @@ fn boards_create_assigns_distinct_accent_colors() {
     }
     assert_eq!(colors.len(), 3);
     // At least one pair must differ
-    assert!(!(colors[0] == colors[1] && colors[1] == colors[2]),
-        "all three boards got same accent: {colors:?}");
+    assert!(
+        !(colors[0] == colors[1] && colors[1] == colors[2]),
+        "all three boards got same accent: {colors:?}"
+    );
 }
 
 #[test]
@@ -731,22 +797,44 @@ fn local_tct_dir_discovery() {
     );
 }
 
-
 #[test]
 fn cards_export_writes_a_pdf_into_the_chosen_folder() {
     let tmp = TempDir::new().unwrap();
     let out = TempDir::new().unwrap();
     ok(&tmp, &["boards", "--create", "Work"]);
     ok(&tmp, &["lists", "Work", "--create", "To Do"]);
-    ok(&tmp, &["cards", "Work", "--create", "To Do", "Plan the Release"]);
+    ok(
+        &tmp,
+        &["cards", "Work", "--create", "To Do", "Plan the Release"],
+    );
 
-    let stdout = ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", out.path().to_str().unwrap()]);
+    let stdout = ok(
+        &tmp,
+        &[
+            "cards",
+            "Work",
+            "--export",
+            "Plan",
+            "--out",
+            out.path().to_str().unwrap(),
+        ],
+    );
     assert!(stdout.contains("plan-the-release.pdf"), "{stdout}");
     let pdf = std::fs::read(out.path().join("plan-the-release.pdf")).unwrap();
     assert!(pdf.starts_with(b"%PDF-"));
 
     let named = out.path().join("custom");
-    ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", named.to_str().unwrap()]);
+    ok(
+        &tmp,
+        &[
+            "cards",
+            "Work",
+            "--export",
+            "Plan",
+            "--out",
+            named.to_str().unwrap(),
+        ],
+    );
     assert!(out.path().join("custom.pdf").exists());
 }
 
@@ -756,19 +844,40 @@ fn cards_export_defaults_to_mono_and_accepts_color_under_the_same_name() {
     let out = TempDir::new().unwrap();
     ok(&tmp, &["boards", "--create", "Work"]);
     ok(&tmp, &["lists", "Work", "--create", "To Do"]);
-    ok(&tmp, &["cards", "Work", "--create", "To Do", "Plan the Release"]);
+    ok(
+        &tmp,
+        &["cards", "Work", "--create", "To Do", "Plan the Release"],
+    );
 
     let dir = out.path().to_str().unwrap();
     let default = ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", dir]);
     assert!(default.contains("plan-the-release.pdf"), "{default}");
-    let explicit = ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", dir, "--style", "mono"]);
+    let explicit = ok(
+        &tmp,
+        &[
+            "cards", "Work", "--export", "Plan", "--out", dir, "--style", "mono",
+        ],
+    );
     assert!(explicit.contains("plan-the-release.pdf"), "{explicit}");
-    let color = ok(&tmp, &["cards", "Work", "--export", "Plan", "--out", dir, "--style", "color"]);
+    let color = ok(
+        &tmp,
+        &[
+            "cards", "Work", "--export", "Plan", "--out", dir, "--style", "color",
+        ],
+    );
     assert!(color.contains("plan-the-release.pdf"), "{color}");
     assert_eq!(std::fs::read_dir(out.path()).unwrap().count(), 1);
 
-    let err = fail(&tmp, &["cards", "Work", "--export", "Plan", "--out", dir, "--style", "neon"]);
-    assert!(err.contains("unknown style 'neon'") && err.contains("mono or color"), "{err}");
+    let err = fail(
+        &tmp,
+        &[
+            "cards", "Work", "--export", "Plan", "--out", dir, "--style", "neon",
+        ],
+    );
+    assert!(
+        err.contains("unknown style 'neon'") && err.contains("mono or color"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -778,15 +887,32 @@ fn cards_export_renders_matrix_tables_in_both_styles() {
     ok(&tmp, &["boards", "--create", "Work"]);
     ok(&tmp, &["lists", "Work", "--create", "To Do"]);
     ok(&tmp, &["cards", "Work", "--create", "To Do", "Matrix"]);
-    let rows: String = (0..12).map(|i| format!("| row {i} | {i} | {i} | {i} |\n")).collect();
+    let rows: String = (0..12)
+        .map(|i| format!("| row {i} | {i} | {i} | {i} |\n"))
+        .collect();
     let table = format!("|  | A | B | C |\n|---|---|---|---|\n{rows}");
-    ok(&tmp, &["cards", "Work", "--edit", "Matrix", "--description", &table]);
+    ok(
+        &tmp,
+        &["cards", "Work", "--edit", "Matrix", "--description", &table],
+    );
 
     let dir = out.path().to_str().unwrap();
     let mut pdfs = Vec::new();
     for style in ["mono", "color"] {
         let file = out.path().join(format!("{style}.pdf"));
-        ok(&tmp, &["cards", "Work", "--export", "Matrix", "--out", file.to_str().unwrap(), "--style", style]);
+        ok(
+            &tmp,
+            &[
+                "cards",
+                "Work",
+                "--export",
+                "Matrix",
+                "--out",
+                file.to_str().unwrap(),
+                "--style",
+                style,
+            ],
+        );
         let pdf = std::fs::read(&file).unwrap();
         assert!(pdf.starts_with(b"%PDF-"), "{style}");
         pdfs.push(pdf);
@@ -796,7 +922,10 @@ fn cards_export_renders_matrix_tables_in_both_styles() {
     // A matrix lays out differently from the same table with a filled corner.
     ok(&tmp, &["cards", "Work", "--create", "To Do", "Plain"]);
     let plain = table.replacen("|  |", "| H |", 1);
-    ok(&tmp, &["cards", "Work", "--edit", "Plain", "--description", &plain]);
+    ok(
+        &tmp,
+        &["cards", "Work", "--edit", "Plain", "--description", &plain],
+    );
     ok(&tmp, &["cards", "Work", "--export", "Plain", "--out", dir]);
     let plain_pdf = std::fs::read(out.path().join("plain.pdf")).unwrap();
     assert!(plain_pdf.starts_with(b"%PDF-"));
