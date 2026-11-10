@@ -480,6 +480,13 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn scroll_description(app: &mut App, step: usize, down: bool) {
+    let max_scroll = app.board().map(|b| b.detail_max_scroll.get()).unwrap_or(0);
+    if let Some(editor) = &mut app.editor {
+        editor.scroll_detail(step, down, max_scroll);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -844,12 +851,5 @@ mod tests {
             }
             assert_eq!(app.board().unwrap().detail_scroll, 3);
         });
-    }
-}
-
-fn scroll_description(app: &mut App, step: usize, down: bool) {
-    let max_scroll = app.board().map(|b| b.detail_max_scroll.get()).unwrap_or(0);
-    if let Some(editor) = &mut app.editor {
-        editor.scroll_detail(step, down, max_scroll);
     }
 }

@@ -762,13 +762,7 @@ mod tests {
         press(&mut e, KeyCode::Enter);
         assert_eq!(
             lines(&e),
-            [
-                &"|  a  |  b  |"[..],
-                "| --- | --- |",
-                "| 1   | 2   |",
-                "",
-                ""
-            ]
+            ["|  a  |  b  |", "| --- | --- |", "| 1   | 2   |", "", ""]
         );
         assert_eq!(cursor(&e), (4, 0));
 

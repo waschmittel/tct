@@ -39,6 +39,63 @@ pub fn delete_card(board_id: &BoardId, card_id: &CardId) -> Result<()> {
     Ok(())
 }
 
+/// The Card ids a board's directory holds, taken from the `card-<id>.json`
+/// file names. A name whose id part is not a valid [`CardId`] was not written
+/// by tct and is not a Card, so it is passed over.
+fn card_ids_on_disk(board_id: &BoardId) -> Vec<CardId> {
+    let mut ids = Vec::new();
+    if let Ok(entries) = fs::read_dir(paths::board_dir(board_id)) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if let Some(rest) = name.strip_prefix("card-")
+                && let Some(id) = rest.strip_suffix(".json")
+                && let Ok(id) = CardId::parse(id)
+            {
+                ids.push(id);
+            }
+        }
+    }
+    ids
+}
+
+/// Read every Card of a board through [`load_card`] (so per-card migrations and
+/// the id/file-name agreement check run), keeping those `keep` selects. An
+/// unreadable card fails the whole load unless `TCT_SKIP_CORRUPT` is set, in
+/// which case it is skipped with a warning.
+fn read_cards(board_id: &BoardId, keep: impl Fn(&Card) -> bool) -> Result<Vec<Card>> {
+    let mut cards = Vec::new();
+    for id in card_ids_on_disk(board_id) {
+        match load_card(board_id, &id) {
+            Ok(card) if keep(&card) => cards.push(card),
+            Ok(_) => {}
+            Err(e) if super::skip_corrupt() => {
+                errln!(
+                    "tct: skipping {}: {e}",
+                    paths::card_path(board_id, &id).display()
+                );
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(cards)
+}
+
+/// Every Card stored for a board, keyed by id.
+pub fn load_all_cards(board_id: &BoardId) -> Result<HashMap<CardId, Card>> {
+    Ok(read_cards(board_id, |_| true)?
+        .into_iter()
+        .map(|card| (card.id.clone(), card))
+        .collect())
+}
+
+/// Archived Cards of a board, newest first.
+pub fn list_archived_cards(board_id: &BoardId) -> Result<Vec<Card>> {
+    let mut cards = read_cards(board_id, |card| card.archived)?;
+    cards.sort_by_key(|c| std::cmp::Reverse(c.updated_at));
+    Ok(cards)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,61 +298,4 @@ mod tests {
             assert!(cards.contains_key(&good.id));
         });
     }
-}
-
-/// The Card ids a board's directory holds, taken from the `card-<id>.json`
-/// file names. A name whose id part is not a valid [`CardId`] was not written
-/// by tct and is not a Card, so it is passed over.
-fn card_ids_on_disk(board_id: &BoardId) -> Vec<CardId> {
-    let mut ids = Vec::new();
-    if let Ok(entries) = fs::read_dir(paths::board_dir(board_id)) {
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            let name = name.to_string_lossy();
-            if let Some(rest) = name.strip_prefix("card-")
-                && let Some(id) = rest.strip_suffix(".json")
-                && let Ok(id) = CardId::parse(id)
-            {
-                ids.push(id);
-            }
-        }
-    }
-    ids
-}
-
-/// Read every Card of a board through [`load_card`] (so per-card migrations and
-/// the id/file-name agreement check run), keeping those `keep` selects. An
-/// unreadable card fails the whole load unless `TCT_SKIP_CORRUPT` is set, in
-/// which case it is skipped with a warning.
-fn read_cards(board_id: &BoardId, keep: impl Fn(&Card) -> bool) -> Result<Vec<Card>> {
-    let mut cards = Vec::new();
-    for id in card_ids_on_disk(board_id) {
-        match load_card(board_id, &id) {
-            Ok(card) if keep(&card) => cards.push(card),
-            Ok(_) => {}
-            Err(e) if super::skip_corrupt() => {
-                errln!(
-                    "tct: skipping {}: {e}",
-                    paths::card_path(board_id, &id).display()
-                );
-            }
-            Err(e) => return Err(e),
-        }
-    }
-    Ok(cards)
-}
-
-/// Every Card stored for a board, keyed by id.
-pub fn load_all_cards(board_id: &BoardId) -> Result<HashMap<CardId, Card>> {
-    Ok(read_cards(board_id, |_| true)?
-        .into_iter()
-        .map(|card| (card.id.clone(), card))
-        .collect())
-}
-
-/// Archived Cards of a board, newest first.
-pub fn list_archived_cards(board_id: &BoardId) -> Result<Vec<Card>> {
-    let mut cards = read_cards(board_id, |card| card.archived)?;
-    cards.sort_by_key(|c| std::cmp::Reverse(c.updated_at));
-    Ok(cards)
 }

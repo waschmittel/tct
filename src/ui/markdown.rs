@@ -963,7 +963,7 @@ mod tests {
     #[test]
     fn test_wrap_long_no_space_word() {
         // 200-char word, no spaces — must hard-wrap
-        let text: String = std::iter::repeat('x').take(200).collect();
+        let text: String = std::iter::repeat_n('x', 200).collect();
         let lines = wrap_spans(vec![Span::raw(text)], 80);
         assert!(lines.len() >= 3);
         for line in &lines {

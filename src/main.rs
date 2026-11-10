@@ -670,8 +670,8 @@ mod tests {
         let mut card = Card::new("Task".into());
         card.label_ids.push(label.id.clone());
 
-        assert!(card.matches_search("critical", &[label.clone()]));
-        assert!(card.matches_search("CRITICAL-BUG", &[label.clone()]));
+        assert!(card.matches_search("critical", std::slice::from_ref(&label)));
+        assert!(card.matches_search("CRITICAL-BUG", std::slice::from_ref(&label)));
         assert!(!card.matches_search("feature", &[label]));
     }
 

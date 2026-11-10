@@ -8,17 +8,29 @@ use crate::model::card::Card;
 use crate::model::label::Label;
 use crate::term_caps::TermCaps;
 
+/// How a card frame is drawn.
+#[derive(Clone, Copy)]
+pub struct Look {
+    pub selected: bool,
+    pub dimmed: bool,
+    pub accent: Color,
+    pub caps: TermCaps,
+}
+
 pub fn render(
     frame: &mut Frame,
     area: Rect,
     card: &Card,
-    selected: bool,
-    dimmed: bool,
+    look: Look,
     board_labels: &[Label],
-    accent: Color,
-    caps: TermCaps,
     stamps: DateStamps,
 ) {
+    let Look {
+        selected,
+        dimmed,
+        accent,
+        caps,
+    } = look;
     if area.height < 2 {
         return;
     }
@@ -267,11 +279,13 @@ mod tests {
                     f,
                     f.area(),
                     &card,
-                    false,
-                    false,
+                    Look {
+                        selected: false,
+                        dimmed: false,
+                        accent: Color::Cyan,
+                        caps: TermCaps::full(),
+                    },
                     &[],
-                    Color::Cyan,
-                    TermCaps::full(),
                     stamps,
                 )
             })
@@ -305,11 +319,13 @@ mod tests {
                     f,
                     f.area(),
                     &card,
-                    false,
-                    true,
+                    Look {
+                        selected: false,
+                        dimmed: true,
+                        accent: Color::Cyan,
+                        caps: TermCaps::full(),
+                    },
                     &[],
-                    Color::Cyan,
-                    TermCaps::full(),
                     DateStamps {
                         created: true,
                         updated: false,
@@ -333,11 +349,13 @@ mod tests {
                         f,
                         f.area(),
                         &card,
-                        selected,
-                        false,
+                        Look {
+                            selected,
+                            dimmed: false,
+                            accent,
+                            caps: TermCaps::full(),
+                        },
                         &[],
-                        accent,
-                        TermCaps::full(),
                         DateStamps {
                             created: true,
                             updated: false,
@@ -510,11 +528,13 @@ mod tests {
                             f,
                             Rect::new(0, 0, area_w, h),
                             &card,
-                            false,
-                            false,
+                            Look {
+                                selected: false,
+                                dimmed: false,
+                                accent: Color::Cyan,
+                                caps: TermCaps::full(),
+                            },
                             &board_labels,
-                            Color::Cyan,
-                            TermCaps::full(),
                             DateStamps::default(),
                         );
                     })

@@ -223,6 +223,24 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn move_board(app: &mut App, direction: i32) -> anyhow::Result<()> {
+    if app.boards.is_empty() {
+        return Ok(());
+    }
+    let idx = app.selected_board_idx;
+    let new_idx = idx as i32 + direction;
+    if new_idx < 0 || new_idx >= app.boards.len() as i32 {
+        return Ok(());
+    }
+    let new_idx = new_idx as usize;
+
+    board_directory::reorder(&app.boards, idx, new_idx)?;
+    app.boards.swap(idx, new_idx);
+    app.selected_board_idx = new_idx;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -542,22 +560,4 @@ mod tests {
             assert!(app.should_quit);
         });
     }
-}
-
-fn move_board(app: &mut App, direction: i32) -> anyhow::Result<()> {
-    if app.boards.is_empty() {
-        return Ok(());
-    }
-    let idx = app.selected_board_idx;
-    let new_idx = idx as i32 + direction;
-    if new_idx < 0 || new_idx >= app.boards.len() as i32 {
-        return Ok(());
-    }
-    let new_idx = new_idx as usize;
-
-    board_directory::reorder(&app.boards, idx, new_idx)?;
-    app.boards.swap(idx, new_idx);
-    app.selected_board_idx = new_idx;
-
-    Ok(())
 }

@@ -25,10 +25,7 @@ pub fn handle_paste(app: &mut App, text: &str) -> anyhow::Result<()> {
     };
     let outcome = handler.handle_paste(text);
     app.insert = Some(handler);
-    match outcome {
-        InsertOutcome::Stay => {}
-        _ => {}
-    }
+    if let InsertOutcome::Stay = outcome {}
     Ok(())
 }
 
@@ -135,6 +132,27 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         InsertOutcome::Help => {
             // Handler stays alive on `app.insert`; Help-Esc returns to it.
             app.mode = crate::app::AppMode::Help;
+        }
+    }
+    Ok(())
+}
+
+fn apply_side_effect(app: &mut App, eff: InsertSideEffect) -> anyhow::Result<()> {
+    match eff {
+        InsertSideEffect::CreateBoard { name } => {
+            let meta = crate::board_directory::create(name)?;
+            app.reload_boards()?;
+            app.set_status(format!("Created board '{}'", meta.name));
+        }
+        InsertSideEffect::RenameSelectedBoard { new_name } => {
+            if let Some(board) = app.boards.get(app.selected_board_idx) {
+                let id = board.id.clone();
+                crate::board_directory::rename(&id, new_name.clone())?;
+                if let Some(b) = app.boards.get_mut(app.selected_board_idx) {
+                    b.name = new_name.clone();
+                }
+                app.set_status(format!("Renamed board to '{new_name}'"));
+            }
         }
     }
     Ok(())
@@ -279,25 +297,4 @@ mod tests {
             assert_eq!(app.board().unwrap().cards[&card_id].description, "x");
         });
     }
-}
-
-fn apply_side_effect(app: &mut App, eff: InsertSideEffect) -> anyhow::Result<()> {
-    match eff {
-        InsertSideEffect::CreateBoard { name } => {
-            let meta = crate::board_directory::create(name)?;
-            app.reload_boards()?;
-            app.set_status(format!("Created board '{}'", meta.name));
-        }
-        InsertSideEffect::RenameSelectedBoard { new_name } => {
-            if let Some(board) = app.boards.get(app.selected_board_idx) {
-                let id = board.id.clone();
-                crate::board_directory::rename(&id, new_name.clone())?;
-                if let Some(b) = app.boards.get_mut(app.selected_board_idx) {
-                    b.name = new_name.clone();
-                }
-                app.set_status(format!("Renamed board to '{new_name}'"));
-            }
-        }
-    }
-    Ok(())
 }

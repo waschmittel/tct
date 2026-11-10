@@ -117,11 +117,11 @@ impl MarkdownEditor {
     }
 
     pub fn paste_from_clipboard(&mut self) {
-        if let Some(text) = crate::app::get_from_system_clipboard() {
-            if !text.is_empty() {
-                self.paste_text(&text);
-                return;
-            }
+        if let Some(text) = crate::app::get_from_system_clipboard()
+            && !text.is_empty()
+        {
+            self.paste_text(&text);
+            return;
         }
         let raw = self.paste_mode;
         grouped(&mut self.input.textarea, None, |ta| {
@@ -609,10 +609,10 @@ fn parse_marker(trimmed: &str) -> Option<(Marker, usize)> {
     if trimmed == "-" || trimmed == "*" {
         return Some((Marker::Bullet(trimmed.chars().next()?), 1));
     }
-    if let Some(dot) = trimmed.find(". ") {
-        if trimmed[..dot].parse::<u64>().is_ok() {
-            return Some((Marker::Numbered, dot + 2));
-        }
+    if let Some(dot) = trimmed.find(". ")
+        && trimmed[..dot].parse::<u64>().is_ok()
+    {
+        return Some((Marker::Numbered, dot + 2));
     }
     if let Some(num_str) = trimmed
         .strip_suffix('.')

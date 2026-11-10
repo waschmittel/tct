@@ -123,10 +123,10 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
                     b.accent_color = color;
                     b.new_card_position = new_card_position;
                 }
-                if let Some(editor) = &mut app.editor {
-                    if editor.board().meta.id == id {
-                        editor.reload()?;
-                    }
+                if let Some(editor) = &mut app.editor
+                    && editor.board().meta.id == id
+                {
+                    editor.reload()?;
                 }
             }
         }

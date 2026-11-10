@@ -36,7 +36,7 @@ pub struct BoardEditor {
 }
 
 enum PendingWrite {
-    Card(Card),
+    Card(Box<Card>),
     Board,
 }
 
@@ -313,14 +313,13 @@ impl BoardEditor {
             else {
                 continue;
             };
-            if let Some(q) = search {
-                if !self
+            if let Some(q) = search
+                && !self
                     .board
                     .visible_cards(li, Some(q))
                     .contains(&visible_all[ord])
-                {
-                    continue;
-                }
+            {
+                continue;
             }
             self.board.selected_list = li;
             self.board.selected_card[li] = ord;
@@ -428,7 +427,7 @@ impl BoardEditor {
                 let card = self.card_mut(&card_id)?;
                 card.archived = true;
                 card.log("Archived");
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
             Command::RestoreCard { card_id } => {
                 // Reattach to a live List if the card's own list_id is missing
@@ -452,7 +451,7 @@ impl BoardEditor {
                 }
                 card.log("Restored from archive");
                 let restored_list = card.list_id.clone();
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
                 // Reflect membership in the in-memory list ordering.
                 if let Some(list) = self.board.lists.iter_mut().find(|l| l.id == restored_list)
                     && !list.card_ids.contains(&card_id)
@@ -470,7 +469,7 @@ impl BoardEditor {
                 } else {
                     card.touch();
                 }
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
             Command::EditCardDescription { card_id, body } => {
                 let card = self.card_mut(&card_id)?;
@@ -487,7 +486,7 @@ impl BoardEditor {
                 } else {
                     card.touch();
                 }
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
             Command::SetDueDate { card_id, date } => {
                 let card = self.card_mut(&card_id)?;
@@ -503,7 +502,7 @@ impl BoardEditor {
                 } else {
                     card.touch();
                 }
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
             Command::ClearDueDate { card_id } => {
                 let card = self.card_mut(&card_id)?;
@@ -518,7 +517,7 @@ impl BoardEditor {
                 } else {
                     card.touch();
                 }
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
             Command::AddChecklistItem { card_id, text } => {
                 let card = self.card_mut(&card_id)?;
@@ -530,7 +529,7 @@ impl BoardEditor {
                 });
                 card.log_checklist(action, old);
                 let last = card.checklist.len() - 1;
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
                 // Detail cursor follows the new item.
                 self.board.detail_item_idx = last;
             }
@@ -557,7 +556,7 @@ impl BoardEditor {
                 } else {
                     card.touch();
                 }
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
             Command::ToggleChecklistItem { card_id, item_idx } => {
                 let card = self.card_mut(&card_id)?;
@@ -573,7 +572,7 @@ impl BoardEditor {
                     format!("Uncompleted checklist item '{}'", item.text)
                 };
                 card.log_checklist(action, old);
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
             Command::RemoveChecklistItem { card_id, item_idx } => {
                 let card = self.card_mut(&card_id)?;
@@ -584,7 +583,7 @@ impl BoardEditor {
                 let removed = card.checklist.remove(item_idx);
                 card.log_checklist(format!("Removed checklist item '{}'", removed.text), old);
                 let len = card.checklist.len();
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
                 // Clamp detail cursor to the shrunk checklist.
                 if self.board.detail_item_idx >= len && len > 0 {
                     self.board.detail_item_idx = len - 1;
@@ -605,7 +604,7 @@ impl BoardEditor {
                 } else {
                     card.touch();
                 }
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
                 // Detail cursor follows the moved item.
                 self.board.detail_item_idx = to;
             }
@@ -641,7 +640,7 @@ impl BoardEditor {
                 };
                 let new = card.label_names_text(board_labels);
                 card.log_change(HistoryField::Labels, action, Some(old), Some(new));
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
             Command::DeleteHistoryEntry { card_id, index } => {
                 let card = self.card_mut(&card_id)?;
@@ -650,7 +649,7 @@ impl BoardEditor {
                 }
                 card.history.remove(index);
                 card.touch();
-                pending.push(PendingWrite::Card(card.clone()));
+                pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
             Command::AddCard { list_id, title } => {
                 let li = self
@@ -673,7 +672,7 @@ impl BoardEditor {
                 let new_id = card.id.clone();
                 self.board.cards.insert(card.id.clone(), card.clone());
                 self.rebuild_list(li);
-                pending.push(PendingWrite::Card(card));
+                pending.push(PendingWrite::Card(Box::new(card)));
                 self.last_added_card_id = Some(new_id);
                 // Selection follows the new card — it is non-archived and last/first
                 // in the list, so its visible ordinal is the last/first visible slot.
@@ -687,10 +686,10 @@ impl BoardEditor {
                 if let Some(slot) = self.board.selected_card.get_mut(li) {
                     *slot = ord;
                 }
-                if self.board.meta.new_card_position == crate::model::board::NewCardPosition::Top {
-                    if let Some(offset) = self.board.scroll_offset.get(li) {
-                        offset.set(0);
-                    }
+                if self.board.meta.new_card_position == crate::model::board::NewCardPosition::Top
+                    && let Some(offset) = self.board.scroll_offset.get(li)
+                {
+                    offset.set(0);
                 }
             }
             Command::MoveCard { card_id, direction } => {
@@ -1098,7 +1097,9 @@ impl BoardEditor {
                 {
                     *slot = ord;
                 }
-                pending.push(PendingWrite::Card(self.board.cards[card_id].clone()));
+                pending.push(PendingWrite::Card(Box::new(
+                    self.board.cards[card_id].clone(),
+                )));
             }
             MoveDir::Left | MoveDir::Right => {
                 let dst = match direction {
@@ -1136,7 +1137,9 @@ impl BoardEditor {
                 {
                     *slot = ord;
                 }
-                pending.push(PendingWrite::Card(self.board.cards[card_id].clone()));
+                pending.push(PendingWrite::Card(Box::new(
+                    self.board.cards[card_id].clone(),
+                )));
             }
         }
         Ok(())

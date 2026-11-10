@@ -199,11 +199,13 @@ pub fn render(
                 frame,
                 card_area,
                 card,
-                is_card_selected,
-                false,
+                card_widget::Look {
+                    selected: is_card_selected,
+                    dimmed: false,
+                    accent,
+                    caps: app.caps,
+                },
                 &board.meta.labels,
-                accent,
-                app.caps,
                 card_widget::DateStamps {
                     created: board.meta.show_created_date,
                     updated: board.meta.show_updated_date,
