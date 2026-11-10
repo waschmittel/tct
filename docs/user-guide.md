@@ -59,6 +59,8 @@ cargo run
 tct --help
 ```
 
+Help topics: `tct --help cli` (commands and flags), `examples`, `env` (data directory and environment variables), and `readme` / `user-guide` — this guide, embedded in the binary. Both take `--toc` (table of contents only) or `--section <heading>` (one section, case-insensitive partial match), e.g. `tct --help user-guide --section "CLI Reference"`. Handy for AI agents.
+
 ---
 
 ## Storage and Sync

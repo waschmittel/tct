@@ -24,7 +24,8 @@ src/
     path.rs          # Default file name, typed-path resolution, directory suggestions
     web.rs           # Browser sessions: PDF sent through the terminal stream (OSC 7733)
   cli/
-    mod.rs           # CLI dispatch, help text
+    mod.rs           # CLI dispatch
+    help.rs          # `tct --help [topic]`: overview, cli/examples/env, embedded README + user guide (`--toc`, `--section`)
     boards.rs        # `tct boards`
     lists.rs         # `tct lists`
     cards.rs         # `tct cards`

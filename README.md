@@ -117,7 +117,7 @@ All keybindings are discoverable in the TUI via the `?` help overlay, which is c
 tct can be used as a CLI tool without opening the TUI — useful for scripting or AI agent integration.
 
 ```
-tct --help                              Show all commands and options
+tct --help                              Overview and help topics (cli, examples, env, readme, user-guide)
 tct --version                           Print the version and exit
 tct --board <name>                      Open TUI directly on a matching board
 ```
@@ -126,7 +126,7 @@ Commands use the pattern `tct <entity> <board> --<action> [args]`. Board (and ca
 
 Name arguments use **case-insensitive partial matching** by default. Pass `--by-id` anywhere in the command to match all identifier arguments by **exact ID** instead of name. IDs are shown in listings as `[xxxxxxxx]`. Multiple name matches produce an error listing all candidates with their IDs.
 
-Entities: `boards`, `lists`, `cards`, `checklist`, `labels`, `search`. Run `tct <entity> --help` (or `tct --help`) for the full set of actions and flags on each.
+Entities: `boards`, `lists`, `cards`, `checklist`, `labels`, `search`. Run `tct --help cli` for the full set of actions and flags, `tct --help examples` for a workflow, and `tct --help user-guide [--toc | --section <heading>]` for the complete guide — the README and guide are embedded in the binary for users and AI agents alike.
 
 ### Examples
 

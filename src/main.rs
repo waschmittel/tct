@@ -42,7 +42,10 @@ fn main() -> anyhow::Result<()> {
     if args.iter().any(|a| a == "--help" || a == "-h")
         || args.first().map(|a| a.as_str()) == Some("help")
     {
-        cli::print_help();
+        if let Err(e) = cli::help::run(&args) {
+            errln!("Error: {e}");
+            std::process::exit(1);
+        }
         return Ok(());
     }
 
