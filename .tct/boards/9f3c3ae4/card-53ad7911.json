@@ -1,0 +1,45 @@
+{
+  "list_id": "a589c4f4",
+  "position": 1.0,
+  "title": "add a really nice gitlab pages page explaining tct and how to use it",
+  "description": "",
+  "label_ids": [
+    "df88cb04"
+  ],
+  "due_date": null,
+  "checklist": [],
+  "archived": false,
+  "created_at": "2026-11-10T22:44:55.077936968Z",
+  "updated_at": "2026-11-10T22:46:20.691457799Z",
+  "history": [
+    {
+      "at": "2026-11-10T22:44:55.077943901Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-10T22:45:34.437564605Z",
+      "action": "Archived",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-10T22:46:00.908431317Z",
+      "action": "Restored from archive",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-10T22:46:17.757227957Z",
+      "action": "Edited title",
+      "field": "title",
+      "old": "add a really",
+      "new": "add a really nice gitlab pages page explaining tct and how to use it"
+    },
+    {
+      "at": "2026-11-10T22:46:20.691457799Z",
+      "action": "Added label 'idea'",
+      "field": "labels",
+      "old": "",
+      "new": "idea"
+    }
+  ]
+}
