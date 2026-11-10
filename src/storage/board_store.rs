@@ -108,7 +108,13 @@ fn read_all_boards() -> Result<Vec<BoardMeta>> {
 pub(super) fn read_board_at(board_id: &BoardId) -> Result<BoardMeta> {
     let path = paths::board_meta_path(board_id);
     let data = super::read_unlinked(&path)?;
-    let mut meta: BoardMeta = serde_json::from_str(&data).map_err(|e| super::corrupt(&path, e))?;
+    parse_board(board_id, &data).map_err(|e| super::corrupt(&path, e))
+}
+
+/// Parse a `board.json` text, stamping the id from its directory name. Shared
+/// with `git_sync`, which reads old versions out of git.
+pub(crate) fn parse_board(board_id: &BoardId, data: &str) -> serde_json::Result<BoardMeta> {
+    let mut meta: BoardMeta = serde_json::from_str(data)?;
     meta.id = board_id.clone();
     Ok(meta)
 }

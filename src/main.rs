@@ -8,6 +8,7 @@ mod dialog;
 mod event;
 mod export;
 mod footnote;
+mod git_sync;
 mod input;
 mod insert;
 mod model;
@@ -72,6 +73,15 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // `tct --git [enable|disable]`
+    if args.first().map(String::as_str) == Some("--git") {
+        if let Err(e) = cli::git_flag(&args[1..]) {
+            errln!("Error: {e}");
+            std::process::exit(1);
+        }
+        return Ok(());
+    }
+
     // TUI mode — resolve optional --board flag before initialising the terminal
     let open_board_id = cli::resolve_board_flag(&args)?;
 
@@ -92,6 +102,10 @@ fn main() -> anyhow::Result<()> {
     let result = run_app(&mut terminal, &mut app, &events);
 
     ratatui::restore();
+    // Commit-on-quit (`tct --git enable`); a failure must not eat the result.
+    if let Some(e) = git_sync::commit_on_quit() {
+        errln!("Warning: {e}");
+    }
     result
 }
 

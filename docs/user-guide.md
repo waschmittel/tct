@@ -90,6 +90,7 @@ This means:
 - **`tct init`** — like `git init`: creates `.tct/` (plus a `README.md` explaining it) in the current directory, or at `$TCT_DATA_DIR` if that is set. Safe to re-run; an existing README is never overwritten
 - Only `~/.tct/` is created implicitly (with the same `README.md` as `tct init`). A `TCT_DATA_DIR` that does not exist is an error ("run `tct init`"), so a typo cannot silently start a fresh data directory
 - tct exits with an error if the current directory no longer exists (except `tct init` with `TCT_DATA_DIR` set)
+- **`tct init --git enable|disable`** — also decides on [git integration](#git-integration) and says what it chose: enabled when the new `.tct/` is inside a git repository that does not ignore it, disabled otherwise; the flag overrides, a re-init keeps an existing setting
 
 `TCT_DATA_DIR` is the *complete* path of the data directory — `.version` and `boards/` go directly into it, nothing is appended. It may be a symlink (your own choice; a *discovered* `.tct` must be a real directory).
 
@@ -147,6 +148,25 @@ git push
 ```
 
 Team members who pull will see the board when they run `tct` from that project directory.
+
+#### Git integration
+
+tct can commit `.tct/` for you — explicitly, never in the background:
+
+```sh
+tct commit                  # commit .tct now (same as commit-on-quit)
+tct --git enable            # also commit when the TUI quits
+tct --git disable
+tct --git                   # show the setting
+```
+
+In the TUI board view, `C` commits now (works with commit-on-quit off). The CLI's other commands never commit.
+
+- **Only `.tct/` is committed** — whatever else you have staged stays staged and out of the commit.
+- **Messages use titles**: `Board "Sprint": card "Fix login" moved to "Done"` for a single change, `Board "Sprint": 3 cards updated` or `Boards "A", "B" updated` plus one line per change otherwise.
+- The setting is local git config (`tct.autocommit`), so each clone opts in separately; it is not stored in `.tct/`.
+- Commits skip hooks and signing so they never block, and are refused during a merge, rebase, cherry-pick or revert. A failed commit-on-quit prints a warning.
+- Needs `git` on the `PATH`, an identity (`user.name`/`user.email`), and a `.tct/` that is not git-ignored.
 
 #### With Dropbox / Syncthing / OneDrive
 
@@ -576,6 +596,14 @@ tct search "old task" --archived              # Include archived cards
 ```
 
 Search matches against: card title, description, checklist item text, and label names.
+
+### Commit
+
+```sh
+tct commit                      # Commit .tct to git, generated message
+```
+
+See [Git integration](#git-integration). `tct --git [enable|disable]` switches commit-on-quit.
 
 ### Using IDs
 

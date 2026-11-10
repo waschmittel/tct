@@ -18,7 +18,9 @@ A keyboard-driven TUI Kanban board. Run without arguments to open the TUI.
 USAGE:
     tct                              Open the TUI board selector
     tct --board <name>               Open TUI directly on a board (partial, case-insensitive)
-    tct init                         Create ./.tct (or $TCT_DATA_DIR) with a README, like git init
+    tct init [--git enable|disable]  Create ./.tct (or $TCT_DATA_DIR) with a README, like git init
+    tct --git [enable|disable]       Commit .tct when the TUI quits (or show the setting)
+    tct commit                       Commit .tct to git now
     tct <COMMAND> [ARGS] [FLAGS]     Run a CLI command (no TUI)
     tct --help [TOPIC]               Show help (see below), also `tct help [TOPIC]`
     tct --version, -V                Print the version and exit
@@ -89,6 +91,18 @@ COMMANDS:
   search <query> --list <name>        Limit search to lists matching name
   search <query> --regex              Treat query as a regular expression
   search <query> --archived           Include archived cards in results
+
+  commit                              Commit the data directory (and only it) to git, now
+
+GIT:
+    The CLI never commits on its own. `tct commit` (or `C` in the TUI board view) always works
+    when the data directory is inside a git repository; only .tct is committed, whatever else
+    is staged. The message names the boards, lists and cards that changed (titles, not ids).
+    `tct --git enable` additionally commits when the TUI quits; `tct --git` shows the setting.
+    `tct init` enables it when the new .tct is inside a git repository (override with --git
+    enable|disable) and says what it chose. The setting is local git config (tct.autocommit),
+    never a file in .tct. Commits skip hooks and signing, and are refused during a merge,
+    rebase, cherry-pick or revert.
 
 IDs are shown in listings as [xxxxxxxx]. Pass --by-id to match by ID instead of name.
 Multiple name matches or a missing ID result in an error.

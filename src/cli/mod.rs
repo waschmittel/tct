@@ -1,7 +1,7 @@
 //! Command-line interface — dispatch (help text lives in [`help`]).
 //!
 //! When `tct` is invoked with a subcommand (`boards`, `lists`, `cards`,
-//! `checklist`, `labels`, `search`), [`run`] strips the leading
+//! `checklist`, `labels`, `search`, `commit`), [`run`] strips the leading
 //! `--by-id` flag and dispatches to the matching submodule. The
 //! `--board <name>` flag (handled by [`resolve_board_flag`]) is the
 //! single exception — it opens the TUI on a board rather than running a
@@ -10,6 +10,7 @@
 mod boards;
 mod cards;
 mod checklist;
+mod git;
 pub mod help;
 mod labels;
 mod lists;
@@ -44,9 +45,16 @@ pub fn resolve_board_flag(args: &[String]) -> anyhow::Result<Option<BoardId>> {
 
 /// `tct init`: create the data directory under the working directory.
 fn init(rest: &[String]) -> anyhow::Result<()> {
-    if let Some(extra) = rest.first() {
-        bail!("init takes no arguments (got '{extra}'); set TCT_DATA_DIR to pick the folder");
-    }
+    let git_choice = match rest {
+        [] => None,
+        [flag, value] if flag == "--git" => Some(git::parse_choice(Some(value))?),
+        [flag] if flag == "--git" => Some(git::parse_choice(None)?),
+        [extra, ..] => {
+            bail!(
+                "init takes only --git enable|disable (got '{extra}'); set TCT_DATA_DIR to pick the folder"
+            )
+        }
+    };
     let existed = crate::storage::board_store::init_data_dir()?;
     let verb = if existed {
         "Reinitialized existing"
@@ -57,7 +65,13 @@ fn init(rest: &[String]) -> anyhow::Result<()> {
         "{verb} tct data directory in {}",
         crate::storage::paths::base_dir().display()
     );
-    Ok(())
+    git::init_step(git_choice)
+}
+
+/// `tct --git [enable|disable]` (the data directory must exist).
+pub fn git_flag(rest: &[String]) -> anyhow::Result<()> {
+    crate::storage::board_store::open_data_dir()?;
+    git::flag(rest)
 }
 
 pub fn run(args: &[String]) -> anyhow::Result<()> {
@@ -76,6 +90,7 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
         "checklist" => checklist::run(rest, by_id),
         "labels" => labels::run(rest, by_id),
         "search" => search::run(rest),
+        "commit" => git::commit(rest),
         other => bail!("Unknown command '{other}'. Run 'tct --help' for usage."),
     }
 }

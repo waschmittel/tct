@@ -108,6 +108,8 @@ git add .tct/ && git commit -m "Add project board"
 
 Team members who pull will see the board when they run `tct` from that project directory. Different cards never conflict. tct auto-reloads from disk every 15 seconds.
 
+`tct commit` commits `.tct/` (only it) with a message naming the boards and cards that changed; `tct --git enable` also does so when the TUI quits, and `C` in the board view commits at once. `tct init` turns this on by itself inside a git repository.
+
 For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs/user-guide.md).
 
 All keybindings are discoverable in the TUI via the `?` help overlay, which is contextual to the current mode (or `F1` / `Ctrl+H` when editing a description).

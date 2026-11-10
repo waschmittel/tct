@@ -41,6 +41,9 @@ src/
     label.rs         # Label, LabelColor (pastel generation)
     list.rs          # CardList (derived view) + build_lists/ordered_card_ids
     rank.rs          # Fractional ranking shared by Cards in a List and Boards
+  git_sync/
+    mod.rs           # Only module that runs `git`: commit .tct (pathspec `.`), opt-in config (ADR-0019)
+    message.rs       # Commit subject/body from board/card changes (pure)
   storage/
     mod.rs           # StorageError, atomic_write
     paths.rs         # Data-dir resolution + path helpers (only BoardId/CardId build paths)

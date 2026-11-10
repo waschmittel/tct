@@ -578,6 +578,10 @@ flowchart TD
 
 `App::on_tick()` reloads board data from the filesystem every 15 seconds (configurable via `reload_interval`). Reload is skipped during editing, dialog, or grab modes to prevent data loss. Selection state (selected list, card index, scroll offset) is preserved across reloads.
 
+### 8.6a Git Integration
+
+`src/git_sync/` is the only module that spawns `git` (ADR-0019). It commits the data directory — and by pathspec nothing else — on `tct commit`, on `C` in the board view, and on TUI quit when `tct --git enable` was run (local git config `tct.autocommit`). Commit messages are generated from the staged diff (`message.rs`, pure): titles of the boards, lists and cards that changed, old versions from `HEAD`, new ones from the index. Nothing commits in the background and the CLI's other commands never commit.
+
 ### 8.7 Format Versioning
 
 `.tct/.version` holds a single integer, checked once at startup by
@@ -639,6 +643,7 @@ The numbered, dated decision records live in [`docs/adr/`](adr/). Summary:
 | [0012](adr/0012-italic-on-ctrl-e.md) | Italic is `Ctrl+E` (not `Ctrl+I`, which terminals send as Tab); `Ctrl+B` toggles bold |
 | [0013](adr/0013-matrix-tables.md) | A pipe table with an empty top-left cell is a *matrix*: labels left and top, rendered differently in the read view and the PDF |
 | [0014](adr/0014-pdf-themes-share-grays.md) | The monochrome PDF theme keeps the color theme's grays; only chromatic elements differ |
+| [0019](adr/0019-git-integration.md) | Git integration: explicit commits of the data directory only (`tct commit`, `C`, optional commit-on-quit); opt-in in local git config |
 
 Foundational decisions not captured as ADRs:
 

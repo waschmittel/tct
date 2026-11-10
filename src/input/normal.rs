@@ -42,6 +42,7 @@ pub enum Action {
     CardHistoryDialog,
     ExportPdf,
     ExportPdfColor,
+    Commit,
     NewList,
     RenameList,
     ArchiveList,
@@ -401,6 +402,14 @@ pub static KEYMAP: &[Binding<Action>] = &[
         section: "App",
     },
     Binding {
+        code: KeyCode::Char('C'),
+        shift: None,
+        action: Action::Commit,
+        keys: "C",
+        help: "Commit data to git",
+        section: "App",
+    },
+    Binding {
         code: KeyCode::Char('?'),
         shift: None,
         action: Action::Help,
@@ -442,6 +451,18 @@ pub fn handle(app: &mut App, key: KeyEvent) -> anyhow::Result<()> {
         return Ok(());
     };
     run(app, action)
+}
+
+/// `C`: commit the data directory now (works whether or not commit-on-quit
+/// is enabled).
+fn commit_to_git(app: &mut App) {
+    use crate::git_sync::{self, Outcome};
+    let msg = match git_sync::commit() {
+        Ok(Outcome::Committed(subject)) => format!("Committed: {subject}"),
+        Ok(Outcome::Nothing) => "Nothing to commit".to_string(),
+        Err(e) => e.to_string(),
+    };
+    app.set_status(msg);
 }
 
 /// Switch the open board to its neighbor in display order, wrapping around.
@@ -673,6 +694,7 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
         }
         Action::ExportPdf => app.open_export_dialog(crate::export::Theme::Mono),
         Action::ExportPdfColor => app.open_export_dialog(crate::export::Theme::Color),
+        Action::Commit => commit_to_git(app),
         Action::ToggleCreatedDate => toggle_created_date(app)?,
         Action::ToggleUpdatedDate => toggle_updated_date(app)?,
         Action::ClearDueDate => {
@@ -1650,6 +1672,18 @@ mod tests {
             crate::input::handle_input(&mut app, key(KeyCode::Char('y'))).unwrap();
             assert_eq!(app.mode, AppMode::Normal);
             assert!(app.board().unwrap().lists.iter().any(|l| l.id == list_id));
+        });
+    }
+
+    #[test]
+    fn capital_c_commits_to_git_or_toasts_why_not() {
+        with_temp_dir(|| {
+            // Not a git repository: the reason shows as a toast.
+            let meta = board_store::create_board("B".into()).unwrap();
+            let mut app = App::new(Some(meta.id)).unwrap();
+            handle(&mut app, key(KeyCode::Char('C'))).unwrap();
+            let (msg, _) = app.status_message.clone().unwrap();
+            assert!(msg.starts_with("cannot commit: "), "{msg}");
         });
     }
 }

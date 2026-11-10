@@ -17,7 +17,13 @@ pub fn load_card(board_id: &BoardId, card_id: &CardId) -> Result<Card> {
         return Err(StorageError::CardNotFound(card_id.to_string()));
     }
     let data = super::read_unlinked(&path)?;
-    let mut card: Card = serde_json::from_str(&data).map_err(|e| super::corrupt(&path, e))?;
+    parse_card(card_id, &data).map_err(|e| super::corrupt(&path, e))
+}
+
+/// Parse a card file's text, stamping the id from its file name. Shared with
+/// `git_sync`, which reads old versions out of git — still one parse recipe.
+pub(crate) fn parse_card(card_id: &CardId, data: &str) -> serde_json::Result<Card> {
+    let mut card: Card = serde_json::from_str(data)?;
     card.id = card_id.clone();
     Ok(card)
 }

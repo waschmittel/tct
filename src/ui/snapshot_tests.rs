@@ -118,6 +118,16 @@ fn snapshot_board_view() {
 }
 
 #[test]
+fn snapshot_board_view_commit_outside_git() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('C'));
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
 fn snapshot_board_view_search_active() {
     with_temp_dir(|| {
         let id = seed_demo_board();
