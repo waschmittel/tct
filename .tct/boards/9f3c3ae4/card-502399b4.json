@@ -8,9 +8,9 @@
   ],
   "due_date": null,
   "checklist": [],
-  "archived": false,
+  "archived": true,
   "created_at": "2026-11-10T20:04:33.787147Z",
-  "updated_at": "2026-11-10T20:26:12.001890Z",
+  "updated_at": "2026-11-10T21:55:33.728526Z",
   "history": [
     {
       "at": "2026-11-10T20:04:33.787198Z",
@@ -72,6 +72,11 @@
       "field": "description",
       "old": "",
       "new": "there are huge files here. suggest how to make the codebase more modular, but don't do anything."
+    },
+    {
+      "at": "2026-11-10T21:55:33.728526Z",
+      "action": "Archived",
+      "field": "general"
     }
   ]
 }

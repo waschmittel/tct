@@ -6,13 +6,18 @@
   "label_ids": [],
   "due_date": null,
   "checklist": [],
-  "archived": false,
+  "archived": true,
   "created_at": "2026-11-10T20:47:44.475904Z",
-  "updated_at": "2026-11-10T20:47:44.475931Z",
+  "updated_at": "2026-11-10T21:55:36.319991Z",
   "history": [
     {
       "at": "2026-11-10T20:47:44.475931Z",
       "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-10T21:55:36.319991Z",
+      "action": "Archived",
       "field": "general"
     }
   ]
