@@ -2331,7 +2331,7 @@ mod tests {
             meta.clone(),
             plain(
                 "Größe, 日本語 and emoji 😀",
-                "Latin: äöüß ÄÖÜ € — “quotes” … ✓ → ★\n\nMissing from the fonts (shown as ?): 日本語 العربية 🧑\u{200d}💻\n\ntab\there and a control\u{7}char".into(),
+                "Latin: äöüß ÄÖÜ € — “quotes” … ✓ → ★\n\nThree dots... become an ellipsis, but `code...` and\n\n```\nfenced...\n```\n\nstay literal.\n\nMissing from the fonts (shown as ?): 日本語 العربية 🧑\u{200d}💻\n\ntab\there and a control\u{7}char".into(),
             ),
         ));
         cases.push((

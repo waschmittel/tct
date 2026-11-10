@@ -320,7 +320,7 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
     let flush = |plain: &mut String, runs: &mut Vec<Run>| {
         if !plain.is_empty() {
             runs.push(Run {
-                text: std::mem::take(plain),
+                text: ellipsis(&std::mem::take(plain)),
                 style: base,
             });
         }
@@ -357,8 +357,9 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
                 "*" => style.italic = true,
                 _ => style.code = true,
             }
+            let text: String = chars[i + len..end].iter().collect();
             runs.push(Run {
-                text: chars[i + len..end].iter().collect(),
+                text: if style.code { text } else { ellipsis(&text) },
                 style,
             });
             i = end + len;
@@ -369,6 +370,11 @@ pub fn inline(text: &str, base: Style) -> Vec<Run> {
     }
     flush(&mut plain, &mut runs);
     runs
+}
+
+/// Typographic ellipsis for `...` (never applied to code).
+fn ellipsis(text: &str) -> String {
+    text.replace("...", "\u{2026}")
 }
 
 fn find_close(chars: &[char], from: usize, marker: &str, single_star: bool) -> Option<usize> {
@@ -394,6 +400,13 @@ mod tests {
         assert!(runs.iter().any(|r| r.text == "c" && r.style.italic));
         assert!(runs.iter().any(|r| r.text == "d" && r.style.strike));
         assert!(runs.iter().any(|r| r.text == "e" && r.style.code));
+    }
+
+    #[test]
+    fn three_dots_become_an_ellipsis_except_in_code() {
+        let runs = inline("wait... **bold...** `a...b` x....", Style::default());
+        assert_eq!(plain(&runs), "wait\u{2026} bold\u{2026} a...b x\u{2026}.");
+        assert_eq!(plain(&inline("..", Style::default())), "..");
     }
 
     #[test]
