@@ -19,16 +19,16 @@ expression: render_to_string(&app)
 │    │  Ctrl+E            Toggle italic (*text*)     Ctrl+T, T         Delete table           │    │
 │    │  Ctrl+K            Inline code (`text`)       Ctrl+T, Arrows    Swap row / column      │    │
 │    │  Ctrl+L            Insert list item (- )      Ctrl+T, a         Cycle alignment        │    │
-│    │                                                                                        │    │
-│    │Selection / navigation                       Alerts (in a quote)                        │    │
-│    │  Shift+Arrows      Highlight text             Ctrl+G, n t i     Note / tip / important │    │
-│    │  Up / Down         Move by visual line        Ctrl+G, c w       Caution / warning      │    │
-│    │                                               Ctrl+G, x         Plain quote again      │    │
-│    │Lists                                                                                   │    │
-│    │  Enter             Auto-continue list       App                                        │    │
-│    │  Tab               Nest item                  F1 / Ctrl+H       Help                   │    │
-│    │  Shift+Tab         Un-nest item                                                        │    │
+│    │  Ctrl+P            Paste mode on/off                                                   │    │
+│    │(normalizes on exit/save)                    Alerts (in a quote)                        │    │
+│    │                                               Ctrl+G, n t i     Note / tip / important │    │
+│    │Selection / navigation                         Ctrl+G, c w       Caution / warning      │    │
+│    │  Shift+Arrows      Highlight text             Ctrl+G, x         Plain quote again      │    │
+│    │  Up / Down         Move by visual line                                                 │    │
+│    │                                             App                                        │    │
+│    │Lists                                          F1 / Ctrl+H       Help                   │    │
+│    │  Enter             Auto-continue list                                                  │    │
+│    │  Tab               Nest item                                                           │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
-│                                                ││                                                │
 └────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
  HELP                                                                                        ~/.tct

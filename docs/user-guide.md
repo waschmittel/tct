@@ -351,6 +351,7 @@ A full Markdown editor with syntax highlighting. Supports headings, bold, italic
 | Ctrl+C | Copy selected text |
 | Ctrl+X | Cut selected text |
 | Ctrl+V | Paste from clipboard |
+| Ctrl+P | Paste mode on/off: keys and pastes insert plain text (no list continuation, renumbering or table reflow); a `PASTE MODE` badge shows bottom right. Leaving it (or saving) normalizes the text: tables reformatted, list indentation snapped, numbers fixed. Fenced code is untouched. |
 | Shift+Arrows | Highlight / select text (for formatting, cut, copy) |
 | Ctrl+B | Toggle bold (`**text**`). Wraps the selection without its surrounding spaces; inside or on already-formatted text it removes the formatting; in a table cell without a selection it formats the whole cell |
 | Ctrl+E | Toggle italic (`*text*`), same rules; combined with bold it gives `***text***`. (`Ctrl+I` is not used: terminals send it as Tab; `Cmd+I` works where the terminal reports it) |

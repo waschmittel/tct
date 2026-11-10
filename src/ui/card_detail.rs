@@ -88,6 +88,18 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         } else {
             None
         };
+        if editing_desc_handler.is_some_and(|h| h.paste_mode()) {
+            block = block.title_bottom(
+                Line::from(Span::styled(
+                    " PASTE MODE ",
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ))
+                .right_aligned(),
+            );
+        }
         if let Some(text) = hint_text {
             block = block.title_bottom(Line::from(Span::styled(
                 text,

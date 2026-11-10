@@ -285,6 +285,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 row("Ctrl+E", "Toggle italic (*text*)"),
                 row("Ctrl+K", "Inline code (`text`)"),
                 row("Ctrl+L", "Insert list item (- )"),
+                row("Ctrl+P", "Paste mode on/off (normalizes on exit/save)"),
                 Line::raw(""),
                 header("Selection / navigation"),
                 row("Shift+Arrows", "Highlight text"),

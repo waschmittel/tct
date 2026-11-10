@@ -312,6 +312,34 @@ pub(crate) fn reformat_at_cursor(ta: &mut Area) -> bool {
     true
 }
 
+/// Reformat every table outside `fenced` rows; the cursor stays on its text.
+pub(crate) fn reformat_all(ta: &mut Area, fenced: &[bool]) {
+    let cursor = ta.cursor();
+    let mut row = 0;
+    while row < ta.lines().len() {
+        let Some(span) =
+            span_at(ta.lines(), row).filter(|s| !fenced.get(s.start).copied().unwrap_or(false))
+        else {
+            row += 1;
+            continue;
+        };
+        let end = if (span.start..=span.end).contains(&cursor.0) {
+            span.end
+        } else if let Some(table) = Table::parse(&ta.lines()[span.start..=span.end]) {
+            let rendered = table.render();
+            replace_lines(ta, span, &rendered.lines);
+            span.start + rendered.lines.len() - 1
+        } else {
+            span.end
+        };
+        row = end + 1;
+    }
+    ta.move_cursor(CursorMove::Jump(cursor.0 as u16, cursor.1 as u16));
+    if !fenced.get(cursor.0).copied().unwrap_or(false) {
+        reformat_at_cursor(ta);
+    }
+}
+
 /// Rewrite the text of the cell under the cursor (not the delimiter row, not an
 /// empty cell) with `f` and reformat. Returns whether it did.
 pub(crate) fn map_cell_text(ta: &mut Area, f: impl FnOnce(&str) -> Option<String>) -> bool {

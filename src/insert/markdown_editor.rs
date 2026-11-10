@@ -26,6 +26,9 @@ pub struct MarkdownEditor {
     table_chord: bool,
     /// `Ctrl+G` was pressed inside a quote; the next key picks the alert kind.
     alert_chord: bool,
+    /// Paste mode: keys and pastes insert plain text (no list continuation,
+    /// renumbering or table reflow) until the text is normalized on leaving.
+    paste_mode: bool,
 }
 
 impl MarkdownEditor {
@@ -38,6 +41,18 @@ impl MarkdownEditor {
             card_id,
             table_chord: false,
             alert_chord: false,
+            paste_mode: false,
+        }
+    }
+
+    pub fn paste_mode(&self) -> bool {
+        self.paste_mode
+    }
+
+    /// Leave paste mode (if on) and normalize the whole text as one undo step.
+    fn leave_paste_mode(&mut self) {
+        if std::mem::take(&mut self.paste_mode) {
+            grouped(&mut self.input.textarea, None, normalize);
         }
     }
 }
@@ -89,11 +104,14 @@ impl MarkdownEditor {
             return;
         }
         let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        let raw = self.paste_mode;
         grouped(&mut self.input.textarea, None, |ta| {
             ta.set_yank_text(normalized);
             ta.paste();
-            renumber_all(ta);
-            table_edit::reformat_at_cursor(ta);
+            if !raw {
+                renumber_all(ta);
+                table_edit::reformat_at_cursor(ta);
+            }
         });
     }
 
@@ -104,10 +122,13 @@ impl MarkdownEditor {
                 return;
             }
         }
+        let raw = self.paste_mode;
         grouped(&mut self.input.textarea, None, |ta| {
             ta.paste();
-            renumber_all(ta);
-            table_edit::reformat_at_cursor(ta);
+            if !raw {
+                renumber_all(ta);
+                table_edit::reformat_at_cursor(ta);
+            }
         });
     }
 
@@ -130,13 +151,24 @@ impl MarkdownEditor {
             return InsertOutcome::StayWithStatus(refused);
         }
         if let Some(op) = table_edit::alt_op(key)
+            && !self.paste_mode
             && table_edit::in_table(&self.input.textarea)
         {
             let refused = table_edit::run_op(&mut self.input.textarea, op);
             return InsertOutcome::StayWithStatus(refused);
         }
         match (key.code, key.modifiers) {
+            (KeyCode::Char('p'), m) if has_ctrl_or_cmd(m) => {
+                if self.paste_mode {
+                    self.leave_paste_mode();
+                    InsertOutcome::StayWithStatus(Some("Paste mode off".into()))
+                } else {
+                    self.paste_mode = true;
+                    InsertOutcome::StayWithStatus(Some("Paste mode on".into()))
+                }
+            }
             (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
+                self.leave_paste_mode();
                 let body = self.input.current_text();
                 self.input.original = body.clone();
                 InsertOutcome::Save(Command::EditCardDescription {
@@ -145,6 +177,7 @@ impl MarkdownEditor {
                 })
             }
             (KeyCode::Char('q'), m) if has_ctrl_or_cmd(m) => {
+                self.leave_paste_mode();
                 let body = self.input.current_text();
                 InsertOutcome::Confirm(Command::EditCardDescription {
                     card_id: self.card_id.clone(),
@@ -203,6 +236,7 @@ impl MarkdownEditor {
             }
             (KeyCode::Char('g'), m)
                 if m.contains(KeyModifiers::CONTROL)
+                    && !self.paste_mode
                     && alert_edit::in_quote(&self.input.textarea) =>
             {
                 self.alert_chord = true;
@@ -232,12 +266,16 @@ impl MarkdownEditor {
                 insert_at_line_start(&mut self.input.textarea, "- ");
                 InsertOutcome::Stay
             }
-            (KeyCode::Char('t'), m) if has_ctrl_or_cmd(m) => {
+            (KeyCode::Char('t'), m) if has_ctrl_or_cmd(m) && !self.paste_mode => {
                 if table_edit::in_table(&self.input.textarea) {
                     self.table_chord = true;
                     return InsertOutcome::StayWithStatus(Some(table_edit::CHORD_HINT.into()));
                 }
                 table_edit::insert_skeleton(&mut self.input.textarea);
+                InsertOutcome::Stay
+            }
+            (KeyCode::Enter | KeyCode::Tab, _) if self.paste_mode => {
+                self.input.textarea.input(key);
                 InsertOutcome::Stay
             }
             (KeyCode::Enter, _) => {
@@ -273,6 +311,10 @@ impl MarkdownEditor {
     /// An ordinary editing key. Edits inside a table reflow it; edits that add or
     /// remove lines renumber lists. Both join the key's edit into one undo step.
     fn type_key(&mut self, key: KeyEvent) {
+        if self.paste_mode {
+            self.input.textarea.input(key);
+            return;
+        }
         let ta = &mut self.input.textarea;
         if matches!(key.code, KeyCode::Char(_))
             && !key
@@ -637,6 +679,81 @@ pub(crate) fn renumber_all(textarea: &mut tui_textarea::TextArea<'static>) {
 
     let (sr, sc) = saved;
     textarea.move_cursor(CursorMove::Jump(sr as u16, sc as u16));
+}
+
+/// Normalize pasted markdown: reflow tables, snap list indentation to
+/// `NEST_INDENT` levels, renumber ordered lists. Fenced code is left alone.
+pub(crate) fn normalize(ta: &mut tui_textarea::TextArea<'static>) {
+    let fenced = fenced_rows(ta.lines());
+    table_edit::reformat_all(ta, &fenced);
+    fix_list_indent(ta, &fenced);
+    renumber_all(ta);
+}
+
+/// Rows that are inside (or are the fence lines of) a fenced code block.
+fn fenced_rows(lines: &[String]) -> Vec<bool> {
+    let mut open = false;
+    lines
+        .iter()
+        .map(|l| {
+            let t = l.trim_start();
+            let fence = t.starts_with("```") || t.starts_with("~~~");
+            let inside = open || fence;
+            if fence {
+                open = !open;
+            }
+            inside
+        })
+        .collect()
+}
+
+/// Rewrite the indent of list items to `NEST_INDENT` per nesting level,
+/// whatever width the source used (2, 4, tabs).
+fn fix_list_indent(ta: &mut tui_textarea::TextArea<'static>, fenced: &[bool]) {
+    let lines = ta.lines().to_vec();
+    let (cr, cc) = ta.cursor();
+    let mut stack: Vec<usize> = Vec::new();
+    let mut edits = Vec::new();
+    for (r, line) in lines.iter().enumerate() {
+        if fenced.get(r).copied().unwrap_or(false) || line.trim().is_empty() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            stack.clear();
+            continue;
+        }
+        let trimmed = line.trim_start();
+        let ws = &line[..line.len() - trimmed.len()];
+        let width: usize = ws.chars().map(|c| if c == '\t' { 4 } else { 1 }).sum();
+        match parse_marker(trimmed) {
+            Some((Marker::Bullet(_) | Marker::Numbered, _)) => {
+                while stack.last().is_some_and(|&t| t > width) {
+                    stack.pop();
+                }
+                if stack.last() != Some(&width) {
+                    stack.push(width);
+                }
+                let new = (stack.len() - 1) * NEST_INDENT;
+                if new != ws.chars().count() || ws.contains('\t') {
+                    edits.push((r, ws.chars().count(), new));
+                }
+            }
+            _ if width == 0 => stack.clear(),
+            _ => {}
+        }
+    }
+    for (r, old, new) in edits {
+        ta.move_cursor(CursorMove::Jump(r as u16, 0));
+        ta.delete_str(old);
+        ta.insert_str(" ".repeat(new));
+    }
+    // Keep the cursor on the same character.
+    let lead = |l: &str| l.chars().take_while(|c| c.is_whitespace()).count();
+    let col = match (lines.get(cr), ta.lines().get(cr)) {
+        (Some(was), Some(now)) if cc >= lead(was) => cc + lead(now) - lead(was).min(cc + lead(now)),
+        _ => cc,
+    };
+    ta.move_cursor(CursorMove::Jump(cr as u16, col as u16));
 }
 
 fn wrap_selection_or_insert(
@@ -1825,5 +1942,69 @@ mod tests {
         press(&mut e, KeyCode::Char('s'));
         press(&mut e, KeyCode::Char('q'));
         assert_eq!(editor_lines(&e), vec!["hello sq".to_string()]);
+    }
+
+    fn paste_mode_on(e: &mut MarkdownEditor) {
+        ctrl(e, 'p');
+        assert!(e.paste_mode());
+    }
+
+    #[test]
+    fn paste_mode_inserts_plain_text_without_list_or_table_magic() {
+        let mut e = make_editor("");
+        paste_mode_on(&mut e);
+        e.handle_paste("1. a\n5. b\n|a|b|\n|-|-|\n|long cell|c|");
+        assert_eq!(
+            editor_lines(&e),
+            ["1. a", "5. b", "|a|b|", "|-|-|", "|long cell|c|"]
+        );
+        // Enter after a list item does not continue the list.
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(editor_lines(&e).len(), 6);
+        assert_eq!(editor_lines(&e)[5], "");
+    }
+
+    #[test]
+    fn leaving_paste_mode_normalizes_in_one_undo_step() {
+        let mut e = make_editor("");
+        paste_mode_on(&mut e);
+        e.handle_paste(
+            "1. a\n5. b\n  - x\n    - y\n\t- z\n|a|b|\n|-|-|\n|long cell|c|\n```\n  - keep\n```",
+        );
+        ctrl(&mut e, 'p');
+        assert!(!e.paste_mode());
+        let lines = editor_lines(&e);
+        assert_eq!(&lines[..3], ["1. a", "2. b", "   - x"]);
+        assert_eq!(&lines[3..5], ["      - y", "      - z"]);
+        assert!(
+            lines[5].contains("long cell") || lines[7].contains("long cell"),
+            "{lines:?}"
+        );
+        assert!(lines[5].len() == lines[7].len(), "{lines:?}");
+        assert_eq!(&lines[8..], ["```", "  - keep", "```"]);
+        e.input.textarea.undo();
+        assert_eq!(editor_lines(&e)[1], "5. b");
+    }
+
+    #[test]
+    fn saving_leaves_paste_mode_and_saves_normalized_text() {
+        let mut e = make_editor("");
+        paste_mode_on(&mut e);
+        e.handle_paste("1. a\n5. b");
+        match ctrl_out(&mut e, 's') {
+            InsertOutcome::Save(Command::EditCardDescription { body, .. }) => {
+                assert_eq!(body, "1. a\n2. b")
+            }
+            _ => panic!("expected Save"),
+        }
+        assert!(!e.paste_mode());
+    }
+
+    #[test]
+    fn paste_mode_keys_are_plain() {
+        let mut e = make_editor("- a");
+        paste_mode_on(&mut e);
+        press(&mut e, KeyCode::Enter);
+        assert_eq!(editor_lines(&e), ["- a", ""]);
     }
 }
