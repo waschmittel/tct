@@ -22,6 +22,10 @@ cargo test -- --test-threads=1   # Tests use shared filesystem state
 
 `rust-toolchain.toml` pins the toolchain (incl. `rustfmt`, `clippy`, `rust-analyzer`); rustup installs it on first use.
 
+## Updating dependencies
+
+"Update dependencies" means everything: run `scripts/update-deps.sh` (bumps the Rust pin in `rust-toolchain.toml`, `cargo update`, breaking bumps via `cargo upgrade --incompatible`, vendor check, then fmt/build/test). Then do by hand: GitHub Actions SHAs in `.github/workflows/` (keep the version comment), Docker base images, and a newer `tui-textarea-2` via `scripts/vendor-textarea.sh update`. Fix breakage, don't pin old versions to dodge it.
+
 ## Code intelligence: use rust-analyzer
 
 Prefer rust-analyzer (LSP tool, IDE integration, or MCP equivalent) over text search for go-to-definition, find-references, hover/types, call hierarchy, rename and diagnostics. Fall back to grep only for strings, docs and non-Rust files. If no rust-analyzer integration is available in your agent, say so rather than silently guessing.
