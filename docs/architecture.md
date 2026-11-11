@@ -84,7 +84,7 @@ src/
     mod.rs           # InsertHandler trait + InsertOutcome
     line_editor.rs   # Single-line text inputs (share LineInput)
     table.rs           # Pipe-table model: parse / render / row+column edits, `is_matrix` (ADR-0013) (pure)
-    table_edit.rs      # (tests in `table_edit/tests.rs`) Table editing glue on the textarea: live reformat, Tab/Enter, Ctrl+T chord, Alt ops
+    table_edit.rs      # (tests in `table_edit/tests.rs`) Table editing glue on the textarea: live reformat, Tab/Enter, Ctrl+T chord (incl. `t` = transpose matrix), Alt ops
     # Ctrl+N footnote insert/jump lives in markdown_editor/footnotes.rs (ADR-0017)
     alert_edit.rs      # Ctrl+G chord: quote -> alert / change kind / plain quote (ADR-0016)
     emphasis.rs        # Bold/italic toggling by XOR on the `*` run around the text (ADR-0012)

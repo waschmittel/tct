@@ -18,7 +18,7 @@ type Area = TextArea<'static>;
 const END: usize = usize::MAX;
 
 /// Hint shown while the `Ctrl+T` chord waits for its key.
-pub const CHORD_HINT: &str = "Table: r/c add row/column after, R/C before, x/X delete row/column, arrows swap, a align, T delete table";
+pub const CHORD_HINT: &str = "Table: r/c add row/column after, R/C before, x/X delete row/column, arrows swap, a align, t transpose matrix, T delete table";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TableOp {
@@ -34,6 +34,7 @@ pub enum TableOp {
     SwapColLeft,
     SwapColRight,
     CycleAlign,
+    Transpose,
 }
 
 /// The key that follows `Ctrl+T` inside a table.
@@ -46,6 +47,7 @@ pub fn chord_op(key: KeyEvent) -> Option<TableOp> {
         KeyCode::Char('x') => TableOp::DeleteRow,
         KeyCode::Char('X') => TableOp::DeleteCol,
         KeyCode::Char('T') => TableOp::DeleteTable,
+        KeyCode::Char('t') => TableOp::Transpose,
         KeyCode::Char('a') => TableOp::CycleAlign,
         KeyCode::Up => TableOp::SwapRowUp,
         KeyCode::Down => TableOp::SwapRowDown,
@@ -568,6 +570,7 @@ pub(crate) fn run_op(ta: &mut Area, op: TableOp) -> Option<String> {
                 t.cycle_align(cell);
                 (Edit::Place(cell), false)
             }
+            TableOp::Transpose => (t.transpose(), false),
             TableOp::DeleteTable => (Edit::Gone, false),
         };
         match edit {
@@ -582,6 +585,11 @@ pub(crate) fn run_op(ta: &mut Area, op: TableOp) -> Option<String> {
                         line: line_of_row(n),
                         cell,
                         off: END,
+                    },
+                    (false, TableOp::Transpose) => Target {
+                        line: line_of_row(cell),
+                        cell: row,
+                        off: ctx.off,
                     },
                     (false, TableOp::CycleAlign) => Target {
                         line: ctx.line,

@@ -229,6 +229,28 @@ Sleep 500ms
 Type "Table rows stay aligned."
 Sleep 600ms
 
+# A table with an empty corner is a matrix: Ctrl+T then t swaps rows and columns
+Enter
+Enter
+Ctrl+T
+Sleep 600ms
+Tab
+Type "Ada"
+Tab
+Type "Design"
+Tab
+Type "owner"
+Tab
+Type "Build"
+Tab
+Type "review"
+Sleep 800ms
+Ctrl+T
+Type "t"
+Sleep 1.2s
+Enter
+Sleep 400ms
+
 # Outside tables the keys open a pair; pressed inside formatted text they remove it
 Enter
 Sleep 300ms

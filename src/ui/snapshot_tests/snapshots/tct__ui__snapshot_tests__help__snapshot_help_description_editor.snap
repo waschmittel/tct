@@ -19,15 +19,15 @@ expression: render_to_string(&app)
 │    │  Ctrl+B            Toggle bold (**text**)     Ctrl+T, T         Delete table           │    │
 │    │  Ctrl+E            Toggle italic (*text*)     Ctrl+T, Arrows    Swap row / column      │    │
 │    │  Ctrl+K            Inline code (`text`)       Ctrl+T, a         Cycle alignment        │    │
-│    │  Ctrl+L            Insert list item (- )                                               │    │
-│    │  Ctrl+N            Footnote / jump back     Alerts (in a quote)                        │    │
-│    │  Ctrl+N (selected) Name it after the text     Ctrl+G, n t i     Note / tip / important │    │
-│    │  Ctrl+P            Toggle paste mode          Ctrl+G, c w       Caution / warning      │    │
-│    │                                               Ctrl+G, x         Plain quote again      │    │
-│    │Lists                                                                                   │    │
-│    │  Enter             Auto-continue list       App                                        │    │
-│    │  Tab               Nest item                  F1 / Ctrl+H       Help                   │    │
-│    │  Shift+Tab         Un-nest item                                                        │    │
+│    │  Ctrl+L            Insert list item (- )      Ctrl+T, t         Transpose matrix       │    │
+│    │  Ctrl+N            Footnote / jump back                                                │    │
+│    │  Ctrl+N (selected) Name it after the text   Alerts (in a quote)                        │    │
+│    │  Ctrl+P            Toggle paste mode          Ctrl+G, n t i     Note / tip / important │    │
+│    │                                               Ctrl+G, c w       Caution / warning      │    │
+│    │Lists                                          Ctrl+G, x         Plain quote again      │    │
+│    │  Enter             Auto-continue list                                                  │    │
+│    │  Tab               Nest item                App                                        │    │
+│    │  Shift+Tab         Un-nest item               F1 / Ctrl+H       Help                   │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
 │                                                ││                                                │
 └────────────────────────────────────────────────┘└────────────────────────────────────────────────┘

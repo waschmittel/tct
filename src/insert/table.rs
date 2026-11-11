@@ -369,6 +369,21 @@ impl Table {
         Edit::Place(other)
     }
 
+    /// Swap rows and columns of a matrix. The corner stays put and every new
+    /// column takes the alignment of the first data column (alignment belongs
+    /// to old columns, which no longer exist as such).
+    pub fn transpose(&mut self) -> Edit {
+        if !self.is_matrix() {
+            return Edit::Refused("Only a matrix (empty top-left cell) can be transposed");
+        }
+        let align = self.aligns.get(1).copied().unwrap_or(Align::None);
+        self.rows = (0..self.cols())
+            .map(|c| self.rows.iter().map(|r| r[c].clone()).collect())
+            .collect();
+        self.aligns = vec![align; self.rows[0].len()];
+        Edit::Place(0)
+    }
+
     /// Cycle a column through no hint → left → center → right.
     pub fn cycle_align(&mut self, col: usize) {
         self.aligns[col] = self.aligns[col].next();
@@ -395,6 +410,32 @@ mod tests {
         };
         assert!(parse(&["|  | a |", "|---|---|", "| r | 1 |"]).is_matrix());
         assert!(!parse(&["| h | a |", "|---|---|", "| r | 1 |"]).is_matrix());
+    }
+
+    #[test]
+    fn transpose_swaps_rows_and_columns_of_a_matrix_only() {
+        let parse = |l: &[&str]| {
+            Table::parse(&l.iter().map(|s| s.to_string()).collect::<Vec<_>>()).unwrap()
+        };
+        let mut t = parse(&["|  | a | b |", "|:-|--:|---|", "| x | 1 | 2 |"]);
+        assert_eq!(t.transpose(), Edit::Place(0));
+        assert_eq!(t.rows, [["", "x"], ["a", "1"], ["b", "2"]]);
+        assert_eq!(t.aligns, [Align::Right; 2]);
+        assert!(t.is_matrix());
+        let before = t.clone();
+        t.transpose();
+        t.transpose();
+        assert_eq!(t, before);
+
+        let mut n = parse(&["| h | a |", "|---|---|", "| x | 1 |"]);
+        let same = n.clone();
+        assert!(matches!(n.transpose(), Edit::Refused(_)));
+        assert_eq!(n, same);
+
+        let mut one = parse(&["|  |", "|--|", "| x |"]);
+        one.transpose();
+        assert_eq!(one.rows, [["", "x"]]);
+        assert_eq!(one.aligns, [Align::None; 2]);
     }
 
     fn lines(s: &[&str]) -> Vec<String> {

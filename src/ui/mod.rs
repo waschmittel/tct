@@ -310,6 +310,7 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 row("Ctrl+T, T", "Delete table"),
                 row("Ctrl+T, Arrows", "Swap row / column"),
                 row("Ctrl+T, a", "Cycle alignment"),
+                row("Ctrl+T, t", "Transpose matrix"),
                 Line::raw(""),
                 header("Alerts (in a quote)"),
                 row("Ctrl+G, n t i", "Note / tip / important"),

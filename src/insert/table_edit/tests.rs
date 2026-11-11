@@ -232,6 +232,33 @@ fn chord_cycles_alignment_and_swaps() {
     assert_eq!(cursor(&e), (0, 10));
 }
 
+const M: &str = "|   | a | b |\n| - | --: | - |\n| x | 1 | 2 |";
+
+#[test]
+fn chord_t_transposes_a_matrix_in_one_undo_step() {
+    let mut e = editor(M, 2, 10); // in cell "2": row 1, column 2
+    chord(&mut e, KeyCode::Char('t'));
+    assert_eq!(
+        lines(&e),
+        [
+            "|     |  x  |",
+            "| --: | --: |",
+            "|   a |   1 |",
+            "|   b |   2 |"
+        ]
+    );
+    assert_eq!(cursor(&e), (3, 10)); // still in "2": row 2, column 1
+    key(&mut e, KeyCode::Char('z'), KeyModifiers::CONTROL);
+    assert_eq!(lines(&e).join("\n").replace(' ', ""), M.replace(' ', ""));
+}
+
+#[test]
+fn chord_t_refuses_a_table_that_is_not_a_matrix() {
+    let mut e = editor(T, 0, 3);
+    chord(&mut e, KeyCode::Char('t'));
+    assert_eq!(lines(&e), T.split('\n').collect::<Vec<_>>());
+}
+
 #[test]
 fn deleting_the_header_row_or_the_last_column_removes_the_table() {
     let mut e = editor(&format!("x\n{T}\ny"), 1, 3);

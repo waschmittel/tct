@@ -405,7 +405,7 @@ A run of `|` lines whose second line is a delimiter row (`|---|---|`, with `:--`
 | Grace | review | owner |
 ```
 
-Put any text in the top-left cell to get a normal table back. Details of how matrices are drawn in the PDF are in [ADR-0013](adr/0013-matrix-tables.md).
+`Ctrl+T`, `t` *transposes* a matrix (rows become columns; the corner stays, all columns take the first data column's alignment). Other tables refuse it. Put any text in the top-left cell to get a normal table back. Details of how matrices are drawn in the PDF are in [ADR-0013](adr/0013-matrix-tables.md).
 
 ### PDF export
 

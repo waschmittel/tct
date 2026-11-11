@@ -45,6 +45,29 @@ fn snapshot_description_editor_table() {
     });
 }
 
+/// `Ctrl+T, t` transposes a matrix in the editor (corner stays, rows become columns).
+#[test]
+fn snapshot_description_editor_transpose_matrix() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        set_description(
+            &mut app,
+            "Plan:\n\n|  | Design | Build | Ship |\n|-|:-:|-|-|\n| Ada | owner | review | - |\n| Grace | review | owner | owner |",
+        );
+        press(&mut app, KeyCode::Enter);
+        press(&mut app, KeyCode::Char('e'));
+        assert_eq!(app.mode, AppMode::Insert);
+        for _ in 0..4 {
+            press(&mut app, KeyCode::Down);
+        }
+        let ctrl_t = KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL);
+        crate::input::handle_input(&mut app, ctrl_t).unwrap();
+        press(&mut app, KeyCode::Char('t'));
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
 #[test]
 fn snapshot_card_detail_citation() {
     with_temp_dir(|| {
