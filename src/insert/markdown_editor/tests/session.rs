@@ -109,3 +109,56 @@ fn paste_mode_keys_are_plain() {
     press(&mut e, KeyCode::Enter);
     assert_eq!(editor_lines(&e), ["- a", ""]);
 }
+
+fn typed(e: &mut MarkdownEditor, text: &str) {
+    for c in text.chars() {
+        press(e, KeyCode::Char(c));
+    }
+}
+
+#[test]
+fn a_typing_burst_undoes_by_word_and_redoes_whole() {
+    let mut e = make_editor("");
+    typed(&mut e, "hello world");
+    ctrl(&mut e, 'z');
+    assert_eq!(editor_lines(&e), ["hello "]);
+    ctrl(&mut e, 'z');
+    assert_eq!(editor_lines(&e), [""]);
+    ctrl(&mut e, 'y');
+    ctrl(&mut e, 'y');
+    assert_eq!(editor_lines(&e), ["hello world"]);
+}
+
+/// The only test that sleeps: the editor reads the real clock.
+#[test]
+fn a_pause_splits_typing_steps() {
+    let mut e = make_editor("");
+    typed(&mut e, "one");
+    std::thread::sleep(std::time::Duration::from_millis(600));
+    typed(&mut e, "two");
+    ctrl(&mut e, 'z');
+    assert_eq!(editor_lines(&e), ["one"]);
+}
+
+#[test]
+fn a_structural_edit_splits_typing_steps() {
+    let mut e = make_editor("");
+    typed(&mut e, "a");
+    press(&mut e, KeyCode::Enter);
+    typed(&mut e, "b");
+    ctrl(&mut e, 'z');
+    assert_eq!(editor_lines(&e), ["a", ""]);
+}
+
+#[test]
+fn undo_history_reaches_past_fifty_edits() {
+    let mut e = make_editor("");
+    for _ in 0..120 {
+        typed(&mut e, "x");
+        press(&mut e, KeyCode::Enter);
+    }
+    for _ in 0..240 {
+        ctrl(&mut e, 'z');
+    }
+    assert_eq!(editor_lines(&e), [""]);
+}

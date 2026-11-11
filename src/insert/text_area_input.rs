@@ -9,6 +9,9 @@
 use ratatui::style::{Color, Style};
 use tui_textarea::{TextArea, WrapMode};
 
+/// Undo depth (steps are bursts, not characters, so this reaches far back).
+const MAX_UNDO_STEPS: usize = 1000;
+
 pub struct TextAreaInput {
     pub textarea: TextArea<'static>,
     pub original: String,
@@ -19,6 +22,9 @@ impl TextAreaInput {
         let lines: Vec<String> = initial.split('\n').map(|s| s.to_string()).collect();
         let mut textarea = TextArea::new(lines);
         textarea.set_wrap_mode(WrapMode::WordOrGlyph);
+        // A typing burst is one undo step; structural edits group themselves.
+        textarea.set_undo_coalescing(true);
+        textarea.set_max_histories(MAX_UNDO_STEPS);
         // Same hanging indent as the markdown preview.
         textarea.set_wrap_continuation_indent(Some(crate::ui::markdown::detect_list_indent));
         textarea.set_cursor_line_style(Style::default());
