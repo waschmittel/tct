@@ -1,6 +1,10 @@
+<img src="docker/pwa/icon.svg" align="right" width="110" alt="tct logo: a Kanban board with three columns">
+
 # tct — Terminal Card Tracker
 
-A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your terminal.
+A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your terminal — and **shared between you and your AI agents**.
+
+Humans work in the TUI, agents and scripts in the headless CLI, and both edit the same boards (see [Humans and AI agents](#humans-and-ai-agents)).
 
 tct stores everything as **plain JSON files** — one file per board and one per card (lists live inline in the board file). Put them in a git repo, Dropbox, or any synced folder and every team member sees the same boards. tct watches the filesystem and picks up changes automatically, making it a natural fit for **background file sync** workflows.
 
@@ -27,11 +31,33 @@ chmod +x tct
 mv tct /usr/local/bin/
 ```
 
+### First steps
+
+```sh
+tct init     # boards next to your code in ./.tct (or skip it to use ~/.tct)
+tct          # board selector: press n for a new board, ? for help
+```
+
+## Build from source
+
+Requires a Rust toolchain.
+
+```sh
+cargo install --path .
+```
+
+Or build and run directly:
+
+```sh
+cargo run
+```
+
 ## Why tct?
 
 - **Files are the API** — every board and card is a standalone JSON file. Human-readable, git-friendly, scriptable.
 - **Sync-friendly by default** — one file per entity, atomic writes, periodic reload. Works with git, Dropbox, Syncthing, or any file sync tool.
 - **Keyboard-first** — every action reachable via keyboard. Modal input (like Vim) keeps bindings contextual and safe.
+- **Built for humans *and* agents** — the TUI and the CLI edit the same files, the binary documents itself (`tct --help user-guide`), and changes show up live on the human's screen.
 - **Dual interface** — interactive TUI for humans, headless CLI for scripts and AI agents. Same data.
 - **Zero infrastructure** — single binary. No database. No server. No account.
 
@@ -57,64 +83,22 @@ mv tct /usr/local/bin/
 - PDF export of a card (PDF/A, fonts embedded, nothing to install) — black and gray for monochrome printers by default, or in color; long descriptions break across pages sensibly (see below)
 - Full CLI interface for scripting and AI agent use (`tct --help`)
 
-## Build from source
+## Humans and AI agents
 
-Requires a Rust toolchain.
-
-```sh
-cargo install --path .
-```
-
-Or build and run directly:
+The goal: **people and AI agents working on the same board.** Humans use the TUI; agents and scripts use the CLI. There is nothing to host and nothing to configure — both sides read and write the same JSON files, and the TUI reloads every 15 seconds so an agent's new card appears on your screen.
 
 ```sh
-cargo run
+tct cards "Sprint" --show "caching"                     # read the task
+tct checklist "Sprint" "caching" --add "Write tests"    # plan
+tct checklist "Sprint" "caching" --toggle 1             # report progress
+tct commit                                              # record it in git
 ```
 
-## Storage and Sync
+- Partial, case-insensitive name matching (and `--by-id` when exact); errors go to stderr with exit status 1.
+- The binary documents itself: `tct --help user-guide --toc` and `--section <heading>` print the guide piece by piece.
+- Output is sanitized, and everything under a discovered `.tct/` is treated as untrusted.
 
-Data is stored as JSON files. Storage location is resolved in this order:
-
-1. `TCT_DATA_DIR` environment variable (if set) — the complete path of the data directory
-2. A `.tct/` directory in the current working directory or any of its parents (project-local boards)
-3. `~/.tct/` (global default)
-
-This means you can keep project-specific boards alongside your code by running `tct init` in your project root (like `git init`; it also drops a README into `.tct/`).
-
-```
-.tct/  (or ~/.tct/)
-  board_order.json        # Board display order
-  boards/
-    <board-id>/
-      board.json          # Board metadata + ordered list definitions + labels
-      card-<id>.json      # Card data: list_id, position, title, description, labels, ...
-```
-
-Each card owns its own list membership (`list_id`) and order within that list
-(`position`, a fractional rank). Lists are just named entries in `board.json` —
-there are no `list-*.json` files. This keeps a card's archived flag and its list
-membership in a single file, so they cannot diverge.
-
-All writes are atomic (write to `.tmp`, then rename) — no partial files, even on
-crash. Boards created by older versions (with `list-<id>.json` files) are
-migrated to this layout automatically the first time they are opened.
-
-### Setting up shared boards with git
-
-```sh
-mkdir .tct
-echo ".tct/**/*.tmp" >> .gitignore
-tct boards --create "Sprint Board"
-git add .tct/ && git commit -m "Add project board"
-```
-
-Team members who pull will see the board when they run `tct` from that project directory. Different cards never conflict. tct auto-reloads from disk every 15 seconds.
-
-`tct commit` commits `.tct/` (only it) with a message naming the boards and cards that changed; `tct --git enable` also does so when the TUI quits, and `C` in the board view commits at once. `tct init` turns this on by itself inside a git repository.
-
-For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs/user-guide.md).
-
-All keybindings are discoverable in the TUI via the `?` help overlay, which is contextual to the current mode (or `F1` / `Ctrl+H` when editing a description).
+More, including a snippet for your `AGENTS.md`: `tct --help user-guide --section "Humans and AI agents"`.
 
 ## CLI Usage
 
@@ -215,6 +199,51 @@ in [docs/export-examples](docs/export-examples/). A nicely laid-out example with
 headings, lists, a table, a matrix, labels and a checklist:
 [monochrome](docs/export-examples/00-showcase.pdf) ·
 [color](docs/export-examples/color/00-showcase.pdf).
+
+## Storage and Sync
+
+Data is stored as JSON files. Storage location is resolved in this order:
+
+1. `TCT_DATA_DIR` environment variable (if set) — the complete path of the data directory
+2. A `.tct/` directory in the current working directory or any of its parents (project-local boards)
+3. `~/.tct/` (global default)
+
+This means you can keep project-specific boards alongside your code by running `tct init` in your project root (like `git init`; it also drops a README into `.tct/`).
+
+```
+.tct/  (or ~/.tct/)
+  board_order.json        # Board display order
+  boards/
+    <board-id>/
+      board.json          # Board metadata + ordered list definitions + labels
+      card-<id>.json      # Card data: list_id, position, title, description, labels, ...
+```
+
+Each card owns its own list membership (`list_id`) and order within that list
+(`position`, a fractional rank). Lists are just named entries in `board.json` —
+there are no `list-*.json` files. This keeps a card's archived flag and its list
+membership in a single file, so they cannot diverge.
+
+All writes are atomic (write to `.tmp`, then rename) — no partial files, even on
+crash. A `.version` file records the format; tct refuses to open a directory
+written by a different format version rather than reading it partially.
+
+### Setting up shared boards with git
+
+```sh
+mkdir .tct
+echo ".tct/**/*.tmp" >> .gitignore
+tct boards --create "Sprint Board"
+git add .tct/ && git commit -m "Add project board"
+```
+
+Team members who pull will see the board when they run `tct` from that project directory. Different cards never conflict. tct auto-reloads from disk every 15 seconds.
+
+`tct commit` commits `.tct/` (only it) with a message naming the boards and cards that changed; `tct --git enable` also does so when the TUI quits, and `C` in the board view commits at once. `tct init` turns this on by itself inside a git repository.
+
+For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs/user-guide.md).
+
+All keybindings are discoverable in the TUI via the `?` help overlay, which is contextual to the current mode (or `F1` / `Ctrl+H` when editing a description).
 
 ## Documentation
 

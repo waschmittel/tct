@@ -1,0 +1,13 @@
+{
+  "name": "tct-guide-site",
+  "private": true,
+  "type": "module",
+  "description": "Renders docs/user-guide.md as the HTML user guide on the project website",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "highlight.js": "11.12.0",
+    "marked": "18.2.0"
+  }
+}

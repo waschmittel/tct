@@ -1,0 +1,48 @@
+/* User guide page; builds on ../style.css (variables, nav). */
+body.guide nav .brand { display: flex; align-items: center; gap: .5rem; }
+body.guide nav a[aria-current] { color: var(--fg); font-weight: 600; }
+#menu { display: none; font-size: 1.3rem; background: none; border: 0; color: var(--fg); cursor: pointer; margin-left: auto; }
+.layout { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); gap: 3rem; max-width: 1180px; margin: 0 auto; padding: 0 1.25rem; }
+#side { position: sticky; top: 3.4rem; align-self: start; max-height: calc(100vh - 3.4rem); overflow-y: auto; padding: 1.5rem 0 2rem; font-size: .93rem; }
+#filter { width: 100%; padding: .5rem .75rem; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg); font: inherit; margin-bottom: 1rem; }
+#toc, #toc ul { list-style: none; margin: 0; padding: 0; }
+#toc a { display: block; padding: .22rem .6rem; color: var(--muted); text-decoration: none; border-left: 2px solid transparent; border-radius: 0 6px 6px 0; line-height: 1.35; }
+#toc a:hover { color: var(--fg); }
+#toc li.grp > a { font-weight: 600; color: var(--fg); margin-top: .5rem; }
+#toc li.grp > ul { display: none; margin-left: .7rem; }
+#toc li.grp.open > ul, #toc.filtering li.grp > ul { display: block; }
+#toc a.active { color: var(--accent); border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+#toc li.hide { display: none; }
+#doc { padding: 2rem 0 3rem; min-width: 0; font-size: 1.02rem; }
+#doc h1 { font-size: clamp(2rem, 4vw, 2.6rem); margin-bottom: 1rem; }
+#doc h2 { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); font-size: 1.7rem; }
+#doc h3 { margin-top: 2.2rem; font-size: 1.28rem; }
+#doc h4 { margin-top: 1.6rem; font-size: 1.05rem; }
+#doc h2, #doc h3, #doc h4 { position: relative; }
+.anchor { position: absolute; left: -1.2em; color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400; }
+h2:hover .anchor, h3:hover .anchor, h4:hover .anchor, .anchor:focus { opacity: 1; }
+#doc hr { display: none; }
+.code { position: relative; margin: 1.1rem 0; }
+.code pre { margin: 0; padding: 1rem 1.2rem; border-radius: 12px; background: var(--term); color: var(--term-fg); overflow-x: auto; font-size: .88rem; line-height: 1.55; border: 1px solid var(--line); }
+.code code { background: none; padding: 0; font-size: inherit; }
+.code .copy { position: absolute; top: .5rem; right: .5rem; font: .72rem var(--mono); padding: .2rem .55rem; border-radius: 6px; cursor: pointer; background: #1b2230; color: #98a3b5; border: 1px solid #2c3850; opacity: 0; transition: opacity .15s; }
+.code:hover .copy, .code .copy:focus { opacity: 1; }
+.hljs-comment { color: #6b7a90; } .hljs-string, .hljs-attr { color: #f0c987; } .hljs-built_in, .hljs-keyword, .hljs-section { color: #b39dff; }
+.hljs-number, .hljs-literal { color: #8ce99a; } .hljs-bullet, .hljs-emphasis, .hljs-strong, .hljs-code { color: #5fd3ee; }
+.tablewrap { overflow-x: auto; margin: 1.1rem 0; }
+.tablewrap table { min-width: 100%; }
+#doc blockquote { margin: 1rem 0; padding: .1rem 1.1rem; border-left: 3px solid var(--accent); background: var(--card); border-radius: 0 10px 10px 0; color: var(--muted); }
+#doc img { max-width: 100%; height: auto; }
+.diagram { margin: 1.2rem 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; text-align: center; overflow-x: auto; }
+.diagram svg { max-width: 100%; height: auto; }
+.diagram .dark { display: none; }
+@media (prefers-color-scheme: dark) { .diagram .light { display: none; } .diagram .dark { display: block; } }
+.edit { margin-top: 3rem; font-size: .9rem; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; gap: 0; }
+  #menu { display: block; }
+  #side { display: none; position: static; max-height: none; border-bottom: 1px solid var(--line); }
+  #side.show { display: block; }
+  nav a.l { display: inline; }
+  .anchor { display: none; }
+}

@@ -4,6 +4,8 @@
 
 tct is a keyboard-driven Kanban board that lives in your terminal. It stores everything as plain JSON files on disk — no server, no database, no account.
 
+tct is built for **humans and AI agents working on the same board**: people use the TUI, agents and scripts use the CLI, and both read and write the same files (see [Humans and AI agents](#humans-and-ai-agents)).
+
 This matters because it means tct boards are **just files**. Put them in a git repo, a Dropbox folder, or any synced directory and every team member sees the same boards. tct watches the filesystem and picks up changes automatically, making it a natural fit for **background file sync** workflows.
 
 ```mermaid
@@ -39,19 +41,32 @@ graph LR
 
 ## Installation
 
-### From source
+### Homebrew (macOS Apple Silicon, Linux x86_64)
 
 ```sh
-git clone <repo-url>
+brew install waschmittel/tct/tct
+```
+
+### Prebuilt binary
+
+Download a binary for your platform from the [releases page](https://github.com/waschmittel/tct/releases), then put it on your `PATH`:
+
+```sh
+chmod +x tct
+mv tct /usr/local/bin/
+```
+
+### From source
+
+Requires a Rust toolchain.
+
+```sh
+git clone https://github.com/waschmittel/tct
 cd tct
 cargo install --path .
 ```
 
-### Run without installing
-
-```sh
-cargo run
-```
+Or build and run directly with `cargo run`.
 
 ### Verify
 
@@ -61,155 +76,15 @@ tct --help
 
 Help topics: `tct --help cli` (commands and flags), `examples`, `env` (data directory and environment variables), and `readme` / `user-guide` — this guide, embedded in the binary. Both take `--toc` (table of contents only) or `--section <heading>` (one section, case-insensitive partial match), e.g. `tct --help user-guide --section "CLI Reference"`. Handy for AI agents.
 
----
-
-## Storage and Sync
-
-### Where data lives
-
-tct resolves its data directory in this order:
-
-```mermaid
-flowchart TD
-    A([tct starts]) --> B{TCT_DATA_DIR<br>env var set?}
-    B -->|Yes| C["Use $TCT_DATA_DIR"]
-    B -->|No| D{"Walk up from CWD:<br>does .tct/ exist<br>in any ancestor?"}
-    D -->|Found| E["Use nearest .tct/"]
-    D -->|Not found| F["Use ~/.tct/<br>(created automatically)"]
-
-    style C fill:#3a6b35,stroke:#fff,color:#fff
-    style E fill:#2d5a88,stroke:#fff,color:#fff
-    style F fill:#555,stroke:#fff,color:#fff
-```
-
-This means:
-
-- **Global boards** live in `~/.tct/` — your personal default
-- **Project-local boards** live in a `.tct/` directory inside (or above) your project — shared with anyone who clones the repo
-- **Custom location** via `TCT_DATA_DIR` — useful for testing or pointing at a sync folder
-- **`tct init`** — like `git init`: creates `.tct/` (plus a `README.md` explaining it) in the current directory, or at `$TCT_DATA_DIR` if that is set. Safe to re-run; an existing README is never overwritten
-- Only `~/.tct/` is created implicitly (with the same `README.md` as `tct init`). A `TCT_DATA_DIR` that does not exist is an error ("run `tct init`"), so a typo cannot silently start a fresh data directory
-- tct exits with an error if the current directory no longer exists (except `tct init` with `TCT_DATA_DIR` set)
-- **`tct init --git enable|disable`** — also decides on [git integration](#git-integration) and says what it chose: enabled when the new `.tct/` is inside a git repository that does not ignore it, disabled otherwise; the flag overrides, a re-init keeps an existing setting
-
-`TCT_DATA_DIR` is the *complete* path of the data directory — `.version` and `boards/` go directly into it, nothing is appended. It may be a symlink (your own choice; a *discovered* `.tct` must be a real directory).
-
-### Environment variables
-
-| Variable | Effect |
-|---|---|
-| `TCT_DATA_DIR` | Complete path of the data directory. Wins over the `.tct` search and `~/.tct`. Must exist — create it with `tct init`. |
-| `TCT_SKIP_CORRUPT` | Any value other than empty or `0`: skip unreadable board/card files and load the rest instead of failing. Single-file loads still fail. |
-| `TCT_WEB` | Set by the Docker/ttyd image: PDF export streams to the browser instead of asking for a path. |
-| `TERM`, `COLORTERM` | `COLORTERM=truecolor`/`24bit` gives full color, otherwise 256 colors; `TERM=linux` gets 16 colors and console-safe glyphs. |
-
-### File layout
-
-```
-.tct/
-  .version                         # Persistence format version (a single integer)
-  boards/
-    a1b2c3d4/                      # One directory per board — the name is the board's ID
-      board.json                   # Board metadata: name, inline lists, labels, accent color
-      card-11223344.json           # Card: list_id, position, title, description, checklist, labels, due date
-      card-55667788.json
-    b2c3d4e5/                      # Another board
-      board.json
-      ...
-```
-
-Lists are defined inline in `board.json`; there are no `list-*.json` files. A
-card owns its own list membership (`list_id`) and order (`position`), and a
-board owns its own place in the selector (`position`). A record's ID is its
-path — the board's directory name, the card's file name — so it is not
-repeated inside the file. This is deliberate:
-
-- **Granular diffs** — changing one card produces a one-file diff, not a monolithic database change
-- **Conflict-friendly** — two people editing different cards never conflict, even without locking
-- **Human-readable** — open any `.json` file in an editor to inspect or fix data
-- **No divergence** — a card's archived flag and its list membership live in one file, so they cannot disagree (see ADR-0006)
-
-### Setting up background sync
-
-#### With git (recommended for teams)
+### Your first board
 
 ```sh
-# In your project root:
-mkdir .tct
-echo ".tct/**/*.tmp" >> .gitignore   # Exclude atomic-write temp files
-
-# Use tct normally — boards are created inside .tct/
-tct boards --create "Sprint Board"
-
-# Commit and push
-git add .tct/
-git commit -m "Add project Kanban board"
-git push
+cd ~/projects/my-app
+tct init        # creates ./.tct, like `git init`
+tct             # opens the board selector; press n to create a board
 ```
 
-Team members who pull will see the board when they run `tct` from that project directory.
-
-#### Git integration
-
-tct can commit `.tct/` for you — explicitly, never in the background:
-
-```sh
-tct commit                  # commit .tct now (same as commit-on-quit)
-tct --git enable            # also commit when the TUI quits
-tct --git disable
-tct --git                   # show the setting
-```
-
-In the TUI board view, `C` commits now (works with commit-on-quit off). The CLI's other commands never commit.
-
-- **Only `.tct/` is committed** — whatever else you have staged stays staged and out of the commit.
-- **Messages use titles**: `Board "Sprint": card "Fix login" moved to "Done"` for a single change, `Board "Sprint": 3 cards updated` or `Boards "A", "B" updated` plus one line per change otherwise.
-- The setting is local git config (`tct.autocommit`), so each clone opts in separately; it is not stored in `.tct/`.
-- Commits skip hooks and signing so they never block, and are refused during a merge, rebase, cherry-pick or revert. A failed commit-on-quit prints a warning.
-- Needs `git` on the `PATH`, an identity (`user.name`/`user.email`), and a `.tct/` that is not git-ignored.
-
-#### With Dropbox / Syncthing / OneDrive
-
-```sh
-# Option 1: Put .tct/ inside a synced folder
-cd ~/Dropbox/my-project
-tct init
-tct
-
-# Option 2: Point TCT_DATA_DIR at a synced location
-export TCT_DATA_DIR=~/Dropbox/shared-boards
-tct
-```
-
-#### How sync safety works
-
-```mermaid
-sequenceDiagram
-    participant TUI as tct instance
-    participant FS as Filesystem
-    participant Sync as Sync Service<br>(git/Dropbox/etc.)
-
-    Note over TUI: User edits card
-    TUI->>FS: Write card-xyz.json.tmp
-    TUI->>FS: Rename .tmp → card-xyz.json
-    Note over FS: Atomic: readers never see partial content
-
-    Sync->>FS: External change arrives<br>(another user's edit)
-
-    Note over TUI: Every 15 seconds...
-    TUI->>FS: Reload board from disk
-    FS-->>TUI: Updated data
-    Note over TUI: Selection state preserved
-```
-
-Key safety properties:
-
-| Property | Mechanism |
-|----------|-----------|
-| **No partial reads** | Atomic write: `.tmp` then rename. Readers always see complete files. |
-| **No edit loss during reload** | Reload skipped while editing description, in dialogs, or in insert mode. |
-| **Selection preserved** | List/card selection indices survive reload. |
-| **No file locking needed** | One file per entity; only conflicting edits to the same card require manual merge. |
+Without `tct init`, boards live in `~/.tct/`. See [Where data lives](#where-data-lives).
 
 ---
 
@@ -621,6 +496,62 @@ tct cards "Sprint" --show a1b2c3d4 --by-id
 
 ---
 
+## Humans and AI agents
+
+tct is designed so that people and AI agents can work on the **same board**. There is no API server to run and no integration to configure: the board is a directory of JSON files, humans use the TUI, and agents use the CLI (or read the files).
+
+| | Humans | Agents and scripts |
+|---|---|---|
+| Interface | TUI (`tct`) | CLI (`tct cards …`) |
+| Reads | Board view, card detail | `tct cards <board>`, `--show`, `tct search`, or the JSON files |
+| Writes | Keyboard | `--create`, `--edit`, `--toggle`, `--assign`, … |
+| Sees the other's changes | Automatically, within 15 seconds | On the next command |
+
+Why this works well:
+
+- **Self-documenting.** `tct --help` is a short overview; `tct --help cli`, `examples` and `env` give the full reference, and `tct --help user-guide --toc` / `--section <heading>` print this guide piece by piece. An agent needs no external documentation.
+- **Forgiving addressing.** Boards, lists, cards and labels match by case-insensitive partial name; ambiguity is an error that lists the candidates with their IDs. Use `--by-id` for exact matches.
+- **Predictable.** Errors go to stderr with a non-zero exit status. Control characters in titles are stripped from output, so a hostile card title cannot inject terminal escape sequences into an agent's or a human's terminal.
+- **Live for humans.** The TUI reloads from disk every 15 seconds, so a card an agent creates appears on the human's screen without a restart. A reload never interrupts editing.
+- **Reviewable.** Every card keeps a change history (`h` in the TUI), and `tct commit` records changes to `.tct/` in git, with a message that names the boards and cards touched. Nothing is committed in the background; the agent or human decides when.
+
+### Example: an agent works through a task
+
+```sh
+# Pick up work
+tct cards "Sprint" --list "To Do"
+tct cards "Sprint" --show "caching"
+
+# Plan it
+tct checklist "Sprint" "caching" --add "Set up Redis connection"
+tct checklist "Sprint" "caching" --add "Add cache middleware"
+tct checklist "Sprint" "caching" --add "Write integration tests"
+
+# Report progress
+tct checklist "Sprint" "caching" --toggle 1
+tct cards "Sprint" --edit "caching" --description "Redis for /api/users; TTL 60 s."
+
+# Record it
+tct commit
+```
+
+### Tell your agent about tct
+
+Put a few lines in your agent instructions (`AGENTS.md`, `CLAUDE.md`, …):
+
+```md
+Track work on the tct board in `.tct/` (run `tct --help user-guide --section
+"Humans and AI agents"` for how). Before starting, read your card with
+`tct cards <board> --show <card>`; tick checklist items as you go; run
+`tct commit` when you finish.
+```
+
+### Safety notes for shared repositories
+
+`tct` treats every file under a discovered `.tct/` as untrusted: IDs are validated, symlinks are refused, and output is sanitized. Agents should still use the CLI instead of editing the JSON by hand, because the CLI keeps the per-card list membership, order and history consistent.
+
+---
+
 ## Workflows
 
 ### Solo developer — project-local board
@@ -675,23 +606,160 @@ for test in $(cat failing_tests.txt); do
 done
 ```
 
+
 ### AI agent integration
 
-The CLI's partial-name matching and `--by-id` mode make it suitable for LLM/AI agent workflows:
+See [Humans and AI agents](#humans-and-ai-agents).
+
+---
+
+## Storage and Sync
+
+### Where data lives
+
+tct resolves its data directory in this order:
+
+```mermaid
+flowchart TD
+    A([tct starts]) --> B{TCT_DATA_DIR<br>env var set?}
+    B -->|Yes| C["Use $TCT_DATA_DIR"]
+    B -->|No| D{"Walk up from CWD:<br>does .tct/ exist<br>in any ancestor?"}
+    D -->|Found| E["Use nearest .tct/"]
+    D -->|Not found| F["Use ~/.tct/<br>(created automatically)"]
+
+    style C fill:#3a6b35,stroke:#fff,color:#fff
+    style E fill:#2d5a88,stroke:#fff,color:#fff
+    style F fill:#555,stroke:#fff,color:#fff
+```
+
+This means:
+
+- **Global boards** live in `~/.tct/` — your personal default
+- **Project-local boards** live in a `.tct/` directory inside (or above) your project — shared with anyone who clones the repo
+- **Custom location** via `TCT_DATA_DIR` — useful for testing or pointing at a sync folder
+- **`tct init`** — like `git init`: creates `.tct/` (plus a `README.md` explaining it) in the current directory, or at `$TCT_DATA_DIR` if that is set. Safe to re-run; an existing README is never overwritten
+- Only `~/.tct/` is created implicitly (with the same `README.md` as `tct init`). A `TCT_DATA_DIR` that does not exist is an error ("run `tct init`"), so a typo cannot silently start a fresh data directory
+- tct exits with an error if the current directory no longer exists (except `tct init` with `TCT_DATA_DIR` set)
+- **`tct init --git enable|disable`** — also decides on [git integration](#git-integration) and says what it chose: enabled when the new `.tct/` is inside a git repository that does not ignore it, disabled otherwise; the flag overrides, a re-init keeps an existing setting
+
+`TCT_DATA_DIR` is the *complete* path of the data directory — `.version` and `boards/` go directly into it, nothing is appended. It may be a symlink (your own choice; a *discovered* `.tct` must be a real directory).
+
+### Environment variables
+
+| Variable | Effect |
+|---|---|
+| `TCT_DATA_DIR` | Complete path of the data directory. Wins over the `.tct` search and `~/.tct`. Must exist — create it with `tct init`. |
+| `TCT_SKIP_CORRUPT` | Any value other than empty or `0`: skip unreadable board/card files and load the rest instead of failing. Single-file loads still fail. |
+| `TCT_WEB` | Set by the Docker/ttyd image: PDF export streams to the browser instead of asking for a path. |
+| `TERM`, `COLORTERM` | `COLORTERM=truecolor`/`24bit` gives full color, otherwise 256 colors; `TERM=linux` gets 16 colors and console-safe glyphs. |
+
+### File layout
+
+```
+.tct/
+  .version                         # Persistence format version (a single integer)
+  boards/
+    a1b2c3d4/                      # One directory per board — the name is the board's ID
+      board.json                   # Board metadata: name, inline lists, labels, accent color
+      card-11223344.json           # Card: list_id, position, title, description, checklist, labels, due date
+      card-55667788.json
+    b2c3d4e5/                      # Another board
+      board.json
+      ...
+```
+
+Lists are defined inline in `board.json`; there are no `list-*.json` files. A
+card owns its own list membership (`list_id`) and order (`position`), and a
+board owns its own place in the selector (`position`). A record's ID is its
+path — the board's directory name, the card's file name — so it is not
+repeated inside the file. This is deliberate:
+
+- **Granular diffs** — changing one card produces a one-file diff, not a monolithic database change
+- **Conflict-friendly** — two people editing different cards never conflict, even without locking
+- **Human-readable** — open any `.json` file in an editor to inspect or fix data
+- **No divergence** — a card's archived flag and its list membership live in one file, so they cannot disagree (see ADR-0006)
+
+### Setting up background sync
+
+#### With git (recommended for teams)
 
 ```sh
-# Agent creates a task
-tct cards "Sprint" --create "To Do" "Implement caching layer"
+# In your project root:
+mkdir .tct
+echo ".tct/**/*.tmp" >> .gitignore   # Exclude atomic-write temp files
 
-# Agent adds details
-tct cards "Sprint" --edit "caching" --description "Add Redis caching for /api/users endpoint"
-tct checklist "Sprint" "caching" --add "Set up Redis connection"
-tct checklist "Sprint" "caching" --add "Add cache middleware"
-tct checklist "Sprint" "caching" --add "Write integration tests"
+# Use tct normally — boards are created inside .tct/
+tct boards --create "Sprint Board"
 
-# Agent marks progress
-tct checklist "Sprint" "caching" --toggle 1
+# Commit and push
+git add .tct/
+git commit -m "Add project Kanban board"
+git push
 ```
+
+Team members who pull will see the board when they run `tct` from that project directory.
+
+#### Git integration
+
+tct can commit `.tct/` for you — explicitly, never in the background:
+
+```sh
+tct commit                  # commit .tct now (same as commit-on-quit)
+tct --git enable            # also commit when the TUI quits
+tct --git disable
+tct --git                   # show the setting
+```
+
+In the TUI board view, `C` commits now (works with commit-on-quit off). The CLI's other commands never commit.
+
+- **Only `.tct/` is committed** — whatever else you have staged stays staged and out of the commit.
+- **Messages use titles**: `Board "Sprint": card "Fix login" moved to "Done"` for a single change, `Board "Sprint": 3 cards updated` or `Boards "A", "B" updated` plus one line per change otherwise.
+- The setting is local git config (`tct.autocommit`), so each clone opts in separately; it is not stored in `.tct/`.
+- Commits skip hooks and signing so they never block, and are refused during a merge, rebase, cherry-pick or revert. A failed commit-on-quit prints a warning.
+- Needs `git` on the `PATH`, an identity (`user.name`/`user.email`), and a `.tct/` that is not git-ignored.
+
+#### With Dropbox / Syncthing / OneDrive
+
+```sh
+# Option 1: Put .tct/ inside a synced folder
+cd ~/Dropbox/my-project
+tct init
+tct
+
+# Option 2: Point TCT_DATA_DIR at a synced location
+export TCT_DATA_DIR=~/Dropbox/shared-boards
+tct
+```
+
+#### How sync safety works
+
+```mermaid
+sequenceDiagram
+    participant TUI as tct instance
+    participant FS as Filesystem
+    participant Sync as Sync Service<br>(git/Dropbox/etc.)
+
+    Note over TUI: User edits card
+    TUI->>FS: Write card-xyz.json.tmp
+    TUI->>FS: Rename .tmp → card-xyz.json
+    Note over FS: Atomic: readers never see partial content
+
+    Sync->>FS: External change arrives<br>(another user's edit)
+
+    Note over TUI: Every 15 seconds...
+    TUI->>FS: Reload board from disk
+    FS-->>TUI: Updated data
+    Note over TUI: Selection state preserved
+```
+
+Key safety properties:
+
+| Property | Mechanism |
+|----------|-----------|
+| **No partial reads** | Atomic write: `.tmp` then rename. Readers always see complete files. |
+| **No edit loss during reload** | Reload skipped while editing description, in dialogs, or in insert mode. |
+| **Selection preserved** | List/card selection indices survive reload. |
+| **No file locking needed** | One file per entity; only conflicting edits to the same card require manual merge. |
 
 ---
 
