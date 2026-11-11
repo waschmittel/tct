@@ -22,7 +22,7 @@ arboard = "3.7"
 unicode-width = "0.2"
 # PDF/A export (embedded DejaVu fonts, validated at finish)
 # Language detection of a card for the PDF (quotes, alert titles)
-whatlang = "0.18.0"
+whichlang = "0.1.1"
 krilla = { version = "0.8", default-features = false, features = ["simple-text"] }
 skrifa = "0.49"
 kurbo = { version = "0.13.1", default-features = false, features = ["std"] }

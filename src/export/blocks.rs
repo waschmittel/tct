@@ -192,7 +192,7 @@ fn title(kind: Alert, lang: Lang) -> Block {
         quote_depth: 0,
         alert: Some(InAlert { kind, title: true }),
         runs: vec![Run {
-            text: lang.alert_title(kind).to_uppercase(),
+            text: lang.alert_title_upper(kind),
             style,
         }],
     }

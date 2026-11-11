@@ -11,6 +11,7 @@ them after changing the layout; the dates inside change on every run.
 | `01-empty-card` | No title, description or checklist |
 | `02-very-long-title` | Title wrapping over many lines |
 | `03-unicode-and-missing-glyphs` | Umlauts, symbols, glyphs the fonts lack (`?`), tabs, control characters |
+| `03b-german-quotes-and-alert-titles`, `03c-french-guillemets`, `03d-spanish-guillemets`, `03e-italian-guillemets`, `03f-dutch-quotes`, `03g-portuguese-quotes`, `03h-swedish-quotes`, `03i-turkish-quotes` | One card per detected language (ADR-0018): typographic quotes (code untouched) and translated alert titles; English is the default and needs no example |
 | `04-unbreakable-words` | Words wider than the page in text, list, quote and inline code |
 | `05-wide-table` | Ten columns: padding and type shrink before words are broken |
 | `06-long-table-repeats-header` | 150 rows over several pages with the header repeated |

@@ -75,6 +75,54 @@ pub(super) fn corner_cases() -> Vec<(&'static str, BoardMeta, Card)> {
             ),
         ));
     cases.push((
+        "03d-spanish-guillemets",
+        meta.clone(),
+        plain(
+            "Comillas españolas",
+            "Ella dijo \"hola\" y nos fuimos a casa, porque es la vida que hemos elegido juntos con los niños.\n\n> [!caution]\n> Una \"precaución\" para todos los lectores.\n\n```\nlet s = \"sin cambios\";\n```".into(),
+        ),
+    ));
+    cases.push((
+        "03e-italian-guillemets",
+        meta.clone(),
+        plain(
+            "Virgolette italiane",
+            "Lei disse \"ciao\" e siamo tornati a casa, perché è la vita che abbiamo scelto insieme ai bambini.\n\n> [!important]\n> Un \"avviso\" importante per tutti i lettori.\n\n```\nlet s = \"invariato\";\n```".into(),
+        ),
+    ));
+    cases.push((
+        "03f-dutch-quotes",
+        meta.clone(),
+        plain(
+            "Nederlandse aanhalingstekens",
+            "Zij zei \"hallo\" en we gingen naar huis, want dat is het leven dat we samen met de kinderen hebben gekozen.\n\n> [!warning]\n> Een \"waarschuwing\" voor alle lezers.\n\n```\nlet s = \"ongewijzigd\";\n```".into(),
+        ),
+    ));
+    cases.push((
+        "03g-portuguese-quotes",
+        meta.clone(),
+        plain(
+            "Aspas portuguesas",
+            "Ela disse \"olá\" e fomos para casa, porque é a vida que escolhemos juntos com as crianças.\n\n> [!tip]\n> Uma \"dica\" para todos os leitores.\n\n```\nlet s = \"inalterado\";\n```".into(),
+        ),
+    ));
+    cases.push((
+        "03h-swedish-quotes",
+        meta.clone(),
+        plain(
+            "Svenska citattecken",
+            "Hon sa \"hej\" och vi gick hem, för det är livet som vi har valt tillsammans med barnen.\n\n> [!caution]\n> En \"varning\" till alla läsare i huset.\n\n```\nlet s = \"oförändrad\";\n```".into(),
+        ),
+    ));
+    cases.push((
+        "03i-turkish-quotes",
+        meta.clone(),
+        plain(
+            "Türkçe tırnak işaretleri",
+            "O \"merhaba\" dedi ve biz eve gittik, çünkü bu çocuklarla birlikte seçtiğimiz hayattır.\n\n> [!important]\n> Tüm okuyucular için \"önemli\" bir not.\n\n```\nlet s = \"değişmedi\";\n```".into(),
+        ),
+    ));
+    cases.push((
         "04-unbreakable-words",
         meta.clone(),
         plain(
@@ -332,6 +380,12 @@ fn corner_cases_are_set_in_their_language() {
         let expected = match name {
             "03b-german-quotes-and-alert-titles" => Some(Lang::De),
             "03c-french-guillemets" => Some(Lang::Fr),
+            "03d-spanish-guillemets" => Some(Lang::Es),
+            "03e-italian-guillemets" => Some(Lang::It),
+            "03f-dutch-quotes" => Some(Lang::Nl),
+            "03g-portuguese-quotes" => Some(Lang::Pt),
+            "03h-swedish-quotes" => Some(Lang::Sv),
+            "03i-turkish-quotes" => Some(Lang::Tr),
             _ => None,
         };
         if let Some(lang) = expected {

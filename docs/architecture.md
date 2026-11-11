@@ -27,7 +27,7 @@ src/
   text_diff.rs       # Line diff for the history detail pane
   export/
     mod.rs           # Card export entry point (`card_pdf`)
-    lang.rs          # Language detection (whatlang): quotes, alert titles (ADR-0018)
+    lang.rs          # Language detection (whichlang): quotes, alert titles (ADR-0018)
     blocks.rs        # Description markdown -> blocks/runs for the PDF layout (`>>>` multiline quotes, ADR-0015; alerts, ADR-0016)
     pdf/             # Layout + PDF/A-2b emission (krilla, bundled DejaVu fonts); Mono/Color themes (ADR-0014), matrix tables (ADR-0013)
       mod.rs         # Constants, draw ops, `Flow` state, `render`/`render_at`
