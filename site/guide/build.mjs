@@ -101,7 +101,9 @@ const page = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="The complete tct user guide: the TUI, the editor, the CLI, working with AI agents, sync and data formats.">
-<meta name="theme-color" content="#14141e">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fafbfc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c1018" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../style.css">
 <link rel="stylesheet" href="guide.css">

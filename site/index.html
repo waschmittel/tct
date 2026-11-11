@@ -7,7 +7,9 @@
 <meta name="description" content="A keyboard-driven Kanban board for your terminal. Plain JSON files, git-friendly, scriptable CLI, PDF export. One binary, no server.">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<meta name="theme-color" content="#11161f">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fafbfc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c1018" media="(prefers-color-scheme: dark)">
 <meta property="og:title" content="tct — Terminal Card Tracker">
 <meta property="og:description" content="Keyboard-driven Kanban in your terminal. Plain JSON files, git-friendly, scriptable, PDF export.">
 <meta property="og:type" content="website">
@@ -16,12 +18,12 @@
 <body>
 <nav><div class="wrap">
   <a class="brand" href="#top"><img src="icon.svg" alt="" width="26" height="26"><span>tct<span>_</span></span></a>
-  <a class="l" href="#agents">Agents</a>
   <a class="l" href="#tour-shots">Screens</a>
   <a class="l" href="#install">Install</a>
   <a class="l" href="#cli">CLI</a>
   <a class="l" href="#sync">Sync</a>
   <a class="l" href="#pdf">PDF</a>
+  <a class="l" href="#agents">Agents</a>
   <a class="l" href="#faq">FAQ</a>
   <a class="l strong" href="guide/">User guide</a>
 </div></nav>
@@ -29,14 +31,14 @@
 <header class="hero" id="top"><div class="wrap">
   <img class="logo" src="icon.svg" alt="tct logo: a Kanban board with three columns" width="96" height="96">
   <p class="eyebrow">Terminal Card Tracker</p>
-  <h1>One board for <em>you and your AI agents</em>.</h1>
-  <p class="lead">You work in a fast, keyboard-driven Kanban TUI. Your agents and scripts use the CLI. Same plain JSON files, same board — in your terminal and in your repo. One binary, no server, no account.</p>
+  <h1>Kanban for people who <em>live in the terminal</em>.</h1>
+  <p class="lead">Think Trello, but keyboard-first and made of plain files. One binary, no server, no account — boards sync through git, Dropbox or whatever you already use.</p>
   <div class="cta">
     <a class="btn primary" href="#install">Get started</a>
     <a class="btn" href="guide/">Read the user guide</a>
     <a class="btn" href="https://github.com/waschmittel/tct">GitHub</a>
   </div>
-  <ul class="pills"><li>Rust</li><li>single binary</li><li>JSON on disk</li><li>TUI + CLI</li><li>agent-ready</li><li>MIT</li></ul>
+  <ul class="pills"><li>Rust</li><li>single binary</li><li>JSON on disk</li><li>TUI + CLI</li><li>MIT</li></ul>
   <div class="window">
     <div class="bar"><i></i><i></i><i></i><b>tct</b></div>
     <img src="demo.gif" alt="Animated demo of tct: navigating a board, moving cards, editing a card with a markdown description" width="1200" height="700" loading="eager">
@@ -44,43 +46,6 @@
 </div></header>
 
 <main class="wrap">
-
-<section id="agents">
-  <p class="eyebrow">Humans + agents</p>
-  <h2>Built to be shared with your agents.</h2>
-  <p class="lead">There's no API server to run and no plugin to install. The board is a directory of JSON files: you use the TUI, agents use the CLI, and tct reloads from disk every 15 seconds, so an agent's new card shows up on your screen.</p>
-  <div class="flowrow">
-    <div class="who"><b>You</b><span>TUI · <code>tct</code></span></div>
-    <div class="arrow">⇄</div>
-    <div class="who files"><b>.tct/</b><span>plain JSON, in git</span></div>
-    <div class="arrow">⇄</div>
-    <div class="who"><b>Agents &amp; scripts</b><span>CLI · <code>tct cards …</code></span></div>
-  </div>
-  <div class="split">
-    <div class="window copy"><div class="bar"><i></i><i></i><i></i><b>an agent, working a card</b></div><pre><span class="c"># read the task</span>
-<span class="p">$</span> tct cards <span class="s">"Sprint"</span> --show <span class="s">"caching"</span>
-
-<span class="c"># plan it, then report progress</span>
-<span class="p">$</span> tct checklist <span class="s">"Sprint"</span> <span class="s">"caching"</span> --add <span class="s">"Write tests"</span>
-<span class="p">$</span> tct checklist <span class="s">"Sprint"</span> <span class="s">"caching"</span> --toggle 1
-
-<span class="c"># record it in git (only .tct/ is committed)</span>
-<span class="p">$</span> tct commit</pre></div>
-    <div class="window"><div class="bar"><i></i><i></i><i></i><b>you, a few seconds later</b></div><img src="img/shot-board.webp" width="1240" height="960" loading="lazy" alt="The board in the tct TUI, as seen by the human"></div>
-  </div>
-  <div class="grid">
-    <div class="card"><h3><span class="ic">📖</span>Self-documenting</h3><p><code>tct --help user-guide --section …</code> prints any part of the guide. An agent needs no outside docs.</p></div>
-    <div class="card"><h3><span class="ic">🎯</span>Forgiving &amp; predictable</h3><p>Partial, case-insensitive names; ambiguity lists candidates with IDs; <code>--by-id</code> for exact. Errors on stderr, exit status 1.</p></div>
-    <div class="card"><h3><span class="ic">🔍</span>Reviewable</h3><p>Every card keeps a change history, and <code>tct commit</code> names the boards and cards touched. Nothing is committed in the background.</p></div>
-    <div class="card"><h3><span class="ic">🛡️</span>Safe by design</h3><p>Control characters are stripped from output, IDs are validated and symlinks refused, even for a <code>.tct/</code> from a cloned repo.</p></div>
-  </div>
-  <h3 style="margin-top:2.2rem">Tell your agent about tct</h3>
-  <p>Add a few lines to <code>AGENTS.md</code> or <code>CLAUDE.md</code>:</p>
-  <div class="window copy"><pre>Track work on the tct board in <span class="s">`.tct/`</span> (run <span class="s">`tct --help user-guide --section "Humans and AI agents"`</span>
-for how). Before starting, read your card with <span class="s">`tct cards &lt;board&gt; --show &lt;card&gt;`</span>;
-tick checklist items as you go; run <span class="s">`tct commit`</span> when you finish.</pre></div>
-  <p class="lead note">Details in the <a href="guide/#humans-and-ai-agents">user guide</a>.</p>
-</section>
 
 <section id="tour-shots">
   <p class="eyebrow">In action</p>
@@ -307,6 +272,32 @@ mv tct /usr/local/bin/</pre></div>
     <p class="lead note">Same card, same text. The PDF adds proper typography, a running footer, and footnotes at the bottom of the page that cites them. Tables and matrices are drawn booktabs-style.</p>
   </div>
   <p class="lead note">More samples: <a href="export/color/15-alerts.pdf">alerts</a> · <a href="export/16-footnotes.pdf">footnotes</a> · <a href="export/14-matrix.pdf">matrix tables</a> · <a href="export/00-showcase.pdf">kitchen-sink showcase</a>. Or from the shell: <code>tct cards "Release 2.0" --export "planning" --style color</code>.</p>
+</section>
+
+<section id="agents">
+  <p class="eyebrow">Also for agents</p>
+  <h2>Works with AI agents, too.</h2>
+  <p class="lead">Because boards are plain files and everything is scriptable, an AI agent can share a board with you: you use the TUI, the agent uses the CLI, and tct reloads from disk every 15 seconds so its changes show up on your screen. Nothing to host, nothing to configure.</p>
+  <div class="split">
+    <div class="window copy"><div class="bar"><i></i><i></i><i></i><b>an agent, working a card</b></div><pre><span class="c"># read the task</span>
+<span class="p">$</span> tct cards <span class="s">"Sprint"</span> --show <span class="s">"caching"</span>
+
+<span class="c"># plan it, then report progress</span>
+<span class="p">$</span> tct checklist <span class="s">"Sprint"</span> <span class="s">"caching"</span> --add <span class="s">"Write tests"</span>
+<span class="p">$</span> tct checklist <span class="s">"Sprint"</span> <span class="s">"caching"</span> --toggle 1
+
+<span class="c"># record it in git (only .tct/ is committed)</span>
+<span class="p">$</span> tct commit</pre></div>
+    <div>
+      <p>The binary documents itself (<code>tct --help user-guide --section …</code>), names match partially, and errors go to stderr with exit status 1. Every card keeps a change history, and output is sanitized so a hostile card title can't inject escape sequences.</p>
+      <p>Tell your agent about it in <code>AGENTS.md</code> or <code>CLAUDE.md</code>:</p>
+      <div class="window copy"><pre>Track work on the tct board in <span class="s">`.tct/`</span> (see
+<span class="s">`tct --help user-guide --section "Humans and AI agents"`</span>).
+Read your card with <span class="s">`tct cards &lt;board&gt; --show &lt;card&gt;`</span>, tick checklist
+items as you go, run <span class="s">`tct commit`</span> when you finish.</pre></div>
+      <p class="lead note">More in the <a href="guide/#humans-and-ai-agents">user guide</a>.</p>
+    </div>
+  </div>
 </section>
 
 <section id="faq">

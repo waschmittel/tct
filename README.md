@@ -2,9 +2,7 @@
 
 # tct — Terminal Card Tracker
 
-A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your terminal — and **shared between you and your AI agents**.
-
-Humans work in the TUI, agents and scripts in the headless CLI, and both edit the same boards (see [Humans and AI agents](#humans-and-ai-agents)).
+A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your terminal.
 
 tct stores everything as **plain JSON files** — one file per board and one per card (lists live inline in the board file). Put them in a git repo, Dropbox, or any synced folder and every team member sees the same boards. tct watches the filesystem and picks up changes automatically, making it a natural fit for **background file sync** workflows.
 
@@ -57,7 +55,6 @@ cargo run
 - **Files are the API** — every board and card is a standalone JSON file. Human-readable, git-friendly, scriptable.
 - **Sync-friendly by default** — one file per entity, atomic writes, periodic reload. Works with git, Dropbox, Syncthing, or any file sync tool.
 - **Keyboard-first** — every action reachable via keyboard. Modal input (like Vim) keeps bindings contextual and safe.
-- **Built for humans *and* agents** — the TUI and the CLI edit the same files, the binary documents itself (`tct --help user-guide`), and changes show up live on the human's screen.
 - **Dual interface** — interactive TUI for humans, headless CLI for scripts and AI agents. Same data.
 - **Zero infrastructure** — single binary. No database. No server. No account.
 
@@ -82,23 +79,6 @@ cargo run
 - Periodic filesystem reload (every 15s) for background sync support
 - PDF export of a card (PDF/A, fonts embedded, nothing to install) — black and gray for monochrome printers by default, or in color; long descriptions break across pages sensibly (see below)
 - Full CLI interface for scripting and AI agent use (`tct --help`)
-
-## Humans and AI agents
-
-The goal: **people and AI agents working on the same board.** Humans use the TUI; agents and scripts use the CLI. There is nothing to host and nothing to configure — both sides read and write the same JSON files, and the TUI reloads every 15 seconds so an agent's new card appears on your screen.
-
-```sh
-tct cards "Sprint" --show "caching"                     # read the task
-tct checklist "Sprint" "caching" --add "Write tests"    # plan
-tct checklist "Sprint" "caching" --toggle 1             # report progress
-tct commit                                              # record it in git
-```
-
-- Partial, case-insensitive name matching (and `--by-id` when exact); errors go to stderr with exit status 1.
-- The binary documents itself: `tct --help user-guide --toc` and `--section <heading>` print the guide piece by piece.
-- Output is sanitized, and everything under a discovered `.tct/` is treated as untrusted.
-
-More, including a snippet for your `AGENTS.md`: `tct --help user-guide --section "Humans and AI agents"`.
 
 ## CLI Usage
 
@@ -244,6 +224,23 @@ Team members who pull will see the board when they run `tct` from that project d
 For detailed sync workflows (git, Dropbox, Syncthing), see the [User Guide](docs/user-guide.md).
 
 All keybindings are discoverable in the TUI via the `?` help overlay, which is contextual to the current mode (or `F1` / `Ctrl+H` when editing a description).
+
+## Using tct with AI agents
+
+tct also works well when an AI agent shares a board with you: you use the TUI, the agent uses the CLI. There is nothing to host and nothing to configure — both sides read and write the same JSON files, and the TUI reloads every 15 seconds so an agent's new card appears on your screen.
+
+```sh
+tct cards "Sprint" --show "caching"                     # read the task
+tct checklist "Sprint" "caching" --add "Write tests"    # plan
+tct checklist "Sprint" "caching" --toggle 1             # report progress
+tct commit                                              # record it in git
+```
+
+- Partial, case-insensitive name matching (and `--by-id` when exact); errors go to stderr with exit status 1.
+- The binary documents itself: `tct --help user-guide --toc` and `--section <heading>` print the guide piece by piece.
+- Output is sanitized, and everything under a discovered `.tct/` is treated as untrusted.
+
+More, including a snippet for your `AGENTS.md`: `tct --help user-guide --section "Humans and AI agents"`.
 
 ## Documentation
 

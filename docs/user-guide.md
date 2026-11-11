@@ -4,7 +4,7 @@
 
 tct is a keyboard-driven Kanban board that lives in your terminal. It stores everything as plain JSON files on disk — no server, no database, no account.
 
-tct is built for **humans and AI agents working on the same board**: people use the TUI, agents and scripts use the CLI, and both read and write the same files (see [Humans and AI agents](#humans-and-ai-agents)).
+The TUI is for people, the CLI for scripts — and for AI agents that share a board with you (see [Humans and AI agents](#humans-and-ai-agents)).
 
 This matters because it means tct boards are **just files**. Put them in a git repo, a Dropbox folder, or any synced directory and every team member sees the same boards. tct watches the filesystem and picks up changes automatically, making it a natural fit for **background file sync** workflows.
 
@@ -498,7 +498,7 @@ tct cards "Sprint" --show a1b2c3d4 --by-id
 
 ## Humans and AI agents
 
-tct is designed so that people and AI agents can work on the **same board**. There is no API server to run and no integration to configure: the board is a directory of JSON files, humans use the TUI, and agents use the CLI (or read the files).
+tct also works well when people and AI agents share a **board**. There is no API server to run and no integration to configure: the board is a directory of JSON files, humans use the TUI, and agents use the CLI (or read the files).
 
 | | Humans | Agents and scripts |
 |---|---|---|

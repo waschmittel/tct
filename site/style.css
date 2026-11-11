@@ -151,8 +151,3 @@ details p { margin: .6rem 0 0; color: var(--muted); }
 nav .brand { display: flex; align-items: center; gap: .5rem; }
 nav a.l.strong { color: var(--fg); font-weight: 600; }
 .hero .logo { width: 96px; height: 96px; margin-bottom: 1.2rem; filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--accent) 35%, transparent)); }
-.flowrow { display: flex; flex-wrap: wrap; gap: 1rem; align-items: stretch; justify-content: center; margin: 2rem 0 0; }
-.flowrow .who { display: flex; flex-direction: column; gap: .2rem; min-width: 11rem; text-align: center; padding: 1rem 1.4rem; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
-.flowrow .who b { font-size: 1.1rem; } .flowrow .who span { color: var(--muted); font-size: .9rem; }
-.flowrow .files { border-color: var(--accent); }
-.flowrow .arrow { align-self: center; font-size: 1.6rem; color: var(--accent); }
