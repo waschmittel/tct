@@ -37,6 +37,9 @@ HELP TOPICS:
         --toc                        Only the table of contents
         --section <heading>          Only that section (case-insensitive, partial match)
     e.g. `tct --help user-guide --toc`, `tct --help user-guide --section \"CLI Reference\"`.
+
+Website: https://waschmittel.github.io/tct/
+Source:  https://github.com/waschmittel/tct
 ";
 
 const CLI: &str = "\
@@ -385,6 +388,12 @@ mod tests {
             run(&s(&["--help", name])).unwrap();
         }
         run(&s(&["--help"])).unwrap();
+    }
+
+    #[test]
+    fn overview_links_website_and_repo() {
+        assert!(OVERVIEW.contains("https://waschmittel.github.io/tct/"));
+        assert!(OVERVIEW.contains("https://github.com/waschmittel/tct"));
     }
 
     #[test]
