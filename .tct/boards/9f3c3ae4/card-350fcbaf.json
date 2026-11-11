@@ -1,0 +1,33 @@
+{
+  "list_id": "91077b69",
+  "position": 1.0,
+  "title": "swap matrix in table",
+  "description": "",
+  "label_ids": [
+    "df88cb04"
+  ],
+  "due_date": null,
+  "checklist": [],
+  "archived": true,
+  "created_at": "2026-11-11T12:19:54.494090Z",
+  "updated_at": "2026-11-11T12:37:24.642210Z",
+  "history": [
+    {
+      "at": "2026-11-11T12:19:54.494110Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-11T12:19:56.923695Z",
+      "action": "Added label 'idea'",
+      "field": "labels",
+      "old": "",
+      "new": "idea"
+    },
+    {
+      "at": "2026-11-11T12:37:24.642210Z",
+      "action": "Archived",
+      "field": "general"
+    }
+  ]
+}
