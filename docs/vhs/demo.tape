@@ -21,7 +21,7 @@ Set Padding 10
 Hide
 # Fixed data dir (not mktemp): the path shows bottom-right in the status
 # bar, so it must be deterministic for the frame-text golden.
-Type `cargo build -q && cp target/debug/tct ./tct && export TCT_DATA_DIR="/tmp/tct-vhs-demo" && rm -rf "$TCT_DATA_DIR" && mkdir -p "$TCT_DATA_DIR" && TCT=./tct ./docs/vhs/seed.sh >/dev/null && clear`
+Type `cargo build -q && cp target/debug/tct ./tct && export TCT_DATA_DIR="/tmp/tct-vhs-demo" && rm -rf "$TCT_DATA_DIR" && mkdir -p "$TCT_DATA_DIR" && TCT=./tct ./docs/vhs/seed.sh >/dev/null && mkdir -p /tmp/tct-vhs-cwd/Documents /tmp/tct-vhs-cwd/Desktop && mv ./tct /tmp/tct-vhs-cwd/tct && cd /tmp/tct-vhs-cwd && clear`
 Enter
 Sleep 3s
 Show
@@ -265,6 +265,7 @@ Sleep 600ms
 Left 3
 Ctrl+E
 Sleep 1s
+Right 2
 
 # Footnotes: Ctrl+N adds [^1] here and jumps to its definition at the bottom;
 # type the note, then Ctrl+N again jumps back to the reference
@@ -274,6 +275,28 @@ Sleep 600ms
 Type "Shown at the bottom of the page in the PDF."
 Sleep 800ms
 Ctrl+N
+Sleep 1s
+
+# Undo / redo: a typing burst is one undo step (Ctrl+Z), Ctrl+Y brings it back
+Enter
+Type "This whole sentence goes away in a single undo step."
+Sleep 1s
+Ctrl+Z
+Sleep 1.2s
+Ctrl+Y
+Sleep 1.2s
+
+# Paste mode (Ctrl+P): keys insert plain text, no list continuation; leaving it
+# tidies lists and tables in one undo step
+Enter
+Enter
+Ctrl+P
+Sleep 800ms
+Type "- raw item"
+Enter
+Type "- stays a plain line"
+Sleep 800ms
+Ctrl+P
 Sleep 1s
 
 # Save without closing (Ctrl+S), then save and close (Ctrl+Q)
@@ -384,6 +407,13 @@ Sleep 1.5s
 Type "c"
 Sleep 500ms
 Type "d"
+Sleep 800ms
+
+# Export the card as PDF (P = color, p = monochrome): the dialog suggests the
+# card title as file name and names the detected language bottom right
+Type "P"
+Sleep 2s
+Escape
 Sleep 800ms
 
 # Help overlay
