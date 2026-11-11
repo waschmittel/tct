@@ -123,7 +123,11 @@ details p { margin: .6rem 0 0; color: var(--muted); }
 .carousel { margin-top: 2rem; }
 .track { position: relative; display: flex; gap: 1.2rem; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: .5rem .25rem 1rem; outline-offset: 4px; }
 .track::-webkit-scrollbar { display: none; }
-.track figure { flex: 0 0 min(100%, 880px); margin: 0 auto; scroll-snap-align: center; }
+.track figure { flex: 0 0 100%; margin: 0; scroll-snap-align: center; scroll-snap-stop: always; }
+/* Screenshots are 1240x960; size the frame from the viewport height so a slide never exceeds it. */
+.track .window { width: min(100%, calc(min(58vh, 680px) * 1.2917)); margin: 0 auto; }
+.track img { width: 100%; height: auto; aspect-ratio: 1240 / 960; }
+.track figcaption { max-width: 46rem; margin-left: auto; margin-right: auto; }
 .track figcaption, .pair figcaption { margin-top: .9rem; color: var(--muted); font-size: .98rem; text-align: center; }
 .track figcaption b { display: block; color: var(--fg); font-size: 1.1rem; }
 .ctrl { display: flex; align-items: center; justify-content: center; gap: 1rem; }
