@@ -2,13 +2,11 @@
 
 # tct — Terminal Card Tracker
 
-**📖 [Website & user guide → waschmittel.github.io/tct](https://waschmittel.github.io/tct/)** · [GitHub](https://github.com/waschmittel/tct)
+**Kanban for people who live in the terminal.**
 
-A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your terminal.
+Think Trello, but keyboard-first and made of plain files. One binary, no server, no account — boards sync through **git**, Dropbox or whatever you already use.
 
-tct stores everything as **plain JSON files** — one file per board and one per card (lists live inline in the board file). Put them in a git repo, Dropbox, or any synced folder and every team member sees the same boards. tct watches the filesystem and picks up changes automatically, making it a natural fit for **background file sync** workflows.
-
-It also has **explicit git support**, so you don't have to manually commit if using git.
+**📖 [Website & user guide](https://waschmittel.github.io/tct/)**
 
 ![demo](docs/vhs/demo.gif)
 
