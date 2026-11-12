@@ -33,6 +33,7 @@ pub mod confirm_restore_list;
 pub mod export_pdf;
 pub mod label_manager;
 pub mod label_picker;
+pub mod no_lists;
 
 /// What rendering layer a dialog overlays.
 ///
@@ -204,6 +205,8 @@ pub enum DialogSideEffect {
     /// through so the reopened manager still returns to the
     /// LabelPicker on close.
     StartNewLabelInsert { from_picker: bool },
+    /// Close the dialog and start the Insert handler for a new list name.
+    StartNewListInsert,
     /// Start an Insert handler for renaming a label at the given index.
     StartRenameLabelInsert {
         label_idx: usize,

@@ -425,3 +425,27 @@ fn snapshot_export_dialog_shows_detected_language() {
 fn snapshot_export_dialog_default_language() {
     insta::assert_snapshot!(export_dialog_screen("English (default)"));
 }
+
+#[test]
+fn snapshot_no_lists_notice() {
+    with_temp_dir(|| {
+        let meta = board_store::create_board("Empty".into()).unwrap();
+        let mut app = App::new(Some(meta.id)).unwrap();
+        press(&mut app, KeyCode::Char('n'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_help_no_lists_notice() {
+    with_temp_dir(|| {
+        let meta = board_store::create_board("Empty".into()).unwrap();
+        let mut app = App::new(Some(meta.id)).unwrap();
+        app.version = "vTEST";
+        press(&mut app, KeyCode::Char('n'));
+        press(&mut app, KeyCode::Char('?'));
+        assert_eq!(app.mode, AppMode::Help);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}

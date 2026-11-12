@@ -929,3 +929,67 @@ fn capital_c_commits_to_git_or_toasts_why_not() {
         assert!(msg.starts_with("cannot commit: "), "{msg}");
     });
 }
+
+/// A board without any list: nothing to put a card in.
+fn empty_board_app() -> App {
+    let meta = board_store::create_board("Empty".into()).unwrap();
+    App::new(Some(meta.id)).unwrap()
+}
+
+#[test]
+fn n_on_board_without_lists_shows_notice_instead_of_card_input() {
+    with_temp_dir(|| {
+        let mut app = empty_board_app();
+        handle(&mut app, key(KeyCode::Char('n'))).unwrap();
+        assert_eq!(app.mode, AppMode::Dialog);
+        assert!(app.insert.is_none(), "no useless New Card input");
+        assert!(app.dialog.is_some());
+    });
+}
+
+#[test]
+fn notice_esc_closes_and_stays_on_the_board() {
+    with_temp_dir(|| {
+        let mut app = empty_board_app();
+        handle(&mut app, key(KeyCode::Char('n'))).unwrap();
+        crate::input::dialog_input::handle(&mut app, key(KeyCode::Esc)).unwrap();
+        assert_eq!(app.mode, AppMode::Normal);
+        assert!(app.dialog.is_none() && app.insert.is_none());
+    });
+}
+
+#[test]
+fn notice_n_starts_creating_a_list() {
+    with_temp_dir(|| {
+        let mut app = empty_board_app();
+        handle(&mut app, key(KeyCode::Char('n'))).unwrap();
+        crate::input::dialog_input::handle(&mut app, key(KeyCode::Char('n'))).unwrap();
+        assert_eq!(app.mode, AppMode::Insert);
+        assert_eq!(app.insert.as_ref().unwrap().title(), "New List");
+        assert!(app.dialog.is_none());
+    });
+}
+
+#[test]
+fn n_with_a_list_still_opens_card_input() {
+    with_temp_dir(|| {
+        let (mut app, _) = single_list_fixture(&[]);
+        handle(&mut app, key(KeyCode::Char('n'))).unwrap();
+        assert_eq!(app.mode, AppMode::Insert);
+        assert_eq!(app.insert.as_ref().unwrap().title(), "New Card");
+    });
+}
+
+#[test]
+fn n_when_every_list_is_archived_shows_notice() {
+    with_temp_dir(|| {
+        let (mut app, _) = single_list_fixture(&[]);
+        let list_id = app.board().unwrap().lists[0].id.clone();
+        app.apply(crate::command::Command::ArchiveList { list_id })
+            .unwrap();
+        assert!(app.board().unwrap().lists.is_empty());
+        handle(&mut app, key(KeyCode::Char('n'))).unwrap();
+        assert_eq!(app.mode, AppMode::Dialog);
+        assert!(app.insert.is_none());
+    });
+}

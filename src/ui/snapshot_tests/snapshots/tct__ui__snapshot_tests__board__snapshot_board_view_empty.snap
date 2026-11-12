@@ -3,7 +3,7 @@ source: src/ui/snapshot_tests/board.rs
 expression: render_to_string(&app)
 ---
  Empty (0 lists)
-  No lists.
+  No lists yet. Press N to create one.
 
 
 

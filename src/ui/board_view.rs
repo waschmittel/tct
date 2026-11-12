@@ -56,7 +56,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // Lists area
     if board.lists.is_empty() {
         let empty = Paragraph::new(Line::from(Span::styled(
-            "  No lists.",
+            "  No lists yet. Press N to create one.",
             Style::default().fg(Color::DarkGray),
         )));
         frame.render_widget(empty, chunks[1]);

@@ -139,8 +139,14 @@ pub(super) fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
             }
         }
         Action::NewCard => {
-            if app.editor.is_some() {
-                app.start_insert(Box::new(line_editor::NewCardTitle::new()));
+            if let Some(board) = app.board() {
+                if board.lists.is_empty() {
+                    // Nothing to put a card in: say so instead of opening a
+                    // title input that could never be confirmed.
+                    app.open_dialog(Box::new(crate::dialog::no_lists::NoLists));
+                } else {
+                    app.start_insert(Box::new(line_editor::NewCardTitle::new()));
+                }
             }
         }
         Action::NewList => {

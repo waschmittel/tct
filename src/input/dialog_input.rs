@@ -157,6 +157,10 @@ fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()>
             app.dialog = None;
             app.start_insert(Box::new(line_editor::NewLabelName::new(from_picker)));
         }
+        DialogSideEffect::StartNewListInsert => {
+            app.dialog = None;
+            app.start_insert(Box::new(line_editor::NewListName::new()));
+        }
         DialogSideEffect::StartRenameLabelInsert {
             label_idx,
             current_name,

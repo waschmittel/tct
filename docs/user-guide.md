@@ -158,7 +158,7 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 | t | Quick-edit card title (inline) |
 | e | Edit card description |
 | y | Copy card title to clipboard |
-| n | Create new card in current list |
+| n | Create new card in current list (on a board without lists, a notice offers to create the first list) |
 | a | Archive card (with confirmation) |
 | h | View card change history |
 
