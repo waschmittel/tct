@@ -18,8 +18,8 @@
 <body>
 <nav><div class="wrap">
   <a class="brand" href="#top"><img src="icon.svg" alt="" width="26" height="26"><span>tct<span>_</span></span></a>
-  <a class="l" href="#tour-shots">Screens</a>
   <a class="l" href="#install">Install</a>
+  <a class="l" href="#tour-shots">Screens</a>
   <a class="l" href="#cli">CLI</a>
   <a class="l" href="#sync">Sync</a>
   <a class="l" href="#pdf">PDF</a>
@@ -34,9 +34,13 @@
   <h1>Kanban for people who <em>live in the terminal</em>.</h1>
   <p class="lead">Think Trello, but keyboard-first and made of plain files. One binary, no server, no account — boards sync through git, Dropbox or whatever you already use.</p>
   <div class="cta">
-    <a class="btn primary" href="#install">Get started</a>
+    <a class="btn primary" href="#install">Install</a>
     <a class="btn" href="guide/">Read the user guide</a>
     <a class="btn" href="https://github.com/waschmittel/tct">GitHub</a>
+  </div>
+  <div class="installbar">
+    <div class="window copy"><pre><span class="p">$</span> brew install waschmittel/tct/tct</pre></div>
+    <p>macOS (Apple Silicon) and Linux x86_64 · <a href="#install">more ways to install</a></p>
   </div>
   <ul class="pills"><li>Rust</li><li>single binary</li><li>JSON on disk</li><li>TUI + CLI</li><li>MIT</li></ul>
   <div class="window">
@@ -46,6 +50,37 @@
 </div></header>
 
 <main class="wrap">
+
+<section id="install">
+  <p class="eyebrow">Install</p>
+  <h2>Up and running in a minute.</h2>
+  <div class="tabs">
+    <div role="tablist" aria-label="Installation method">
+      <button role="tab" aria-selected="true" aria-controls="t-brew" id="b-brew">Homebrew</button>
+      <button role="tab" aria-selected="false" aria-controls="t-bin" id="b-bin">Prebuilt binary</button>
+      <button role="tab" aria-selected="false" aria-controls="t-src" id="b-src">From source</button>
+    </div>
+    <div role="tabpanel" id="t-brew" aria-labelledby="b-brew"><div class="window copy"><pre>brew install waschmittel/tct/tct</pre></div>
+      <p class="lead note">macOS (Apple Silicon) and Linux x86_64.</p></div>
+    <div role="tabpanel" id="t-bin" aria-labelledby="b-bin" hidden><div class="window copy"><pre>chmod +x tct
+mv tct /usr/local/bin/</pre></div>
+      <p class="lead note">Download from the <a href="https://github.com/waschmittel/tct/releases">releases page</a>.</p></div>
+    <div role="tabpanel" id="t-src" aria-labelledby="b-src" hidden><div class="window copy"><pre>git clone https://github.com/waschmittel/tct
+cd tct
+cargo install --path .</pre></div>
+      <p class="lead note">Needs a Rust toolchain.</p></div>
+  </div>
+  <div class="split">
+    <div>
+      <h3>Your first board</h3>
+      <p>Run <code>tct init</code> in a project to keep boards next to your code in <code>.tct/</code> (like <code>git init</code>). Without it, boards live in <code>~/.tct/</code>.</p>
+    </div>
+    <div class="window copy"><pre><span class="c"># project-local boards</span>
+<span class="p">$</span> tct init
+<span class="p">$</span> tct              <span class="c"># open the board selector</span>
+<span class="p">$</span> tct --board sprint  <span class="c"># jump straight into a board</span></pre></div>
+  </div>
+</section>
 
 <section id="tour-shots">
   <p class="eyebrow">In action</p>
@@ -132,35 +167,6 @@
     <div class="card"><h3>Accent colors</h3><p>Each board gets its own accent: cycle pastels with <kbd>c</kbd> or pick any color with <kbd>C</kbd>.</p></div>
     <div class="card"><h3>Any terminal</h3><p>Truecolor where available, quantized to 256 or 16 colors elsewhere, with a fallback for the bare Linux console.</p></div>
     <div class="card"><h3>macOS friendly</h3><p><kbd>Cmd</kbd> shortcuts work in terminals that pass them through.</p></div>
-  </div>
-</section>
-
-<section id="install">
-  <p class="eyebrow">Install</p>
-  <h2>Up and running in a minute.</h2>
-  <div class="tabs">
-    <div role="tablist" aria-label="Installation method">
-      <button role="tab" aria-selected="true" aria-controls="t-brew" id="b-brew">Homebrew</button>
-      <button role="tab" aria-selected="false" aria-controls="t-bin" id="b-bin">Prebuilt binary</button>
-      <button role="tab" aria-selected="false" aria-controls="t-src" id="b-src">From source</button>
-    </div>
-    <div role="tabpanel" id="t-brew" aria-labelledby="b-brew"><div class="window copy"><pre>brew install waschmittel/tct/tct</pre></div>
-      <p class="lead note">macOS (Apple Silicon) and Linux x86_64.</p></div>
-    <div role="tabpanel" id="t-bin" aria-labelledby="b-bin" hidden><div class="window copy"><pre>chmod +x tct
-mv tct /usr/local/bin/</pre></div>
-      <p class="lead note">Download from the <a href="https://github.com/waschmittel/tct/releases">releases page</a>.</p></div>
-    <div role="tabpanel" id="t-src" aria-labelledby="b-src" hidden><div class="window copy"><pre>cargo install --path .</pre></div>
-      <p class="lead note">Needs a Rust toolchain.</p></div>
-  </div>
-  <div class="split">
-    <div>
-      <h3>Your first board</h3>
-      <p>Run <code>tct init</code> in a project to keep boards next to your code in <code>.tct/</code> (like <code>git init</code>). Without it, boards live in <code>~/.tct/</code>.</p>
-    </div>
-    <div class="window copy"><pre><span class="c"># project-local boards</span>
-<span class="p">$</span> tct init
-<span class="p">$</span> tct              <span class="c"># open the board selector</span>
-<span class="p">$</span> tct --board sprint  <span class="c"># jump straight into a board</span></pre></div>
   </div>
 </section>
 
