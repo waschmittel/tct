@@ -74,8 +74,9 @@ nav a.l:hover { color: var(--fg); }
 .card h3 { display: flex; gap: .6rem; align-items: center; }
 .card .ic { font-size: 1.4rem; }
 .card p { margin: 0; color: var(--muted); font-size: .98rem; }
-.split { display: grid; gap: 2rem; grid-template-columns: 1fr 1fr; align-items: start; margin-top: 2rem; }
-@media (max-width: 820px) { .split { grid-template-columns: 1fr; } }
+.split { display: grid; gap: 2rem; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; margin-top: 2rem; }
+.split > * { min-width: 0; }
+@media (max-width: 820px) { .split { grid-template-columns: minmax(0, 1fr); } }
 
 /* install tabs */
 .tabs { margin-top: 2rem; }
