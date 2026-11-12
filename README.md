@@ -8,7 +8,6 @@ A keyboard-driven TUI Kanban board built in Rust. Think Trello, but in your term
 
 ```sh
 brew install waschmittel/tct/tct   # macOS (Apple Silicon) / Linux x86_64; more options below
-tct init && tct                    # boards next to your code, then open the TUI
 ```
 
 tct stores everything as **plain JSON files** — one file per board and one per card (lists live inline in the board file). Put them in a git repo, Dropbox, or any synced folder and every team member sees the same boards. tct watches the filesystem and picks up changes automatically, making it a natural fit for **background file sync** workflows.
