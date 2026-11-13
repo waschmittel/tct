@@ -267,6 +267,8 @@ In the PDF, `...` becomes `â€¦` and straight quotes become typographic ones (`â€
 | Shift+Tab | Un-nest list item (or selected lines) |
 | Esc | Cancel (confirms if changed) |
 
+Saving (`Ctrl+S` / `Ctrl+Q`) stores the cursor position in the card (`description_cursor`, not in the history); the next edit resumes there, even after a restart. Only a save that changed the text stores it: moving the cursor alone, or discarding, does not. CLI edits leave it alone.
+
 On macOS, **Cmd** can substitute for Ctrl in terminals that support it (kitty, Alacritty, WezTerm).
 
 #### Tables
@@ -822,6 +824,7 @@ matches the list's `id`, ordered by ascending `position`.
   "title": "Fix login bug",
   "description": "Auth token expires too early.\n\n## Steps to reproduce\n1. Login\n2. Wait 5 minutes\n3. Token is invalid",
   "label_ids": ["11112222"],
+  "description_cursor": [4, 12],
   "due_date": "2026-06-01",
   "checklist": [
     { "text": "Reproduce issue", "completed": true },
@@ -833,6 +836,8 @@ matches the list's `id`, ordered by ascending `position`.
   "updated_at": "2026-05-14T15:30:00Z"
 }
 ```
+
+`description_cursor` (`[row, column]` of the editor's cursor at the last save) is optional and absent until a description is saved from the editor.
 
 Neither file carries an `id`: a board's ID is the directory it lives in and a
 card's is its file name, so renaming or moving the file re-IDs the record.

@@ -5,6 +5,7 @@ use arboard::Clipboard;
 use ratatui::style::Color;
 
 use crate::board_editor::BoardEditor;
+use crate::insert::markdown_editor::MarkdownEditor;
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
 use crate::model::id::{BoardId, CardId};
@@ -535,6 +536,15 @@ impl App {
 
     /// Enter **Insert** mode with the given handler, remembering the
     /// current mode for cancel-return.
+    /// Open the description editor on `card`, where its last save left the cursor.
+    pub fn edit_description(&mut self, card: &Card) {
+        let mut editor = MarkdownEditor::new(card.id.clone(), &card.description);
+        if let Some(cursor) = card.description_cursor {
+            editor.restore(cursor);
+        }
+        self.start_insert(Box::new(editor));
+    }
+
     pub fn start_insert(&mut self, handler: Box<dyn crate::insert::InsertHandler>) {
         self.remember_return_mode();
         self.insert = Some(handler);

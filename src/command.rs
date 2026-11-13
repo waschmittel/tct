@@ -30,6 +30,8 @@ pub enum Command {
     EditCardDescription {
         card_id: CardId,
         body: String,
+        /// The editor's cursor at save time; `None` (CLI) leaves the stored one.
+        cursor: Option<(usize, usize)>,
     },
     SetDueDate {
         card_id: CardId,

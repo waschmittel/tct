@@ -87,6 +87,7 @@ fn history_records_description_and_due_date_changes() {
         ed.apply(Command::EditCardDescription {
             card_id: id.clone(),
             body: "hi".into(),
+            cursor: None,
         })
         .unwrap();
         ed.apply(Command::SetDueDate {
@@ -139,6 +140,7 @@ fn unchanged_values_add_no_history_entry() {
         ed.apply(Command::EditCardDescription {
             card_id: id.clone(),
             body: String::new(),
+            cursor: None,
         })
         .unwrap();
         ed.apply(Command::ClearDueDate {
@@ -257,5 +259,34 @@ fn delete_history_entry_unknown_card_errors() {
             })
             .is_err()
         );
+    });
+}
+
+#[test]
+fn the_description_cursor_is_never_part_of_history() {
+    with_temp_dir(|| {
+        let (mut ed, _, ids) = editor_with_cards(&["t"]);
+        let id = ids[0].clone();
+        let save = |ed: &mut _, body: &str, cursor| {
+            let ed: &mut crate::board_editor::BoardEditor = ed;
+            ed.apply(Command::EditCardDescription {
+                card_id: id.clone(),
+                body: body.into(),
+                cursor,
+            })
+            .unwrap();
+        };
+        let entries = |ed: &crate::board_editor::BoardEditor| ed.board().cards[&id].history.len();
+        let before = entries(&ed);
+        save(&mut ed, "hi", Some((0, 2)));
+        assert_eq!(entries(&ed), before + 1);
+        // Only the cursor moved: no entry at all.
+        save(&mut ed, "hi", Some((0, 0)));
+        save(&mut ed, "hi", None);
+        assert_eq!(entries(&ed), before + 1);
+        let last = ed.board().cards[&id].history.last().unwrap();
+        assert_eq!(last.old.as_deref(), Some(""));
+        assert_eq!(last.new.as_deref(), Some("hi"));
+        assert!(!last.action.contains('('));
     });
 }

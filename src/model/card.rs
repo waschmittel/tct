@@ -22,6 +22,11 @@ pub struct Card {
     pub position: f64,
     pub title: String,
     pub description: String,
+    /// Where the description editor's cursor (row, column) was when the
+    /// description was last saved; the next edit resumes there. Absent when the
+    /// description was set without an editor (CLI) or never edited.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description_cursor: Option<(usize, usize)>,
     #[serde(default)]
     pub label_ids: Vec<LabelId>,
     pub due_date: Option<NaiveDate>,
@@ -95,6 +100,7 @@ impl Card {
             position: 0.0,
             title,
             description: String::new(),
+            description_cursor: None,
             label_ids: Vec::new(),
             due_date: None,
             checklist: Vec::new(),

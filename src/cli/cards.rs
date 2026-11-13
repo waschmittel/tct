@@ -208,6 +208,7 @@ fn edit(
         editor.apply(Command::EditCardDescription {
             card_id: card_id.clone(),
             body: d.to_string(),
+            cursor: None,
         })?;
     }
     match due_change {

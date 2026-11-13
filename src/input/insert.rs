@@ -297,4 +297,120 @@ mod tests {
             assert_eq!(app.board().unwrap().cards[&card_id].description, "x");
         });
     }
+
+    fn ctrl(app: &mut App, c: char) {
+        handle_input(app, KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)).unwrap();
+    }
+
+    fn cursor(app: &App) -> (usize, usize) {
+        app.insert
+            .as_ref()
+            .and_then(|h| {
+                h.as_any()
+                    .downcast_ref::<crate::insert::markdown_editor::MarkdownEditor>()
+            })
+            .unwrap()
+            .input
+            .textarea
+            .cursor()
+    }
+
+    /// Editor open on a card with a 3-line description, cursor moved to (1, 2).
+    fn app_with_moved_cursor() -> App {
+        let mut app = app_editing_description();
+        for line in ["a", "bcd", "e"] {
+            press(&mut app, KeyCode::Enter);
+            for c in line.chars() {
+                press(&mut app, KeyCode::Char(c));
+            }
+        }
+        press(&mut app, KeyCode::Up);
+        press(&mut app, KeyCode::Left);
+        app
+    }
+
+    #[test]
+    fn saved_cursor_survives_a_restart() {
+        with_temp_dir(|| {
+            let mut app = app_with_moved_cursor();
+            let pos = cursor(&app);
+            ctrl(&mut app, 'q');
+            let id = app.board().unwrap().meta.id.clone();
+            // A new App reads everything back from disk.
+            let mut app = App::new(Some(id)).unwrap();
+            app.mode = AppMode::CardDetail;
+            press(&mut app, KeyCode::Char('e'));
+            assert_eq!(cursor(&app), pos);
+        });
+    }
+
+    #[test]
+    fn saved_cursor_is_restored_on_reopening() {
+        with_temp_dir(|| {
+            let mut app = app_with_moved_cursor();
+            let pos = cursor(&app);
+            assert_ne!(pos, (3, 1));
+            ctrl(&mut app, 'q');
+            press(&mut app, KeyCode::Char('e'));
+            assert_eq!(cursor(&app), pos);
+        });
+    }
+
+    #[test]
+    fn ctrl_s_also_remembers_the_position() {
+        with_temp_dir(|| {
+            let mut app = app_with_moved_cursor();
+            let pos = cursor(&app);
+            ctrl(&mut app, 's');
+            press(&mut app, KeyCode::Esc);
+            press(&mut app, KeyCode::Char('e'));
+            assert_eq!(cursor(&app), pos);
+        });
+    }
+
+    #[test]
+    fn discarded_edit_does_not_remember_the_position() {
+        with_temp_dir(|| {
+            let mut app = app_with_moved_cursor();
+            press(&mut app, KeyCode::Esc);
+            press(&mut app, KeyCode::Char('y'));
+            let card = app.board().unwrap().current_card().unwrap();
+            assert_eq!(card.description_cursor, None);
+            press(&mut app, KeyCode::Char('e'));
+            // Fresh editor: cursor at the end of the (empty) saved text.
+            assert_eq!(cursor(&app), (0, 0));
+        });
+    }
+
+    #[test]
+    fn moving_the_cursor_after_the_last_save_is_not_remembered() {
+        with_temp_dir(|| {
+            let mut app = app_with_moved_cursor();
+            let saved = cursor(&app);
+            ctrl(&mut app, 's');
+            press(&mut app, KeyCode::Up);
+            ctrl(&mut app, 'q');
+            press(&mut app, KeyCode::Char('e'));
+            assert_eq!(cursor(&app), saved);
+        });
+    }
+
+    #[test]
+    fn cursor_only_session_writes_nothing() {
+        with_temp_dir(|| {
+            let mut app = app_with_moved_cursor();
+            ctrl(&mut app, 'q');
+            let before = app.board().unwrap().current_card().unwrap().clone();
+            press(&mut app, KeyCode::Char('e'));
+            press(&mut app, KeyCode::Up);
+            app.status_message = None;
+            ctrl(&mut app, 'q');
+            assert!(matches!(app.mode, AppMode::CardDetail));
+            assert!(app.status_message.is_none(), "no 'Saved' toast");
+            let after = app.board().unwrap().current_card().unwrap();
+            assert_eq!(after.updated_at, before.updated_at);
+            assert_eq!(after.description_cursor, before.description_cursor);
+            assert_eq!(after.history.len(), before.history.len());
+        });
+    }
 }

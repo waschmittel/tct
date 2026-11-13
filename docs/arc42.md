@@ -266,7 +266,7 @@ path for board-collection operations (ADR-0001/0002/0004).
 | Module | Types | Purpose |
 |--------|-------|---------|
 | `board.rs` | `BoardMeta` | Board identity, name, list ordering, labels, accent color, archive flag |
-| `card.rs` | `Card`, `ChecklistItem` | Card data: `list_id`, `position`, title, description, labels, due date, checklist, archive flag |
+| `card.rs` | `Card`, `ChecklistItem` | Card data: `list_id`, `position`, title, description (+ editor cursor), labels, due date, checklist, archive flag |
 | `list.rs` | `CardList` | Derived in-memory view of a list; `build_lists`/`ordered_card_ids` assemble it from `ListMeta` + cards |
 | `label.rs` | `Label`, `LabelColor` | Label identity + color; HSL-based pastel generation |
 | `id.rs` | `BoardId`, `CardId`, `ListId`, `LabelId` | Validated id newtypes; 8-char UUID v4 prefix generator (ADR-0007) |
@@ -497,7 +497,7 @@ flowchart TD
   boards/
     a1b2c3d4/                  # Board directory (8-char ID) — the directory name IS the board id
       board.json               # BoardMeta: name, position, lists[] (id/name/archived), labels, accent_color
-      card-11223344.json       # Card: list_id, position, title, description, checklist, label_ids, due_date
+      card-11223344.json       # Card: list_id, position, title, description, description_cursor (optional), checklist, label_ids, due_date
       card-55667788.json
     b2c3d4e5/                  # Another board
       board.json

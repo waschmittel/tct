@@ -245,6 +245,37 @@ mod tests {
     }
 
     #[test]
+    fn description_cursor_round_trips_and_is_omitted_when_absent() {
+        with_temp_dir(|| {
+            let board = make_board();
+            let mut card = Card::new("Task".into());
+            save_card(&board.id, &card).unwrap();
+            let path = paths::card_path(&board.id, &card.id);
+            let raw = std::fs::read_to_string(&path).unwrap();
+            assert!(!raw.contains("description_cursor"), "{raw}");
+            assert_eq!(
+                load_card(&board.id, &card.id).unwrap().description_cursor,
+                None
+            );
+
+            card.description_cursor = Some((3, 7));
+            save_card(&board.id, &card).unwrap();
+            let loaded = load_card(&board.id, &card.id).unwrap();
+            assert_eq!(loaded.description_cursor, Some((3, 7)));
+        });
+    }
+
+    #[test]
+    fn card_files_without_a_cursor_still_load() {
+        with_temp_dir(|| {
+            let board = make_board();
+            write_card_json(&board, "abcd1234", "abcd1234");
+            let card = load_card(&board.id, &"abcd1234".into()).unwrap();
+            assert_eq!(card.description_cursor, None);
+        });
+    }
+
+    #[test]
     fn file_name_wins_over_a_declared_id() {
         with_temp_dir(|| {
             let board = make_board();

@@ -89,6 +89,7 @@ fn edit_title_and_description_persist_across_reload() {
         ed.apply(Command::EditCardDescription {
             card_id: id.clone(),
             body: "body text".into(),
+            cursor: None,
         })
         .unwrap();
         ed.reload().unwrap();
@@ -385,5 +386,37 @@ fn board_commands_persist_across_reload() {
         .unwrap();
         ed.reload().unwrap();
         assert!(!ed.board().meta.archived);
+    });
+}
+
+#[test]
+fn description_cursor_is_stored_with_the_save_and_left_alone_by_cli_edits() {
+    with_temp_dir(|| {
+        let (mut ed, _, c) = editor_with_cards(&["t"]);
+        let id = c[0].clone();
+        ed.apply(Command::EditCardDescription {
+            card_id: id.clone(),
+            body: "a\nb".into(),
+            cursor: Some((1, 1)),
+        })
+        .unwrap();
+        ed.reload().unwrap();
+        assert_eq!(ed.board().cards[&id].description_cursor, Some((1, 1)));
+        ed.apply(Command::EditCardDescription {
+            card_id: id.clone(),
+            body: "a\nb".into(),
+            cursor: Some((0, 0)),
+        })
+        .unwrap();
+        assert_eq!(ed.board().cards[&id].description_cursor, Some((0, 0)));
+        // No cursor (CLI): the stored one stays, whatever the new text.
+        ed.apply(Command::EditCardDescription {
+            card_id: id.clone(),
+            body: "other".into(),
+            cursor: None,
+        })
+        .unwrap();
+        ed.reload().unwrap();
+        assert_eq!(ed.board().cards[&id].description_cursor, Some((0, 0)));
     });
 }

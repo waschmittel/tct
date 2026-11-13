@@ -55,6 +55,14 @@ impl MarkdownEditor {
         }
     }
 
+    /// Put the cursor at `(row, col)` (clamped if the text got shorter).
+    pub fn restore(&mut self, (row, col): (usize, usize)) {
+        let clamp = |n: usize| n.min(u16::MAX as usize) as u16;
+        self.input
+            .textarea
+            .move_cursor(CursorMove::Jump(clamp(row), clamp(col)));
+    }
+
     pub fn paste_mode(&self) -> bool {
         self.paste_mode
     }
@@ -201,19 +209,28 @@ impl MarkdownEditor {
             }
             (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
                 self.leave_paste_mode();
+                if !self.input.is_modified() {
+                    // Nothing but maybe the cursor moved: not worth a save.
+                    return InsertOutcome::Stay;
+                }
                 let body = self.input.current_text();
                 self.input.original = body.clone();
                 InsertOutcome::Save(Command::EditCardDescription {
                     card_id: self.card_id.clone(),
                     body,
+                    cursor: Some(self.input.textarea.cursor()),
                 })
             }
             (KeyCode::Char('q'), m) if has_ctrl_or_cmd(m) => {
                 self.leave_paste_mode();
+                if !self.input.is_modified() {
+                    return InsertOutcome::Cancel;
+                }
                 let body = self.input.current_text();
                 InsertOutcome::Confirm(Command::EditCardDescription {
                     card_id: self.card_id.clone(),
                     body,
+                    cursor: Some(self.input.textarea.cursor()),
                 })
             }
             (KeyCode::Esc, _) => {

@@ -6,9 +6,7 @@ use crate::dialog::{
     card_history::CardHistory, confirm_clear_due_date::ConfirmClearDueDate,
     label_manager::LabelManager, label_picker::LabelPicker,
 };
-use crate::insert::{
-    InsertSurface, date_picker::DatePicker, line_editor, markdown_editor::MarkdownEditor,
-};
+use crate::insert::{InsertSurface, date_picker::DatePicker, line_editor};
 
 use super::keymap::{self, Binding};
 
@@ -384,9 +382,8 @@ fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
             if let Some(board) = app.board()
                 && let Some(card) = board.current_card()
             {
-                let desc = card.description.clone();
-                let card_id = card.id.clone();
-                app.start_insert(Box::new(MarkdownEditor::new(card_id, &desc)));
+                let card = card.clone();
+                app.edit_description(&card);
             }
         }
         Action::EditTitle => {

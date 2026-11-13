@@ -11,7 +11,7 @@ fn ctrl_s_returns_save_and_resets_is_modified() {
         None,
     );
     match out {
-        InsertOutcome::Save(Command::EditCardDescription { card_id, body }) => {
+        InsertOutcome::Save(Command::EditCardDescription { card_id, body, .. }) => {
             assert_eq!(card_id, "card1");
             assert_eq!(body, "initial!");
         }
@@ -35,7 +35,7 @@ fn ctrl_q_returns_confirm() {
         None,
     );
     match out {
-        InsertOutcome::Confirm(Command::EditCardDescription { card_id, body }) => {
+        InsertOutcome::Confirm(Command::EditCardDescription { card_id, body, .. }) => {
             assert_eq!(card_id, "card1");
             assert_eq!(body, "initial!");
         }
@@ -161,4 +161,98 @@ fn undo_history_reaches_past_fifty_edits() {
         ctrl(&mut e, 'z');
     }
     assert_eq!(editor_lines(&e), [""]);
+}
+
+// ── Remembered cursor ────────────────────────────────────────────────
+
+fn doc(n: usize) -> String {
+    (0..n)
+        .map(|i| format!("line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn restore_puts_the_cursor_back() {
+    let mut e = make_editor(&doc(50));
+    e.restore((20, 3));
+    assert_eq!(editor_cursor(&e), (20, 3));
+}
+
+#[test]
+fn restore_clamps_when_the_text_got_shorter() {
+    let mut e = make_editor("short\ntext");
+    e.restore((40, 6));
+    assert_eq!(editor_cursor(&e), (1, 4));
+}
+
+#[test]
+fn restore_survives_absurd_values_from_a_hostile_file() {
+    let mut e = make_editor("short\ntext");
+    e.restore((usize::MAX, usize::MAX));
+    assert_eq!(editor_cursor(&e), (1, 4));
+    e.restore((65_536, 0)); // would wrap to row 0 with a bare `as u16`
+    assert_eq!(editor_cursor(&e), (1, 0));
+}
+
+#[test]
+fn saving_reports_the_cursor() {
+    let mut e = make_editor("one\ntwo");
+    plain(&mut e, '!');
+    cursor_at(&mut e, 0, 2);
+    let save = e.handle_key(
+        KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
+        None,
+    );
+    assert!(matches!(
+        save,
+        InsertOutcome::Save(Command::EditCardDescription {
+            cursor: Some((0, 2)),
+            ..
+        })
+    ));
+    plain(&mut e, '?');
+    let quit = e.handle_key(
+        KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+        None,
+    );
+    assert!(matches!(
+        quit,
+        InsertOutcome::Confirm(Command::EditCardDescription {
+            cursor: Some((0, 3)),
+            ..
+        })
+    ));
+}
+
+#[test]
+fn nothing_is_saved_when_only_the_cursor_moved() {
+    let mut e = make_editor("one\ntwo");
+    cursor_at(&mut e, 0, 2);
+    assert!(matches!(ctrl_out(&mut e, 's'), InsertOutcome::Stay));
+    assert!(matches!(ctrl_out(&mut e, 'q'), InsertOutcome::Cancel));
+}
+
+#[test]
+fn typing_and_undoing_back_to_the_original_is_not_a_change() {
+    let mut e = make_editor("one");
+    plain(&mut e, 'x');
+    ctrl(&mut e, 'z');
+    assert!(matches!(ctrl_out(&mut e, 's'), InsertOutcome::Stay));
+}
+
+#[test]
+fn second_save_without_edits_is_a_noop() {
+    let mut e = make_editor("one");
+    plain(&mut e, 'x');
+    assert!(matches!(ctrl_out(&mut e, 's'), InsertOutcome::Save(_)));
+    assert!(matches!(ctrl_out(&mut e, 's'), InsertOutcome::Stay));
+    assert!(matches!(ctrl_out(&mut e, 'q'), InsertOutcome::Cancel));
+}
+
+#[test]
+fn paste_mode_normalizing_to_the_original_is_not_a_change() {
+    let mut e = make_editor("1. a\n2. b");
+    paste_mode_on(&mut e);
+    assert!(matches!(ctrl_out(&mut e, 's'), InsertOutcome::Stay));
 }

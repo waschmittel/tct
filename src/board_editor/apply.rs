@@ -62,8 +62,15 @@ impl BoardEditor {
                 }
                 pending.push(PendingWrite::Card(Box::new(card.clone())));
             }
-            Command::EditCardDescription { card_id, body } => {
+            Command::EditCardDescription {
+                card_id,
+                body,
+                cursor,
+            } => {
                 let card = self.card_mut(&card_id)?;
+                if cursor.is_some() {
+                    card.description_cursor = cursor;
+                }
                 let changed = card.description != body;
                 let old = std::mem::replace(&mut card.description, body);
                 if changed {
