@@ -31,14 +31,17 @@ fn matrix_corner_has_no_rule_above_and_no_line_left() {
         thin.last().unwrap().1 <= header.1 + 0.1,
         "the bottom rule stays whole"
     );
-    // Wide matrix: left edge line is dropped on the header row only.
+    // Wide matrix: no outer vertical lines, left or right, on any row.
     let g = table_page(&matrix(5, 2));
     let thin = verticals(&g, MIDRULE);
-    let left = thin.iter().map(|l| l.0).fold(f32::MAX, f32::min);
-    assert_eq!(
-        thin.iter().filter(|l| l.0 == left).count(),
-        2,
-        "left edge on the two body rows only"
+    let (_, left, right) = rules(&g, HEAVY_RULE)[0];
+    let (left, right) = (left.min(right), left.max(right));
+    let inner = |l: &&(f32, f32, f32)| l.0 > left + 0.1 && l.0 < right - 0.1;
+    let heavy = verticals(&g, HEAVY_RULE);
+    let all: Vec<_> = thin.iter().chain(&heavy).collect();
+    assert!(
+        !thin.is_empty() && all.iter().all(inner),
+        "outer line drawn"
     );
 }
 
@@ -65,8 +68,8 @@ fn matrix_labels_are_separated_from_contents_by_heavy_lines() {
 fn matrix_column_lines_start_at_four_content_columns() {
     let thin = |cols| verticals(&table_page(&matrix(cols, 2)), MIDRULE).len();
     assert_eq!(thin(4), 0, "3 content columns");
-    // Header: 4 (no left edge); each of the 2 body rows: 5. The divider after the labels is heavy.
-    assert_eq!(thin(5), 4 + 2 * 5, "4 content columns");
+    // Inner lines only (3 per row, 3 rows); the divider after the labels is heavy.
+    assert_eq!(thin(5), 3 * 3, "4 content columns");
 }
 
 #[test]

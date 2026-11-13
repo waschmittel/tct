@@ -527,17 +527,14 @@ fn rendering_at_a_fixed_time_is_deterministic() {
     }
 }
 
-/// Regenerates `docs/export-examples/*.pdf`:
-/// `TZ=UTC cargo test write_example_pdfs -- --ignored`.
-#[test]
-#[ignore = "writes files into docs/"]
-fn write_example_pdfs() {
+/// Every example PDF with its path under `docs/export-examples/`.
+fn example_pdfs() -> Vec<(std::path::PathBuf, Vec<u8>)> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/export-examples");
+    let mut out = Vec::new();
     for (theme, dir) in [
         (Theme::Mono, root.clone()),
         (Theme::Color, root.join("color")),
     ] {
-        std::fs::create_dir_all(&dir).unwrap();
         for (name, meta, card) in corner_cases() {
             // Color is shown by the showcase and the alerts only; the rest are monochrome.
             if !name.starts_with("00-") && !name.starts_with("15-") && theme == Theme::Color {
@@ -546,7 +543,34 @@ fn write_example_pdfs() {
             let card = at_example_time(card);
             let pdf =
                 render_at(&meta, "To Do", &card, theme, EXAMPLE_TIME, EXAMPLE_VERSION).unwrap();
-            std::fs::write(dir.join(format!("{name}.pdf")), pdf).unwrap();
+            out.push((dir.join(format!("{name}.pdf")), pdf));
         }
     }
+    out
+}
+
+/// Regenerates `docs/export-examples/*.pdf`:
+/// `TZ=UTC cargo test write_example_pdfs -- --ignored`.
+#[test]
+#[ignore = "writes files into docs/"]
+fn write_example_pdfs() {
+    for (path, pdf) in example_pdfs() {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, pdf).unwrap();
+    }
+}
+
+/// The committed example PDFs must match what the code renders now; fails
+/// after a layout change until they are regenerated.
+#[test]
+fn example_pdfs_are_up_to_date() {
+    let stale: Vec<_> = example_pdfs()
+        .into_iter()
+        .filter(|(path, pdf)| std::fs::read(path).ok().as_ref() != Some(pdf))
+        .map(|(path, _)| path.display().to_string())
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "stale example PDFs (run `TZ=UTC cargo test write_example_pdfs -- --ignored`): {stale:#?}"
+    );
 }

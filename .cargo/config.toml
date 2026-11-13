@@ -1,0 +1,3 @@
+# Example-PDF dates are rendered in local time; pin it so tests are reproducible.
+[env]
+TZ = "UTC"

@@ -231,7 +231,8 @@ impl<'f> Flow<'f> {
         for (i, w) in std::iter::once(&0.0).chain(t.widths).enumerate() {
             vx += w;
             let divider = t.matrix && i == 1; // labels | contents
-            if !(t.col_lines || divider) || (t.matrix && header && i == 0) {
+            let outer = i == 0 || i == t.widths.len();
+            if !(t.col_lines || divider) || (t.matrix && outer) {
                 continue;
             }
             let width = if divider { HEAVY_RULE } else { MIDRULE };
