@@ -63,6 +63,17 @@ impl BoardEditor {
             })
     }
 
+    /// Clears the label filter when its label no longer exists — deleted
+    /// here or by a remote change picked up on reload — so it cannot hide
+    /// every card.
+    pub(super) fn drop_dead_label_filter(&mut self) {
+        if let Some(id) = &self.board.label_filter
+            && !self.board.meta.labels.iter().any(|l| l.id == *id)
+        {
+            self.board.label_filter = None;
+        }
+    }
+
     pub(super) fn commit_pending(&self, writes: Vec<PendingWrite>) -> Result<(), BoardEditorError> {
         for w in writes {
             match w {

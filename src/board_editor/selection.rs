@@ -1,5 +1,5 @@
 use super::*;
-use crate::model::id::CardId;
+use crate::model::id::{CardId, LabelId};
 
 impl BoardEditor {
     // ── Selection verbs (ADR-0002: direct methods, not Commands) ──────────
@@ -75,6 +75,15 @@ impl BoardEditor {
     }
 
     /// Jump to the first Card matching `query` anywhere on the board.
+    /// Show only cards with this label (`None` clears the filter) and select
+    /// the first one that is still visible.
+    pub fn set_label_filter(&mut self, label: Option<LabelId>) {
+        self.board.label_filter = label;
+        if self.board.label_filter.is_some() {
+            self.select_first_match("");
+        }
+    }
+
     pub fn select_first_match(&mut self, query: &str) {
         for li in 0..self.board.lists.len() {
             if let Some(&raw) = self.board.visible_cards(li, Some(query)).first() {

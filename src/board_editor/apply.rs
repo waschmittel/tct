@@ -482,6 +482,7 @@ impl BoardEditor {
                 }
             }
         }
+        self.drop_dead_label_filter();
         self.commit_pending(pending)?;
         self.board.clamp_selection();
         #[cfg(debug_assertions)]

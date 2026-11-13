@@ -499,6 +499,7 @@ mod tests {
                     selected_list: 0,
                     selected_card: vec![],
                     scroll_offset: vec![],
+                    label_filter: None,
                     detail_item_idx: 0,
                     detail_scroll: 0,
                     detail_max_scroll: std::cell::Cell::new(0),

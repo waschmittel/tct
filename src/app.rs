@@ -8,8 +8,7 @@ use crate::board_editor::BoardEditor;
 use crate::insert::markdown_editor::MarkdownEditor;
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
-use crate::model::id::{BoardId, CardId};
-use crate::model::label::LabelColor;
+use crate::model::id::{BoardId, CardId, LabelId};
 use crate::model::list::CardList;
 use crate::storage::board_store;
 
@@ -63,6 +62,9 @@ pub struct LoadedBoard {
     /// Input clamps `detail_scroll` against this so scrolling up responds
     /// immediately even if the stored value ran past the rendered max.
     pub detail_max_scroll: std::cell::Cell<usize>,
+    /// Label filter: only cards carrying this label are visible. Applies
+    /// together with the search (see `App::search`); survives reloads.
+    pub label_filter: Option<LabelId>,
 }
 
 impl LoadedBoard {
@@ -97,6 +99,11 @@ impl LoadedBoard {
                     .get(*id)
                     .map(|c| {
                         !c.archived
+                            && (search.is_none()
+                                || self
+                                    .label_filter
+                                    .as_ref()
+                                    .is_none_or(|l| c.label_ids.contains(l)))
                             && search
                                 .map(|q| c.matches_search(q, &self.meta.labels))
                                 .unwrap_or(true)
@@ -141,7 +148,6 @@ pub struct App {
     pub editor: Option<BoardEditor>,
     pub search_query: String,
     pub search_active: bool,
-    pub label_filter: Option<LabelColor>,
     pub last_reload: Instant,
     pub reload_interval: Duration,
     /// Active modal **Dialog Kind** — present iff `mode == AppMode::Dialog`.
@@ -232,7 +238,6 @@ impl App {
             editor: None,
             search_query: String::new(),
             search_active: false,
-            label_filter: None,
             last_reload: Instant::now(),
             reload_interval: Duration::from_secs(15),
             dialog: None,
@@ -255,9 +260,14 @@ impl App {
         self.editor.as_ref().map(|e| e.board())
     }
 
-    /// The active search query, if search is on.
+    /// The active filter, if any: the search query, or `""` (matches all)
+    /// when only a label filter is on.
     pub fn search(&self) -> Option<&str> {
-        self.search_active.then_some(self.search_query.as_str())
+        if self.search_active {
+            Some(self.search_query.as_str())
+        } else {
+            self.board()?.label_filter.is_some().then_some("")
+        }
     }
 
     /// Test-only mutable access to the Loaded Board.

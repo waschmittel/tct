@@ -31,6 +31,7 @@ pub mod confirm_restore_board;
 pub mod confirm_restore_card;
 pub mod confirm_restore_list;
 pub mod export_pdf;
+pub mod label_filter_picker;
 pub mod label_manager;
 pub mod label_picker;
 pub mod no_lists;
@@ -157,6 +158,10 @@ impl DialogOutcome {
 /// Direct side effects a dialog can request when the operation can't be
 /// expressed as a `Command` (e.g. hard-deleting an archived board file).
 pub enum DialogSideEffect {
+    /// Filter the board view by a label (`None` clears the label filter).
+    SetLabelFilter {
+        label_id: Option<crate::model::id::LabelId>,
+    },
     /// Hard-delete an archived board's directory.
     DeleteArchivedBoard { board_id: crate::model::id::BoardId },
     /// Hard-delete an archived list and all its cards.

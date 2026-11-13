@@ -43,10 +43,14 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(Color::Yellow),
         ));
     }
-    if app.label_filter.is_some() {
+    if let Some(label) = board
+        .label_filter
+        .as_ref()
+        .and_then(|id| board.meta.labels.iter().find(|l| l.id == *id))
+    {
         title_spans.push(Span::raw("  "));
         title_spans.push(Span::styled(
-            "[label filter active]",
+            format!("[label: {}]", label.name),
             Style::default().fg(Color::Yellow),
         ));
     }

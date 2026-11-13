@@ -61,6 +61,7 @@ impl BoardEditor {
                 selected_list: 0,
                 selected_card: vec![0; num_lists],
                 scroll_offset: (0..num_lists).map(|_| std::cell::Cell::new(0)).collect(),
+                label_filter: None,
                 detail_item_idx: 0,
                 detail_scroll: 0,
                 detail_max_scroll: std::cell::Cell::new(0),
@@ -124,6 +125,7 @@ impl BoardEditor {
                 self.board.selected_card[i] = old_selected_card[i];
             }
         }
+        self.drop_dead_label_filter();
         self.board.clamp_selection();
         Ok(())
     }

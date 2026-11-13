@@ -80,6 +80,11 @@ fn export_card_pdf(
 
 fn apply_side_effect(app: &mut App, eff: DialogSideEffect) -> anyhow::Result<()> {
     match eff {
+        DialogSideEffect::SetLabelFilter { label_id } => {
+            if let Some(editor) = &mut app.editor {
+                editor.set_label_filter(label_id);
+            }
+        }
         DialogSideEffect::DeleteArchivedBoard { board_id } => {
             crate::board_directory::delete(&board_id)?;
         }

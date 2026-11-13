@@ -114,3 +114,38 @@ fn focus_card_ignores_archived() {
     // c1 is archived, so focusing c1 must fail
     assert!(!editor.focus_card(&"c1".into(), None));
 }
+
+#[test]
+fn visible_cards_label_filter_applies_with_search_only() {
+    let label = crate::model::label::Label::new("bug".into(), crate::model::label::LabelColor::Red);
+    let mut cards = vec![
+        fixed_card("c1", "alpha"),
+        fixed_card("c2", "beta"),
+        fixed_card("c3", "gamma"),
+    ];
+    cards[1].label_ids = vec![label.id.clone()];
+    cards[2].label_ids = vec![label.id.clone()];
+    let mut board = loaded_board(cards);
+    board.meta.labels.push(label.clone());
+    board.label_filter = Some(label.id);
+
+    // Base visibility (ordinals) is unaffected; the filter rides with search.
+    assert_eq!(board.visible_cards(0, None), vec![0, 1, 2]);
+    assert_eq!(board.visible_cards(0, Some("")), vec![1, 2]);
+    assert_eq!(board.visible_cards(0, Some("gam")), vec![2]);
+}
+
+#[test]
+fn set_label_filter_selects_first_match_and_clears() {
+    let label = crate::model::label::Label::new("bug".into(), crate::model::label::LabelColor::Red);
+    let mut cards = vec![fixed_card("c1", "alpha"), fixed_card("c2", "beta")];
+    cards[1].label_ids = vec![label.id.clone()];
+    let mut board = loaded_board(cards);
+    board.meta.labels.push(label.clone());
+    let mut editor = BoardEditor::from_loaded(board);
+
+    editor.set_label_filter(Some(label.id));
+    assert_eq!(editor.board().selected_card[0], 1);
+    editor.set_label_filter(None);
+    assert!(editor.board().label_filter.is_none());
+}

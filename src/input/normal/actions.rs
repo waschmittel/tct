@@ -3,8 +3,8 @@ use crate::command::{Command, MoveDir};
 use crate::dialog::{
     archived_cards::ArchivedCards, archived_lists::ArchivedLists, card_history::CardHistory,
     confirm_archive_card::ConfirmArchiveCard, confirm_archive_list::ConfirmArchiveList,
-    confirm_clear_due_date::ConfirmClearDueDate, label_manager::LabelManager,
-    label_picker::LabelPicker,
+    confirm_clear_due_date::ConfirmClearDueDate, label_filter_picker::LabelFilterPicker,
+    label_manager::LabelManager, label_picker::LabelPicker,
 };
 use crate::insert::{InsertSurface, date_picker::DatePicker, line_editor};
 
@@ -210,12 +210,14 @@ pub(super) fn run(app: &mut App, action: Action) -> anyhow::Result<()> {
             app.mode = AppMode::Command;
         }
         Action::FilterByLabel => {
-            app.open_dialog(Box::new(LabelPicker { selected_idx: 0 }));
+            app.open_dialog(Box::new(LabelFilterPicker { selected_idx: 0 }));
         }
         Action::ClearFilters => {
             app.search_active = false;
             app.search_query.clear();
-            app.label_filter = None;
+            if let Some(editor) = &mut app.editor {
+                editor.set_label_filter(None);
+            }
             app.set_status("Filters cleared".into());
         }
         Action::AssignLabels => {

@@ -420,3 +420,46 @@ fn description_cursor_is_stored_with_the_save_and_left_alone_by_cli_edits() {
         assert_eq!(ed.board().cards[&id].description_cursor, Some((0, 0)));
     });
 }
+
+#[test]
+fn deleting_the_filtered_label_clears_the_filter() {
+    let (mut ed, _, _) = editor_with_cards(&["task"]);
+    for name in ["keep", "gone"] {
+        ed.apply(Command::DefineLabel {
+            name: name.into(),
+            color: LabelColor::Green,
+        })
+        .unwrap();
+    }
+    let keep = ed.board().meta.labels[0].id.clone();
+    let gone = ed.board().meta.labels[1].id.clone();
+
+    // Deleting another label leaves the filter alone.
+    ed.set_label_filter(Some(keep.clone()));
+    ed.apply(Command::DeleteLabel {
+        label_id: gone.clone(),
+    })
+    .unwrap();
+    assert_eq!(ed.board().label_filter, Some(keep.clone()));
+
+    ed.apply(Command::DeleteLabel { label_id: keep }).unwrap();
+    assert!(ed.board().label_filter.is_none());
+}
+
+#[test]
+fn reload_drops_a_filter_whose_label_vanished() {
+    let (mut ed, _, _) = editor_with_cards(&["task"]);
+    ed.apply(Command::DefineLabel {
+        name: "x".into(),
+        color: LabelColor::Green,
+    })
+    .unwrap();
+    let id = ed.board().meta.labels[0].id.clone();
+    ed.set_label_filter(Some(id));
+    // Simulate a deletion on disk by another process.
+    let mut meta = ed.board().meta.clone();
+    meta.labels.clear();
+    crate::storage::board_store::save_board(&meta).unwrap();
+    ed.reload().unwrap();
+    assert!(ed.board().label_filter.is_none());
+}

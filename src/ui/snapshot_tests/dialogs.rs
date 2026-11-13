@@ -449,3 +449,52 @@ fn snapshot_help_no_lists_notice() {
         insta::assert_snapshot!(render_to_string(&app));
     });
 }
+
+#[test]
+fn snapshot_label_filter_picker() {
+    with_temp_dir(|| {
+        let id = seed_board_with_multiple_labels();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('f'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_label_filter_applied() {
+    with_temp_dir(|| {
+        let id = seed_board_with_multiple_labels();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('f'));
+        press(&mut app, KeyCode::Enter); // first label: bug
+        assert_eq!(app.mode, AppMode::Normal);
+        let text = render_to_string(&app);
+        assert!(text.contains("[label: bug]"));
+        assert!(text.contains("Implement authentication"));
+        assert!(!text.contains("Write documentation"));
+        insta::assert_snapshot!(text);
+    });
+}
+
+#[test]
+fn label_filter_toggles_and_clears() {
+    with_temp_dir(|| {
+        let id = seed_board_with_multiple_labels();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('f'));
+        press(&mut app, KeyCode::Enter);
+        assert!(app.board().unwrap().label_filter.is_some());
+        // Picking the active label again clears it.
+        press(&mut app, KeyCode::Char('f'));
+        press(&mut app, KeyCode::Enter);
+        assert!(app.board().unwrap().label_filter.is_none());
+        // A label no card has hides everything; F restores.
+        press(&mut app, KeyCode::Char('f'));
+        press(&mut app, KeyCode::Down);
+        press(&mut app, KeyCode::Enter);
+        assert!(!render_to_string(&app).contains("Write documentation"));
+        press(&mut app, KeyCode::Char('F'));
+        assert!(render_to_string(&app).contains("Write documentation"));
+    });
+}

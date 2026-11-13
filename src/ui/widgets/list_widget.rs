@@ -54,7 +54,7 @@ pub fn render(
 
     let active_count = board.visible_cards(list_index, None).len();
 
-    let count_label = if app.search_active {
+    let count_label = if app.search().is_some() {
         let filtered_count = board.visible_cards(list_index, app.search()).len();
         format!("{filtered_count}/{active_count}")
     } else {

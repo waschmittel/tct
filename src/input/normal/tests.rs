@@ -404,11 +404,18 @@ fn shift_f_clears_filters() {
         let (mut app, _, _, _) = fixture();
         app.search_active = true;
         app.search_query = "x".into();
-        app.label_filter = Some(crate::model::label::LabelColor::Red);
+        let label = app
+            .board()
+            .unwrap()
+            .meta
+            .labels
+            .first()
+            .map(|l| l.id.clone());
+        app.editor.as_mut().unwrap().set_label_filter(label);
         handle(&mut app, shift_key(KeyCode::Char('F'))).unwrap();
         assert!(!app.search_active);
         assert!(app.search_query.is_empty());
-        assert!(app.label_filter.is_none());
+        assert!(app.board().unwrap().label_filter.is_none());
     });
 }
 

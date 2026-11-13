@@ -294,7 +294,7 @@ Sections, the checklist, code blocks and tables stay together on a page where th
 
 ### Search
 
-`/` in board view opens the search bar; type a query and press `enter`. Non-matching cards are **hidden**, navigation skips them, and the first match is selected. `f` filters by label; `F` clears all filters.
+`/` in board view opens the search bar; type a query and press `enter`. Non-matching cards are **hidden**, navigation skips them, and the first match is selected. `f` opens a label picker and shows only cards with the chosen label (pick it again to clear; it combines with search); `F` clears all filters.
 
 ---
 
