@@ -1,4 +1,4 @@
-# PDF language: detected from the text, drives quotes and alert titles
+# PDF language: detected from the text, drives quotes, alert titles and fixed texts
 
 ## Decision
 
@@ -9,7 +9,8 @@ Detection runs on the card at export time, so the export dialog shows the same r
 ## What depends on it
 
 - **Quotes:** straight `"` and `'` become the language's typographic quotes (en/nl/pt/tr `“…” ‘…’`, sv `”…” ’…’`, de `„…“ ‚…‘`, fr `« … »` with narrow no-break spaces, es/it `«…»`). Open/close is decided from the neighbors, looking through emphasis markers. Apostrophes between letters are always `’`; a quote after a digit stays straight (5", 6'); code spans and blocks are never touched. `...` becomes `…` in every language.
-- **Alert titles:** `Lang::alert_title` (`Hinweis`, `Tipp`, `Wichtig`, `Vorsicht`, `Warnung`, …).
+- **Alert titles:** `Lang::alert_title` (`Hinweis`, `Tipp`, `Wichtig`, `Achtung`, `Warnung`, …).
+- **Fixed texts:** everything the PDF adds around the card — section titles (`Beschreibung`, `Checkliste`), `Fällig`, `Erstellt`, `Aktualisiert` and the "made at" stamp (`Stand`, = Status) in the header and footer — comes from `Lang::label(Label)`. Dates stay ISO. A new fixed text must be a `Label` with all nine translations; the German ones are confirmed by a German speaker, so ask before choosing or changing one.
 
 The read view is unaffected (ADR-0015: it never changes the typed text).
 

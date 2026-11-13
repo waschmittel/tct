@@ -67,3 +67,30 @@ fn wide_list_markers_do_not_touch_the_text() {
     let marker_end = x_of("100.").unwrap() + fonts.sans.width("100.", BODY);
     assert!(x_of("hundred").unwrap() >= marker_end + 3.0);
 }
+
+fn german_card(description: &str) -> Card {
+    let mut card = Card::new("Ein Titel für die Beschreibung der Aufgabe".into());
+    card.description = description.into();
+    assert_eq!(Lang::of(&card), Lang::De);
+    card
+}
+
+#[test]
+fn fixed_texts_follow_the_detected_language() {
+    let mut de =
+        german_card("Das ist ein deutscher Text, der lang genug ist, um erkannt zu werden.");
+    de.checklist.push(ChecklistItem {
+        text: "Eins".into(),
+        completed: false,
+    });
+    let all: Vec<_> = laid_out(&de).into_iter().flatten().collect();
+    let all = texts(&all).join("|");
+    for word in ["BESCHREIBUNG", "CHECKLISTE", "Checkliste 0/1"] {
+        assert!(all.contains(word), "{word} missing in {all}");
+    }
+    assert!(!all.contains("DESCRIPTION") && !all.contains("Checklist 0"));
+    let mut en = Card::new("Title".into());
+    en.description = "Body".into();
+    let all: Vec<_> = laid_out(&en).into_iter().flatten().collect();
+    assert!(texts(&all).join("|").contains("DESCRIPTION"));
+}

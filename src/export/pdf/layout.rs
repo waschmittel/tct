@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use super::*;
 use crate::export::blocks::{self, Block, Run, Style};
-use crate::export::lang::Lang;
+use crate::export::lang::{Label, Lang};
 use crate::model::board::BoardMeta;
 use crate::model::card::Card;
 
@@ -57,10 +57,14 @@ pub(super) fn layout(
     };
     let mut facts = vec![format!("{} › {}", board.name, list)];
     if let Some(due) = card.due_date {
-        facts.push(format!("Due {}", due.format("%Y-%m-%d")));
+        facts.push(format!(
+            "{} {}",
+            lang.label(Label::Due),
+            due.format("%Y-%m-%d")
+        ));
     }
     if let Some((done, total)) = card.checklist_progress() {
-        facts.push(format!("Checklist {done}/{total}"));
+        facts.push(format!("{} {done}/{total}", lang.label(Label::Checklist)));
     }
     flow.paragraph(
         &muted(facts.join("   ·   ")),
@@ -70,9 +74,12 @@ pub(super) fn layout(
         flow.muted(),
     );
     let dates = format!(
-        "Created {}   ·   Updated {}   ·   Status {}",
+        "{} {}   ·   {} {}   ·   {} {}",
+        lang.label(Label::Created),
         stamp(card.created_at),
+        lang.label(Label::Updated),
         stamp(card.updated_at),
+        lang.label(Label::Status),
         stamp(now)
     );
     flow.paragraph(&muted(dates), 9.0, MARGIN, CONTENT_W, flow.muted());
@@ -93,7 +100,7 @@ pub(super) fn layout(
     }
     if !card.checklist.is_empty() {
         let checklist = |f: &mut Flow<'_>| {
-            f.section_title("Checklist");
+            f.section_title(lang.label(Label::Checklist));
             f.checklist(card);
         };
         flow.keep_together(&checklist);

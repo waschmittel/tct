@@ -168,15 +168,18 @@ pub(super) fn corner_cases() -> Vec<(&'static str, BoardMeta, Card)> {
     let mut hierarchy = String::from("# Overview\n\n");
     hierarchy.push_str(&lines("Overview line", 20));
     for chapter in 1..=3 {
-        hierarchy.push_str(&format!("\n\n# Chapter {chapter}\n\n{}", lines("Intro", 4)));
+        hierarchy.push_str(&format!(
+            "\n\n# Chapter {chapter}\n\n{}",
+            lines("This is the introduction of the chapter, line", 4)
+        ));
         for part in 1..=3 {
             hierarchy.push_str(&format!(
                 "\n\n## Part {chapter}.{part}\n\n{}",
-                lines("Text", 14)
+                lines("The text of this part goes on and on, line", 14)
             ));
             hierarchy.push_str(&format!(
                 "\n\n### Detail {chapter}.{part}\n\n{}",
-                lines("Detail", 6)
+                lines("Another detail of the part, line", 6)
             ));
         }
     }
@@ -205,7 +208,10 @@ pub(super) fn corner_cases() -> Vec<(&'static str, BoardMeta, Card)> {
                 ),
             ),
         ));
-    let mut checklist = plain("Checklist page break", lines("filler", 30));
+    let mut checklist = plain(
+        "Checklist page break",
+        lines("This filler line is plain English text, line", 30),
+    );
     checklist.checklist = (0..14)
         .map(|i| ChecklistItem {
             text: if i == 3 {
@@ -386,10 +392,12 @@ fn corner_cases_are_set_in_their_language() {
             "03g-portuguese-quotes" => Some(Lang::Pt),
             "03h-swedish-quotes" => Some(Lang::Sv),
             "03i-turkish-quotes" => Some(Lang::Tr),
+            // Everything else is English, so its fixed texts are too.
             _ => None,
         };
-        if let Some(lang) = expected {
-            assert_eq!(Lang::detect(&card), Some(lang), "{name}");
+        match expected {
+            Some(lang) => assert_eq!(Lang::detect(&card), Some(lang), "{name}"),
+            None => assert!(Lang::of(&card) == Lang::En, "{name} is not English"),
         }
     }
 }

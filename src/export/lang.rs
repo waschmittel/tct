@@ -22,6 +22,18 @@ pub enum Lang {
     Tr,
 }
 
+/// Fixed texts of the PDF that are not part of the card.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Label {
+    Description,
+    Checklist,
+    Due,
+    Created,
+    Updated,
+    /// The time the PDF was made.
+    Status,
+}
+
 /// Opening and closing double and single quotes.
 pub struct Quotes {
     pub open2: &'static str,
@@ -155,6 +167,93 @@ impl Lang {
         }
     }
 
+    /// A fixed text of the PDF in this language.
+    pub fn label(self, label: Label) -> &'static str {
+        use Label::*;
+        let [description, checklist, due, created, updated, status] = match self {
+            Lang::En => [
+                "Description",
+                "Checklist",
+                "Due",
+                "Created",
+                "Updated",
+                "Status",
+            ],
+            Lang::De => [
+                "Beschreibung",
+                "Checkliste",
+                "Fällig",
+                "Erstellt",
+                "Aktualisiert",
+                "Stand",
+            ],
+            Lang::Fr => [
+                "Description",
+                "Liste de contrôle",
+                "Échéance",
+                "Créé",
+                "Mis à jour",
+                "État",
+            ],
+            Lang::Es => [
+                "Descripción",
+                "Lista de comprobación",
+                "Vence",
+                "Creado",
+                "Actualizado",
+                "Estado",
+            ],
+            Lang::It => [
+                "Descrizione",
+                "Checklist",
+                "Scadenza",
+                "Creato",
+                "Aggiornato",
+                "Stato",
+            ],
+            Lang::Nl => [
+                "Beschrijving",
+                "Checklist",
+                "Vervalt",
+                "Aangemaakt",
+                "Bijgewerkt",
+                "Stand",
+            ],
+            Lang::Pt => [
+                "Descrição",
+                "Lista de verificação",
+                "Prazo",
+                "Criado",
+                "Atualizado",
+                "Estado",
+            ],
+            Lang::Sv => [
+                "Beskrivning",
+                "Checklista",
+                "Förfaller",
+                "Skapad",
+                "Uppdaterad",
+                "Status",
+            ],
+            Lang::Tr => [
+                "Açıklama",
+                "Kontrol listesi",
+                "Son tarih",
+                "Oluşturuldu",
+                "Güncellendi",
+                "Durum",
+            ],
+        };
+        match label {
+            Description => description,
+            Checklist => checklist,
+            Due => due,
+            Created => created,
+            Updated => updated,
+            Status => status,
+        }
+    }
+
     /// The alert title in capitals; Turkish has a dotted capital İ for i.
     pub fn alert_title_upper(self, kind: Alert) -> String {
         let title = self.alert_title(kind);
@@ -168,7 +267,7 @@ impl Lang {
         use Alert::*;
         let [note, tip, important, caution, warning] = match self {
             Lang::En => ["Note", "Tip", "Important", "Caution", "Warning"],
-            Lang::De => ["Hinweis", "Tipp", "Wichtig", "Vorsicht", "Warnung"],
+            Lang::De => ["Hinweis", "Tipp", "Wichtig", "Achtung", "Warnung"],
             Lang::Fr => [
                 "Remarque",
                 "Astuce",
@@ -199,14 +298,15 @@ impl Lang {
     }
 }
 
-/// Title and description without code, which says nothing about the language.
+/// Title and description without code and table rows (labels, numbers),
+/// which say little about the language.
 fn prose(card: &Card) -> String {
     let mut text = card.title.clone();
     let mut fenced = false;
     for line in card.description.lines() {
         if line.starts_with("```") {
             fenced = !fenced;
-        } else if !fenced {
+        } else if !fenced && !line.trim_start().starts_with('|') {
             text.push('\n');
             let mut code = false;
             text.extend(line.split('`').filter(|_| {

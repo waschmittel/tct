@@ -7,10 +7,10 @@ impl<'f> Flow<'f> {
     pub(super) fn description(&mut self, blocks: &[Block]) {
         let first = &blocks[..section_end(blocks, 0).max(1).min(blocks.len())];
         self.keep_together(&|f| {
-            f.section_title("Description");
+            f.section_title(f.lang.label(Label::Description));
             f.blocks_inner(first, true);
         });
-        self.section_title("Description");
+        self.section_title(self.lang.label(Label::Description));
         self.blocks_inner(blocks, true);
     }
 

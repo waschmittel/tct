@@ -21,7 +21,7 @@ regex = "1"
 arboard = "3.7"
 unicode-width = "0.2"
 # PDF/A export (embedded DejaVu fonts, validated at finish)
-# Language detection of a card for the PDF (quotes, alert titles)
+# Language detection of a card for the PDF (quotes, alert titles, fixed texts)
 whichlang = "0.1.1"
 krilla = { version = "0.8", default-features = false, features = ["simple-text"] }
 skrifa = "0.49"

@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use super::Theme;
 use super::blocks::{Note, Style};
-use super::lang::Lang;
+use super::lang::{Label, Lang};
 use crate::alert::Alert;
 use crate::insert::table::Align;
 use crate::model::board::BoardMeta;

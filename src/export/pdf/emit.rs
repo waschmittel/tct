@@ -49,7 +49,7 @@ pub(super) fn emit(
     document.set_metadata(metadata);
 
     let total = pages.len();
-    let created = format!("Status {}", stamp(now));
+    let created = format!("{} {}", Lang::of(card).label(Label::Status), stamp(now));
     let location = format!("{} › {}", board.name, list);
     for (n, ops) in pages.iter().enumerate() {
         let mut page = document.start_page_with(
