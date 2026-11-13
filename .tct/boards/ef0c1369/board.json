@@ -1,0 +1,19 @@
+{
+  "name": "Test",
+  "position": 0.0,
+  "lists": [
+    {
+      "id": "543b9eae",
+      "name": "L",
+      "archived": false
+    }
+  ],
+  "labels": [],
+  "accent_color": "cyan",
+  "new_card_position": "bottom",
+  "archived": false,
+  "show_created_date": false,
+  "show_updated_date": false,
+  "created_at": "2026-11-13T15:24:26.157777Z",
+  "updated_at": "2026-11-13T15:24:26.157777Z"
+}
