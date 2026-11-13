@@ -164,8 +164,19 @@ pub(super) fn shift_list_item(textarea: &mut tui_textarea::TextArea<'static>, ne
         }
 
         // Top-level item: remove the marker completely so it is no longer a list item or citation.
+        let number = (current == Marker::Numbered)
+            .then(|| {
+                trimmed
+                    .split('.')
+                    .next()
+                    .and_then(|n| n.parse::<u64>().ok())
+            })
+            .flatten();
         textarea.move_cursor(CursorMove::Jump(row as u16, 0));
         textarea.delete_str(old_marker_len);
+        if let Some(n) = number {
+            hand_over_number(textarea, row, n);
+        }
         renumber_all(textarea);
         let new_line_len = textarea.lines().get(row).map_or(0, |l| l.chars().count());
         let target_col = col.saturating_sub(old_marker_len).min(new_line_len);
@@ -229,6 +240,36 @@ pub(super) fn shift_list_item(textarea: &mut tui_textarea::TextArea<'static>, ne
     true
 }
 
+/// The numbered item at `row` just stopped being one: the next numbered item at
+/// the same level below it takes over its number `n`, so the remaining items
+/// stay gapless (`renumber_all` then continues from it).
+fn hand_over_number(textarea: &mut tui_textarea::TextArea<'static>, row: usize, n: u64) {
+    let next = textarea.lines()[row + 1..]
+        .iter()
+        .enumerate()
+        .find_map(|(i, line)| {
+            let trimmed = line.trim_start();
+            let indent = line.len() - trimmed.len();
+            if trimmed.is_empty() {
+                return Some(None);
+            }
+            if indent > 0 {
+                return None; // a child of the item that left
+            }
+            Some(match parse_marker(trimmed) {
+                Some((Marker::Numbered, _)) => Some(row + 1 + i),
+                _ => None,
+            })
+        })
+        .flatten();
+    if let Some(r) = next {
+        let digits = textarea.lines()[r].find('.').unwrap_or(0);
+        textarea.move_cursor(CursorMove::Jump(r as u16, 0));
+        textarea.delete_str(digits);
+        textarea.insert_str(n.to_string());
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum Marker {
     Bullet(char),
@@ -287,9 +328,10 @@ pub(crate) fn renumber_all(textarea: &mut tui_textarea::TextArea<'static>) {
     let saved = textarea.cursor();
 
     let mut stack: Vec<(usize, u64)> = Vec::new();
+    let fenced = fenced_rows(&lines);
 
     for (r, line) in lines.iter().enumerate() {
-        if line.is_empty() {
+        if fenced[r] || line.is_empty() {
             stack.clear();
             continue;
         }
@@ -310,6 +352,7 @@ pub(crate) fn renumber_all(textarea: &mut tui_textarea::TextArea<'static>) {
                 }
             }
 
+            // A run keeps the number it starts at (as CommonMark does).
             let expected = match stack.last() {
                 Some(&(top_indent, next)) if top_indent == indent => next,
                 _ => n,

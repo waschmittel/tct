@@ -65,7 +65,7 @@ fn shift_tab_on_top_level_list_item_removes_marker() {
     e2.input.textarea.move_cursor(CursorMove::Top);
     e2.input.textarea.move_cursor(CursorMove::End);
     press(&mut e2, KeyCode::BackTab);
-    assert_eq!(editor_lines(&e2), vec!["a".to_string(), "2. b".to_string()]);
+    assert_eq!(editor_lines(&e2), vec!["a".to_string(), "1. b".to_string()]);
     assert_eq!(editor_cursor(&e2), (0, 1));
 
     let mut e3 = make_editor("- first\n- second");
@@ -367,11 +367,11 @@ fn shift_tab_with_selection_unnests_all_selected_items() {
 }
 
 #[test]
-fn shift_tab_on_selected_top_level_items_removes_markers_and_keeps_run_start() {
+fn shift_tab_on_selected_top_level_items_removes_markers_and_renumbers_the_rest() {
     let mut e = make_editor("1. a\n2. b\n3. c\n4. d");
     select(&mut e, (0, 0), (1, 4));
     press(&mut e, KeyCode::BackTab);
-    assert_eq!(lines_of(&e), ["a", "b", "3. c", "4. d"]);
+    assert_eq!(lines_of(&e), ["a", "b", "1. c", "2. d"]);
 }
 
 #[test]
@@ -551,4 +551,83 @@ fn whole_document_selection_via_select_all() {
     e.input.textarea.select_all();
     press(&mut e, KeyCode::Tab);
     assert_eq!(lines_of(&e), ["   - a", "   - b"]);
+}
+
+// ── Un-listing renumbers the remaining items ─────────────────────────
+
+#[test]
+fn unlisting_the_first_item_renumbers_the_rest_from_one() {
+    let e = unnest_at("1. a\n2. b\n3. c", 0, 3);
+    assert_eq!(lines_of(&e), ["a", "1. b", "2. c"]);
+}
+
+#[test]
+fn unlisting_a_middle_item_keeps_the_remaining_ones_gapless() {
+    let e = unnest_at("1. a\n2. b\n3. c\n4. d", 1, 3);
+    assert_eq!(lines_of(&e), ["1. a", "b", "2. c", "3. d"]);
+}
+
+#[test]
+fn unlisting_the_last_item_changes_nothing_else() {
+    let e = unnest_at("1. a\n2. b\n3. c", 2, 3);
+    assert_eq!(lines_of(&e), ["1. a", "2. b", "c"]);
+}
+
+#[test]
+fn unlisting_skips_children_of_the_item_that_left() {
+    let e = unnest_at("1. a\n   - child\n2. b\n3. c", 0, 3);
+    assert_eq!(lines_of(&e), ["a", "   - child", "1. b", "2. c"]);
+}
+
+#[test]
+fn unlisting_does_not_reach_across_a_blank_line_or_other_text() {
+    let e = unnest_at("1. a\n\n5. b\n6. c", 0, 3);
+    assert_eq!(lines_of(&e), ["a", "", "5. b", "6. c"]);
+    let e = unnest_at("1. a\ntext\n2. b", 0, 3);
+    assert_eq!(lines_of(&e), ["a", "text", "2. b"]);
+}
+
+#[test]
+fn unlisting_handles_number_width_changes() {
+    let e = unnest_at("9. a\n10. b\n11. c", 0, 3);
+    assert_eq!(lines_of(&e), ["a", "9. b", "10. c"]);
+    let e = unnest_at("1. a\n2. b\n10. c\n11. d", 0, 3);
+    assert_eq!(lines_of(&e), ["a", "1. b", "2. c", "3. d"]);
+}
+
+#[test]
+fn unlisting_a_bullet_or_citation_leaves_numbers_alone() {
+    let e = unnest_at("- a\n1. b\n2. c", 0, 2);
+    assert_eq!(lines_of(&e), ["a", "1. b", "2. c"]);
+    let e = unnest_at("> q\n3. b\n4. c", 0, 3);
+    assert_eq!(lines_of(&e), ["q", "3. b", "4. c"]);
+}
+
+#[test]
+fn unnesting_to_a_parent_level_still_joins_and_renumbers() {
+    let e = unnest_at("1. a\n   1. b\n2. d", 1, 6);
+    assert_eq!(lines_of(&e), ["1. a", "2. b", "3. d"]);
+}
+
+#[test]
+fn unlisting_is_one_undo_step() {
+    let mut e = unnest_at("1. a\n2. b\n3. c", 0, 3);
+    ctrl(&mut e, 'z');
+    assert_eq!(lines_of(&e), ["1. a", "2. b", "3. c"]);
+}
+
+#[test]
+fn unlisting_a_selected_prefix_of_a_run_renumbers_the_rest() {
+    let mut e = make_editor("1. a\n2. b\n3. c\n4. d");
+    select(&mut e, (0, 0), (1, 4));
+    press(&mut e, KeyCode::BackTab);
+    assert_eq!(lines_of(&e), ["a", "b", "1. c", "2. d"]);
+}
+
+#[test]
+fn unlisting_a_selected_middle_item_range() {
+    let mut e = make_editor("1. a\n2. b\n3. c\n4. d");
+    select(&mut e, (1, 0), (2, 4));
+    press(&mut e, KeyCode::BackTab);
+    assert_eq!(lines_of(&e), ["1. a", "b", "c", "2. d"]);
 }

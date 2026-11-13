@@ -255,7 +255,7 @@ In the PDF, `...` becomes `â€¦` and straight quotes become typographic ones (`â€
 | Ctrl+X | Cut selected text |
 | Ctrl+V | Paste from clipboard |
 | Ctrl+N | Footnote: insert reference and jump to its definition (in a definition: jump back) |
-| Ctrl+P | Paste mode on/off: plain text only (no list continuation, renumbering, table reflow). Leaving it normalizes tables, list indents and numbers (not fenced code) |
+| Ctrl+P | Paste mode on/off: plain text only (no list continuation, renumbering, table reflow); normalized when you leave it |
 | Shift+Arrows | Select text |
 | Ctrl+B | Toggle bold (`**text**`); without a selection in a table cell, formats the cell |
 | Ctrl+E | Toggle italic (`*text*`); not `Ctrl+I`, which terminals send as Tab |
@@ -267,7 +267,7 @@ In the PDF, `...` becomes `â€¦` and straight quotes become typographic ones (`â€
 | Shift+Tab | Un-nest list item (or selected lines) |
 | Esc | Cancel (confirms if changed) |
 
-Saving (`Ctrl+S` / `Ctrl+Q`) stores the cursor position in the card (`description_cursor`, not in the history); the next edit resumes there, even after a restart. Only a save that changed the text stores it: moving the cursor alone, or discarding, does not. CLI edits leave it alone.
+Saving (`Ctrl+S` / `Ctrl+Q`) normalizes the text (tables, list indents, numbering; not fenced code) and writes only if something changed, which keeps history and sync free of noise. The cursor position is stored in the card and restored on the next edit.
 
 On macOS, **Cmd** can substitute for Ctrl in terminals that support it (kitty, Alacritty, WezTerm).
 

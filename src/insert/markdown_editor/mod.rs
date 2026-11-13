@@ -67,6 +67,21 @@ impl MarkdownEditor {
         self.paste_mode
     }
 
+    /// Normalize before a save and say whether there is anything to save.
+    /// Untouched text is left as it is (a cursor-only session must not rewrite
+    /// the card); leaving paste mode normalizes by itself.
+    fn normalize_for_save(&mut self) -> bool {
+        let was_paste = self.paste_mode;
+        self.leave_paste_mode();
+        if !self.input.is_modified() {
+            return false;
+        }
+        if !was_paste {
+            grouped(&mut self.input.textarea, None, normalize);
+        }
+        true
+    }
+
     /// Leave paste mode (if on) and normalize the whole text as one undo step.
     fn leave_paste_mode(&mut self) {
         if std::mem::take(&mut self.paste_mode) {
@@ -208,8 +223,7 @@ impl MarkdownEditor {
                 }
             }
             (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
-                self.leave_paste_mode();
-                if !self.input.is_modified() {
+                if !self.normalize_for_save() {
                     // Nothing but maybe the cursor moved: not worth a save.
                     return InsertOutcome::Stay;
                 }
@@ -222,8 +236,7 @@ impl MarkdownEditor {
                 })
             }
             (KeyCode::Char('q'), m) if has_ctrl_or_cmd(m) => {
-                self.leave_paste_mode();
-                if !self.input.is_modified() {
+                if !self.normalize_for_save() {
                     return InsertOutcome::Cancel;
                 }
                 let body = self.input.current_text();

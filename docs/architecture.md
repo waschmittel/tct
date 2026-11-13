@@ -92,7 +92,7 @@ src/
       mod.rs           # Handler + key dispatch
       lists.rs         # Autocontinue, nest/unnest, renumber
       footnotes.rs     # Footnote insert/jump/renumber (ADR-0017)
-      normalize.rs     # Paste-mode normalization
+      normalize.rs     # Normalization (every save, paste-mode exit)
       tests/           # basics, enter, numbered, nesting, renumber, quotes, session, footnotes
     date_picker.rs   # Due-date picker
     line_input.rs    # Shared single-line buffer/cursor base

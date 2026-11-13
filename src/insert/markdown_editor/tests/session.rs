@@ -256,3 +256,75 @@ fn paste_mode_normalizing_to_the_original_is_not_a_change() {
     paste_mode_on(&mut e);
     assert!(matches!(ctrl_out(&mut e, 's'), InsertOutcome::Stay));
 }
+
+// ── Normalization on every save ──────────────────────────────────────
+
+fn save_text(e: &mut MarkdownEditor) -> String {
+    match ctrl_out(e, 's') {
+        InsertOutcome::Save(Command::EditCardDescription { body, .. }) => body,
+        _ => panic!("expected a save"),
+    }
+}
+
+#[test]
+fn every_save_normalizes_without_paste_mode() {
+    let mut e = make_editor("5. a\n9. b\n    - deep\n|a|b|\n|-|-|\n|1|2|");
+    plain(&mut e, '!');
+    assert!(!e.paste_mode());
+    let body = save_text(&mut e);
+    let lines: Vec<&str> = body.lines().collect();
+    assert_eq!(&lines[..2], ["5. a", "6. b"]);
+    assert_eq!(lines[2], "   - deep");
+    assert!(lines[4].starts_with("| ---"), "{lines:?}");
+}
+
+#[test]
+fn ctrl_q_normalizes_too_and_in_one_undo_step() {
+    let mut e = make_editor("1. a\n  - b");
+    plain(&mut e, 'x');
+    let out = ctrl_out(&mut e, 'q');
+    assert!(matches!(
+        out,
+        InsertOutcome::Confirm(Command::EditCardDescription { ref body, .. }) if body == "1. a\n   - bx"
+    ));
+    ctrl(&mut e, 'z');
+    assert_eq!(editor_lines(&e)[1], "  - bx");
+}
+
+#[test]
+fn fenced_code_is_not_normalized_on_save() {
+    let mut e = make_editor("```\n5. keep\n9. keep\n```");
+    plain(&mut e, 'x');
+    let body = save_text(&mut e);
+    assert!(body.contains("5. keep\n9. keep"), "{body}");
+}
+
+#[test]
+fn untouched_text_is_not_normalized_or_saved() {
+    let mut e = make_editor("5. a\n9. b");
+    assert!(matches!(ctrl_out(&mut e, 's'), InsertOutcome::Stay));
+    assert!(matches!(ctrl_out(&mut e, 'q'), InsertOutcome::Cancel));
+    assert_eq!(editor_lines(&e), ["5. a", "9. b"]);
+}
+
+#[test]
+fn saved_text_is_stable_under_a_second_normalization() {
+    let mut e = make_editor("2. a\n   7. b\n 9. c");
+    plain(&mut e, 'x');
+    let first = save_text(&mut e);
+    plain(&mut e, 'y');
+    let second = save_text(&mut e);
+    assert_eq!(first.lines().count(), second.lines().count());
+    assert_eq!(
+        second.replace('y', "").replace("x", ""),
+        first.replace('x', "")
+    );
+}
+
+#[test]
+fn numbered_lines_in_fences_keep_their_numbers_when_editing_around_them() {
+    let mut e = make_editor("```\n5. x\n```\n3. a");
+    cursor_at(&mut e, 3, 4);
+    press(&mut e, KeyCode::Enter);
+    assert_eq!(editor_lines(&e)[1], "5. x");
+}
