@@ -199,8 +199,16 @@ fn board_details(b: &BoardChange) -> Vec<Detail> {
     out
 }
 
+/// Marks every commit tct makes, so they stand out in `git log`.
+pub const SUBJECT_PREFIX: &str = "TCT: ";
+
 /// `(subject, body)` — the body is empty when the subject says it all.
 pub fn message(changes: &[BoardChange]) -> (String, String) {
+    let (subject, body) = describe(changes);
+    (format!("{SUBJECT_PREFIX}{subject}"), body)
+}
+
+fn describe(changes: &[BoardChange]) -> (String, String) {
     let touched: Vec<(&BoardChange, Vec<Detail>)> = changes
         .iter()
         .map(|b| (b, board_details(b)))
@@ -346,7 +354,10 @@ mod tests {
         let b = board("Sprint", &[("l1", "To Do"), ("l2", "Done")]);
         let c = edited(card("Fix login", "l1"), |c| c.list_id = ListId::from("l2"));
         let (s, body) = message(&[change(Some(b.clone()), Some(b), vec![c])]);
-        assert_eq!(s, "Board \"Sprint\": card \"Fix login\" moved to \"Done\"");
+        assert_eq!(
+            s,
+            "TCT: Board \"Sprint\": card \"Fix login\" moved to \"Done\""
+        );
         assert_eq!(body, "");
     }
 
@@ -386,7 +397,7 @@ mod tests {
             new: None,
         };
         let (s, body) = message(&[change(Some(b.clone()), Some(b), vec![created, deleted])]);
-        assert_eq!(s, "Board \"B\": 2 cards updated");
+        assert_eq!(s, "TCT: Board \"B\": 2 cards updated");
         assert_eq!(
             body,
             "- card \"Fresh\" created in \"To Do\"\n- card \"Gone\" deleted"
@@ -407,15 +418,15 @@ mod tests {
             },
         ];
         let (s, _) = message(&[change(None, Some(b.clone()), cards)]);
-        assert_eq!(s, "Board \"New\": created (2 cards)");
+        assert_eq!(s, "TCT: Board \"New\": created (2 cards)");
         let (s, _) = message(&[change(Some(b.clone()), None, vec![])]);
-        assert_eq!(s, "Board \"New\": deleted");
+        assert_eq!(s, "TCT: Board \"New\": deleted");
         let one = vec![CardChange {
             old: Some(card("a", "l1")),
             new: None,
         }];
         let (s, _) = message(&[change(Some(b), None, one)]);
-        assert_eq!(s, "Board \"New\": deleted (1 card)");
+        assert_eq!(s, "TCT: Board \"New\": deleted (1 card)");
     }
 
     #[test]
@@ -433,7 +444,7 @@ mod tests {
         });
         new.lists.swap(0, 1);
         let (s, body) = message(&[change(Some(old), Some(new), vec![])]);
-        assert_eq!(s, "Board \"New\": 6 changes");
+        assert_eq!(s, "TCT: Board \"New\": 6 changes");
         for expected in [
             "- renamed from \"Old\"",
             "- list \"D\" added",
@@ -454,7 +465,7 @@ mod tests {
             change(Some(b.clone()), Some(b), vec![c])
         };
         let (s, body) = message(&[mk("A", "one"), mk("B", "two")]);
-        assert_eq!(s, "Boards \"A\", \"B\" updated");
+        assert_eq!(s, "TCT: Boards \"A\", \"B\" updated");
         assert_eq!(
             body,
             "Board \"A\":\n- card \"one\" edited\n\nBoard \"B\":\n- card \"two\" edited"
@@ -466,7 +477,7 @@ mod tests {
             mk("D", "4"),
             mk("E", "5"),
         ]);
-        assert_eq!(s, "Boards \"A\", \"B\", \"C\" and 2 more updated");
+        assert_eq!(s, "TCT: Boards \"A\", \"B\", \"C\" and 2 more updated");
     }
 
     #[test]
@@ -480,7 +491,7 @@ mod tests {
             })
             .collect();
         let (s, body) = message(&[change(Some(b.clone()), Some(b), cards)]);
-        assert_eq!(s, "Board \"B\": 25 cards updated");
+        assert_eq!(s, "TCT: Board \"B\": 25 cards updated");
         let lines: Vec<&str> = body.lines().collect();
         assert_eq!(lines.len(), MAX_DETAILS + 1);
         assert_eq!(lines[MAX_DETAILS], "- … and 5 more");
@@ -497,6 +508,9 @@ mod tests {
 
     #[test]
     fn nothing_describable_is_a_generic_subject() {
-        assert_eq!(message(&[]), ("Update tct data".to_string(), String::new()));
+        assert_eq!(
+            message(&[]),
+            ("TCT: Update tct data".to_string(), String::new())
+        );
     }
 }

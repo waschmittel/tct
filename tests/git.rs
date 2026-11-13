@@ -134,7 +134,10 @@ fn cli_commands_never_commit_but_tct_commit_does() {
     sh(&root, &["add", "outside.txt"]);
 
     let out = ok(&root, &["commit"]);
-    assert!(out.starts_with("Committed: Board \"Sprint\":"), "{out}");
+    assert!(
+        out.starts_with("Committed: TCT: Board \"Sprint\":"),
+        "{out}"
+    );
     let files = sh(&root, &["show", "--name-only", "--pretty=format:", "HEAD"]);
     assert!(
         files
@@ -164,7 +167,7 @@ fn cli_commands_never_commit_but_tct_commit_does() {
     let out = ok(&root, &["commit"]);
     assert_eq!(
         out.trim(),
-        "Committed: Board \"Sprint\": card \"Fix logout\" renamed from \"Fix login\""
+        "Committed: TCT: Board \"Sprint\": card \"Fix logout\" renamed from \"Fix login\""
     );
 }
 

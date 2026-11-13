@@ -705,7 +705,7 @@ tct --git                   # show the setting
 In the TUI board view, `C` commits now (works with commit-on-quit off). The CLI's other commands never commit.
 
 - **Only `.tct/` is committed** — whatever else you have staged stays staged and out of the commit.
-- **Messages use titles**: `Board "Sprint": card "Fix login" moved to "Done"` for a single change, `Board "Sprint": 3 cards updated` or `Boards "A", "B" updated` plus one line per change otherwise.
+- **Messages use titles** and every subject starts with `TCT: `: `TCT: Board "Sprint": card "Fix login" moved to "Done"` for a single change, `TCT: Board "Sprint": 3 cards updated` or `TCT: Boards "A", "B" updated` plus one line per change otherwise.
 - The setting is local git config (`tct.autocommit`), so each clone opts in separately; it is not stored in `.tct/`.
 - Commits skip hooks and signing so they never block, and are refused during a merge, rebase, cherry-pick or revert. A failed commit-on-quit prints a warning.
 - Needs `git` on the `PATH`, an identity (`user.name`/`user.email`), and a `.tct/` that is not git-ignored.

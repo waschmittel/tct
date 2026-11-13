@@ -439,7 +439,7 @@ mod tests {
 
             set_enabled(true).unwrap();
             assert!(commit_on_quit().is_none());
-            assert_eq!(subject(root), "Board \"A\": created");
+            assert_eq!(subject(root), "TCT: Board \"A\": created");
             assert!(sh(root, &["status", "--porcelain"]).is_empty());
 
             // A failure is returned, not swallowed.
@@ -468,12 +468,12 @@ mod tests {
             card.list_id = todo;
             card_store::save_card(&board.id, &card).unwrap();
             commit().unwrap();
-            assert_eq!(subject(root), "Board \"Sprint\": created (1 card)");
+            assert_eq!(subject(root), "TCT: Board \"Sprint\": created (1 card)");
 
             card.list_id = done;
             card_store::save_card(&board.id, &card).unwrap();
             let out = commit().unwrap();
-            let expected = "Board \"Sprint\": card \"Fix login\" moved to \"Done\"";
+            let expected = "TCT: Board \"Sprint\": card \"Fix login\" moved to \"Done\"";
             assert_eq!(out, Outcome::Committed(expected.into()));
             assert_eq!(subject(root), expected);
         });
@@ -484,7 +484,7 @@ mod tests {
         with_repo(|root| {
             // Only README/.version are new: no board to name.
             assert!(matches!(commit().unwrap(), Outcome::Committed(_)));
-            assert_eq!(subject(root), "Update tct data");
+            assert_eq!(subject(root), "TCT: Update tct data");
         });
     }
 
@@ -523,7 +523,7 @@ mod tests {
             commit().unwrap();
             board_store::delete_board(&board.id).unwrap();
             commit().unwrap();
-            assert_eq!(subject(root), "Board \"Gone\": deleted");
+            assert_eq!(subject(root), "TCT: Board \"Gone\": deleted");
         });
     }
 
