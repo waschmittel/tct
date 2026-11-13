@@ -377,6 +377,18 @@ Sleep 800ms
 Type "<"
 Sleep 800ms
 
+# Filter by label: pick one in the dialog; non-matching cards are hidden
+Type "f"
+Sleep 800ms
+Down
+Sleep 500ms
+Space
+Sleep 800ms
+Escape
+Sleep 1.5s
+Type "F"
+Sleep 800ms
+
 # Search, jump to the match, clear filters
 Type "/"
 Sleep 400ms
