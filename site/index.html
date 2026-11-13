@@ -18,11 +18,11 @@
 <body>
 <nav><div class="wrap">
   <a class="brand" href="#top"><img src="icon.svg" alt="" width="26" height="26"><span>tct<span>_</span></span></a>
-  <a class="l" href="#install">Install</a>
-  <a class="l" href="#features">Why</a>
-  <a class="l" href="#agents">Agents</a>
-  <a class="l" href="#pdf">PDF</a>
-  <a class="l" href="#faq">FAQ</a>
+  <a class="l" href="#install" style="--h:190" aria-label="Install"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M4 19h16"/></svg><span>Install</span></a>
+  <a class="l" href="#features" style="--h:265" aria-label="Features"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg><span>Features</span></a>
+  <a class="l" href="#agents" style="--h:320" aria-label="Agents"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16v4M17 18h4"/></svg><span>Agents</span></a>
+  <a class="l" href="#pdf" style="--h:0" aria-label="PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg><span>PDF</span></a>
+  <a class="l" href="#faq" style="--h:235" aria-label="FAQ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4z"/></svg><span>FAQ</span></a>
   <a class="l strong" href="guide/">User guide</a>
 </div></nav>
 
@@ -57,8 +57,7 @@
 <main class="wrap">
 
 <section id="install">
-  <p class="eyebrow">Install</p>
-  <h2>Up and running in a minute.</h2>
+  <div class="head"><span class="ic" style="--h:190"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M4 19h16"/></svg></span><div><p class="eyebrow">Install</p><h2>Up and running in a minute.</h2></div></div>
   <div class="tabs">
     <div role="tablist" aria-label="Installation method">
       <button role="tab" aria-selected="true" aria-controls="t-brew" id="b-brew">Homebrew</button>
@@ -80,7 +79,7 @@ cargo install --path .</pre></div>
       <h3>Your first board</h3>
       <p>Just run <code>tct</code>: your boards live in <code>~/.tct/</code>. Optionally, run <code>tct init</code> in a project (for example a git repo) to keep its boards next to your code in <code>./.tct/</code>, like <code>git init</code>.</p>
     </div>
-    <div class="window copy"><pre><span class="p">$</span> tct              <span class="c"># open the board selector (~/.tct)</span>
+    <div class="window"><pre><span class="p">$</span> tct              <span class="c"># open the board selector</span>
 <span class="p">$</span> tct --board sprint  <span class="c"># jump straight into a board</span>
 
 <span class="c"># optional: boards local to a project</span>
@@ -88,42 +87,52 @@ cargo install --path .</pre></div>
   </div>
 </section>
 
-<section id="who">
-  <p class="eyebrow">Who it's for</p>
-  <h2>One tool, three ways to work.</h2>
-  <div class="grid">
-    <div class="card"><h3><span class="ic">🧑‍💻</span>Solo developers</h3><p>Keep your tasks in the terminal where you already work. No browser tab, no account, no context switch.</p></div>
-    <div class="card"><h3><span class="ic">👥</span>Teams in a repo</h3><p>Commit <code>.tct/</code> and everyone who pulls sees the same board. Cards live in separate files, so merges stay boring.</p></div>
-    <div class="card"><h3><span class="ic">🤖</span>Scripts &amp; AI agents</h3><p>A complete CLI and a user guide embedded in the binary: <code>tct --help user-guide</code>.</p></div>
-  </div>
-</section>
-
 <section id="features">
-  <p class="eyebrow">Why tct</p>
-  <h2>Small, sharp feature set.</h2>
-  <p class="lead">Every board and every card is one human-readable JSON file. That single decision makes tct easy to sync, diff, script and trust.</p>
-  <div class="grid">
-    <div class="card"><h3>Markdown descriptions</h3><p>Highlighting, soft wrap, auto-continued lists, live-reformatted tables, footnotes, alerts and undo/redo. It remembers where you left off.</p></div>
-    <div class="card"><h3>Checklists</h3><p>Add, edit, toggle, delete and reorder items; progress shows on the card, e.g. <code>[2/3]</code>.</p></div>
-    <div class="card"><h3>Labels</h3><p>Board-wide labels with auto-generated pastel colors that stay maximally distinct.</p></div>
-    <div class="card"><h3>Due dates</h3><p>A calendar picker and clear overdue display in the list and the detail view.</p></div>
-    <div class="card"><h3>Archive &amp; history</h3><p>Archive cards, lists and boards and restore them later. Every card keeps a change history.</p></div>
-    <div class="card"><h3>Accent colors</h3><p>Each board gets its own accent: cycle pastels or pick any color.</p></div>
-    <div class="card"><h3>Any terminal</h3><p>Truecolor where available, quantized to 256 or 16 colors elsewhere, with a fallback for the bare Linux console.</p></div>
-    <div class="card"><h3>Files are the API</h3><p>Standalone, readable JSON. Any tool that can read and write files can work with your boards.</p></div>
-    <div class="card"><h3>Sync-friendly</h3><p>One file per card, atomic writes, live reload. Different cards never conflict.</p></div>
-    <div class="card"><h3>Dual interface</h3><p>A TUI for humans, a headless CLI for scripts and AI agents — same data, same files.</p></div>
-    <div class="card"><h3>Zero infrastructure</h3><p>A single binary. No database, no daemon, no network, no sign-up.</p></div>
-    <div class="card"><h3>Print-ready</h3><p>Export any card as a PDF/A — black and gray for monochrome printers, or in color.</p></div>
+  <div class="head"><span class="ic" style="--h:265"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span><div><p class="eyebrow">Why tct</p><h2>Small, sharp feature set.</h2></div></div>
+  <div class="group">
+    <h3 class="gh">Organize</h3>
+    <p class="gd">Boards, lists and cards, kept simple.</p>
+    <div class="grid g4">
+      <div class="card"><h3><span class="ic" style="--h:215"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.2"/><rect x="9.5" y="4" width="5" height="10" rx="1.2"/><rect x="16" y="4" width="5" height="13" rx="1.2"/></svg></span>Boards, lists, cards</h3><p>As many boards as you like, each with its own accent color. Move cards within a list or across lists.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:30"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5V4a1 1 0 0 1 1-1h7.5l9 9a1.5 1.5 0 0 1 0 2.1l-5.4 5.4a1.5 1.5 0 0 1-2.1 0L3 9.5z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></span>Labels &amp; due dates</h3><p>Colored labels, a calendar picker, and overdue cards that stand out.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:175"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></span>Search &amp; filter</h3><p>Hide everything that doesn't match a search or a label, and see only what you're looking for.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:45"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4.5" rx="1"/><path d="M5 8.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8.5M10 13h4"/></svg></span>Archive &amp; history</h3><p>Nothing is deleted by accident: archive cards, lists and boards and restore them later. Every card keeps its change history.</p></div>
+    </div>
+  </div>
+  <div class="group">
+    <h3 class="gh">Write</h3>
+    <p class="gd">Everything a task needs, nothing it doesn't.</p>
+    <div class="grid g4">
+      <div class="card"><h3><span class="ic" style="--h:280"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.2-4.3L16.2 4.7a2.1 2.1 0 0 1 3 3L8.3 18.8z"/><path d="M14.5 6.5l3 3"/></svg></span>Markdown descriptions</h3><p>Live highlighting, auto-continued lists, tables that realign as you type, footnotes, alerts and undo/redo. It remembers where you left off.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:145"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5l1.8 1.8L9 4.8M3.5 15l1.8 1.8L9 13.3M13 7h8M13 15.5h8"/></svg></span>Checklists</h3><p>Progress shows on the card, e.g. <code>[2/3]</code>. Copy a checklist as Markdown.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg></span>PDF export</h3><p>Turn a card into a PDF/A. Sections stay together across pages and footnotes sit at the bottom of the page.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:235"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg></span>Built-in help</h3><p>Shows exactly the keys that work on the current screen.</p></div>
+    </div>
+  </div>
+  <div class="group">
+    <h3 class="gh">Own your data</h3>
+    <p class="gd">Plain files you control, no service in between.</p>
+    <div class="grid g3">
+      <div class="card"><h3><span class="ic" style="--h:190"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>Plain files</h3><p>One readable JSON file per card. Diff them, grep them, edit them with any tool.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:160"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></span>Git or any sync</h3><p>Commit <code>.tct/</code> with <code>tct commit</code> or on quit, or use Dropbox or Syncthing. Different cards never conflict, and the board updates live when files change.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:255"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>Runs anywhere</h3><p>One binary for macOS, Linux and Windows, with no server or account. Colors adapt to any terminal, down to the bare Linux console.</p></div>
+    </div>
+  </div>
+  <div class="group">
+    <h3 class="gh">One tool, three ways to work</h3>
+    <div class="grid g3">
+      <div class="card"><h3><span class="ic" style="--h:200"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><path d="M12 19h8"/></svg></span>Solo developers</h3><p>Keep your tasks in the terminal where you already work. No browser tab, no account, no context switch.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:265"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1"/><circle cx="17" cy="9" r="2.5"/><path d="M17.5 14a4 4 0 0 1 3.5 4v2"/></svg></span>Teams in a repo</h3><p>Commit <code>.tct/</code> and everyone who pulls sees the same board. Cards live in separate files, so merges stay boring.</p></div>
+      <div class="card"><h3><span class="ic" style="--h:320"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><path d="M9 13.5v1.5M15 13.5v1.5"/></svg></span>Scripts &amp; AI agents</h3><p>A complete CLI and a user guide embedded in the binary: <code>tct --help user-guide</code>.</p></div>
+    </div>
   </div>
 </section>
 
 <section id="agents">
-  <p class="eyebrow">Also for agents</p>
-  <h2>Works for AI agents, too.</h2>
+  <div class="head"><span class="ic" style="--h:320"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16v4M17 18h4"/></svg></span><div><p class="eyebrow">Also for agents</p><h2>Works for AI agents, too.</h2></div></div>
   <p class="lead">Because boards are plain files and everything is scriptable, an AI agent can share a board with you: you use the TUI, the agent uses the CLI, and tct reloads from disk when files change so its changes show up on your screen. Nothing to host, nothing to configure.</p>
   <div class="split">
-    <div class="window copy"><div class="bar"><i></i><i></i><i></i><b>an agent, working a card</b></div><pre><span class="c"># read the task</span>
+    <div class="window"><pre><span class="c"># read the task</span>
 <span class="p">$</span> tct cards <span class="s">"Sprint"</span> --show <span class="s">"caching"</span>
 
 <span class="c"># plan it, then report progress</span>
@@ -145,8 +154,7 @@ items as you go, run <span class="s">`tct commit`</span> when you finish.</pre><
 </section>
 
 <section id="pdf">
-  <p class="eyebrow">PDF export</p>
-  <h2>From card to paper.</h2>
+  <div class="head"><span class="ic" style="--h:0"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg></span><div><p class="eyebrow">PDF export</p><h2>From card to paper.</h2></div></div>
   <p class="lead">Press <kbd>p</kbd> for a black-and-gray PDF/A made for monochrome printers, or <kbd>P</kbd> for color. Fonts are embedded, so it looks the same everywhere. Headings, lists, tables, code, footnotes and alerts are laid out with sensible page breaks. The language is detected from the card.</p>
   <div class="compare" id="compare">
     <div class="seg" role="tablist" aria-label="Which part of the card">
@@ -158,7 +166,7 @@ items as you go, run <span class="s">`tct commit`</span> when you finish.</pre><
       <button type="button" role="tab" aria-selected="false" data-style="color">Color</button>
     </div>
     <div class="pair">
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>terminal</b></div><img id="cmp-term" src="img/shot-detail.webp" width="1240" height="960" alt="The card in tct's detail view"></div><figcaption>In the terminal</figcaption></figure>
+      <figure><div class="window"><img id="cmp-term" src="img/shot-detail.webp" width="1240" height="960" alt="The card in tct's detail view"></div><figcaption>In the terminal</figcaption></figure>
       <figure><a id="cmp-pdf-link" href="export/showcase-mono.pdf"><img id="cmp-pdf" class="paper" src="img/pdf-mono-1.webp" width="827" height="1170" alt="The same card as a PDF page"></a><figcaption>As a PDF (<a id="cmp-pdf-link2" href="export/showcase-mono.pdf">open</a>)</figcaption></figure>
     </div>
   </div>
@@ -166,12 +174,11 @@ items as you go, run <span class="s">`tct commit`</span> when you finish.</pre><
 </section>
 
 <section id="faq">
-  <p class="eyebrow">FAQ</p>
-  <h2>Good to know.</h2>
+  <div class="head"><span class="ic" style="--h:235"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4z"/></svg></span><div><p class="eyebrow">FAQ</p><h2>Good to know.</h2></div></div>
   <details><summary>Do I need git?</summary><p>No. Git is optional and strictly opt-in; tct never commits in the background. Any file sync works.</p></details>
   <details><summary>Does tct talk to the network?</summary><p>No. There is no server, telemetry or account. The optional browser version is something you host yourself.</p></details>
   <details><summary>What if two people edit the same card?</summary><p>Writes are atomic and each card is its own file, so unrelated edits never clash. Concurrent edits to the <em>same</em> card are resolved by your sync tool as for any file.</p></details>
-  <details><summary>I cloned a repo that contains a <code>.tct/</code>. Is that safe?</summary><p>Yes: IDs are validated, symlinks are refused and terminal output is sanitized, so a malicious data directory can't read or write outside itself.</p></details>
+  <details><summary>Can I add or edit the files by hand?</summary><p>Yes, they are plain JSON. But tct keeps list membership, order and history consistent for you, and an invalid file makes loading fail. The command line is the better tool for changes from scripts.</p></details>
 </section>
 
 </main>
@@ -192,15 +199,25 @@ for (const tabs of document.querySelectorAll(".tabs")) {
     }
   });
 }
+const ICONS = {
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
+  copied: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  failed: '<path d="M6 6l12 12M18 6L6 18"/>',
+};
 for (const w of document.querySelectorAll(".window.copy")) {
   const btn = document.createElement("button");
-  btn.textContent = "copy";
+  const show = state => {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[state]}</svg>`;
+    btn.dataset.state = state;
+    btn.title = btn.ariaLabel = { copy: "Copy", copied: "Copied", failed: "Copy failed" }[state];
+  };
+  show("copy");
   btn.addEventListener("click", async () => {
     const lines = [...w.querySelector("pre").innerText.split("\n")]
       .filter(l => !l.startsWith("#")).map(l => l.replace(/^\$ /, "").replace(/\s+#.*$/, ""));
-    try { await navigator.clipboard.writeText(lines.join("\n").trim()); btn.textContent = "copied"; }
-    catch { btn.textContent = "failed"; }
-    setTimeout(() => (btn.textContent = "copy"), 1500);
+    try { await navigator.clipboard.writeText(lines.join("\n").trim()); show("copied"); }
+    catch { show("failed"); }
+    setTimeout(() => show("copy"), 1500);
   });
   w.append(btn);
 }
