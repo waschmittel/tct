@@ -155,12 +155,12 @@ impl Dialog for CardHistory {
         Some(super::DialogHelp {
             title: " Help — Card History ",
             rows: vec![
-                ("Up / Down / j / k", "Select entry"),
-                ("g / Home", "Newest entry"),
-                ("G / End", "Oldest entry"),
-                ("PgUp / PgDn", "Scroll the detail pane"),
-                ("x / d / Del", "Delete entry (asks to confirm)"),
-                ("Esc / q / h", "Close"),
+                ("↑ / ↓ / j / k", "select entry"),
+                ("g / home", "newest entry"),
+                ("G / end", "oldest entry"),
+                ("pgup / pgdn", "scroll the detail pane"),
+                ("x / d / del", "delete entry (asks to confirm)"),
+                ("esc / q / h", "close"),
             ],
         })
     }
@@ -666,7 +666,7 @@ mod tests {
                     .unwrap()
                     .rows
                     .iter()
-                    .any(|(k, _)| k.contains("Del"))
+                    .any(|(k, _)| k.contains("del"))
             );
         });
     }

@@ -309,13 +309,12 @@ impl Dialog for ExportPdf {
         Some(DialogHelp {
             title: " Help — Export PDF ",
             rows: vec![
-                ("Type", "Path of the file (empty name: card title)"),
-                ("Up / Down", "Browse folders and PDFs below"),
-                ("Tab", "Open folder / take name; complete typed name"),
-                ("Enter", "Open selected folder, else save"),
-                ("..", "Go up one folder"),
-                ("Esc", "Deselect, then cancel"),
-                ("F1", "This help"),
+                ("type", "path of the file (empty name: card title)"),
+                ("↑ / ↓", "browse folders and PDFs"),
+                ("tab", "open folder / take name; complete typed name"),
+                ("enter", "open selected folder, else save"),
+                ("..", "go up one folder"),
+                ("esc", "deselect, then cancel"),
             ],
         })
     }

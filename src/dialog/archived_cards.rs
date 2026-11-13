@@ -109,10 +109,10 @@ impl Dialog for ArchivedCards {
         Some(super::DialogHelp {
             title: " Help — Archived Cards ",
             rows: vec![
-                ("Up / Down", "Select card"),
-                ("Enter", "Restore card"),
-                ("x", "Delete permanently"),
-                ("Esc", "Close"),
+                ("↑ / ↓", "select card"),
+                ("enter", "restore card"),
+                ("x", "delete permanently"),
+                ("esc", "close"),
             ],
         })
     }

@@ -331,25 +331,22 @@ impl Dialog for ColorPicker {
                 title: " Help — Board Configuration ",
                 rows: vec![
                     (
-                        "Up / Down",
-                        "Select field (hue, saturation, lightness, new items)",
+                        "↑ / ↓",
+                        "select field (hue, saturation, lightness, new items)",
                     ),
-                    (
-                        "Left / Right",
-                        "Adjust selected field / change new items position",
-                    ),
-                    ("Space", "Toggle new items (when selected)"),
-                    ("Enter", "Apply configuration"),
-                    ("Esc", "Cancel"),
+                    ("← / →", "adjust selected field"),
+                    ("space", "toggle new items (when selected)"),
+                    ("enter", "apply configuration"),
+                    ("esc", "cancel"),
                 ],
             }),
             ColorTarget::Label { .. } => Some(super::DialogHelp {
                 title: " Help — Color Picker ",
                 rows: vec![
-                    ("Up / Down", "Select field (hue, saturation, lightness)"),
-                    ("Left / Right", "Adjust selected field"),
-                    ("Enter", "Apply color"),
-                    ("Esc", "Cancel"),
+                    ("↑ / ↓", "select field (hue, saturation, lightness)"),
+                    ("← / →", "adjust selected field"),
+                    ("enter", "apply color"),
+                    ("esc", "cancel"),
                 ],
             }),
         }

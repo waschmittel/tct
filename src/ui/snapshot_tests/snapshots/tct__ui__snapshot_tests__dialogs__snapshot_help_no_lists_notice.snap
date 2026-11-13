@@ -16,8 +16,8 @@ expression: render_to_string(&app)
                         ┌ Can't add a card ────────────────────────────────┐
                         │This board┌ Help — No Lists ──────────┐           │
                         │          │Keys                       │           │
-                        │Cards live│  n / Enter  Create a list │t,         │
-                        │then add c│  Esc / q    Close         │           │
+                        │Cards live│  n / enter  create a list │t,         │
+                        │then add c│  esc / q    close         │           │
                         │          └ Esc:close ───────── vTEST ┘           │
                         │ N  Create a list     Esc  Close                  │
                         └──────────────────────────────────────────────────┘

@@ -32,7 +32,7 @@ impl Dialog for ConfirmCancelEdit {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — Discard Changes ",
-            rows: vec![("y", "Discard changes"), ("n / Esc", "Keep editing")],
+            rows: vec![("y", "discard changes"), ("n / esc", "keep editing")],
         })
     }
 }

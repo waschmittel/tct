@@ -47,7 +47,7 @@ impl Dialog for ConfirmArchiveBoard {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — Archive Board ",
-            rows: vec![("y", "Archive board"), ("n / Esc", "Cancel")],
+            rows: vec![("y", "archive board"), ("n / esc", "cancel")],
         })
     }
 }

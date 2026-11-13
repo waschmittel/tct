@@ -49,7 +49,7 @@ impl Dialog for ConfirmClearDueDate {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — Clear Due Date ",
-            rows: vec![("y", "Clear due date"), ("n / Esc", "Cancel")],
+            rows: vec![("y", "clear due date"), ("n / esc", "cancel")],
         })
     }
 }

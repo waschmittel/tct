@@ -56,32 +56,32 @@ pub static KEYMAP: &[Binding<Action>] = &[
         code: KeyCode::Left,
         shift: Some(false),
         action: Action::SelectListLeft,
-        keys: "Left / Right",
-        help: "Switch lists",
+        keys: "← / →",
+        help: "switch list",
         section: "Navigation",
     },
     Binding {
         code: KeyCode::Right,
         shift: Some(false),
         action: Action::SelectListRight,
-        keys: "Left / Right",
-        help: "Switch lists",
+        keys: "← / →",
+        help: "switch list",
         section: "Navigation",
     },
     Binding {
         code: KeyCode::Up,
         shift: Some(false),
         action: Action::SelectCardUp,
-        keys: "Up / Down",
-        help: "Navigate cards",
+        keys: "↑ / ↓",
+        help: "select card",
         section: "Navigation",
     },
     Binding {
         code: KeyCode::Down,
         shift: Some(false),
         action: Action::SelectCardDown,
-        keys: "Up / Down",
-        help: "Navigate cards",
+        keys: "↑ / ↓",
+        help: "select card",
         section: "Navigation",
     },
     Binding {
@@ -89,7 +89,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::JumpFirstCard,
         keys: "g / G",
-        help: "First / last card",
+        help: "first/last card",
         section: "Navigation",
     },
     Binding {
@@ -97,7 +97,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::JumpLastCard,
         keys: "g / G",
-        help: "First / last card",
+        help: "first/last card",
         section: "Navigation",
     },
     Binding {
@@ -105,7 +105,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::SwitchBoardPrev,
         keys: "j/k or ,/.",
-        help: "Prev / next board",
+        help: "prev/next board",
         section: "Navigation",
     },
     Binding {
@@ -113,7 +113,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::SwitchBoardNext,
         keys: "j/k or ,/.",
-        help: "Prev / next board",
+        help: "prev/next board",
         section: "Navigation",
     },
     Binding {
@@ -121,7 +121,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::SwitchBoardPrev,
         keys: "j/k or ,/.",
-        help: "Prev / next board",
+        help: "prev/next board",
         section: "Navigation",
     },
     Binding {
@@ -129,15 +129,15 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::SwitchBoardNext,
         keys: "j/k or ,/.",
-        help: "Prev / next board",
+        help: "prev/next board",
         section: "Navigation",
     },
     Binding {
         code: KeyCode::Enter,
         shift: None,
         action: Action::OpenCardDetail,
-        keys: "Enter",
-        help: "Open card detail",
+        keys: "enter",
+        help: "open card detail",
         section: "Navigation",
     },
     // Card
@@ -146,7 +146,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::EditTitle,
         keys: "t",
-        help: "Quick-edit title",
+        help: "edit title",
         section: "Card",
     },
     Binding {
@@ -154,7 +154,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::EditDescription,
         keys: "e",
-        help: "Edit description",
+        help: "edit description",
         section: "Card",
     },
     Binding {
@@ -162,7 +162,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::CopyTitle,
         keys: "y",
-        help: "Copy title",
+        help: "copy title",
         section: "Card",
     },
     Binding {
@@ -170,7 +170,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::NewCard,
         keys: "n",
-        help: "New card",
+        help: "new card",
         section: "Card",
     },
     Binding {
@@ -178,7 +178,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ArchiveCard,
         keys: "a",
-        help: "Archive card",
+        help: "archive card",
         section: "Card",
     },
     Binding {
@@ -186,7 +186,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ViewArchivedCards,
         keys: "v",
-        help: "View archived cards",
+        help: "view archived cards",
         section: "Card",
     },
     Binding {
@@ -194,7 +194,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::CardHistoryDialog,
         keys: "h",
-        help: "View change history",
+        help: "view change history",
         section: "Card",
     },
     Binding {
@@ -202,7 +202,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ExportPdf,
         keys: "p",
-        help: "Export as PDF",
+        help: "export as PDF",
         section: "Card",
     },
     Binding {
@@ -210,7 +210,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ExportPdfColor,
         keys: "P",
-        help: "Export as color PDF",
+        help: "export as color PDF",
         section: "Card",
     },
     // Move. Grab mode exists because the Linux console (and vhs) never
@@ -220,32 +220,32 @@ pub static KEYMAP: &[Binding<Action>] = &[
         code: KeyCode::Left,
         shift: Some(true),
         action: Action::MoveCardLeft,
-        keys: "Shift+Left/Right",
-        help: "Move to adjacent list",
+        keys: "shift+←/→",
+        help: "move to adjacent list",
         section: "Move",
     },
     Binding {
         code: KeyCode::Right,
         shift: Some(true),
         action: Action::MoveCardRight,
-        keys: "Shift+Left/Right",
-        help: "Move to adjacent list",
+        keys: "shift+←/→",
+        help: "move to adjacent list",
         section: "Move",
     },
     Binding {
         code: KeyCode::Up,
         shift: Some(true),
         action: Action::MoveCardUp,
-        keys: "Shift+Up/Down",
-        help: "Move within list",
+        keys: "shift+↑/↓",
+        help: "move within list",
         section: "Move",
     },
     Binding {
         code: KeyCode::Down,
         shift: Some(true),
         action: Action::MoveCardDown,
-        keys: "Shift+Up/Down",
-        help: "Move within list",
+        keys: "shift+↑/↓",
+        help: "move within list",
         section: "Move",
     },
     Binding {
@@ -253,7 +253,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::GrabCard,
         keys: "m",
-        help: "Grab/drop card (arrows)",
+        help: "grab/drop card (arrows)",
         section: "Move",
     },
     // Lists
@@ -262,7 +262,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::NewList,
         keys: "N",
-        help: "New list",
+        help: "new list",
         section: "Lists",
     },
     Binding {
@@ -270,7 +270,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::RenameList,
         keys: "r",
-        help: "Rename list",
+        help: "rename list",
         section: "Lists",
     },
     Binding {
@@ -278,7 +278,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ArchiveList,
         keys: "A",
-        help: "Archive list",
+        help: "archive list",
         section: "Lists",
     },
     Binding {
@@ -286,7 +286,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ViewArchivedLists,
         keys: "V",
-        help: "View archived lists",
+        help: "view archived lists",
         section: "Lists",
     },
     Binding {
@@ -294,7 +294,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::MoveListLeft,
         keys: "< / >",
-        help: "Reorder list",
+        help: "reorder list",
         section: "Lists",
     },
     Binding {
@@ -302,7 +302,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::MoveListRight,
         keys: "< / >",
-        help: "Reorder list",
+        help: "reorder list",
         section: "Lists",
     },
     // Search & Filter
@@ -311,7 +311,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::Search,
         keys: "/",
-        help: "Search",
+        help: "search",
         section: "Search & Filter",
     },
     Binding {
@@ -319,7 +319,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::FilterByLabel,
         keys: "f",
-        help: "Filter by label",
+        help: "filter by label",
         section: "Search & Filter",
     },
     Binding {
@@ -327,7 +327,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ClearFilters,
         keys: "F",
-        help: "Clear filters",
+        help: "clear filters",
         section: "Search & Filter",
     },
     // Labels & Due
@@ -336,7 +336,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::AssignLabels,
         keys: "l",
-        help: "Assign / remove labels",
+        help: "edit card labels",
         section: "Labels & Due",
     },
     Binding {
@@ -344,7 +344,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ManageLabels,
         keys: "L",
-        help: "Manage labels",
+        help: "manage available labels",
         section: "Labels & Due",
     },
     Binding {
@@ -352,7 +352,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::SetDueDate,
         keys: "u",
-        help: "Set due date",
+        help: "set due date",
         section: "Labels & Due",
     },
     Binding {
@@ -360,7 +360,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ClearDueDate,
         keys: "U",
-        help: "Clear due date",
+        help: "clear due date",
         section: "Labels & Due",
     },
     // View
@@ -369,7 +369,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ToggleCreatedDate,
         keys: "c",
-        help: "Show/hide created date",
+        help: "show/hide created date",
         section: "View",
     },
     Binding {
@@ -377,7 +377,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::ToggleUpdatedDate,
         keys: "d",
-        help: "Show/hide updated date",
+        help: "show/hide updated date",
         section: "View",
     },
     // App
@@ -386,7 +386,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::CloseBoard,
         keys: "b",
-        help: "Back to selector",
+        help: "back to board selector",
         section: "App",
     },
     Binding {
@@ -394,7 +394,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::Commit,
         keys: "C",
-        help: "Commit data to git",
+        help: "commit data to git",
         section: "App",
     },
     Binding {
@@ -402,7 +402,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::Help,
         keys: "?",
-        help: "Help",
+        help: "",
         section: "App",
     },
     Binding {
@@ -410,7 +410,7 @@ pub static KEYMAP: &[Binding<Action>] = &[
         shift: None,
         action: Action::Quit,
         keys: "q",
-        help: "Quit",
+        help: "quit",
         section: "App",
     },
 ];

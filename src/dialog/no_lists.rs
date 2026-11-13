@@ -66,7 +66,7 @@ impl Dialog for NoLists {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — No Lists ",
-            rows: vec![("n / Enter", "Create a list"), ("Esc / q", "Close")],
+            rows: vec![("n / enter", "create a list"), ("esc / q", "close")],
         })
     }
 }

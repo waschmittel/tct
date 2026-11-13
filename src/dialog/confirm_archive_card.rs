@@ -45,7 +45,7 @@ impl Dialog for ConfirmArchiveCard {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — Archive Card ",
-            rows: vec![("y", "Archive card"), ("n / Esc", "Cancel")],
+            rows: vec![("y", "archive card"), ("n / esc", "cancel")],
         })
     }
 }

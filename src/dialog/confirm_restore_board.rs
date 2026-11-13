@@ -76,7 +76,7 @@ impl Dialog for ConfirmRestoreBoard {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — Restore Board ",
-            rows: vec![("y", "Restore board"), ("n / Esc", "Cancel")],
+            rows: vec![("y", "restore board"), ("n / esc", "cancel")],
         })
     }
 }

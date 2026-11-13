@@ -106,11 +106,11 @@ flowchart LR
     CD["Card Detail<br><i>Full card editing</i>"]
     DE["Description Editor<br><i>Markdown with highlighting</i>"]
 
-    BS -->|Enter| BV
-    BV -->|Enter| CD
+    BS -->|enter| BV
+    BV -->|enter| CD
     CD -->|e| DE
-    DE -->|Ctrl+Q / Esc| CD
-    CD -->|Esc| BV
+    DE -->|ctrl+q / esc| CD
+    CD -->|esc| BV
     BV -->|b| BS
 
     style BS fill:#555,stroke:#fff,color:#fff
@@ -125,9 +125,9 @@ The first screen you see. Lists all active boards.
 
 | Key | Action |
 |-----|--------|
-| Up / Down | Select board |
-| Shift+Up / Shift+Down | Reorder board |
-| Enter | Open selected board |
+| ↑ / ↓ | Select board |
+| shift+↑/↓ | Reorder board |
+| enter | Open selected board |
 | n | Create new board |
 | r | Rename selected board |
 | c | Cycle board accent color |
@@ -145,8 +145,8 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 
 | Key | Action |
 |-----|--------|
-| Left / Right | Switch list |
-| Up / Down | Select card |
+| ← / → | Switch list |
+| ↑ / ↓ | Select card |
 | g | Jump to first card |
 | G | Jump to last card |
 
@@ -154,7 +154,7 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 
 | Key | Action |
 |-----|--------|
-| Enter | Open card detail |
+| enter | Open card detail |
 | t | Quick-edit card title (inline) |
 | e | Edit card description |
 | y | Copy card title |
@@ -166,8 +166,8 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 
 | Key | Action |
 |-----|--------|
-| Shift+Up / Shift+Down | Move card within list |
-| Shift+Left / Shift+Right | Move card to next list |
+| shift+↑/↓ | Move card within list |
+| shift+←/→ | Move card to next list |
 
 **List management:**
 
@@ -177,8 +177,8 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 | r | Rename current list |
 | A | Archive list |
 | V | Archived lists |
-| < (Shift+,) | Move list left |
-| > (Shift+.) | Move list right |
+| < (shift+,) | Move list left |
+| > (shift+.) | Move list right |
 
 **Labels & due dates:**
 
@@ -214,14 +214,14 @@ A full overlay showing all card properties: title, description, checklist, label
 |-----|--------|
 | t | Edit title |
 | e | Edit description |
-| PgUp / PgDn | Scroll description |
+| pgup / pgdn | Scroll description |
 | y | Copy description |
 | Y | Copy checklist as Markdown |
-| Up / Down | Select checklist item |
-| Shift+Up / Shift+Down | Reorder checklist item |
-| Space | Toggle checklist item |
+| ↑ / ↓ | Select checklist item |
+| shift+↑/↓ | Reorder checklist item |
+| space | Toggle checklist item |
 | a | Add new checklist item |
-| Enter | Edit checklist item |
+| enter | Edit checklist item |
 | x | Delete checklist item |
 | l | Assign / remove labels |
 | L | Manage board labels |
@@ -229,51 +229,51 @@ A full overlay showing all card properties: title, description, checklist, label
 | U | Clear due date |
 | h | Card history |
 | ? | Help |
-| Esc | Close card detail |
+| esc | Close card detail |
 | q | Quit |
 
 ### Description Editor
 
 A Markdown editor with syntax highlighting: headings, bold, italic, inline code, code blocks, lists, blockquotes (`> text` per line, or between two `>>>` lines), alerts, footnotes, tables and strikethrough.
 
-**Alerts** are quotes whose first line is a tag: `> [!note]` plus `> ` lines, or `>>> [!note]` … `>>>`. Kinds: `note` (blue), `tip` (green), `important` (purple), `warning` (gold), `caution` (red); unknown tags stay ordinary quotes. The read view shows the kind in bold capitals in the alert's color; the PDF adds a colored bar and GitHub's icon (black in the monochrome theme). In a quote, `Ctrl+G` then `n` `t` `i` `c` `w` makes it an alert or changes its kind; `x` makes it a plain quote again.
+**Alerts** are quotes whose first line is a tag: `> [!note]` plus `> ` lines, or `>>> [!note]` … `>>>`. Kinds: `note` (blue), `tip` (green), `important` (purple), `warning` (gold), `caution` (red); unknown tags stay ordinary quotes. The read view shows the kind in bold capitals in the alert's color; the PDF adds a colored bar and GitHub's icon (black in the monochrome theme). In a quote, `ctrl+g` then `n` `t` `i` `c` `w` makes it an alert or changes its kind; `x` makes it a plain quote again.
 
 In the PDF, `...` becomes `…` and straight quotes become typographic ones (`„Hallo“`, `« bonjour »`, `“hello”`); code stays literal. The language is detected from the card's text (English, German, French, Spanish, Italian, Dutch, Portuguese, Swedish, Turkish; English when unsure) and also translates alert titles and fixed texts (section titles, dates). The export dialog shows it.
 
 **Footnotes** work as on GitHub/GitLab: a reference `text[^1]` and a definition `[^1]: The note.` anywhere in the text; labels may be names (`[^my-note]`). A note continues on following lines and, after a blank line, in paragraphs indented by four spaces. Unpaired references or definitions, and anything in code, stay literal. The PDF prints each note at the bottom of every page that references it, under its name, or for numbered labels a count (1, 2, …) by first reference.
 
-`Ctrl+N` inserts the next number as a reference at the cursor, renumbers the numbered footnotes to ascend by first reference (names and unpaired labels untouched), and jumps to the new definition, ready to type. In a definition it jumps back to the first reference. With text selected, the reference is named after it (`[^two-words]`; whitespace becomes `-`, max. 32 characters) and the text stays; an already defined name just jumps to its definition.
+`ctrl+n` inserts the next number as a reference at the cursor, renumbers the numbered footnotes to ascend by first reference (names and unpaired labels untouched), and jumps to the new definition, ready to type. In a definition it jumps back to the first reference. With text selected, the reference is named after it (`[^two-words]`; whitespace becomes `-`, max. 32 characters) and the text stays; an already defined name just jumps to its definition.
 
 | Key | Action |
 |-----|--------|
-| F1 / Ctrl+H | Help |
-| Ctrl+S | Save description |
-| Ctrl+Q | Save and close |
-| Ctrl+Z | Undo |
-| Ctrl+Y | Redo |
-| Ctrl+C | Copy selected text |
-| Ctrl+X | Cut selected text |
-| Ctrl+V | Paste from clipboard |
-| Ctrl+N | Footnote: insert reference and jump to its definition (in a definition: jump back) |
-| Ctrl+P | Paste mode on/off: plain text only (no list continuation, renumbering, table reflow); normalized when you leave it |
-| Shift+Arrows | Select text |
-| Ctrl+B | Toggle bold (`**text**`); without a selection in a table cell, formats the cell |
-| Ctrl+E | Toggle italic (`*text*`); not `Ctrl+I`, which terminals send as Tab |
-| Ctrl+K | Toggle inline code (`` `text` ``) |
-| Ctrl+L | Insert list item |
-| Up / Down | Move by visual (wrapped) line |
-| Enter | Continue bullet / numbered list |
-| Tab | Nest list item (or selected lines) |
-| Shift+Tab | Un-nest list item (or selected lines) |
-| Esc | Cancel (confirms if changed) |
+| f1 / ctrl+h | Help |
+| ctrl+s | Save description |
+| ctrl+q | Save and close |
+| ctrl+z | Undo |
+| ctrl+y | Redo |
+| ctrl+c | Copy selected text |
+| ctrl+x | Cut selected text |
+| ctrl+v | Paste from clipboard |
+| ctrl+n | Footnote: insert reference and jump to its definition (in a definition: jump back) |
+| ctrl+p | Paste mode on/off: plain text only (no list continuation, renumbering, table reflow); normalized when you leave it |
+| shift+←↑↓→ | Select text |
+| ctrl+b | Toggle bold (`**text**`); without a selection in a table cell, formats the cell |
+| ctrl+e | Toggle italic (`*text*`); not `ctrl+i`, which terminals send as Tab |
+| ctrl+k | Toggle inline code (`` `text` ``) |
+| ctrl+l | Insert list item |
+| ↑ / ↓ | Move by visual (wrapped) line |
+| enter | Continue bullet / numbered list |
+| tab | Nest list item (or selected lines) |
+| shift+tab | Un-nest list item (or selected lines) |
+| esc | Cancel (confirms if changed) |
 
-Saving (`Ctrl+S` / `Ctrl+Q`) normalizes the text (tables, list indents, numbering; not fenced code) and writes only if something changed, which keeps history and sync free of noise. The cursor position is stored in the card and restored on the next edit.
+Saving (`ctrl+s` / `ctrl+q`) normalizes the text (tables, list indents, numbering; not fenced code) and writes only if something changed, which keeps history and sync free of noise. The cursor position is stored in the card and restored on the next edit.
 
-On macOS, **Cmd** can substitute for Ctrl in terminals that support it (kitty, Alacritty, WezTerm).
+On macOS, **Cmd** can substitute for `ctrl` in terminals that support it (kitty, Alacritty, WezTerm).
 
 #### Tables
 
-A run of `|` lines whose second line is a delimiter row (`|---|---|`; `:--`, `:-:`, `--:` align) is a table, reformatted on every edit. `Tab` / `Shift+Tab` walk the cells (`Tab` in the last cell adds a row), `Enter` goes down a row, `Ctrl+T` inserts a skeleton, `Alt+arrows` / `Alt+Shift+arrows` move and add/delete rows and columns (`F1` lists all).
+A run of `|` lines whose second line is a delimiter row (`|---|---|`; `:--`, `:-:`, `--:` align) is a table, reformatted on every edit. `tab` / `shift+tab` walk the cells (`tab` in the last cell adds a row), `enter` goes down a row, `ctrl+t` inserts a skeleton, `alt+←↑↓→` / `alt+shift+←↑↓→` move and add/delete rows and columns (`f1` lists all).
 
 **Matrices.** A table with an empty top-left cell is a *matrix*: labels on the left as well as on top. Its first column is bold like the header and the corner is left open:
 
@@ -284,7 +284,7 @@ A run of `|` lines whose second line is a delimiter row (`|---|---|`; `:--`, `:-
 | Grace | review | owner |
 ```
 
-`Ctrl+T`, `t` *transposes* a matrix (other tables refuse it). Put text in the corner to get a normal table back. PDF details: [ADR-0013](adr/0013-matrix-tables.md).
+`ctrl+t`, `t` *transposes* a matrix (other tables refuse it). Put text in the corner to get a normal table back. PDF details: [ADR-0013](adr/0013-matrix-tables.md).
 
 ### PDF export
 
@@ -294,7 +294,7 @@ Sections, the checklist, code blocks and tables stay together on a page where th
 
 ### Search
 
-`/` in board view opens the search bar; type a query and press Enter. Non-matching cards are **hidden**, navigation skips them, and the first match is selected. `f` filters by label; `F` clears all filters.
+`/` in board view opens the search bar; type a query and press `enter`. Non-matching cards are **hidden**, navigation skips them, and the first match is selected. `f` filters by label; `F` clears all filters.
 
 ---
 
@@ -304,11 +304,11 @@ Labels are **board-level**: defined once per board, then assigned to cards, so r
 
 ### Creating labels
 
-`L` opens the label manager, `n` creates a label: type a name, press Enter. The color is generated to be distinct from existing labels.
+`L` opens the label manager, `n` creates a label: type a name, press `enter`. The color is generated to be distinct from existing labels.
 
 ### Assigning labels to cards
 
-`l` opens the label picker (board view or card detail): Up/Down to select, Space or Enter to toggle, Esc to close.
+`l` opens the label picker (board view or card detail): `↑`/`↓` to select, `space` or `enter` to toggle, `esc` to close.
 
 ### Label colors
 
@@ -325,16 +325,16 @@ The label manager cycles through named presets (Red, Orange, Yellow, Green, Blue
 
 ### Label ordering
 
-Cards show labels in **board-level order** (as in the label manager), not assignment order. Reorder them there with Shift+Up/Down.
+Cards show labels in **board-level order** (as in the label manager), not assignment order. Reorder them there with `shift+↑/↓`.
 
 ---
 
 ## Due Dates
 
 - `u` (card detail, or the selected card in board view) opens the calendar picker; `U` clears the date
-- Picker: arrows move by day/week, PgUp/PgDn by month (Shift = year), `t` jumps to today, Home/End to the month's first/last day
+- Picker: arrows move by day/week, `pgup`/`pgdn` by month (`shift` = year), `t` jumps to today, `home`/`end` to the month's first/last day
 - Or type the date (`YYYY-MM-DD`); the calendar follows as you type
-- Enter saves, Esc cancels; an emptied buffer (Ctrl+U) plus Enter removes the date
+- `enter` saves, `esc` cancels; an emptied buffer (`ctrl+u`) plus `enter` removes the date
 - **Overdue** cards are marked in the card list and detail view
 - Due dates show in CLI output (`tct cards <board>`) and search results
 
@@ -356,7 +356,7 @@ Archiving is a **soft delete**: data stays on disk but is hidden.
 |--------|-----|
 | Archive card | `a` in board view |
 | View archive | `v` in board view |
-| Restore | `Enter` in archive view |
+| Restore | `enter` in archive view |
 | Permanently delete | `x` in archive view |
 
 ### Lists
@@ -365,7 +365,7 @@ Archiving is a **soft delete**: data stays on disk but is hidden.
 |--------|-----|
 | Archive list | `A` in board view |
 | View archive | `V` in board view |
-| Restore | `Enter` in archive view |
+| Restore | `enter` in archive view |
 | Permanently delete | `x` in archive view |
 
 ### Boards
@@ -374,7 +374,7 @@ Archiving is a **soft delete**: data stays on disk but is hidden.
 |--------|-----|
 | Archive board | `a` in board selector |
 | View archive | `v` in board selector |
-| Restore | `Enter` in archive view |
+| Restore | `enter` in archive view |
 | Permanently delete | `x` in archive view |
 
 ---
@@ -784,7 +784,7 @@ A card is shown only if its `list_id` names a list in `board.json`. If a card is
 
 ### macOS Cmd key not working
 
-Cmd key support requires a terminal that sends Super modifier events. Supported: kitty, Alacritty, WezTerm. Not supported: Terminal.app, iTerm2 (use Ctrl instead).
+Cmd key support requires a terminal that sends Super modifier events. Supported: kitty, Alacritty, WezTerm. Not supported: Terminal.app, iTerm2 (use `ctrl` instead).
 
 ---
 

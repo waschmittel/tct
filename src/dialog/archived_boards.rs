@@ -117,10 +117,10 @@ impl Dialog for ArchivedBoards {
         Some(super::DialogHelp {
             title: " Help — Archived Boards ",
             rows: vec![
-                ("Up / Down", "Select board"),
-                ("Enter", "Restore board"),
-                ("x", "Delete permanently"),
-                ("Esc", "Close"),
+                ("↑ / ↓", "select board"),
+                ("enter", "restore board"),
+                ("x", "delete permanently"),
+                ("esc", "close"),
             ],
         })
     }

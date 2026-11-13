@@ -144,10 +144,10 @@ impl Dialog for LabelPicker {
         Some(super::DialogHelp {
             title: " Help — Labels ",
             rows: vec![
-                ("Up / Down", "Select label"),
-                ("Space / Enter", "Toggle label on card"),
-                ("L", "Manage labels (create, edit, delete)"),
-                ("Esc", "Back"),
+                ("↑ / ↓", "select label"),
+                ("space / enter", "toggle label on card"),
+                ("L", "manage labels (create, edit, delete)"),
+                ("esc", "back"),
             ],
         })
     }

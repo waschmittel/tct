@@ -47,7 +47,7 @@ impl Dialog for ConfirmArchiveList {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — Archive List ",
-            rows: vec![("y", "Archive list"), ("n / Esc", "Cancel")],
+            rows: vec![("y", "archive list"), ("n / esc", "cancel")],
         })
     }
 }

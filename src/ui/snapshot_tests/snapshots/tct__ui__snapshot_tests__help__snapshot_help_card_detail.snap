@@ -7,25 +7,25 @@ expression: render_to_string(&app)
 │┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓││┌──────────────────────────────────────────────┐│
 │┃Fix logi┌ Fix login flow ──────────────────────────────────────────────────────────────┐        ││
 │┃[bug]   │                                                                              │────────┘│
-│┃[1/┌ Help — Card Detail ────────────────────────────────────────────────────────────────────┐    │
-│┗━━━│Card                                         Labels & Due                               │    │
-│┌───│  t                 Edit title                 l                 Assign / remove labels │    │
-││Red│  e                 Edit description           L                 Manage labels          │    │
-│└───│  PgUp/PgDn ←/→     Scroll description         u                 Set due date           │    │
-│    │  y                 Copy description           U                 Clear due date         │    │
-│    │  Y                 Copy checklist (md)                                                 │    │
-│    │  h                 View change history      View                                       │    │
-│    │  p                 Export as PDF              c                 Show/hide created date │    │
-│    │  P                 Export as color PDF        d                 Show/hide updated date │    │
-│    │                                                                                        │    │
-│    │Checklist                                    App                                        │    │
-│    │  Up / Down         Navigate items             Esc               Close                  │    │
-│    │  Shift+Up/Down     Reorder item               ?                 Help                   │    │
-│    │  Space             Toggle item                q                 Quit                   │    │
-│    │  a                 Add item                                                            │    │
-│    │  Enter             Edit item                                                           │    │
-│    │  x                 Delete item                                                         │    │
-│    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
+│┃[1┌ Help — Card Detail ──────────────────────────────────────────────────────────────────────┐   │
+│┗━━│Card                                          Labels & Due                                │   │
+│┌──│  t                 edit title                  l                 assign / remove labels  │   │
+││Re│  e                 edit description            L                 manage labels           │   │
+│└──│  pgup/pgdn ←/→     scroll description          u                 set due date            │   │
+│   │  y                 copy description            U                 clear due date          │   │
+│   │  Y                 copy checklist (md)                                                   │   │
+│   │  h                 view change history       View                                        │   │
+│   │  p                 export as PDF               c                 show/hide created date  │   │
+│   │  P                 export as color PDF         d                 show/hide updated date  │   │
+│   │                                                                                          │   │
+│   │Checklist                                     App                                         │   │
+│   │  ↑ / ↓             navigate items              esc               close                   │   │
+│   │  shift+↑/↓         reorder item                q                 quit                    │   │
+│   │  space             toggle item                                                           │   │
+│   │  a                 add item                                                              │   │
+│   │  enter             edit item                                                             │   │
+│   │  x                 delete item                                                           │   │
+│   └ Esc:close ──────────────────────────────────────────────────────────────────────── vTEST ┘   │
 │         │                                                                              │         │
 │         │                                                                              │         │
 │         └──────────────────────────────────────────────────────────────────────────────┘         │

@@ -190,14 +190,14 @@ impl Dialog for LabelManager {
         Some(super::DialogHelp {
             title: " Help — Label Manager ",
             rows: vec![
-                ("Up / Down", "Select label"),
-                ("Shift+Up/Down", "Reorder label"),
-                ("n", "New label"),
-                ("e", "Rename label"),
-                ("c", "Cycle preset color"),
-                ("C", "Pick color (HSL)"),
-                ("d", "Delete label"),
-                ("Esc", "Close"),
+                ("↑ / ↓", "select label"),
+                ("shift+↑/↓", "reorder label"),
+                ("n", "new label"),
+                ("e", "rename label"),
+                ("c", "cycle preset color"),
+                ("C", "pick color"),
+                ("d", "delete label"),
+                ("esc", "close"),
             ],
         })
     }

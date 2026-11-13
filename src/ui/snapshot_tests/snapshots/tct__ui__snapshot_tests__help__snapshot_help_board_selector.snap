@@ -10,19 +10,19 @@ expression: render_to_string(&app)
 │  Beta                                                                                            │
 │                                                                                                  │
 │                                                                                                  │
-│    ┌ Help — Board Selector ─────────────────────────────────────────────────────────────────┐    │
-│    │Navigation                                   Actions                                    │    │
-│    │  Up / Down         Navigate boards            n                 New board              │    │
-│    │  Shift+Up/Down     Reorder board              r                 Rename board           │    │
-│    │  Enter             Open board                 c                 Cycle accent color     │    │
-│    │                                               C                 Board configuration    │    │
-│    │                                               a                 Archive board          │    │
-│    │                                               v                 View archived          │    │
-│    │                                                                                        │    │
-│    │                                             App                                        │    │
-│    │                                               ?                 Help                   │    │
-│    │                                               q                 Quit                   │    │
-│    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
+│                                                                                                  │
+│   ┌ Help — Board Selector ───────────────────────────────────────────────────────────────────┐   │
+│   │Navigation                                    Actions                                     │   │
+│   │  ↑ / ↓             select board                n                 new board               │   │
+│   │  shift+↑/↓         reorder board               r                 rename board            │   │
+│   │  enter             open board                  c                 cycle accent color      │   │
+│   │                                                C                 board configuration     │   │
+│   │                                                a                 archive board           │   │
+│   │                                                v                 view archived boards    │   │
+│   │                                                                                          │   │
+│   │                                              App                                         │   │
+│   │                                                q                 quit                    │   │
+│   └ Esc:close ──────────────────────────────────────────────────────────────────────── vTEST ┘   │
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │

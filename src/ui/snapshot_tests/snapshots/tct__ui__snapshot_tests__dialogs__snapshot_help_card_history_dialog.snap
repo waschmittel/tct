@@ -12,15 +12,15 @@ expression: "stamp.replace_all(&text, \"YYYY-MM-DD HH:MM\")"
 │┌│                                       │ No field values recorded.                            │ │
 │││                                       │                                                      │ │
 │└│                                       │                                                      │ │
-│ │                    ┌ Help — Card History ───────────────────────────────┐                    │ │
-│ │                    │Keys                                                │                    │ │
-│ │                    │  Up / Down / j / k  Select entry                   │                    │ │
-│ │                    │  g / Home           Newest entry                   │                    │ │
-│ │                    │  G / End            Oldest entry                   │                    │ │
-│ │                    │  PgUp / PgDn        Scroll the detail pane         │                    │ │
-│ │                    │  x / d / Del        Delete entry (asks to confirm) │                    │ │
-│ │                    │  Esc / q / h        Close                          │                    │ │
-│ │                    └ Esc:close ────────────────────────────────── vTEST ┘                    │ │
+│ │                      ┌ Help — Card History ───────────────────────────┐                      │ │
+│ │                      │Keys                                            │                      │ │
+│ │                      │  ↑ / ↓ / j / k  select entry                   │                      │ │
+│ │                      │  g / home       newest entry                   │                      │ │
+│ │                      │  G / end        oldest entry                   │                      │ │
+│ │                      │  pgup / pgdn    scroll the detail pane         │                      │ │
+│ │                      │  x / d / del    delete entry (asks to confirm) │                      │ │
+│ │                      │  esc / q / h    close                          │                      │ │
+│ │                      └ Esc:close ────────────────────────────── vTEST ┘                      │ │
 │ │                                       │                                                      │ │
 │ │                                       │                                                      │ │
 │ │                                       │                                                      │ │

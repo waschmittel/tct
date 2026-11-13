@@ -72,7 +72,7 @@ impl Dialog for ConfirmRestoreList {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — Restore List ",
-            rows: vec![("y", "Restore list"), ("n / Esc", "Cancel")],
+            rows: vec![("y", "restore list"), ("n / esc", "cancel")],
         })
     }
 }

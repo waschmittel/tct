@@ -11,7 +11,7 @@ pub struct Binding<A: Copy> {
     /// keys, where case already encodes shift.
     pub shift: Option<bool>,
     pub action: A,
-    /// Key display in the help overlay, e.g. `"Shift+Up/Down"`. Bindings
+    /// Key display in the help overlay, e.g. `"shift+↑/↓"`. Bindings
     /// sharing a help row use the same string; `help_rows` dedupes.
     pub keys: &'static str,
     pub help: &'static str,
@@ -24,12 +24,12 @@ pub fn lookup<A: Copy>(map: &[Binding<A>], code: KeyCode, shift: bool) -> Option
         .map(|b| b.action)
 }
 
-/// Help rows of one section, in table order, deduped (e.g. `"Up / Down"`
+/// Help rows of one section, in table order, deduped (e.g. `"↑ / ↓"`
 /// appears once even though Up and Down are two bindings).
 pub fn help_rows<A: Copy>(map: &[Binding<A>], section: &str) -> Vec<(&'static str, &'static str)> {
     let mut rows: Vec<(&'static str, &'static str)> = Vec::new();
     for b in map.iter().filter(|b| b.section == section) {
-        if !rows.iter().any(|(k, h)| *k == b.keys && *h == b.help) {
+        if !b.help.is_empty() && !rows.iter().any(|(k, h)| *k == b.keys && *h == b.help) {
             rows.push((b.keys, b.help));
         }
     }
@@ -52,7 +52,7 @@ mod tests {
             code: KeyCode::Up,
             shift: Some(false),
             action: A::X,
-            keys: "Up / Down",
+            keys: "↑ / ↓",
             help: "nav",
             section: "S",
         },
@@ -60,7 +60,7 @@ mod tests {
             code: KeyCode::Down,
             shift: Some(false),
             action: A::Y,
-            keys: "Up / Down",
+            keys: "↑ / ↓",
             help: "nav",
             section: "S",
         },
@@ -70,6 +70,14 @@ mod tests {
             action: A::Z,
             keys: "q",
             help: "quit",
+            section: "App",
+        },
+        Binding {
+            code: KeyCode::Char('?'),
+            shift: None,
+            action: A::Z,
+            keys: "?",
+            help: "",
             section: "App",
         },
     ];
@@ -82,8 +90,14 @@ mod tests {
     }
 
     #[test]
+    fn help_rows_skips_bindings_without_help_text() {
+        assert_eq!(help_rows(MAP, "App"), vec![("q", "quit")]);
+        assert_eq!(lookup(MAP, KeyCode::Char('?'), false), Some(A::Z));
+    }
+
+    #[test]
     fn help_rows_dedupes_shared_rows() {
-        assert_eq!(help_rows(MAP, "S"), vec![("Up / Down", "nav")]);
+        assert_eq!(help_rows(MAP, "S"), vec![("↑ / ↓", "nav")]);
         assert_eq!(help_rows(MAP, "App"), vec![("q", "quit")]);
     }
 }

@@ -109,10 +109,10 @@ impl Dialog for ArchivedLists {
         Some(super::DialogHelp {
             title: " Help — Archived Lists ",
             rows: vec![
-                ("Up / Down", "Select list"),
-                ("Enter", "Restore list"),
-                ("x", "Delete permanently"),
-                ("Esc", "Close"),
+                ("↑ / ↓", "select list"),
+                ("enter", "restore list"),
+                ("x", "delete permanently"),
+                ("esc", "close"),
             ],
         })
     }

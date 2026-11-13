@@ -67,7 +67,7 @@ impl Dialog for ConfirmRestoreCard {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — Restore Card ",
-            rows: vec![("y", "Restore card"), ("n / Esc", "Cancel")],
+            rows: vec![("y", "restore card"), ("n / esc", "cancel")],
         })
     }
 }

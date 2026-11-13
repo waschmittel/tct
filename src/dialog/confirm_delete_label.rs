@@ -74,7 +74,7 @@ impl Dialog for ConfirmDeleteLabel {
     fn help(&self) -> Option<super::DialogHelp> {
         Some(super::DialogHelp {
             title: " Help — Delete Label ",
-            rows: vec![("y", "Delete label from all cards"), ("n / Esc", "Cancel")],
+            rows: vec![("y", "delete label from all cards"), ("n / esc", "cancel")],
         })
     }
 }
