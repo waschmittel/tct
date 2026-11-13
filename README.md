@@ -76,7 +76,7 @@ tct          # board selector: press n for a new board, ? for help
 - macOS Cmd key support (in supported terminals)
 - Auto-continuing lists in editor
 - Per-board configurable accent color (pastel palette cycle with 'c', or free HSL color picker with 'C')
-- Periodic filesystem reload (every 15s) for background sync support
+- Live reload: watches the data directory (falls back to a 15s poll; `--no-watch` forces it)
 - PDF export of a card (PDF/A, fonts embedded, nothing to install) — black and gray for monochrome printers by default, or in color; long descriptions break across pages sensibly (see below)
 - Full CLI interface for scripting and AI agent use (`tct --help`)
 
@@ -88,6 +88,7 @@ tct can be used as a CLI tool without opening the TUI — useful for scripting o
 tct --help                              Overview and help topics (cli, examples, env, readme, user-guide)
 tct --version                           Print the version and exit
 tct --board <name>                      Open TUI directly on a matching board
+tct --no-watch                          Poll every 15s instead of watching files
 ```
 
 Commands use the pattern `tct <entity> <board> --<action> [args]`. Board (and card for checklist) always come before the action flag. The default action for each entity is listing.
@@ -217,7 +218,7 @@ tct boards --create "Sprint Board"
 git add .tct/ && git commit -m "Add project board"
 ```
 
-Team members who pull will see the board when they run `tct` from that project directory. Different cards never conflict. tct auto-reloads from disk every 15 seconds.
+Team members who pull will see the board when they run `tct` from that project directory. Different cards never conflict. tct reloads automatically when files change.
 
 `tct commit` commits `.tct/` (only it) with a message naming the boards and cards that changed; `tct --git enable` also does so when the TUI quits, and `C` in the board view commits at once. `tct init` turns this on by itself inside a git repository.
 
@@ -227,7 +228,7 @@ All keybindings are discoverable in the TUI via the `?` help overlay, which is c
 
 ## Using tct with AI agents
 
-tct also works well when an AI agent shares a board with you: you use the TUI, the agent uses the CLI. There is nothing to host and nothing to configure — both sides read and write the same JSON files, and the TUI reloads every 15 seconds so an agent's new card appears on your screen.
+tct also works well when an AI agent shares a board with you: you use the TUI, the agent uses the CLI. There is nothing to host and nothing to configure — both sides read and write the same JSON files, and the TUI reloads when files change so an agent's new card appears on your screen.
 
 ```sh
 tct cards "Sprint" --show "caching"                     # read the task

@@ -576,7 +576,7 @@ flowchart TD
 
 ### 8.6 Periodic Reload
 
-`App::on_tick()` reloads board data from the filesystem every 15 seconds (configurable via `reload_interval`). Reload is skipped during editing, dialog, or grab modes to prevent data loss. Selection state (selected list, card index, scroll offset) is preserved across reloads.
+`App::on_tick()` reloads board data when the data-directory watcher (`notify`, ADR-0021) reports a change, or every 15 seconds (configurable via `reload_interval`) without a watcher (`--no-watch`, or start/runtime failure). Reload is skipped during editing, dialog, or grab modes to prevent data loss. Selection state (selected list, card index, scroll offset) is preserved across reloads.
 
 ### 8.6a Git Integration
 
@@ -695,7 +695,7 @@ mindmap
 | QS-3 | Performance | User navigates 100+ cards on a board | Render completes within single frame |
 | QS-4 | Portability | User runs on macOS with kitty terminal | Cmd+S works via `has_ctrl_or_cmd()` helper |
 | QS-5 | Maintainability | Developer adds new card field | Follow documented 5-step recipe in AGENTS.md |
-| QS-6 | Data safety | Two tct instances access same board | Periodic reload (15s) picks up external changes |
+| QS-6 | Data safety | Two tct instances access same board | File watching (poll every 15s as fallback) picks up external changes |
 
 ---
 
@@ -732,7 +732,7 @@ mindmap
 | **Atomic write** | Write to `.tmp` then rename; ensures no partial file content. |
 | **Accent color** | Per-board `LabelColor` used for all UI highlights instead of hardcoded Cyan. |
 | **Pastel generation** | HSL-based algorithm that picks maximally distant hue from existing colors. |
-| **Periodic reload** | `on_tick()` reloads board from filesystem every 15s for external-change detection. |
+| **Periodic reload** | `on_tick()` reloads the board on watcher events (poll every 15s as fallback) for external-change detection. |
 | **Card archiving** | Soft-delete: card's `archived` flag set to true, removed from list but file kept. |
 | **Internal clipboard** | In-memory fallback buffer (`INTERNAL_CLIPBOARD`) enabling within-app copy/cut/paste even when system clipboard services are absent (ADR-0011). |
 | **Bracketed paste** | Terminal escape sequence capturing external multi-line pastes atomically into `AppEvent::Paste` (ADR-0011). |

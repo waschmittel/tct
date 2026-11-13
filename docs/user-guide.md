@@ -95,6 +95,7 @@ Without `tct init`, boards live in `~/.tct/`. See [Where data lives](#where-data
 ```sh
 tct                     # Open board selector
 tct --board "Sprint"    # Open directly into a board (partial name match)
+tct --no-watch          # Poll for external changes every 15 s instead of watching files
 ```
 
 ### Screens overview
@@ -496,14 +497,14 @@ tct also works well when people and AI agents share a **board**. There is no API
 | Interface | TUI (`tct`) | CLI (`tct cards …`) |
 | Reads | Board view, card detail | `tct cards <board>`, `--show`, `tct search`, or the JSON files |
 | Writes | Keyboard | `--create`, `--edit`, `--toggle`, `--assign`, … |
-| Sees the other's changes | Automatically, within 15 seconds | On the next command |
+| Sees the other's changes | Automatically, within a second (or 15 s with `--no-watch`) | On the next command |
 
 Why this works well:
 
 - **Self-documenting.** `tct --help` is a short overview; `tct --help cli`, `examples` and `env` give the full reference, and `tct --help user-guide --toc` / `--section <heading>` print this guide piece by piece. An agent needs no external documentation.
 - **Forgiving addressing.** Boards, lists, cards and labels match by case-insensitive partial name; ambiguity is an error that lists the candidates with their IDs. Use `--by-id` for exact matches.
 - **Predictable.** Errors go to stderr with a non-zero exit status. Control characters in titles are stripped from output, so a hostile card title cannot inject terminal escape sequences into an agent's or a human's terminal.
-- **Live for humans.** The TUI reloads from disk every 15 seconds, so a card an agent creates appears on the human's screen without a restart. A reload never interrupts editing.
+- **Live for humans.** The TUI watches the data directory and reloads when files change (every 15 seconds with `--no-watch`, or where watching is unavailable), so a card an agent creates appears on the human's screen without a restart. A reload never interrupts editing.
 - **Reviewable.** Every card keeps a change history (`h` in the TUI), and `tct commit` records changes to `.tct/` in git, with a message that names the boards and cards touched. Nothing is committed in the background; the agent or human decides when.
 
 ### Example: an agent works through a task
@@ -766,7 +767,7 @@ Check which directory tct resolves:
 
 ### Changes from another user don't appear
 
-tct reloads from disk every 15 seconds, but only in safe modes (board view, card detail, help). If you're in the middle of editing, reload is paused to prevent data loss. Close any editor/dialog and wait up to 15 seconds, or restart tct.
+tct reloads from disk as soon as files change (it watches the data directory; `tct --no-watch` polls every 15 seconds instead, as does tct where the platform watcher cannot start), but only in safe modes (board view, card detail, help). If you're in the middle of editing, the reload waits until you close the editor or dialog.
 
 ### Merge conflict in .tct/ files
 

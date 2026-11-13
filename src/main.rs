@@ -17,6 +17,7 @@ mod term_caps;
 mod term_out;
 mod text_diff;
 mod ui;
+mod watch;
 
 #[cfg(test)]
 mod test_support;
@@ -96,6 +97,9 @@ fn main() -> anyhow::Result<()> {
     app.caps = term_caps::TermCaps::detect();
     if std::env::var_os("TCT_WEB").is_some() {
         app.web_sink = Some(Box::new(std::io::stdout()));
+    }
+    if !args.iter().any(|a| a == "--no-watch") {
+        app.watcher = watch::Watcher::start(&storage::paths::base_dir());
     }
     let events = EventHandler::new(Duration::from_millis(250));
 

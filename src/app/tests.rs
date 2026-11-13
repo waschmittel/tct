@@ -51,6 +51,8 @@ fn bare_app() -> App {
         search_active: false,
         last_reload: Instant::now(),
         reload_interval: Duration::from_secs(15),
+        watcher: None,
+        reload_pending: false,
         dialog: None,
         insert: None,
         version: crate::VERSION,
@@ -447,4 +449,115 @@ fn copy_to_clipboard_reports_error_when_osc52_write_fails() {
         app.status_message.as_ref().map(|(m, _)| m.as_str()),
         Some("Clipboard not available: no display")
     );
+}
+
+/// Ticks until the board has `n` cards in its first list (or gives up).
+fn tick_until_cards(app: &mut App, n: usize) -> bool {
+    let end = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < end {
+        app.on_tick();
+        if app.board().unwrap().lists[0].card_ids.len() == n {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    false
+}
+
+fn add_card_on_disk(meta: &crate::model::board::BoardMeta, list: &crate::model::id::ListId) {
+    let mut c = Card::new("Disk-added".into());
+    c.list_id = list.clone();
+    c.position = 4.0;
+    card_store::save_card(&meta.id, &c).unwrap();
+}
+
+#[test]
+fn watcher_event_reloads_without_waiting_for_the_poll() {
+    with_temp_dir(|| {
+        let (meta, list, _) = make_board_with_cards();
+        let mut app = App::new(Some(meta.id.clone())).unwrap();
+        app.watcher = crate::watch::Watcher::start(&crate::storage::paths::base_dir());
+        assert!(app.watcher.is_some());
+        // The 15 s poll is far away (and 5 min with a watcher).
+        app.last_reload = Instant::now();
+
+        add_card_on_disk(&meta, &list);
+        assert!(
+            tick_until_cards(&mut app, 4),
+            "watcher did not trigger a reload"
+        );
+        assert!(!app.reload_pending);
+    });
+}
+
+#[test]
+fn watcher_event_waits_for_a_reloadable_mode() {
+    with_temp_dir(|| {
+        let (meta, list, _) = make_board_with_cards();
+        let mut app = App::new(Some(meta.id.clone())).unwrap();
+        app.watcher = crate::watch::Watcher::start(&crate::storage::paths::base_dir());
+        app.last_reload = Instant::now();
+        app.mode = AppMode::Dialog;
+
+        add_card_on_disk(&meta, &list);
+        let end = Instant::now() + Duration::from_secs(10);
+        while !app.reload_pending && Instant::now() < end {
+            app.on_tick();
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(app.reload_pending, "event not remembered");
+        assert_eq!(app.board().unwrap().lists[0].card_ids.len(), 3);
+
+        app.mode = AppMode::Normal;
+        app.on_tick();
+        assert_eq!(app.board().unwrap().lists[0].card_ids.len(), 4);
+        assert!(!app.reload_pending);
+    });
+}
+
+#[test]
+fn live_watcher_stretches_the_poll_to_a_safety_net() {
+    with_temp_dir(|| {
+        let (meta, list, _) = make_board_with_cards();
+        let mut app = App::new(Some(meta.id.clone())).unwrap();
+        app.watcher = crate::watch::Watcher::start(&crate::storage::paths::base_dir());
+        add_card_on_disk(&meta, &list);
+        // Swallow the event so only the poll interval could reload.
+        std::thread::sleep(Duration::from_millis(1000));
+        let _ = app.watcher.as_ref().unwrap().poll();
+
+        app.last_reload = Instant::now() - Duration::from_secs(20);
+        app.on_tick();
+        assert_eq!(
+            app.board().unwrap().lists[0].card_ids.len(),
+            3,
+            "15 s poll must not fire"
+        );
+
+        app.last_reload = Instant::now() - Duration::from_secs(301);
+        app.on_tick();
+        assert_eq!(
+            app.board().unwrap().lists[0].card_ids.len(),
+            4,
+            "safety net"
+        );
+    });
+}
+
+#[test]
+fn failed_watcher_falls_back_to_polling_with_a_toast() {
+    with_temp_dir(|| {
+        let (meta, _, _) = make_board_with_cards();
+        let mut app = App::new(Some(meta.id.clone())).unwrap();
+        let mut w = crate::watch::Watcher::start(&crate::storage::paths::base_dir()).unwrap();
+        w.kill_for_test();
+        app.watcher = Some(w);
+        app.on_tick();
+        assert!(app.watcher.is_none());
+        assert!(app.status_message.as_ref().unwrap().0.contains("polling"));
+        // Polling works again at the normal interval.
+        app.last_reload = Instant::now() - Duration::from_secs(16);
+        app.reload_pending = false;
+        app.on_tick();
+    });
 }

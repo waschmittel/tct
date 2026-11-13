@@ -18,6 +18,7 @@ A keyboard-driven TUI Kanban board. Run without arguments to open the TUI.
 USAGE:
     tct                              Open the TUI board selector
     tct --board <name>               Open TUI directly on a board (partial, case-insensitive)
+    tct --no-watch                   TUI: poll for external changes every 15s instead of watching files
     tct init [--git enable|disable]  Create ./.tct (or $TCT_DATA_DIR) with a README, like git init
     tct --git [enable|disable]       Commit .tct when the TUI quits (or show the setting)
     tct commit                       Commit .tct to git now

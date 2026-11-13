@@ -39,6 +39,9 @@ impl AppMode {
     }
 }
 
+/// Safety-net poll interval while a watcher delivers the real changes.
+const WATCHED_RELOAD_INTERVAL: Duration = Duration::from_secs(300);
+
 pub struct LoadedBoard {
     pub meta: BoardMeta,
     pub lists: Vec<CardList>,
@@ -150,6 +153,11 @@ pub struct App {
     pub search_active: bool,
     pub last_reload: Instant,
     pub reload_interval: Duration,
+    /// Data-directory watcher (ADR-0021); `None` means polling only.
+    pub watcher: Option<crate::watch::Watcher>,
+    /// A watcher event arrived that has not been applied yet (it may land
+    /// while editing or in a dialog, where reloading is deferred).
+    pub reload_pending: bool,
     /// Active modal **Dialog Kind** — present iff `mode == AppMode::Dialog`.
     pub dialog: Option<Box<dyn crate::dialog::Dialog>>,
     /// Active **Insert Handler** — present iff `mode == AppMode::Insert`.
@@ -240,6 +248,8 @@ impl App {
             search_active: false,
             last_reload: Instant::now(),
             reload_interval: Duration::from_secs(15),
+            watcher: None,
+            reload_pending: false,
             dialog: None,
             insert: None,
             version: crate::VERSION,
@@ -283,9 +293,30 @@ impl App {
             self.status_message = None;
         }
 
-        if self.last_reload.elapsed() >= self.reload_interval && self.should_reload() {
+        self.poll_watcher();
+        let interval = if self.watcher.is_some() {
+            WATCHED_RELOAD_INTERVAL
+        } else {
+            self.reload_interval
+        };
+        if (self.reload_pending || self.last_reload.elapsed() >= interval) && self.should_reload() {
+            self.reload_pending = false;
             self.last_reload = Instant::now();
             self.try_reload_board();
+        }
+    }
+
+    fn poll_watcher(&mut self) {
+        use crate::watch::Poll;
+        let Some(watcher) = &self.watcher else { return };
+        match watcher.poll() {
+            Poll::Idle => {}
+            Poll::Changed => self.reload_pending = true,
+            Poll::Failed => {
+                self.watcher = None;
+                self.reload_pending = true;
+                self.set_status("File watching stopped; polling instead".into());
+            }
         }
     }
 

@@ -112,7 +112,7 @@ cargo install --path .</pre></div>
   <p class="lead">Every board and every card is one human-readable JSON file. That single decision makes tct easy to sync, diff, script and trust.</p>
   <div class="grid">
     <div class="card"><h3><span class="ic">📄</span>Files are the API</h3><p>Standalone, readable JSON. Any tool that can read and write files can work with your boards.</p></div>
-    <div class="card"><h3><span class="ic">🔄</span>Sync-friendly</h3><p>One file per card, atomic writes, reload every 15 s. Different cards never conflict.</p></div>
+    <div class="card"><h3><span class="ic">🔄</span>Sync-friendly</h3><p>One file per card, atomic writes, live reload. Different cards never conflict.</p></div>
     <div class="card"><h3><span class="ic">⌨️</span>Keyboard-first</h3><p>Every action is a keystroke. Modal input like Vim keeps bindings contextual and safe.</p></div>
     <div class="card"><h3><span class="ic">🤖</span>Dual interface</h3><p>A TUI for humans, a headless CLI for scripts and AI agents — same data, same files.</p></div>
     <div class="card"><h3><span class="ic">📦</span>Zero infrastructure</h3><p>A single binary. No database, no daemon, no network, no sign-up.</p></div>
@@ -243,7 +243,7 @@ cargo install --path .</pre></div>
   <h2>Share boards without a server.</h2>
   <div class="split">
     <div>
-      <p>Put <code>.tct/</code> in your repo and teammates see the board when they run <code>tct</code> there. One file per card means different cards never conflict, and tct reloads from disk every 15 seconds.</p>
+      <p>Put <code>.tct/</code> in your repo and teammates see the board when they run <code>tct</code> there. One file per card means different cards never conflict, and tct reloads from disk when files change.</p>
       <p>Prefer Dropbox, Syncthing or OneDrive? Point <code>TCT_DATA_DIR</code> at a synced folder.</p>
       <p><code>tct --git enable</code> commits on quit, <kbd>C</kbd> commits at once, and <code>tct commit</code> does it from scripts. Only <code>.tct/</code> is ever committed, with a message naming the boards and cards that changed.</p>
     </div>
@@ -283,7 +283,7 @@ cargo install --path .</pre></div>
 <section id="agents">
   <p class="eyebrow">Also for agents</p>
   <h2>Works with AI agents, too.</h2>
-  <p class="lead">Because boards are plain files and everything is scriptable, an AI agent can share a board with you: you use the TUI, the agent uses the CLI, and tct reloads from disk every 15 seconds so its changes show up on your screen. Nothing to host, nothing to configure.</p>
+  <p class="lead">Because boards are plain files and everything is scriptable, an AI agent can share a board with you: you use the TUI, the agent uses the CLI, and tct reloads from disk when files change so its changes show up on your screen. Nothing to host, nothing to configure.</p>
   <div class="split">
     <div class="window copy"><div class="bar"><i></i><i></i><i></i><b>an agent, working a card</b></div><pre><span class="c"># read the task</span>
 <span class="p">$</span> tct cards <span class="s">"Sprint"</span> --show <span class="s">"caching"</span>
