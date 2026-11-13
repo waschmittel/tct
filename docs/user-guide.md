@@ -125,16 +125,16 @@ The first screen you see. Lists all active boards.
 
 | Key | Action |
 |-----|--------|
-| Up / Down | Navigate boards |
-| Shift+Up / Shift+Down | Reorder board in list |
+| Up / Down | Select board |
+| Shift+Up / Shift+Down | Reorder board |
 | Enter | Open selected board |
 | n | Create new board |
 | r | Rename selected board |
 | c | Cycle board accent color |
-| C | Board configuration |
-| a | Archive board (with confirmation) |
-| v | View / restore archived boards |
-| ? | Help overlay |
+| C | Configure board |
+| a | Archive board |
+| v | Archived boards |
+| ? | Help |
 | q | Quit |
 
 ### Board View (Kanban columns)
@@ -145,8 +145,8 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 
 | Key | Action |
 |-----|--------|
-| Left / Right | Switch between lists |
-| Up / Down | Navigate cards within a list |
+| Left / Right | Switch list |
+| Up / Down | Select card |
 | g | Jump to first card |
 | G | Jump to last card |
 
@@ -154,20 +154,20 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 
 | Key | Action |
 |-----|--------|
-| Enter | Open card detail view |
+| Enter | Open card detail |
 | t | Quick-edit card title (inline) |
 | e | Edit card description |
-| y | Copy card title to clipboard |
-| n | Create new card in current list (on a board without lists, a notice offers to create the first list) |
-| a | Archive card (with confirmation) |
-| h | View card change history |
+| y | Copy card title |
+| n | New card in current list |
+| a | Archive card |
+| h | Card history |
 
 **Card movement:**
 
 | Key | Action |
 |-----|--------|
-| Shift+Up / Shift+Down | Move card up/down within list |
-| Shift+Left / Shift+Right | Move card to adjacent list |
+| Shift+Up / Shift+Down | Move card within list |
+| Shift+Left / Shift+Right | Move card to next list |
 
 **List management:**
 
@@ -175,8 +175,8 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 |-----|--------|
 | N | Create new list |
 | r | Rename current list |
-| A | Archive list (with confirmation) |
-| V | View / restore / delete archived lists |
+| A | Archive list |
+| V | Archived lists |
 | < (Shift+,) | Move list left |
 | > (Shift+.) | Move list right |
 
@@ -184,9 +184,9 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 
 | Key | Action |
 |-----|--------|
-| l | Assign / remove labels (label picker) |
+| l | Assign / remove labels |
 | L | Open label manager |
-| u | Set due date (opens calendar picker) |
+| u | Set due date |
 | U | Clear due date |
 
 **Search & filter:**
@@ -195,15 +195,15 @@ The main working screen. Shows lists as columns with cards stacked vertically.
 |-----|--------|
 | / | Open search bar |
 | f | Filter by label |
-| F | Clear all filters (search + label) |
+| F | Clear filters |
 
 **Other:**
 
 | Key | Action |
 |-----|--------|
-| v | View / restore / delete archived cards |
-| b | Back to board selector |
-| ? | Help overlay |
+| v | Archived cards |
+| b | Board selector |
+| ? | Help |
 | q | Quit |
 
 ### Card Detail View
@@ -213,38 +213,40 @@ A full overlay showing all card properties: title, description, checklist, label
 | Key | Action |
 |-----|--------|
 | t | Edit title |
-| e | Edit description (opens Markdown editor) |
+| e | Edit description |
 | PgUp / PgDn | Scroll description |
-| y | Copy description to clipboard |
-| Y | Copy entire checklist as Markdown to clipboard |
-| Up / Down | Navigate checklist items |
-| Shift+Up / Shift+Down | Reorder selected checklist item |
-| Space | Toggle checklist item done/undone |
+| y | Copy description |
+| Y | Copy checklist as Markdown |
+| Up / Down | Select checklist item |
+| Shift+Up / Shift+Down | Reorder checklist item |
+| Space | Toggle checklist item |
 | a | Add new checklist item |
-| Enter | Edit selected checklist item text |
-| x | Delete selected checklist item |
-| l | Assign / remove labels (label picker) |
-| L | Manage board labels (create, rename, recolor, reorder, delete) |
-| u | Set due date (opens calendar picker) |
+| Enter | Edit checklist item |
+| x | Delete checklist item |
+| l | Assign / remove labels |
+| L | Manage board labels |
+| u | Set due date |
 | U | Clear due date |
-| h | View card change history |
-| ? | Help overlay |
+| h | Card history |
+| ? | Help |
 | Esc | Close card detail |
 | q | Quit |
 
 ### Description Editor
 
-A full Markdown editor with syntax highlighting. Supports headings, bold, italic, bold italic (`***text***`), inline code, code blocks, lists, blockquotes (`> text` per line, or a block between two `>>>` lines), alerts, and strikethrough.
+A Markdown editor with syntax highlighting: headings, bold, italic, inline code, code blocks, lists, blockquotes (`> text` per line, or between two `>>>` lines), alerts, footnotes, tables and strikethrough.
 
-**Alerts** are quotes whose first line is a tag — `> [!note]` followed by `> ` lines, or `>>> [!note]` … `>>>` for several paragraphs. Kinds: `note` (blue), `tip` (green), `important` (purple), `warning` (gold), `caution` (red); unknown tags stay ordinary quotes. The details view shows the tag as the kind in bold capitals (`NOTE`) in the alert's color; the PDF draws a colored bar with GitHub's icon and the kind in bold capitals (black in the monochrome theme). With the cursor in a quote, `Ctrl+G` then `n` `t` `i` `c` `w` makes it an alert (or changes its kind), `x` makes it a plain quote again.
+**Alerts** are quotes whose first line is a tag: `> [!note]` plus `> ` lines, or `>>> [!note]` … `>>>`. Kinds: `note` (blue), `tip` (green), `important` (purple), `warning` (gold), `caution` (red); unknown tags stay ordinary quotes. The read view shows the kind in bold capitals in the alert's color; the PDF adds a colored bar and GitHub's icon (black in the monochrome theme). In a quote, `Ctrl+G` then `n` `t` `i` `c` `w` makes it an alert or changes its kind; `x` makes it a plain quote again.
 
-In the PDF, `...` in text becomes a proper ellipsis `…`, and straight quotes become typographic ones (`„Hallo“`, `« bonjour »`, `“hello”`); code spans and code blocks stay literal. The language is detected from the card's text (English, German, French, Spanish, Italian, Dutch, Portuguese, Swedish, Turkish; English when unsure). It also translates the titles of alert boxes and all fixed texts (section titles, dates). The export dialog shows it in its bottom frame.
+In the PDF, `...` becomes `…` and straight quotes become typographic ones (`„Hallo“`, `« bonjour »`, `“hello”`); code stays literal. The language is detected from the card's text (English, German, French, Spanish, Italian, Dutch, Portuguese, Swedish, Turkish; English when unsure) and also translates alert titles and fixed texts (section titles, dates). The export dialog shows it.
 
-**Footnotes** work as on GitHub/GitLab: a reference `text[^1]` and a definition `[^1]: The note.` anywhere in the text (labels may be names, `[^my-note]`). A note continues on following lines (two trailing spaces are optional) and, after a blank line, in paragraphs indented by four spaces. Position does not matter: the PDF prints each note under the name of its label (`[^my-note]` → `my-note`), while numbered labels count up 1, 2, … by first reference whatever their digits, and prints each at the bottom of every page that references it (a note too long for a page continues on the next). Definitions without reference, references without definition, and anything in code stay literal. `Ctrl+N` inserts a numbered reference at the cursor — the numbered footnotes of the text are renumbered to ascend in the order of their references (names untouched; a reference without definition or a definition without reference keeps its number, and the others skip it) — and jumps to its new definition, placed among the numbered definitions by its number (at the bottom if there are none), ready to type; in a definition, `Ctrl+N` jumps back to its first reference. With text highlighted, the reference is named after it instead of numbered: the text stays and `[^two-words]` is added behind it (whitespace becomes `-`, at most 32 characters; a name that is already defined just jumps to its definition).
+**Footnotes** work as on GitHub/GitLab: a reference `text[^1]` and a definition `[^1]: The note.` anywhere in the text; labels may be names (`[^my-note]`). A note continues on following lines and, after a blank line, in paragraphs indented by four spaces. Unpaired references or definitions, and anything in code, stay literal. The PDF prints each note at the bottom of every page that references it, under its name, or for numbered labels a count (1, 2, …) by first reference.
+
+`Ctrl+N` inserts the next number as a reference at the cursor, renumbers the numbered footnotes to ascend by first reference (names and unpaired labels untouched), and jumps to the new definition, ready to type. In a definition it jumps back to the first reference. With text selected, the reference is named after it (`[^two-words]`; whitespace becomes `-`, max. 32 characters) and the text stays; an already defined name just jumps to its definition.
 
 | Key | Action |
 |-----|--------|
-| F1 / Ctrl+H | Show help / shortcut overview |
+| F1 / Ctrl+H | Help |
 | Ctrl+S | Save description |
 | Ctrl+Q | Save and close |
 | Ctrl+Z | Undo |
@@ -252,26 +254,26 @@ In the PDF, `...` in text becomes a proper ellipsis `…`, and straight quotes b
 | Ctrl+C | Copy selected text |
 | Ctrl+X | Cut selected text |
 | Ctrl+V | Paste from clipboard |
-| Ctrl+N | Footnote: insert reference + jump to definition; in a definition, jump back |
-| Ctrl+P | Paste mode on/off: keys and pastes insert plain text (no list continuation, renumbering or table reflow); a `PASTE MODE` badge shows bottom right. Leaving it (or saving) normalizes the text: tables reformatted, list indentation snapped, numbers fixed. Fenced code is untouched. |
-| Shift+Arrows | Highlight / select text (for formatting, cut, copy) |
-| Ctrl+B | Toggle bold (`**text**`). Wraps the selection without its surrounding spaces; inside or on already-formatted text it removes the formatting; in a table cell without a selection it formats the whole cell |
-| Ctrl+E | Toggle italic (`*text*`), same rules; combined with bold it gives `***text***`. (`Ctrl+I` is not used: terminals send it as Tab; `Cmd+I` works where the terminal reports it) |
-| Ctrl+K | Toggle inline code (`` `text` ``, wraps selection) |
-| Ctrl+L | Insert list item (`- `) |
+| Ctrl+N | Footnote: insert reference and jump to its definition (in a definition: jump back) |
+| Ctrl+P | Paste mode on/off: plain text only (no list continuation, renumbering, table reflow). Leaving it normalizes tables, list indents and numbers (not fenced code) |
+| Shift+Arrows | Select text |
+| Ctrl+B | Toggle bold (`**text**`); without a selection in a table cell, formats the cell |
+| Ctrl+E | Toggle italic (`*text*`); not `Ctrl+I`, which terminals send as Tab |
+| Ctrl+K | Toggle inline code (`` `text` ``) |
+| Ctrl+L | Insert list item |
 | Up / Down | Move by visual (wrapped) line |
-| Enter | Auto-continue bullet / numbered list items; renumbers numbered runs |
-| Tab | Nest the current list item one level deeper (3 spaces) |
-| Shift+Tab | Un-nest the current list item one level |
-| Esc | Cancel — prompts to confirm if changes exist |
+| Enter | Continue bullet / numbered list |
+| Tab | Nest list item (or selected lines) |
+| Shift+Tab | Un-nest list item (or selected lines) |
+| Esc | Cancel (confirms if changed) |
 
 On macOS, **Cmd** can substitute for Ctrl in terminals that support it (kitty, Alacritty, WezTerm).
 
 #### Tables
 
-A run of `|` lines whose second line is a delimiter row (`|---|---|`, with `:--`, `:-:`, `--:` for alignment) is a table. The editor reformats it on every edit, padded to the widest cell. `Tab` / `Shift+Tab` walk the cells (`Tab` in the last cell appends a row), `Enter` goes to the row below, `Ctrl+T` inserts a table skeleton, and `Alt+arrows` / `Alt+Shift+arrows` move and add/delete rows and columns (see `F1` for the full list).
+A run of `|` lines whose second line is a delimiter row (`|---|---|`; `:--`, `:-:`, `--:` align) is a table, reformatted on every edit. `Tab` / `Shift+Tab` walk the cells (`Tab` in the last cell adds a row), `Enter` goes down a row, `Ctrl+T` inserts a skeleton, `Alt+arrows` / `Alt+Shift+arrows` move and add/delete rows and columns (`F1` lists all).
 
-**Matrices.** If the top-left cell of a table is empty, the table is a *matrix*: it has labels on the left as well as on top. In the read view and the PDF export the first column is then bold like the header and the empty corner is left open (no border around it):
+**Matrices.** A table with an empty top-left cell is a *matrix*: labels on the left as well as on top. Its first column is bold like the header and the corner is left open:
 
 ```
 |       | Design | Build |
@@ -280,47 +282,35 @@ A run of `|` lines whose second line is a delimiter row (`|---|---|`, with `:--`
 | Grace | review | owner |
 ```
 
-`Ctrl+T`, `t` *transposes* a matrix (rows become columns; the corner stays, all columns take the first data column's alignment). Other tables refuse it. Put any text in the top-left cell to get a normal table back. Details of how matrices are drawn in the PDF are in [ADR-0013](adr/0013-matrix-tables.md).
+`Ctrl+T`, `t` *transposes* a matrix (other tables refuse it). Put text in the corner to get a normal table back. PDF details: [ADR-0013](adr/0013-matrix-tables.md).
 
 ### PDF export
 
-Press `p` in the board view or card detail to export the selected card (title, labels, due date, description with tables, checklist) as a PDF/A document, or `P` for a color version. `p` produces black text with gray accents, made for monochrome printers; `P` is the same layout in color. A dialog asks where to save: type a path or browse folders with Up/Down and Tab; it starts in the folder you last exported to and suggests the card title as file name. In the browser version the PDF is sent to the browser as a download instead.
+`p` in the board view or card detail exports the selected card (title, labels, due date, description, checklist) as a PDF/A document, in black and gray for monochrome printers; `P` is the same in color. A dialog asks where to save: type a path or browse with Up/Down and Tab. It starts in the last export folder and suggests the card title as file name. In the browser version the PDF is downloaded instead.
 
-Sections, the checklist, code blocks and tables are kept together on a page where they fit; long tables repeat their header row on every page. Sample output is in [`docs/export-examples/`](export-examples/) (monochrome, plus a color showcase).
+Sections, the checklist, code blocks and tables stay together on a page where they fit; long tables repeat their header row. Samples: [`docs/export-examples/`](export-examples/).
 
 ### Search
 
-Press `/` in board view to open the search bar. Type a query and press Enter.
-
-- Non-matching cards are **hidden** (not dimmed)
-- Navigation **skips** hidden cards
-- First match is **auto-selected**
-- Label-based filtering also supported via the label manager
-
-Press `F` to clear all active filters.
+`/` in board view opens the search bar; type a query and press Enter. Non-matching cards are **hidden**, navigation skips them, and the first match is selected. `f` filters by label; `F` clears all filters.
 
 ---
 
 ## Labels
 
-Labels are **board-level** — defined once per board, then assigned to cards. This means renaming or recoloring a label updates it everywhere.
+Labels are **board-level**: defined once per board, then assigned to cards, so renaming or recoloring updates them everywhere.
 
 ### Creating labels
 
-1. Press `L` in board view or card detail to open the label manager
-2. Press `n` to create a new label
-3. Type a name and press Enter
-4. Color is auto-generated to be maximally distinct from existing labels
+`L` opens the label manager, `n` creates a label: type a name, press Enter. The color is generated to be distinct from existing labels.
 
 ### Assigning labels to cards
 
-1. Open a card (Enter) and press `l` to open the label picker
-2. Navigate with Up/Down, press Space or Enter to toggle assignment
-3. Press Esc to close
+`l` opens the label picker (board view or card detail): Up/Down to select, Space or Enter to toggle, Esc to close.
 
 ### Label colors
 
-tct generates pastel colors automatically using HSL color space. Each new label picks the hue that is maximally distant from all existing label hues:
+New labels get a pastel color whose hue is maximally distant from all existing label hues:
 
 ```mermaid
 pie title Example: 3 labels on a board
@@ -329,62 +319,61 @@ pie title Example: 3 labels on a board
     "Label C (hue 120)" : 1
 ```
 
-You can cycle through named color presets (Red, Orange, Yellow, Green, Blue, Purple, Pink, Cyan) in the label manager, or stick with auto-generated pastels.
+The label manager cycles through named presets (Red, Orange, Yellow, Green, Blue, Purple, Pink, Cyan).
 
 ### Label ordering
 
-Labels display on cards in **board-level order** (the order shown in the label manager), not in assignment order. Reorder labels in the manager with Shift+Up/Down to control display priority.
+Cards show labels in **board-level order** (as in the label manager), not assignment order. Reorder them there with Shift+Up/Down.
 
 ---
 
 ## Due Dates
 
-- Press `u` in card detail (or in board view, on the selected card) to open the calendar picker
-- In the picker: arrow keys move by day/week, PgUp/PgDn jump months (Shift = year), `t` jumps to today, Home/End jump to first/last day of month
-- Type digits and `-` to edit the date text directly (`YYYY-MM-DD`); the calendar reparses as you type
-- Press Enter to save, Esc to cancel; clearing the buffer (Ctrl+U) and pressing Enter removes the due date
-- Press `U` to clear the due date without opening the picker
-- **Overdue** cards show a visual indicator in both the card list and detail view
-- Due dates are visible in CLI output (`tct cards <board>`) and search results
+- `u` (card detail, or the selected card in board view) opens the calendar picker; `U` clears the date
+- Picker: arrows move by day/week, PgUp/PgDn by month (Shift = year), `t` jumps to today, Home/End to the month's first/last day
+- Or type the date (`YYYY-MM-DD`); the calendar follows as you type
+- Enter saves, Esc cancels; an emptied buffer (Ctrl+U) plus Enter removes the date
+- **Overdue** cards are marked in the card list and detail view
+- Due dates show in CLI output (`tct cards <board>`) and search results
 
 ---
 
 ## Board Accent Colors
 
-Each board has a configurable accent color used for all UI highlights (selection, borders, headings). Press `c` in the board selector to cycle through pastel colors. New boards auto-generate a color that is distinct from existing boards.
+Each board has an accent color for all UI highlights; `c` in the board selector cycles it. New boards get one distinct from existing boards.
 
 ---
 
 ## Archiving
 
-Archiving is a **soft delete** — the data stays on disk but is hidden from normal views.
+Archiving is a **soft delete**: data stays on disk but is hidden.
 
 ### Cards
 
 | Action | How |
 |--------|-----|
-| Archive card | `a` in board view (with confirmation) |
-| View archived cards | `v` in board view |
-| Restore archived card | Select in archive view, press `Enter` |
-| Permanently delete | Select in archive view, press `x` |
+| Archive card | `a` in board view |
+| View archive | `v` in board view |
+| Restore | `Enter` in archive view |
+| Permanently delete | `x` in archive view |
 
 ### Lists
 
 | Action | How |
 |--------|-----|
-| Archive list | `A` in board view (with confirmation) |
-| View archived lists | `V` in board view |
-| Restore archived list | Select in archive view, press `Enter` |
-| Permanently delete | Select in archive view, press `x` |
+| Archive list | `A` in board view |
+| View archive | `V` in board view |
+| Restore | `Enter` in archive view |
+| Permanently delete | `x` in archive view |
 
 ### Boards
 
 | Action | How |
 |--------|-----|
-| Archive board | `a` in board selector (with confirmation) |
-| View archived boards | `v` in board selector |
-| Restore archived board | Select in archive view, press `Enter` |
-| Permanently delete | Select in archive view, press `x` |
+| Archive board | `a` in board selector |
+| View archive | `v` in board selector |
+| Restore | `Enter` in archive view |
+| Permanently delete | `x` in archive view |
 
 ---
 

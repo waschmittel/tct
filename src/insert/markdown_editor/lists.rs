@@ -339,3 +339,77 @@ pub(crate) fn renumber_all(textarea: &mut tui_textarea::TextArea<'static>) {
     let (sr, sc) = saved;
     textarea.move_cursor(CursorMove::Jump(sr as u16, sc as u16));
 }
+
+/// Tab / Shift+Tab with a selection: shift every selected line like a single
+/// one — list items and citations nest/unnest, other non-blank lines (table rows
+/// excepted) gain or lose up to `NEST_INDENT` leading spaces (or one tab). The
+/// cursor's row always counts, even at column 0; an anchor there does not. The
+/// selection stays on the same text. Returns `false` (nothing done) without one.
+pub(super) fn shift_selection(textarea: &mut tui_textarea::TextArea<'static>, nest: bool) -> bool {
+    let Some(((r0, c0), (r1, c1))) = textarea.selection_range() else {
+        return false;
+    };
+    if (r0, c0) == (r1, c1) {
+        // An empty selection is none; left active it would swallow the edit.
+        textarea.cancel_selection();
+        return false;
+    }
+    let cursor = textarea.cursor();
+    // The cursor's row always counts; an anchor at column 0 of a later row does not.
+    let last = if c1 == 0 && r1 > r0 && cursor.0 != r1 {
+        r1 - 1
+    } else {
+        r1
+    };
+    // Selection endpoints (anchor, cursor) as movable positions.
+    let mut ends = [
+        if cursor == (r0, c0) {
+            (r1, c1)
+        } else {
+            (r0, c0)
+        },
+        cursor,
+    ];
+    textarea.cancel_selection();
+
+    for row in r0..=last {
+        let line = textarea.lines()[row].clone();
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('|') {
+            continue;
+        }
+        let lens: Vec<usize> = textarea.lines().iter().map(|l| l.chars().count()).collect();
+        let prefix = parse_marker(trimmed).map_or(0, |(_, m)| line.len() - trimmed.len() + m);
+        textarea.move_cursor(CursorMove::Jump(row as u16, 0));
+        if parse_marker(trimmed).is_some() {
+            shift_list_item(textarea, nest);
+        } else if nest {
+            textarea.insert_str(" ".repeat(NEST_INDENT));
+        } else {
+            let n = if line.starts_with('\t') {
+                1
+            } else {
+                line.chars()
+                    .take(NEST_INDENT)
+                    .take_while(|c| *c == ' ')
+                    .count()
+            };
+            textarea.delete_str(n);
+        }
+        // Follow the edit: columns behind the changed prefix move with the text.
+        for (er, ec) in &mut ends {
+            let new = textarea.lines()[*er].chars().count();
+            let guard = if *er == row { prefix.max(1) } else { 1 };
+            if *ec >= guard {
+                *ec = (*ec as isize + new as isize - lens[*er] as isize).max(0) as usize;
+            }
+            *ec = (*ec).min(new);
+        }
+    }
+
+    let [(ar, ac), (cr, cc)] = ends;
+    textarea.move_cursor(CursorMove::Jump(ar as u16, ac as u16));
+    textarea.start_selection();
+    textarea.move_cursor(CursorMove::Jump(cr as u16, cc as u16));
+    true
+}

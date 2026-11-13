@@ -292,8 +292,8 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 Line::raw(""),
                 header("Lists"),
                 row("Enter", "Auto-continue list"),
-                row("Tab", "Nest item"),
-                row("Shift+Tab", "Un-nest item"),
+                row("Tab", "Nest line(s)"),
+                row("Shift+Tab", "Un-nest line(s)"),
             ],
             vec![
                 header("Tables"),

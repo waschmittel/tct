@@ -320,6 +320,9 @@ impl MarkdownEditor {
             }
             (KeyCode::Tab, m) if !m.contains(KeyModifiers::SHIFT) => {
                 let ta = &mut self.input.textarea;
+                if !table_edit::in_table(ta) && grouped(ta, None, |ta| shift_selection(ta, true)) {
+                    return InsertOutcome::Stay;
+                }
                 if !table_edit::tab(ta, false) && !grouped(ta, None, handle_tab_nest) {
                     ta.input(key);
                 }
@@ -327,6 +330,9 @@ impl MarkdownEditor {
             }
             (KeyCode::BackTab, _) | (KeyCode::Tab, _) => {
                 let ta = &mut self.input.textarea;
+                if !table_edit::in_table(ta) && grouped(ta, None, |ta| shift_selection(ta, false)) {
+                    return InsertOutcome::Stay;
+                }
                 if !table_edit::tab(ta, true) {
                     grouped(ta, None, handle_shift_tab_unnest);
                 }

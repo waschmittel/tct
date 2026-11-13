@@ -26,8 +26,8 @@ expression: render_to_string(&app)
 │    │                                               Ctrl+G, c w       Caution / warning      │    │
 │    │Lists                                          Ctrl+G, x         Plain quote again      │    │
 │    │  Enter             Auto-continue list                                                  │    │
-│    │  Tab               Nest item                App                                        │    │
-│    │  Shift+Tab         Un-nest item               F1 / Ctrl+H       Help                   │    │
+│    │  Tab               Nest line(s)             App                                        │    │
+│    │  Shift+Tab         Un-nest line(s)            F1 / Ctrl+H       Help                   │    │
 │    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
 │                                                ││                                                │
 └────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
