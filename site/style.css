@@ -50,7 +50,6 @@ nav a.l:hover { color: var(--fg); }
 .hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), var(--accent-2));
   -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero .lead { margin: 0 auto 2rem; }
-.cta { display: flex; flex-wrap: wrap; gap: .8rem; justify-content: center; margin-bottom: 3rem; }
 .btn { display: inline-block; padding: .7rem 1.3rem; border-radius: 10px; font-weight: 600; text-decoration: none;
   border: 1px solid var(--line); color: var(--fg); background: var(--card); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #04222b; }
@@ -90,25 +89,7 @@ nav a.l:hover { color: var(--fg); }
   cursor: pointer; background: #1b2230; color: #98a3b5; border: 1px solid #2c3850; }
 .copy button:hover { color: #fff; }
 
-/* journey */
-.steps { counter-reset: s; display: grid; gap: 1rem; margin-top: 2rem; padding: 0; list-style: none; }
-.steps li { counter-increment: s; display: grid; grid-template-columns: 3rem 1fr; gap: 1rem; background: var(--card);
-  border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem 1.4rem; }
-.steps li::before { content: counter(s); font: 700 1.3rem var(--mono); color: #04222b; background: var(--accent);
-  width: 2.4rem; height: 2.4rem; border-radius: 50%; display: grid; place-items: center; }
-.steps h3 { margin-bottom: .2em; } .steps p { margin: 0; color: var(--muted); }
 
-/* keys */
-table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-th, td { text-align: left; padding: .55rem .9rem; border-bottom: 1px solid var(--line); font-size: .96rem; }
-th { font: .78rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-tr:last-child td { border-bottom: 0; }
-td:first-child { white-space: nowrap; width: 1%; }
-
-/* flow diagram */
-.flow { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; justify-content: center; margin: 2rem 0 0; font: .9rem var(--mono); }
-.flow span { padding: .5rem .9rem; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
-.flow .a { border-color: var(--accent); } .flow .arrow { border: 0; background: none; color: var(--muted); padding: 0; }
 
 .pdfs { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.2rem; }
 footer { margin-top: 5rem; padding: 2.5rem 0 3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .95rem; }
@@ -120,6 +101,7 @@ details { background: var(--card); border: 1px solid var(--line); border-radius:
 summary { cursor: pointer; font-weight: 600; }
 details p { margin: .6rem 0 0; color: var(--muted); }
 .window .bar b { flex: 1; text-align: center; }
+
 /* carousel */
 .carousel { margin-top: 2rem; }
 .track { position: relative; display: flex; gap: 1.2rem; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: .5rem .25rem 1rem; outline-offset: 4px; }
@@ -128,6 +110,7 @@ details p { margin: .6rem 0 0; color: var(--muted); }
 /* Screenshots are 1240x960; size the frame from the viewport height so a slide never exceeds it. */
 .track .window { width: min(100%, calc(min(58vh, 680px) * 1.2917)); margin: 0 auto; }
 .track img { width: 100%; height: auto; aspect-ratio: 1240 / 960; }
+.track img.gif { aspect-ratio: 1200 / 700; }
 .track figcaption { max-width: 46rem; margin-left: auto; margin-right: auto; }
 .track figcaption, .pair figcaption { margin-top: .9rem; color: var(--muted); font-size: .98rem; text-align: center; }
 .track figcaption b { display: block; color: var(--fg); font-size: 1.1rem; }
@@ -153,7 +136,4 @@ nav .brand { display: flex; align-items: center; gap: .5rem; }
 nav a.l.strong { color: var(--fg); font-weight: 600; }
 .hero .logo { width: 96px; height: 96px; margin-bottom: 1.2rem; filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--accent) 35%, transparent)); }
 
-.installbar { max-width: 30rem; margin: -1.4rem auto 2.4rem; }
-.installbar .window pre { font-size: 1.02rem; padding: 1rem 4.5rem 1rem 1.3rem; }
-.installbar p { margin: .7rem 0 0; font-size: .9rem; color: var(--muted); }
-@media (max-width: 480px) { .installbar .window pre { font-size: .8rem; padding-right: 4rem; } }
+@media (max-width: 480px) { 

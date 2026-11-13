@@ -19,11 +19,9 @@
 <nav><div class="wrap">
   <a class="brand" href="#top"><img src="icon.svg" alt="" width="26" height="26"><span>tct<span>_</span></span></a>
   <a class="l" href="#install">Install</a>
-  <a class="l" href="#tour-shots">Screens</a>
-  <a class="l" href="#cli">CLI</a>
-  <a class="l" href="#sync">Sync</a>
-  <a class="l" href="#pdf">PDF</a>
+  <a class="l" href="#features">Why</a>
   <a class="l" href="#agents">Agents</a>
+  <a class="l" href="#pdf">PDF</a>
   <a class="l" href="#faq">FAQ</a>
   <a class="l strong" href="guide/">User guide</a>
 </div></nav>
@@ -33,19 +31,26 @@
   <p class="eyebrow">Terminal Card Tracker</p>
   <h1>Kanban for people who <em>live in the terminal</em>.</h1>
   <p class="lead">Think Trello, but keyboard-first and made of plain files. One binary, no server, no account — boards sync through git, Dropbox or whatever you already use.</p>
-  <div class="cta">
-    <a class="btn primary" href="#install">Install</a>
-    <a class="btn" href="guide/">Read the user guide</a>
-    <a class="btn" href="https://github.com/waschmittel/tct">GitHub</a>
-  </div>
-  <div class="installbar">
-    <div class="window copy"><pre><span class="p">$</span> brew install waschmittel/tct/tct</pre></div>
-    <p>macOS (Apple Silicon) and Linux x86_64 · <a href="#install">more ways to install</a></p>
-  </div>
-  <ul class="pills"><li>Rust</li><li>single binary</li><li>JSON on disk</li><li>TUI + CLI</li><li>MIT</li></ul>
-  <div class="window">
-    <div class="bar"><i></i><i></i><i></i><b>tct</b></div>
-    <img src="demo.gif" alt="Animated demo of tct: navigating a board, moving cards, editing a card with a markdown description" width="1200" height="700" loading="eager">
+  <ul class="pills"><li>Rust</li><li>single binary</li><li>kanban</li><li>local first</li><li>TUI + CLI</li><li>MIT</li></ul>
+  <div class="carousel" aria-roledescription="carousel" aria-label="tct screenshots">
+    <div class="ctrl">
+      <button type="button" class="prev" aria-label="Previous screenshot">←</button>
+      <span class="dots" role="tablist" aria-label="Choose screenshot"></span>
+      <button type="button" class="next" aria-label="Next screenshot">→</button>
+    </div>
+    <div class="track" tabindex="0">
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img class="gif" src="demo.gif" alt="Animated demo of tct: navigating a board, moving cards, editing a card with a markdown description" width="1200" height="700" loading="eager"></div><figcaption><b>Demo</b> Navigating a board, moving cards, editing a card with a markdown description.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-board.webp" width="1240" height="960" loading="lazy" alt="Board view with four lists: Backlog, Doing, Review and Done, cards with colored labels, due date and checklist progress"></div><figcaption><b>Board view</b> Lists as columns, labels, due dates and checklist progress at a glance. <kbd>Shift</kbd>+arrows move cards.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-detail.webp" width="1240" height="960" loading="lazy" alt="Card detail view showing a markdown description with a warning alert, goals list, checklist, labels and due date"></div><figcaption><b>Card detail</b> Description, checklist, labels and due date in one view. Alerts like <code>[!warning]</code> get their own color.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-detail-scrolled.webp" width="1240" height="960" loading="lazy" alt="Card detail scrolled to a schedule table and a matrix table with row and column labels"></div><figcaption><b>Tables &amp; matrices</b> Pipe tables are aligned and drawn with box lines. An empty top-left cell makes a <em>matrix</em> with labels on both axes.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-detail-end.webp" width="1240" height="960" loading="lazy" alt="Card detail scrolled to a code block, a tip alert and two footnote definitions"></div><figcaption><b>Code, alerts &amp; footnotes</b> Fenced code, multiline alerts and footnotes (<kbd>Ctrl</kbd>+<kbd>N</kbd> inserts one) in the read view.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-editor.webp" width="1240" height="960" loading="lazy" alt="Markdown description editor with tables, a code block and footnotes"></div><figcaption><b>Markdown editor</b> Tables reformat as you type, lists continue themselves, <kbd>Tab</kbd> walks cells, and every operation is one undo step.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-search.webp" width="1240" height="960" loading="lazy" alt="Board filtered by the search term login, showing a single matching card"></div><figcaption><b>Search</b> <kbd>/</kbd> hides every card that does not match; navigation skips the rest.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-filter.webp" width="1240" height="960" loading="lazy" alt="Label filter dialog listing the labels feature, bug and docs"></div><figcaption><b>Label filters</b> <kbd>f</kbd> filters by one or more labels; <kbd>F</kbd> clears everything.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-pdf-dialog.webp" width="1240" height="960" loading="lazy" alt="PDF export dialog with a path input and a folder listing"></div><figcaption><b>PDF export</b> <kbd>p</kbd> (mono) or <kbd>P</kbd> (color) opens a save dialog; type a path or browse with <kbd>Tab</kbd>.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-selector.webp" width="1240" height="960" loading="lazy" alt="Board selector listing three boards, each in its own accent color"></div><figcaption><b>Accent colors</b> Every board has its own accent, so you always know where you are. <kbd>c</kbd> cycles, <kbd>C</kbd> picks.</figcaption></figure>
+      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-help.webp" width="1240" height="960" loading="lazy" alt="Contextual help overlay listing all board view key bindings by section"></div><figcaption><b>Built-in help</b> <kbd>?</kbd> lists every key that works right now, generated from the same table that handles input.</figcaption></figure>
+    </div>
   </div>
 </div></header>
 
@@ -73,50 +78,13 @@ cargo install --path .</pre></div>
   <div class="split">
     <div>
       <h3>Your first board</h3>
-      <p>Run <code>tct init</code> in a project to keep boards next to your code in <code>.tct/</code> (like <code>git init</code>). Without it, boards live in <code>~/.tct/</code>.</p>
+      <p>Just run <code>tct</code>: your boards live in <code>~/.tct/</code>. Optionally, run <code>tct init</code> in a project (for example a git repo) to keep its boards next to your code in <code>./.tct/</code>, like <code>git init</code>.</p>
     </div>
-    <div class="window copy"><pre><span class="c"># project-local boards</span>
-<span class="p">$</span> tct init
-<span class="p">$</span> tct              <span class="c"># open the board selector</span>
-<span class="p">$</span> tct --board sprint  <span class="c"># jump straight into a board</span></pre></div>
-  </div>
-</section>
+    <div class="window copy"><pre><span class="p">$</span> tct              <span class="c"># open the board selector (~/.tct)</span>
+<span class="p">$</span> tct --board sprint  <span class="c"># jump straight into a board</span>
 
-<section id="tour-shots">
-  <p class="eyebrow">In action</p>
-  <h2>See what it can do.</h2>
-  <div class="carousel" aria-roledescription="carousel" aria-label="tct screenshots">
-    <div class="track" tabindex="0">
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-board.webp" width="1240" height="960" loading="lazy" alt="Board view with four lists: Backlog, Doing, Review and Done, cards with colored labels, due date and checklist progress"></div><figcaption><b>Board view</b> Lists as columns, labels, due dates and checklist progress at a glance. <kbd>Shift</kbd>+arrows move cards.</figcaption></figure>
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-detail.webp" width="1240" height="960" loading="lazy" alt="Card detail view showing a markdown description with a warning alert, goals list, checklist, labels and due date"></div><figcaption><b>Card detail</b> Description, checklist, labels and due date in one view. Alerts like <code>[!warning]</code> get their own color.</figcaption></figure>
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-detail-scrolled.webp" width="1240" height="960" loading="lazy" alt="Card detail scrolled to a schedule table and a matrix table with row and column labels"></div><figcaption><b>Tables &amp; matrices</b> Pipe tables are aligned and drawn with box lines. An empty top-left cell makes a <em>matrix</em> with labels on both axes.</figcaption></figure>
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-detail-end.webp" width="1240" height="960" loading="lazy" alt="Card detail scrolled to a code block, a tip alert and two footnote definitions"></div><figcaption><b>Code, alerts &amp; footnotes</b> Fenced code, multiline alerts and footnotes (<kbd>Ctrl</kbd>+<kbd>N</kbd> inserts one) in the read view.</figcaption></figure>
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-editor.webp" width="1240" height="960" loading="lazy" alt="Markdown description editor with tables, a code block and footnotes"></div><figcaption><b>Markdown editor</b> Tables reformat as you type, lists continue themselves, <kbd>Tab</kbd> walks cells, and every operation is one undo step.</figcaption></figure>
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-search.webp" width="1240" height="960" loading="lazy" alt="Board filtered by the search term login, showing a single matching card"></div><figcaption><b>Search</b> <kbd>/</kbd> hides every card that does not match; navigation skips the rest.</figcaption></figure>
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-filter.webp" width="1240" height="960" loading="lazy" alt="Label filter dialog listing the labels feature, bug and docs"></div><figcaption><b>Label filters</b> <kbd>f</kbd> filters by one or more labels; <kbd>F</kbd> clears everything.</figcaption></figure>
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-pdf-dialog.webp" width="1240" height="960" loading="lazy" alt="PDF export dialog with a path input and a folder listing"></div><figcaption><b>PDF export</b> <kbd>p</kbd> (mono) or <kbd>P</kbd> (color) opens a save dialog; type a path or browse with <kbd>Tab</kbd>.</figcaption></figure>
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-selector.webp" width="1240" height="960" loading="lazy" alt="Board selector listing three boards, each in its own accent color"></div><figcaption><b>Accent colors</b> Every board has its own accent, so you always know where you are. <kbd>c</kbd> cycles, <kbd>C</kbd> picks.</figcaption></figure>
-      <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>tct</b></div><img src="img/shot-help.webp" width="1240" height="960" loading="lazy" alt="Contextual help overlay listing all board view key bindings by section"></div><figcaption><b>Built-in help</b> <kbd>?</kbd> lists every key that works right now, generated from the same table that handles input.</figcaption></figure>
-    </div>
-    <div class="ctrl">
-      <button type="button" class="prev" aria-label="Previous screenshot">←</button>
-      <span class="dots" role="tablist" aria-label="Choose screenshot"></span>
-      <button type="button" class="next" aria-label="Next screenshot">→</button>
-    </div>
-  </div>
-</section>
-
-<section id="why">
-  <p class="eyebrow">Why tct</p>
-  <h2>Boards are just files.</h2>
-  <p class="lead">Every board and every card is one human-readable JSON file. That single decision makes tct easy to sync, diff, script and trust.</p>
-  <div class="grid">
-    <div class="card"><h3><span class="ic">📄</span>Files are the API</h3><p>Standalone, readable JSON. Any tool that can read and write files can work with your boards.</p></div>
-    <div class="card"><h3><span class="ic">🔄</span>Sync-friendly</h3><p>One file per card, atomic writes, live reload. Different cards never conflict.</p></div>
-    <div class="card"><h3><span class="ic">⌨️</span>Keyboard-first</h3><p>Every action is a keystroke. Modal input like Vim keeps bindings contextual and safe.</p></div>
-    <div class="card"><h3><span class="ic">🤖</span>Dual interface</h3><p>A TUI for humans, a headless CLI for scripts and AI agents — same data, same files.</p></div>
-    <div class="card"><h3><span class="ic">📦</span>Zero infrastructure</h3><p>A single binary. No database, no daemon, no network, no sign-up.</p></div>
-    <div class="card"><h3><span class="ic">🖨️</span>Print-ready</h3><p>Export any card as a PDF/A — black and gray for monochrome printers, or in color. Quotes, alert titles and section headings follow the card's language.</p></div>
+<span class="c"># optional: boards local to a project</span>
+<span class="p">$</span> tct init</pre></div>
   </div>
 </section>
 
@@ -124,144 +92,62 @@ cargo install --path .</pre></div>
   <p class="eyebrow">Who it's for</p>
   <h2>One tool, three ways to work.</h2>
   <div class="grid">
-    <div class="card"><h3><span class="ic">🧑‍💻</span>Solo developers</h3><p>Keep a board next to your code with <code>tct init</code>. No browser tab, no context switch.</p></div>
+    <div class="card"><h3><span class="ic">🧑‍💻</span>Solo developers</h3><p>Keep your tasks in the terminal where you already work. No browser tab, no account, no context switch.</p></div>
     <div class="card"><h3><span class="ic">👥</span>Teams in a repo</h3><p>Commit <code>.tct/</code> and everyone who pulls sees the same board. Cards live in separate files, so merges stay boring.</p></div>
-    <div class="card"><h3><span class="ic">🤖</span>Scripts &amp; AI agents</h3><p>A complete CLI with partial-name matching and a user guide embedded in the binary: <code>tct --help user-guide</code>.</p></div>
+    <div class="card"><h3><span class="ic">🤖</span>Scripts &amp; AI agents</h3><p>A complete CLI and a user guide embedded in the binary: <code>tct --help user-guide</code>.</p></div>
   </div>
-</section>
-
-<section id="files">
-  <p class="eyebrow">Under the hood</p>
-  <h2>Open a card in any editor.</h2>
-  <p class="lead">No proprietary format and no database. A board is a directory; a card is a file you can read, diff and <code>grep</code>.</p>
-  <div class="split">
-    <div class="window"><div class="bar"><i></i><i></i><i></i><b>.tct/</b></div><pre>.tct/
-└── boards/
-    └── 9f3c3ae4/
-        ├── board.json        <span class="c"># name, lists, labels</span>
-        ├── card-53ad7911.json
-        └── card-a07e12c0.json</pre></div>
-    <div class="window"><div class="bar"><i></i><i></i><i></i><b>card-53ad7911.json</b></div><pre>{
-  <span class="k">"list_id"</span>: <span class="s">"24d6c0f0"</span>,
-  <span class="k">"position"</span>: 1.0,
-  <span class="k">"title"</span>: <span class="s">"Fix login bug"</span>,
-  <span class="k">"description"</span>: <span class="s">"Fails on **expired** tokens."</span>,
-  <span class="k">"label_ids"</span>: [<span class="s">"df88cb04"</span>],
-  <span class="k">"due_date"</span>: <span class="s">"2099-12-31"</span>,
-  <span class="k">"checklist"</span>: [ <span class="c">…</span> ],
-  <span class="k">"archived"</span>: false
-}</pre></div>
-  </div>
-  <p class="lead note">A card knows its list and its rank, so moving a card rewrites one small file. A card's history (created, moved, archived, edited) is kept inside it.</p>
 </section>
 
 <section id="features">
-  <p class="eyebrow">Everything on a card</p>
+  <p class="eyebrow">Why tct</p>
   <h2>Small, sharp feature set.</h2>
+  <p class="lead">Every board and every card is one human-readable JSON file. That single decision makes tct easy to sync, diff, script and trust.</p>
   <div class="grid">
     <div class="card"><h3>Markdown descriptions</h3><p>Highlighting, soft wrap, auto-continued lists, live-reformatted tables, footnotes, alerts and undo/redo. It remembers where you left off.</p></div>
     <div class="card"><h3>Checklists</h3><p>Add, edit, toggle, delete and reorder items; progress shows on the card, e.g. <code>[2/3]</code>.</p></div>
-    <div class="card"><h3>Labels</h3><p>Board-wide labels with auto-generated pastel colors that stay maximally distinct. Filter by label with <kbd>f</kbd>.</p></div>
+    <div class="card"><h3>Labels</h3><p>Board-wide labels with auto-generated pastel colors that stay maximally distinct.</p></div>
     <div class="card"><h3>Due dates</h3><p>A calendar picker and clear overdue display in the list and the detail view.</p></div>
-    <div class="card"><h3>Archive &amp; history</h3><p>Archive cards, lists and boards and restore them later. Every card keeps a change history (<kbd>h</kbd>).</p></div>
-    <div class="card"><h3>Accent colors</h3><p>Each board gets its own accent: cycle pastels with <kbd>c</kbd> or pick any color with <kbd>C</kbd>.</p></div>
+    <div class="card"><h3>Archive &amp; history</h3><p>Archive cards, lists and boards and restore them later. Every card keeps a change history.</p></div>
+    <div class="card"><h3>Accent colors</h3><p>Each board gets its own accent: cycle pastels or pick any color.</p></div>
     <div class="card"><h3>Any terminal</h3><p>Truecolor where available, quantized to 256 or 16 colors elsewhere, with a fallback for the bare Linux console.</p></div>
-    <div class="card"><h3>macOS friendly</h3><p><kbd>Cmd</kbd> shortcuts work in terminals that pass them through.</p></div>
+    <div class="card"><h3>Files are the API</h3><p>Standalone, readable JSON. Any tool that can read and write files can work with your boards.</p></div>
+    <div class="card"><h3>Sync-friendly</h3><p>One file per card, atomic writes, live reload. Different cards never conflict.</p></div>
+    <div class="card"><h3>Dual interface</h3><p>A TUI for humans, a headless CLI for scripts and AI agents — same data, same files.</p></div>
+    <div class="card"><h3>Zero infrastructure</h3><p>A single binary. No database, no daemon, no network, no sign-up.</p></div>
+    <div class="card"><h3>Print-ready</h3><p>Export any card as a PDF/A — black and gray for monochrome printers, or in color.</p></div>
   </div>
 </section>
 
-<section id="tour">
-  <p class="eyebrow">Tour</p>
-  <h2>Four screens, one flow.</h2>
-  <div class="flow">
-    <span>Board selector</span><span class="arrow">→ Enter →</span><span class="a">Board view</span><span class="arrow">→ Enter →</span><span>Card detail</span><span class="arrow">→ e →</span><span>Markdown editor</span>
-  </div>
-  <ol class="steps">
-    <li><div><h3>Pick a board</h3><p>The selector lists your boards. <kbd>n</kbd> creates one, <kbd>c</kbd> cycles its accent color, <kbd>a</kbd> archives it.</p></div></li>
-    <li><div><h3>Work the columns</h3><p>Lists are columns of cards. Move around with the arrows, create cards with <kbd>n</kbd>, and push them along with <kbd>Shift</kbd>+arrows — within a list or across lists. On bare Linux consoles, <kbd>m</kbd> grabs a card and arrows move it.</p></div></li>
-    <li><div><h3>Open a card</h3><p>Description, checklist, labels and due date in one scrollable view. Toggle items with <kbd>Space</kbd>, set a due date with <kbd>u</kbd>, assign labels with <kbd>l</kbd>.</p></div></li>
-    <li><div><h3>Write in Markdown</h3><p>The editor highlights as you type, wraps softly, auto-continues lists, reformats pipe tables on every edit and supports footnotes, alerts and undo/redo.</p></div></li>
-    <li><div><h3>Find things</h3><p><kbd>/</kbd> searches and <em>hides</em> non-matching cards; <kbd>f</kbd> filters by label; <kbd>F</kbd> clears it all.</p></div></li>
-  </ol>
-  <p class="lead note">Forgot a key? <kbd>?</kbd> opens a help overlay that is always specific to where you are (<kbd>F1</kbd> in the editor).</p>
-</section>
-
-<section id="keys">
-  <p class="eyebrow">Cheat sheet</p>
-  <h2>The keys you'll use daily.</h2>
+<section id="agents">
+  <p class="eyebrow">Also for agents</p>
+  <h2>Works for AI agents, too.</h2>
+  <p class="lead">Because boards are plain files and everything is scriptable, an AI agent can share a board with you: you use the TUI, the agent uses the CLI, and tct reloads from disk when files change so its changes show up on your screen. Nothing to host, nothing to configure.</p>
   <div class="split">
-    <table>
-      <tr><th colspan="2">Board view</th></tr>
-      <tr><td><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd></td><td>Move between lists and cards</td></tr>
-      <tr><td><kbd>Enter</kbd></td><td>Open card</td></tr>
-      <tr><td><kbd>n</kbd> / <kbd>N</kbd></td><td>New card / new list</td></tr>
-      <tr><td><kbd>Shift</kbd>+arrows</td><td>Move card</td></tr>
-      <tr><td><kbd>t</kbd> / <kbd>e</kbd></td><td>Edit title / description</td></tr>
-      <tr><td><kbd>l</kbd> / <kbd>u</kbd></td><td>Labels / due date</td></tr>
-      <tr><td><kbd>a</kbd></td><td>Archive card</td></tr>
-    </table>
-    <table>
-      <tr><th colspan="2">Everywhere</th></tr>
-      <tr><td><kbd>/</kbd></td><td>Search</td></tr>
-      <tr><td><kbd>f</kbd> / <kbd>F</kbd></td><td>Filter by label / clear filters</td></tr>
-      <tr><td><kbd>p</kbd> / <kbd>P</kbd></td><td>Export PDF (mono / color)</td></tr>
-      <tr><td><kbd>h</kbd></td><td>Card history</td></tr>
-      <tr><td><kbd>C</kbd></td><td>Commit <code>.tct/</code> to git</td></tr>
-      <tr><td><kbd>?</kbd></td><td>Contextual help</td></tr>
-      <tr><td><kbd>q</kbd></td><td>Quit</td></tr>
-    </table>
-  </div>
-</section>
+    <div class="window copy"><div class="bar"><i></i><i></i><i></i><b>an agent, working a card</b></div><pre><span class="c"># read the task</span>
+<span class="p">$</span> tct cards <span class="s">"Sprint"</span> --show <span class="s">"caching"</span>
 
-<section id="cli">
-  <p class="eyebrow">Command line</p>
-  <h2>Everything the TUI does, scriptable.</h2>
-  <p class="lead">Commands follow <code>tct &lt;entity&gt; &lt;board&gt; --&lt;action&gt;</code>. Names match case-insensitively and partially; use <code>--by-id</code> for exact IDs. Perfect for scripts, CI and AI agents.</p>
-  <div class="window copy" style="margin-top:2rem"><pre><span class="c"># create a board with lists and cards</span>
-<span class="p">$</span> tct boards --create <span class="s">"My Project"</span>
-<span class="p">$</span> tct lists <span class="s">"My Project"</span> --create <span class="s">"To Do"</span>
-<span class="p">$</span> tct cards <span class="s">"My Project"</span> --create <span class="s">"To Do"</span> <span class="s">"Fix login bug"</span>
+<span class="c"># plan it, then report progress</span>
+<span class="p">$</span> tct checklist <span class="s">"Sprint"</span> <span class="s">"caching"</span> --add <span class="s">"Write tests"</span>
+<span class="p">$</span> tct checklist <span class="s">"Sprint"</span> <span class="s">"caching"</span> --toggle 1
 
-<span class="c"># flesh it out</span>
-<span class="p">$</span> tct cards <span class="s">"My Project"</span> --edit <span class="s">"Fix login"</span> --due 2099-12-31
-<span class="p">$</span> tct checklist <span class="s">"My Project"</span> <span class="s">"Fix login"</span> --add <span class="s">"Write a failing test"</span>
-<span class="p">$</span> tct labels <span class="s">"My Project"</span> --assign <span class="s">"Fix login"</span> <span class="s">"bug"</span>
-
-<span class="c"># review, search, export, commit</span>
-<span class="p">$</span> tct cards <span class="s">"My Project"</span>
-<span class="p">$</span> tct cards <span class="s">"My Project"</span> --export <span class="s">"Fix login"</span> --style color
+<span class="c"># record it in git (only .tct/ is committed)</span>
 <span class="p">$</span> tct commit</pre></div>
-  <div class="grid">
-    <div class="card"><h3>Built-in docs</h3><p><code>tct --help</code> lists topics: <code>cli</code>, <code>examples</code>, <code>env</code>, <code>readme</code>, <code>user-guide</code>. The guide is embedded in the binary.</p></div>
-    <div class="card"><h3>Safe output</h3><p>Control characters in card titles are stripped before they reach your terminal.</p></div>
-    <div class="card"><h3>Untrusted-repo safe</h3><p>Validated IDs and no symlinks: a <code>.tct/</code> from a cloned repo can't escape its directory.</p></div>
-  </div>
-</section>
-
-<section id="sync">
-  <p class="eyebrow">Sync &amp; git</p>
-  <h2>Share boards without a server.</h2>
-  <div class="split">
     <div>
-      <p>Put <code>.tct/</code> in your repo and teammates see the board when they run <code>tct</code> there. One file per card means different cards never conflict, and tct reloads from disk when files change.</p>
-      <p>Prefer Dropbox, Syncthing or OneDrive? Point <code>TCT_DATA_DIR</code> at a synced folder.</p>
-      <p><code>tct --git enable</code> commits on quit, <kbd>C</kbd> commits at once, and <code>tct commit</code> does it from scripts. Only <code>.tct/</code> is ever committed, with a message naming the boards and cards that changed.</p>
+      <p>The binary documents itself (<code>tct --help user-guide --section …</code>), and errors go to stderr with exit status 1. Every card keeps a change history, and output is sanitized so a hostile card title can't inject escape sequences.</p>
+      <p>Tell your agent about it in <code>AGENTS.md</code> or <code>CLAUDE.md</code>:</p>
+      <div class="window copy"><pre>Track work on the tct board in <span class="s">`.tct/`</span> (see
+<span class="s">`tct --help user-guide --section "Humans and AI agents"`</span>).
+Read your card with <span class="s">`tct cards &lt;board&gt; --show &lt;card&gt;`</span>, tick checklist
+items as you go, run <span class="s">`tct commit`</span> when you finish.</pre></div>
+      <p class="lead note">More in the <a href="guide/#humans-and-ai-agents">user guide</a>.</p>
     </div>
-    <div class="window copy"><pre><span class="c"># share a board with your team</span>
-<span class="p">$</span> tct init
-<span class="p">$</span> tct boards --create <span class="s">"Sprint Board"</span>
-<span class="p">$</span> tct commit
-<span class="p">$</span> git push
-
-<span class="c"># teammates</span>
-<span class="p">$</span> git pull &amp;&amp; tct</pre></div>
   </div>
 </section>
 
 <section id="pdf">
   <p class="eyebrow">PDF export</p>
   <h2>From card to paper.</h2>
-  <p class="lead">Press <kbd>p</kbd> for a black-and-gray PDF/A made for monochrome printers, or <kbd>P</kbd> for color. Fonts are embedded, so it looks the same everywhere. Headings, lists, tables, code, footnotes and alerts are laid out with sensible page breaks. The language is detected from the card (English, German, French, Spanish, Italian, Dutch, Portuguese, Swedish, Turkish), so typographic quotes, alert titles and fixed texts like “Due” match it.</p>
+  <p class="lead">Press <kbd>p</kbd> for a black-and-gray PDF/A made for monochrome printers, or <kbd>P</kbd> for color. Fonts are embedded, so it looks the same everywhere. Headings, lists, tables, code, footnotes and alerts are laid out with sensible page breaks. The language is detected from the card.</p>
   <div class="compare" id="compare">
     <div class="seg" role="tablist" aria-label="Which part of the card">
       <button type="button" role="tab" aria-selected="true" data-term="shot-detail" data-pdf="1">Top of the card</button>
@@ -275,58 +161,19 @@ cargo install --path .</pre></div>
       <figure><div class="window"><div class="bar"><i></i><i></i><i></i><b>terminal</b></div><img id="cmp-term" src="img/shot-detail.webp" width="1240" height="960" alt="The card in tct's detail view"></div><figcaption>In the terminal</figcaption></figure>
       <figure><a id="cmp-pdf-link" href="export/showcase-mono.pdf"><img id="cmp-pdf" class="paper" src="img/pdf-mono-1.webp" width="827" height="1170" alt="The same card as a PDF page"></a><figcaption>As a PDF (<a id="cmp-pdf-link2" href="export/showcase-mono.pdf">open</a>)</figcaption></figure>
     </div>
-    <p class="lead note">Same card, same text. The PDF adds proper typography, a running footer, and footnotes at the bottom of the page that cites them. Tables and matrices are drawn booktabs-style.</p>
   </div>
-  <p class="lead note">More samples: <a href="export/color/15-alerts.pdf">alerts</a> · <a href="export/16-footnotes.pdf">footnotes</a> · <a href="export/14-matrix.pdf">matrix tables</a> · <a href="export/00-showcase.pdf">kitchen-sink showcase</a>. Or from the shell: <code>tct cards "Release 2.0" --export "planning" --style color</code>.</p>
-</section>
-
-<section id="agents">
-  <p class="eyebrow">Also for agents</p>
-  <h2>Works with AI agents, too.</h2>
-  <p class="lead">Because boards are plain files and everything is scriptable, an AI agent can share a board with you: you use the TUI, the agent uses the CLI, and tct reloads from disk when files change so its changes show up on your screen. Nothing to host, nothing to configure.</p>
-  <div class="split">
-    <div class="window copy"><div class="bar"><i></i><i></i><i></i><b>an agent, working a card</b></div><pre><span class="c"># read the task</span>
-<span class="p">$</span> tct cards <span class="s">"Sprint"</span> --show <span class="s">"caching"</span>
-
-<span class="c"># plan it, then report progress</span>
-<span class="p">$</span> tct checklist <span class="s">"Sprint"</span> <span class="s">"caching"</span> --add <span class="s">"Write tests"</span>
-<span class="p">$</span> tct checklist <span class="s">"Sprint"</span> <span class="s">"caching"</span> --toggle 1
-
-<span class="c"># record it in git (only .tct/ is committed)</span>
-<span class="p">$</span> tct commit</pre></div>
-    <div>
-      <p>The binary documents itself (<code>tct --help user-guide --section …</code>), names match partially, and errors go to stderr with exit status 1. Every card keeps a change history, and output is sanitized so a hostile card title can't inject escape sequences.</p>
-      <p>Tell your agent about it in <code>AGENTS.md</code> or <code>CLAUDE.md</code>:</p>
-      <div class="window copy"><pre>Track work on the tct board in <span class="s">`.tct/`</span> (see
-<span class="s">`tct --help user-guide --section "Humans and AI agents"`</span>).
-Read your card with <span class="s">`tct cards &lt;board&gt; --show &lt;card&gt;`</span>, tick checklist
-items as you go, run <span class="s">`tct commit`</span> when you finish.</pre></div>
-      <p class="lead note">More in the <a href="guide/#humans-and-ai-agents">user guide</a>.</p>
-    </div>
-  </div>
+  <p class="lead note">More samples: <a href="export/color/15-alerts.pdf">alerts</a> · <a href="export/16-footnotes.pdf">footnotes</a> · <a href="export/14-matrix.pdf">matrix tables</a> · <a href="export/00-showcase.pdf">kitchen-sink showcase</a></p>
 </section>
 
 <section id="faq">
   <p class="eyebrow">FAQ</p>
   <h2>Good to know.</h2>
-  <details open><summary>Where does tct store my data?</summary><p><code>TCT_DATA_DIR</code> if set, else the nearest <code>.tct/</code> in the current directory or a parent, else <code>~/.tct/</code>.</p></details>
   <details><summary>Do I need git?</summary><p>No. Git is optional and strictly opt-in; tct never commits in the background. Any file sync works.</p></details>
   <details><summary>Does tct talk to the network?</summary><p>No. There is no server, telemetry or account. The optional browser version is something you host yourself.</p></details>
   <details><summary>What if two people edit the same card?</summary><p>Writes are atomic and each card is its own file, so unrelated edits never clash. Concurrent edits to the <em>same</em> card are resolved by your sync tool as for any file.</p></details>
   <details><summary>I cloned a repo that contains a <code>.tct/</code>. Is that safe?</summary><p>Yes: IDs are validated, symlinks are refused and terminal output is sanitized, so a malicious data directory can't read or write outside itself.</p></details>
-  <details><summary>How does an AI agent learn to use tct?</summary><p>From the binary itself: <code>tct --help</code> gives an overview and <code>tct --help user-guide --toc</code> plus <code>--section</code> print the guide piece by piece. Add the snippet from <a href="#agents">above</a> to your agent instructions and it will find the rest.</p></details>
-  <details><summary>Where is the full documentation?</summary><p>In the binary: <code>tct --help</code>, then <code>tct --help user-guide --toc</code>. Also as a <a href="guide/">web page</a>.</p></details>
 </section>
 
-<section id="more">
-  <p class="eyebrow">More</p>
-  <h2>In the browser, and in depth.</h2>
-  <div class="grid">
-    <div class="card"><h3>Browser PWA</h3><p>A Docker image serves tct as an installable web app, with Basic Auth or OAuth. <a href="https://github.com/waschmittel/tct/blob/main/docs/docker/README.md">Self-hosting guide</a></p></div>
-    <div class="card"><h3>User guide</h3><p>Every screen, label colors, archiving, data format, troubleshooting. <a href="guide/">Read the guide</a></p></div>
-    <div class="card"><h3>Architecture</h3><p>arc42 documentation and decision records. <a href="https://github.com/waschmittel/tct/blob/main/docs/arc42.md">Explore the design</a></p></div>
-  </div>
-</section>
 </main>
 
 <footer><div class="wrap">
