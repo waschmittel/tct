@@ -383,8 +383,9 @@ pub fn inline(text: &str, base: Style, lang: Lang) -> Vec<Run> {
     runs
 }
 
-/// `chars[from..to]` with `...` as an ellipsis and straight quotes as the
-/// language's typographic ones (never applied to code).
+/// `chars[from..to]` with `...` as an ellipsis, straight quotes as the
+/// language's typographic ones, `--`/`---` as en/em dash and a spaced ` - `
+/// as a spaced en dash (never applied to code).
 fn typeset(chars: &[char], from: usize, to: usize, lang: Lang) -> String {
     let mut out = String::new();
     let mut i = from;
@@ -396,11 +397,84 @@ fn typeset(chars: &[char], from: usize, to: usize, lang: Lang) -> String {
                 continue;
             }
             '"' | '\'' => out.push_str(&quote(chars, i, lang)),
+            ' ' if spaced_hyphen(chars, i, to) => {
+                out.push_str(" \u{2013} ");
+                i += 3;
+                continue;
+            }
+            '-' if let Some(len) = hyphen_run_dash(chars, i, from, to) => {
+                out.push(if len == 2 { '\u{2013}' } else { '\u{2014}' });
+                i += len;
+                continue;
+            }
             c => out.push(c),
         }
         i += 1;
     }
     out
+}
+
+/// Is `chars[at..at + 3]` a ` - ` that is punctuation: words on both sides
+/// (not two digits — `5 - 3` is arithmetic, a range or a score) and all three
+/// characters inside the run (`to`)?
+fn spaced_hyphen(chars: &[char], at: usize, to: usize) -> bool {
+    if at + 3 > to || at == 0 || chars[at + 1] != '-' || chars[at + 2] != ' ' {
+        return false;
+    }
+    let (Some(&before), Some(&after)) = (chars.get(at - 1), chars.get(at + 3)) else {
+        return false;
+    };
+    let word = |c: char| !c.is_whitespace() && !matches!(c, '|' | '-');
+    word(before)
+        && word(after)
+        && !(before.is_ascii_digit() && after.is_ascii_digit())
+        && !literal_token(chars, at + 1)
+}
+
+/// A run of exactly two or three hyphens at `chars[at]` that is a dash and not
+/// a flag (`--verbose`), an arrow (`-->`), part of a table rule (`|--:|`), a
+/// URL, a path or an address; its length. Whole-line `---` never gets here.
+fn hyphen_run_dash(chars: &[char], at: usize, from: usize, to: usize) -> Option<usize> {
+    if at > from && chars[at - 1] == '-' {
+        return None;
+    }
+    let len = chars[at..to].iter().take_while(|&&c| c == '-').count();
+    if !(2..=3).contains(&len) {
+        return None;
+    }
+    let prev = at.checked_sub(1).map(|i| chars[i]);
+    let next = chars.get(at + len).copied();
+    if next == Some('-') || prev == Some('-') {
+        return None;
+    }
+    let blank = |c: Option<char>| c.is_none_or(char::is_whitespace);
+    let glue = |c: Option<char>| c.is_some_and(|c| matches!(c, '|' | ':' | '<' | '>' | '='));
+    if glue(prev) || glue(next) {
+        return None;
+    }
+    // `--flag`: opens a word of its own.
+    if blank(prev) && next.is_some_and(char::is_alphanumeric) {
+        return None;
+    }
+    // Dashes sit between words, never at the very edge of the text.
+    if prev.is_none() || next.is_none() || literal_token(chars, at) {
+        return None;
+    }
+    Some(len)
+}
+
+/// Does the whitespace-delimited token around `chars[at]` look like a URL,
+/// path or address (`://`, `@`, `/`) — text that must stay as typed?
+fn literal_token(chars: &[char], at: usize) -> bool {
+    let start = chars[..at]
+        .iter()
+        .rposition(|c| c.is_whitespace())
+        .map_or(0, |i| i + 1);
+    let end = chars[at..]
+        .iter()
+        .position(|c| c.is_whitespace())
+        .map_or(chars.len(), |i| at + i);
+    chars[start..end].iter().any(|&c| matches!(c, '/' | '@'))
 }
 
 /// The typographic form of the straight quote at `chars[at]`, judged by its
@@ -472,6 +546,40 @@ mod tests {
 
     fn quoted(text: &str, lang: Lang) -> String {
         plain(&inline(text, Style::default(), lang))
+    }
+
+    #[test]
+    fn dashes_become_en_and_em_dashes() {
+        // `--` en, `---` em, a spaced hyphen a spaced en dash.
+        assert_eq!(quoted("a -- b", Lang::En), "a \u{2013} b");
+        assert_eq!(quoted("a--b", Lang::En), "a\u{2013}b");
+        assert_eq!(quoted("a --- b", Lang::En), "a \u{2014} b");
+        assert_eq!(quoted("one - two", Lang::En), "one \u{2013} two");
+        // Same in every language; looks through emphasis.
+        assert_eq!(quoted("eins - zwei", Lang::De), "eins \u{2013} zwei");
+        assert_eq!(quoted("**a** - b", Lang::En), "a \u{2013} b");
+        assert_eq!(quoted("a - **b**", Lang::En), "a \u{2013} b");
+    }
+
+    #[test]
+    fn dash_corner_cases_stay_literal() {
+        for text in [
+            "well-known and 10-20 and 2026-11-15",
+            "5 - 3",
+            "run --verbose or --help",
+            "see https://x.com/a--b and a@b--c.de and src/a--b.rs",
+            "a --> b <-- c |--:| ----",
+            "-- leading and trailing --",
+            "- list marker",
+            "a -  b",
+            "trailing -",
+            "a - ",
+            "a | - | b",
+        ] {
+            assert_eq!(quoted(text, Lang::De), text, "{text}");
+        }
+        // Code is never touched.
+        assert_eq!(quoted("`a -- b` and `x - y`", Lang::En), "a -- b and x - y");
     }
 
     #[test]

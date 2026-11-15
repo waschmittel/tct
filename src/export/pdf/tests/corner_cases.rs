@@ -123,6 +123,14 @@ pub(super) fn corner_cases() -> Vec<(&'static str, BoardMeta, Card)> {
         ),
     ));
     cases.push((
+        "03j-dashes",
+        meta.clone(),
+        plain(
+            "Dashes -- en and em",
+            "Spaced hyphen - becomes a spaced en dash; a double -- hyphen is an en dash, a triple --- hyphen an em dash, and a--b sits tight.\n\nStays literal: well-known, 10-20, 2026-11-15, 5 - 3, `a -- b`, --verbose, a --> b, https://x.com/a--b, src/a--b.rs, me@a--b.de.\n\n**Bold** - and - *italic* -- across emphasis.\n\n- list marker stays\n\n| a - b | c -- d |\n|---|:--|\n| 1 - 2 | x --- y |\n\n```\nfenced -- stays - literal\n```".into(),
+        ),
+    ));
+    cases.push((
         "04-unbreakable-words",
         meta.clone(),
         plain(
@@ -378,6 +386,8 @@ cargo build --release
 ```
 
 That is all — a last paragraph after the code block.
+
+Dashes: a spaced hyphen - an en dash; `--` is an en dash -- and `---` an em dash --- as typed.
 ";
 
 #[test]
