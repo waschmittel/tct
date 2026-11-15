@@ -11,18 +11,18 @@ expression: render_to_string(&app)
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
-│   ┌ Help — Board Selector ───────────────────────────────────────────────────────────────────┐   │
-│   │Navigation                                    Actions                                     │   │
-│   │  ↑ / ↓             select board                n                 new board               │   │
-│   │  shift+↑/↓         reorder board               r                 rename board            │   │
-│   │  enter             open board                  c                 cycle accent color      │   │
-│   │                                                C                 board configuration     │   │
-│   │                                                a                 archive board           │   │
-│   │                                                v                 view archived boards    │   │
-│   │                                                                                          │   │
-│   │                                              App                                         │   │
-│   │                                                q                 quit                    │   │
-│   └ Esc:close ──────────────────────────────────────────────────────────────────────── vTEST ┘   │
+│                    ┌ Help — Board Selector ────────────────────────────────┐                     │
+│                    │         Navigation                   Actions          │                     │
+│                    │      ↑ / ↓  select board     n  new board             │                     │
+│                    │  shift+↑/↓  reorder board    r  rename board          │                     │
+│                    │      enter  open board       c  cycle accent color    │                     │
+│                    │                              C  board configuration   │                     │
+│                    │                              a  archive board         │                     │
+│                    │                              v  view archived boards  │                     │
+│                    │                                                       │                     │
+│                    │                                        App            │                     │
+│                    │                              q  quit                  │                     │
+│                    └ Esc:close ───────────────────────────────────── vTEST ┘                     │
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │

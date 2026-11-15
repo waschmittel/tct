@@ -145,17 +145,8 @@ fn render_status_toast(frame: &mut Frame, area: ratatui::layout::Rect, app: &App
     frame.render_widget(toast, rect);
 }
 
-fn dialog_help_key_width(dh: &crate::dialog::DialogHelp) -> usize {
-    dh.rows
-        .iter()
-        .map(|(k, _)| k.chars().count())
-        .max()
-        .unwrap_or(0)
-        + 2
-}
-
 fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
-    use ratatui::layout::{Constraint, Layout};
+    use ratatui::layout::{Constraint, Layout, Margin};
     use ratatui::style::{Color, Modifier, Style};
     use ratatui::text::{Line, Span};
     use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
@@ -215,178 +206,208 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         " Help — Board View "
     };
 
-    // Keys column: fixed width on the mode pages (fits "Shift+Left/Right"), sized to the longest key
-    // on a dialog page so long key lists never crowd the description.
-    let key_width = dialog_help
-        .as_ref()
-        .map(dialog_help_key_width)
-        .unwrap_or(18);
+    type HelpSection = (&'static str, Vec<(&'static str, &'static str)>);
 
-    let header = |s: &str| -> Line<'static> {
-        Line::from(Span::styled(
-            s.to_string(),
-            Style::default().fg(accent).add_modifier(Modifier::BOLD),
-        ))
-    };
-    let row = |key: &str, action: &str| -> Line<'static> {
-        Line::from(vec![
-            Span::raw("  "),
-            Span::styled(
-                format!("{key:<key_width$}"),
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::raw(action.to_string()),
-        ])
-    };
-
-    // One column of help lines from a keymap: section headers + their rows.
-    fn keymap_column<A: Copy>(
+    fn keymap_sections<A: Copy>(
         map: &[crate::input::keymap::Binding<A>],
-        sections: &[&str],
-        header: &dyn Fn(&str) -> Line<'static>,
-        row: &dyn Fn(&str, &str) -> Line<'static>,
-    ) -> Vec<Line<'static>> {
+        sections: &[&'static str],
+    ) -> Vec<HelpSection> {
+        sections
+            .iter()
+            .map(|&s| (s, crate::input::keymap::help_rows(map, s)))
+            .collect()
+    }
+
+    let (left_secs, right_secs): (Vec<HelpSection>, Vec<HelpSection>) =
+        if let Some(dh) = &dialog_help {
+            (vec![("Keys", dh.rows.clone())], vec![])
+        } else if is_editing_desc {
+            // Description-editor keys live on the MarkdownEditor handler, not a
+            // mode keymap — documented here directly.
+            (
+                vec![
+                    (
+                        "Edit",
+                        vec![
+                            ("ctrl+s", "save"),
+                            ("ctrl+q", "save and close"),
+                            ("esc", "cancel"),
+                            ("ctrl+z / ctrl+y", "undo / redo"),
+                            ("ctrl+c", "copy selection"),
+                            ("ctrl+x", "cut selection"),
+                            ("ctrl+v", "paste"),
+                            ("shift+←↑↓→", "select text"),
+                        ],
+                    ),
+                    (
+                        "Format",
+                        vec![
+                            ("ctrl+b", "toggle bold (**text**)"),
+                            ("ctrl+e", "toggle italic (*text*)"),
+                            ("ctrl+k", "inline code (`text`)"),
+                            ("ctrl+l", "insert list item (- )"),
+                            ("ctrl+n", "footnote / jump back"),
+                            ("ctrl+n (selected)", "name it after the text"),
+                            ("ctrl+p", "toggle paste mode"),
+                        ],
+                    ),
+                    (
+                        "Lists",
+                        vec![
+                            ("enter", "auto-continue list"),
+                            ("tab", "nest line(s)"),
+                            ("shift+tab", "un-nest line(s)"),
+                        ],
+                    ),
+                ],
+                vec![
+                    (
+                        "Tables",
+                        vec![
+                            ("tab / shift+tab", "next/previous cell"),
+                            ("enter", "row below / leave"),
+                            ("alt+←↑↓→", "swap column / row"),
+                            ("alt+shift+→ / ↓", "add column / row"),
+                            ("alt+shift+← / ↑", "delete column / row"),
+                            ("alt+a", "cycle alignment"),
+                            ("ctrl+t", "insert table"),
+                            ("ctrl+t, r / c", "add row / column"),
+                            ("ctrl+t, R / C", "add before"),
+                            ("ctrl+t, x / X", "delete row / column"),
+                            ("ctrl+t, T", "delete table"),
+                            ("ctrl+t, ←↑↓→", "swap row / column"),
+                            ("ctrl+t, a", "cycle alignment"),
+                            ("ctrl+t, t", "transpose matrix"),
+                        ],
+                    ),
+                    (
+                        "Alerts (in a quote)",
+                        vec![
+                            ("ctrl+g, n t i", "note / tip / important"),
+                            ("ctrl+g, c w", "caution / warning"),
+                            ("ctrl+g, x", "plain quote again"),
+                        ],
+                    ),
+                ],
+            )
+        } else if is_date_picker {
+            // Date-picker keys live on the DatePicker handler, not a mode
+            // keymap — documented here directly.
+            (
+                vec![(
+                    "Calendar",
+                    vec![
+                        ("← / →", "previous/next day"),
+                        ("↑ / ↓", "previous/next week"),
+                        ("pgup / pgdn", "previous/next month"),
+                        ("shift+pgup/pgdn", "previous/next year"),
+                        (", / .", "previous/next year"),
+                        ("home / end", "first/last of month"),
+                        ("t", "today"),
+                    ],
+                )],
+                vec![
+                    (
+                        "Input",
+                        vec![
+                            ("0-9 / -", "type date (YYYY-MM-DD)"),
+                            ("ctrl+u", "clear (remove due date)"),
+                        ],
+                    ),
+                    ("File", vec![("enter", "save"), ("esc", "cancel")]),
+                ],
+            )
+        } else if is_card_detail {
+            let map = crate::input::card_detail_input::KEYMAP;
+            (
+                keymap_sections(map, &["Card", "Checklist"]),
+                keymap_sections(map, &["Labels & Due", "View", "App"]),
+            )
+        } else if is_board_selector_base {
+            let map = crate::input::board_selector_input::KEYMAP;
+            (
+                keymap_sections(map, &["Navigation"]),
+                keymap_sections(map, &["Actions", "App"]),
+            )
+        } else {
+            let map = crate::input::normal::KEYMAP;
+            (
+                keymap_sections(map, &["Navigation", "Card", "Move"]),
+                keymap_sections(
+                    map,
+                    &["Lists", "Search & Filter", "Labels & Due", "View", "App"],
+                ),
+            )
+        };
+
+    // Per-column content width: longest key + 2-space gap + longest description
+    // (or longest section header, if wider).
+    fn column_metrics(secs: &[HelpSection]) -> (usize, usize) {
+        let key_w = secs
+            .iter()
+            .flat_map(|(_, rows)| rows.iter().map(|(k, _)| k.chars().count()))
+            .max()
+            .unwrap_or(0);
+        let desc_w = secs
+            .iter()
+            .flat_map(|(_, rows)| rows.iter().map(|(_, d)| d.chars().count()))
+            .max()
+            .unwrap_or(0);
+        let header_w = secs
+            .iter()
+            .map(|(h, _)| h.chars().count())
+            .max()
+            .unwrap_or(0);
+        let col_w = (key_w + 2 + desc_w).max(header_w);
+        (key_w, col_w)
+    }
+
+    fn render_column(secs: &[HelpSection], key_w: usize, accent: Color) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
-        for (i, section) in sections.iter().enumerate() {
+        for (i, (title, rows)) in secs.iter().enumerate() {
             if i > 0 {
                 lines.push(Line::raw(""));
             }
-            lines.push(header(section));
-            for (keys, help) in crate::input::keymap::help_rows(map, section) {
-                lines.push(row(keys, help));
+            lines.push(
+                Line::from(Span::styled(
+                    (*title).to_string(),
+                    Style::default().fg(accent).add_modifier(Modifier::BOLD),
+                ))
+                .centered(),
+            );
+            for &(key, action) in rows {
+                lines.push(Line::from(vec![
+                    Span::styled(format!("{key:>key_w$}"), Style::default().fg(Color::Yellow)),
+                    Span::raw("  "),
+                    Span::raw(action.to_string()),
+                ]));
             }
         }
         lines
     }
 
-    let (left, right): (Vec<Line>, Vec<Line>) = if let Some(dh) = &dialog_help {
-        (
-            std::iter::once(header("Keys"))
-                .chain(dh.rows.iter().map(|(k, h)| row(k, h)))
-                .collect(),
-            vec![],
-        )
-    } else if is_editing_desc {
-        // Description-editor keys live on the MarkdownEditor handler, not a
-        // mode keymap — documented here directly.
-        (
-            vec![
-                header("Edit"),
-                row("ctrl+s", "save"),
-                row("ctrl+q", "save and close"),
-                row("esc", "cancel"),
-                row("ctrl+z / ctrl+y", "undo / redo"),
-                row("ctrl+c", "copy selection"),
-                row("ctrl+x", "cut selection"),
-                row("ctrl+v", "paste"),
-                row("shift+←↑↓→", "select text"),
-                Line::raw(""),
-                header("Format"),
-                row("ctrl+b", "toggle bold (**text**)"),
-                row("ctrl+e", "toggle italic (*text*)"),
-                row("ctrl+k", "inline code (`text`)"),
-                row("ctrl+l", "insert list item (- )"),
-                row("ctrl+n", "footnote / jump back"),
-                row("ctrl+n (selected)", "name it after the text"),
-                row("ctrl+p", "toggle paste mode"),
-                Line::raw(""),
-                header("Lists"),
-                row("enter", "auto-continue list"),
-                row("tab", "nest line(s)"),
-                row("shift+tab", "un-nest line(s)"),
-            ],
-            vec![
-                header("Tables"),
-                row("tab / shift+tab", "next/previous cell"),
-                row("enter", "row below / leave"),
-                row("alt+←↑↓→", "swap column / row"),
-                row("alt+shift+→ / ↓", "add column / row"),
-                row("alt+shift+← / ↑", "delete column / row"),
-                row("alt+a", "cycle alignment"),
-                row("ctrl+t", "insert table"),
-                row("ctrl+t, r / c", "add row / column"),
-                row("ctrl+t, R / C", "add before"),
-                row("ctrl+t, x / X", "delete row / column"),
-                row("ctrl+t, T", "delete table"),
-                row("ctrl+t, ←↑↓→", "swap row / column"),
-                row("ctrl+t, a", "cycle alignment"),
-                row("ctrl+t, t", "transpose matrix"),
-                Line::raw(""),
-                header("Alerts (in a quote)"),
-                row("ctrl+g, n t i", "note / tip / important"),
-                row("ctrl+g, c w", "caution / warning"),
-                row("ctrl+g, x", "plain quote again"),
-            ],
-        )
-    } else if is_date_picker {
-        // Date-picker keys live on the DatePicker handler, not a mode
-        // keymap — documented here directly.
-        (
-            vec![
-                header("Calendar"),
-                row("← / →", "previous/next day"),
-                row("↑ / ↓", "previous/next week"),
-                row("pgup / pgdn", "previous/next month"),
-                row("shift+pgup/pgdn", "previous/next year"),
-                row(", / .", "previous/next year"),
-                row("home / end", "first/last of month"),
-                row("t", "today"),
-            ],
-            vec![
-                header("Input"),
-                row("0-9 / -", "type date (YYYY-MM-DD)"),
-                row("ctrl+u", "clear (remove due date)"),
-                Line::raw(""),
-                header("File"),
-                row("enter", "save"),
-                row("esc", "cancel"),
-            ],
-        )
-    } else if is_card_detail {
-        let map = crate::input::card_detail_input::KEYMAP;
-        (
-            keymap_column(map, &["Card", "Checklist"], &header, &row),
-            keymap_column(map, &["Labels & Due", "View", "App"], &header, &row),
-        )
-    } else if is_board_selector_base {
-        let map = crate::input::board_selector_input::KEYMAP;
-        (
-            keymap_column(map, &["Navigation"], &header, &row),
-            keymap_column(map, &["Actions", "App"], &header, &row),
-        )
-    } else {
-        let map = crate::input::normal::KEYMAP;
-        (
-            keymap_column(map, &["Navigation", "Card", "Move"], &header, &row),
-            keymap_column(
-                map,
-                &["Lists", "Search & Filter", "Labels & Due", "View", "App"],
-                &header,
-                &row,
-            ),
-        )
-    };
+    const OUTER_MARGIN: usize = 2;
+    const COL_GAP: usize = 4;
 
-    // The popup hugs its content: as tall as the longer column; as wide as
-    // the widest row for a dialog page, a fixed two-column width otherwise.
-    let width = match &dialog_help {
-        // Widest row (indent + keys + description), widened if needed for
-        // the title and the bottom border text, plus the side borders.
-        Some(dh) => {
-            let rows = dh
-                .rows
-                .iter()
-                .map(|(_, d)| 2 + dialog_help_key_width(dh) + d.chars().count() + 1)
-                .max()
-                .unwrap_or(0);
-            let title = dh.title.chars().count();
-            let footer = " Esc:close ".len() + app.version.chars().count() + 2;
-            (rows.max(title).max(footer) + 2) as u16
-        }
-        None => 92,
-    }
-    .min(area.width.saturating_sub(4))
-    .max(20);
+    let (left_key_w, left_col_w) = column_metrics(&left_secs);
+    let (right_key_w, right_col_w) = column_metrics(&right_secs);
+    let left = render_column(&left_secs, left_key_w, accent);
+    let right = render_column(&right_secs, right_key_w, accent);
+
+    // The popup hugs its content: 2-space outer margins inside the borders,
+    // 4-space gap between columns on two-column pages, widened if needed for
+    // the title or bottom border text.
+    let content_w = if right_secs.is_empty() {
+        left_col_w
+    } else {
+        left_col_w + COL_GAP + right_col_w
+    };
+    let inner_w = OUTER_MARGIN * 2 + content_w;
+    let title_w = title.chars().count();
+    let footer_w = " Esc:close ".len() + app.version.chars().count() + 2;
+    let width = ((inner_w.max(title_w).max(footer_w) + 2) as u16)
+        .min(area.width.saturating_sub(4))
+        .max(20);
     let height = (left.len().max(right.len()) as u16 + 2)
         .min(area.height.saturating_sub(4))
         .max(5);
@@ -411,15 +432,20 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         )
         .borders(Borders::ALL)
         .border_style(Style::default().fg(accent));
-    let inner = block.inner(popup);
+    let content = block
+        .inner(popup)
+        .inner(Margin::new(OUTER_MARGIN as u16, 0));
     frame.render_widget(block, popup);
 
-    let columns = if dialog_help.is_some() {
-        Layout::horizontal([Constraint::Percentage(100), Constraint::Length(0)]).split(inner)
+    let columns = if right_secs.is_empty() {
+        Layout::horizontal([Constraint::Fill(1), Constraint::Length(0)]).split(content)
     } else {
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .spacing(2)
-            .split(inner)
+        Layout::horizontal([
+            Constraint::Fill(left_col_w as u16),
+            Constraint::Fill(right_col_w as u16),
+        ])
+        .spacing(COL_GAP as u16)
+        .split(content)
     };
 
     frame.render_widget(Paragraph::new(left).wrap(Wrap { trim: false }), columns[0]);

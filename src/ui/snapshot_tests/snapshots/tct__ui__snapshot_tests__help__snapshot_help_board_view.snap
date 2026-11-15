@@ -4,31 +4,31 @@ expression: render_to_string(&app)
 ---
  Demo (2 lists)
 ┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
-│┏━━┌ Help — Board View ───────────────────────────────────────────────────────────────────────┐──┐│
-│┃Fi│Navigation                                    Lists                                       │  ││
-│┃[b│  ← / →             switch list                 N                 new list                │──┘│
-│┃[1│  ↑ / ↓             select card                 r                 rename list             │   │
-│┗━━│  g / G             first/last card             A                 archive list            │   │
-│┌──│  j/k or ,/.        prev/next board             V                 view archived lists     │   │
-││Re│  enter             open card detail            < / >             reorder list            │   │
-│└──│                                                                                          │   │
-│   │Card                                          Search & Filter                             │   │
-│   │  t                 edit title                  /                 search                  │   │
-│   │  e                 edit description            f                 filter by label         │   │
-│   │  y                 copy title                  F                 clear filters           │   │
-│   │  n                 new card                                                              │   │
-│   │  a                 archive card              Labels & Due                                │   │
-│   │  v                 view archived cards         l                 edit card labels        │   │
-│   │  h                 view change history         L                 manage available labels │   │
-│   │  p                 export as PDF               u                 set due date            │   │
-│   │  P                 export as color PDF         U                 clear due date          │   │
-│   │                                                                                          │   │
-│   │Move                                          View                                        │   │
-│   │  shift+←/→         move to adjacent list       c                 show/hide created date  │   │
-│   │  shift+↑/↓         move within list            d                 show/hide updated date  │   │
-│   │  m                 grab/drop card (arrows)                                               │   │
-│   │                                              App                                         │   │
-│   │                                                b                 back to board selector  │   │
-│   └ Esc:close ──────────────────────────────────────────────────────────────────────── vTEST ┘   │
+│┏━━━━━━━━━━┌ Help — Board View ──────────────────────────────────────────────────────┐───────────┐│
+│┃Fix login │              Navigation                              Lists              │           ││
+│┃[bug]     │       ← / →  switch list                    N  new list                 │───────────┘│
+│┃[1/3] ≡   │       ↑ / ↓  select card                    r  rename list              │            │
+│┗━━━━━━━━━━│       g / G  first/last card                A  archive list             │            │
+│┌──────────│  j/k or ,/.  prev/next board                V  view archived lists      │            │
+││Redesign d│       enter  open card detail           < / >  reorder list             │            │
+│└──────────│                                                                         │            │
+│           │                 Card                            Search & Filter         │            │
+│           │           t  edit title                     /  search                   │            │
+│           │           e  edit description               f  filter by label          │            │
+│           │           y  copy title                     F  clear filters            │            │
+│           │           n  new card                                                   │            │
+│           │           a  archive card                        Labels & Due           │            │
+│           │           v  view archived cards            l  edit card labels         │            │
+│           │           h  view change history            L  manage available labels  │            │
+│           │           p  export as PDF                  u  set due date             │            │
+│           │           P  export as color PDF            U  clear due date           │            │
+│           │                                                                         │            │
+│           │                 Move                                 View               │            │
+│           │   shift+←/→  move to adjacent list          c  show/hide created date   │            │
+│           │   shift+↑/↓  move within list               d  show/hide updated date   │            │
+│           │           m  grab/drop card (arrows)                                    │            │
+│           │                                                       App               │            │
+│           │                                             b  back to board selector   │            │
+│           └ Esc:close ─────────────────────────────────────────────────────── vTEST ┘            │
 └────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
  HELP                                                                                        ~/.tct
