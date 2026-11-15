@@ -66,9 +66,9 @@
   ],
   "accent_color": {
     "custom": {
-      "r": 12,
-      "g": 143,
-      "b": 0
+      "r": 0,
+      "g": 122,
+      "b": 143
     }
   },
   "new_card_position": "bottom",

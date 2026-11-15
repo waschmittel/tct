@@ -230,6 +230,21 @@ fn snapshot_confirm_restore_card() {
 }
 
 #[test]
+fn snapshot_confirm_delete_board() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('b'));
+        press(&mut app, KeyCode::Char('a'));
+        press(&mut app, KeyCode::Char('y'));
+        press(&mut app, KeyCode::Char('v'));
+        press(&mut app, KeyCode::Char('x'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
 fn snapshot_archived_cards_dialog() {
     with_temp_dir(|| {
         let id = seed_demo_board();
@@ -253,9 +268,9 @@ fn dialog_help_pages_are_compact_and_unwrapped() {
         archived_lists::ArchivedLists, card_history::CardHistory,
         confirm_archive_card::ConfirmArchiveCard, confirm_archive_list::ConfirmArchiveList,
         confirm_cancel_edit::ConfirmCancelEdit, confirm_clear_due_date::ConfirmClearDueDate,
-        confirm_restore_board::ConfirmRestoreBoard, confirm_restore_card::ConfirmRestoreCard,
-        confirm_restore_list::ConfirmRestoreList, label_manager::LabelManager,
-        label_picker::LabelPicker,
+        confirm_delete_board::ConfirmDeleteBoard, confirm_restore_board::ConfirmRestoreBoard,
+        confirm_restore_card::ConfirmRestoreCard, confirm_restore_list::ConfirmRestoreList,
+        label_manager::LabelManager, label_picker::LabelPicker,
     };
     use crate::model::board::BoardMeta;
     use crate::model::list::CardList;
@@ -277,6 +292,11 @@ fn dialog_help_pages_are_compact_and_unwrapped() {
                 selected: 0,
             }),
             Box::new(ConfirmRestoreBoard {
+                board: BoardMeta::new("Test board".into()),
+                boards: vec![],
+                selected: 0,
+            }),
+            Box::new(ConfirmDeleteBoard {
                 board: BoardMeta::new("Test board".into()),
                 boards: vec![],
                 selected: 0,

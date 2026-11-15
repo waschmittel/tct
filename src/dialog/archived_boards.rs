@@ -8,7 +8,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
-use super::{Dialog, DialogBackground, DialogOutcome, DialogSideEffect};
+use super::{Dialog, DialogBackground, DialogOutcome};
 use crate::app::LoadedBoard;
 use crate::model::board::BoardMeta;
 
@@ -89,19 +89,12 @@ impl Dialog for ArchivedBoards {
                 ))
             }
             KeyCode::Char('x') if self.selected < self.boards.len() => {
-                let board = self.boards.remove(self.selected);
-                let name = board.name.clone();
-                if self.selected > 0 && self.selected >= self.boards.len() {
-                    self.selected = self.boards.len().saturating_sub(1);
-                }
-                let mut out = DialogOutcome::side_effect(DialogSideEffect::DeleteArchivedBoard {
-                    board_id: board.id,
-                })
-                .with_status(format!("Deleted board '{name}'"));
-                if self.boards.is_empty() {
-                    out = out.with_close_to(crate::app::AppMode::BoardSelector);
-                }
-                out
+                let board = self.boards[self.selected].clone();
+                DialogOutcome::open(Box::new(super::confirm_delete_board::ConfirmDeleteBoard {
+                    board,
+                    boards: self.boards.clone(),
+                    selected: self.selected,
+                }))
             }
             KeyCode::Char('?') => DialogOutcome::help(),
             KeyCode::Esc => DialogOutcome::close_to(crate::app::AppMode::BoardSelector),
@@ -144,6 +137,18 @@ mod tests {
         };
         let out = dialog.handle_key(key(KeyCode::Enter), None);
         assert!(matches!(out.follow, super::super::Follow::Open(_)));
+    }
+
+    #[test]
+    fn x_opens_confirm_delete_without_deleting() {
+        let mut dialog = ArchivedBoards {
+            boards: vec![BoardMeta::new("B".into())],
+            selected: 0,
+        };
+        let out = dialog.handle_key(key(KeyCode::Char('x')), None);
+        assert!(out.side_effect.is_none());
+        assert!(matches!(out.follow, super::super::Follow::Open(_)));
+        assert_eq!(dialog.boards.len(), 1);
     }
 
     #[test]

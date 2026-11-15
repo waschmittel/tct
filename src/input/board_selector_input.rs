@@ -484,6 +484,47 @@ mod tests {
     }
 
     #[test]
+    fn delete_archived_board_requires_dialog_confirmation() {
+        with_temp_dir(|| {
+            seed_boards(&["Doomed"]);
+            let key = |app: &mut App, c| {
+                crate::input::handle_input(
+                    app,
+                    KeyEvent::new(KeyCode::Char(c), KeyModifiers::empty()),
+                )
+                .unwrap()
+            };
+            let mut app = App::new(None).unwrap();
+            key(&mut app, 'a');
+            key(&mut app, 'y');
+            assert!(app.boards.is_empty());
+            key(&mut app, 'v');
+
+            // 'x' only asks; cancelling keeps the board on disk.
+            key(&mut app, 'x');
+            assert_eq!(app.mode, AppMode::Dialog);
+            key(&mut app, 'n');
+            assert_eq!(app.mode, AppMode::Dialog);
+            assert!(
+                crate::storage::board_store::list_archived_boards()
+                    .unwrap()
+                    .len()
+                    == 1
+            );
+
+            // Confirming deletes for good.
+            key(&mut app, 'x');
+            key(&mut app, 'y');
+            assert_eq!(app.mode, AppMode::BoardSelector);
+            assert!(
+                crate::storage::board_store::list_archived_boards()
+                    .unwrap()
+                    .is_empty()
+            );
+        });
+    }
+
+    #[test]
     fn unarchive_board_requires_dialog_confirmation() {
         with_temp_dir(|| {
             let boards = seed_boards(&["Board to Archive"]);
