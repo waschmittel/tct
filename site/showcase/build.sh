@@ -13,9 +13,9 @@ mkdir -p "$TCT_DATA_DIR" "$BIN" site/img site/export "$HOME_DIR"/{Desktop,Docume
 cp target/debug/tct "$BIN/tct"
 site/showcase/seed.sh >/dev/null
 
+TZ=Europe/Berlin cargo test -q write_showcase_pdfs -- --ignored
+
 for style in mono color; do
-    tct cards "Release 2.0" --export "planning overview" --style "$style" \
-        --out "site/export/showcase-$style.pdf" >/dev/null
     rm -f site/img/pdf-"$style"*.png
     pdftoppm -png -r 100 "site/export/showcase-$style.pdf" "site/img/pdf-$style"
 done

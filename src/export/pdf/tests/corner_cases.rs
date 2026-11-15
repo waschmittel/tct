@@ -592,3 +592,64 @@ fn example_pdfs_are_up_to_date() {
         "stale example PDFs (run `TZ=UTC cargo test write_example_pdfs -- --ignored`): {stale:#?}"
     );
 }
+
+/// Regenerates `site/export/showcase-{mono,color}.pdf` with static timestamps:
+/// `TZ=Europe/Berlin cargo test write_showcase_pdfs -- --ignored`.
+#[test]
+#[ignore = "writes files into site/export/"]
+fn write_showcase_pdfs() {
+    use crate::model::label::{Label, LabelColor};
+
+    const SHOWCASE_VERSION: &str = "snap-2026-11-11";
+    const SHOWCASE_TIME: chrono::DateTime<chrono::Utc> =
+        chrono::DateTime::from_timestamp(1_794_412_297, 0).unwrap();
+
+    let mut meta = BoardMeta::new("Release 2.0".into());
+    meta.accent_color = LabelColor::generate_pastel(&[]);
+    let mut existing = Vec::new();
+    let mut label_ids = Vec::new();
+    for name in ["feature", "bug", "docs"] {
+        let color = LabelColor::generate_pastel(&existing);
+        existing.push(color);
+        let label = Label::new(name.into(), color);
+        label_ids.push(label.id.clone());
+        meta.labels.push(label);
+    }
+
+    let mut card = Card::new("Release 2.0 — planning overview".into());
+    card.description = include_str!("../../../../site/showcase/description.md").into();
+    card.due_date = chrono::NaiveDate::from_ymd_opt(2027, 6, 30);
+    card.label_ids = vec![label_ids[0].clone(), label_ids[2].clone()];
+    card.checklist = [
+        ("Freeze the feature list", true),
+        ("Write the migration guide", false),
+        ("Run the load test", false),
+        ("Tag the release", false),
+    ]
+    .into_iter()
+    .map(|(text, completed)| ChecklistItem {
+        text: text.into(),
+        completed,
+    })
+    .collect();
+    card.created_at = SHOWCASE_TIME;
+    card.updated_at = SHOWCASE_TIME;
+
+    let out_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("site/export");
+    std::fs::create_dir_all(&out_dir).unwrap();
+    for (theme, name) in [
+        (Theme::Mono, "showcase-mono.pdf"),
+        (Theme::Color, "showcase-color.pdf"),
+    ] {
+        let pdf = render_at(
+            &meta,
+            "Doing",
+            &card,
+            theme,
+            SHOWCASE_TIME,
+            SHOWCASE_VERSION,
+        )
+        .unwrap();
+        std::fs::write(out_dir.join(name), pdf).unwrap();
+    }
+}
