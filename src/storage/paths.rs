@@ -29,6 +29,43 @@ pub fn is_home_fallback() -> bool {
 
 /// The data directory and whether it is the `~/.tct` fallback.
 fn resolve() -> (PathBuf, bool) {
+    let resolved = resolve_unchecked();
+    #[cfg(test)]
+    forbid_real_data_dir(&resolved.0);
+    resolved
+}
+
+/// Unit tests must never read or write a real data dir (the project's own
+/// `.tct`, found by walking up from the cwd, or `~/.tct`): anything outside
+/// the system temp dir panics. Use `test_support::with_temp_dir`.
+#[cfg(test)]
+fn forbid_real_data_dir(dir: &std::path::Path) {
+    // `dir` may not exist yet: resolve its deepest existing ancestor (macOS
+    // /var → /private/var) and put the rest back.
+    let mut rest = std::path::PathBuf::new();
+    let mut base = dir;
+    let mut real = loop {
+        if let Ok(p) = base.canonicalize() {
+            break p;
+        }
+        match (base.parent(), base.file_name()) {
+            (Some(parent), Some(name)) => {
+                rest = std::path::Path::new(name).join(&rest);
+                base = parent;
+            }
+            _ => break dir.to_path_buf(),
+        }
+    };
+    real.push(rest);
+    let tmp = std::env::temp_dir().canonicalize().unwrap_or_default();
+    assert!(
+        real.starts_with(&tmp),
+        "a unit test touched the real data dir {}: wrap it in with_temp_dir",
+        dir.display()
+    );
+}
+
+fn resolve_unchecked() -> (PathBuf, bool) {
     if let Ok(dir) = std::env::var("TCT_DATA_DIR") {
         return (PathBuf::from(dir), false);
     }
@@ -207,7 +244,8 @@ mod tests {
         unsafe { std::env::remove_var("TCT_DATA_DIR") };
         std::env::set_current_dir(&repo_path).unwrap();
 
-        let adopted = base_dir();
+        // Unchecked: this only inspects which path discovery picks.
+        let adopted = resolve_unchecked().0;
 
         std::env::set_current_dir(restore).unwrap();
         if let Some(dir) = data_dir {
