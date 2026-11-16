@@ -2,11 +2,11 @@
 # Every group relaunches tct so state (selection, toasts) is deterministic.
 Output "/tmp/tct-site-shots.gif"
 Set Shell bash
-Set Theme "Catppuccin Mocha"
-Set FontSize 15
-Set Width 1240
-Set Height 960
-Set Padding 14
+Set Theme { "name": "tct-black", "background": "#000000", "foreground": "#dddddd", "selection": "#283457", "cursor": "#dddddd", "black": "#282a2e", "brightBlack": "#4d4d4d", "red": "#D74E6F", "brightRed": "#FE5F86", "green": "#31BB71", "brightGreen": "#00D787", "yellow": "#D3E561", "brightYellow": "#EBFF71", "blue": "#8056FF", "brightBlue": "#9B79FF", "magenta": "#ED61D7", "brightMagenta": "#FF7AEA", "cyan": "#04D7D7", "brightCyan": "#00FEFE", "white": "#bfbfbf", "brightWhite": "#e6e6e6" }
+Set FontSize 14
+Set Width 1200
+Set Height 700
+Set Padding 10
 Set TypingSpeed 60ms
 
 Hide

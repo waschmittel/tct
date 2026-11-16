@@ -12,6 +12,7 @@ Output docs/vhs/demo.gif
 Output docs/vhs/golden/demo.txt
 
 Set Shell bash
+Set Theme { "name": "tct-black", "background": "#000000", "foreground": "#dddddd", "selection": "#283457", "cursor": "#dddddd", "black": "#282a2e", "brightBlack": "#4d4d4d", "red": "#D74E6F", "brightRed": "#FE5F86", "green": "#31BB71", "brightGreen": "#00D787", "yellow": "#D3E561", "brightYellow": "#EBFF71", "blue": "#8056FF", "brightBlue": "#9B79FF", "magenta": "#ED61D7", "brightMagenta": "#FF7AEA", "cyan": "#04D7D7", "brightCyan": "#00FEFE", "white": "#bfbfbf", "brightWhite": "#e6e6e6" }
 Set FontSize 14
 Set Width 1200
 Set Height 700
