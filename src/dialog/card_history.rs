@@ -18,7 +18,12 @@ use crate::command::Command;
 use crate::model::card::{Card, HistoryField};
 use crate::text_diff::{DiffKind, diff_lines_collapsed};
 
-const SUMMARY_WIDTH: u16 = 40;
+/// `YYYY-MM-DD HH:MM`, see `short_stamp`.
+const STAMP_WIDTH: u16 = 16;
+/// Narrowest master column: selection marker, stamp, a space, the border.
+const SUMMARY_MIN_WIDTH: u16 = 2 + STAMP_WIDTH + 1 + 1;
+/// The popup grows with the terminal up to this many columns.
+const MAX_WIDTH: u16 = 200;
 
 #[derive(Default)]
 pub struct CardHistory {
@@ -60,8 +65,13 @@ impl Dialog for CardHistory {
             return;
         };
 
-        let width = 110u16.min(area.width.saturating_sub(4)).max(40);
-        let height = 28u16.min(area.height.saturating_sub(4)).max(8);
+        // Margins: 12 columns per side on wide terminals (2 on small ones);
+        // 8 rows in total on terminals over 40 rows high, 4 otherwise.
+        let width = (area.width.saturating_sub(24))
+            .max(110u16.min(area.width.saturating_sub(4)))
+            .clamp(40, MAX_WIDTH);
+        let row_margin = if area.height > 40 { 8 } else { 4 };
+        let height = area.height.saturating_sub(row_margin).max(8);
         let x = area.width.saturating_sub(width) / 2;
         let y = area.height.saturating_sub(height) / 2;
         let popup = Rect::new(x, y, width, height);
@@ -74,7 +84,9 @@ impl Dialog for CardHistory {
         let inner = block.inner(popup);
         frame.render_widget(block, popup);
 
-        let summary_width = SUMMARY_WIDTH.min(inner.width / 2);
+        let summary_width = (inner.width * 9 / 20)
+            .max(SUMMARY_MIN_WIDTH)
+            .min(inner.width / 2);
         let [left, right] =
             Layout::horizontal([Constraint::Length(summary_width), Constraint::Min(1)])
                 .areas(inner);

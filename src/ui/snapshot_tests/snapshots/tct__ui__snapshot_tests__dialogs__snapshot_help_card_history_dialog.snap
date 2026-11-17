@@ -5,13 +5,13 @@ expression: "stamp.replace_all(&text, \"YYYY-MM-DD HH:MM\")"
  Demo (2 lists)
 ┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
 │┏┌ History — Fix login flow ────────────────────────────────────────────────────────────────────┐┐│
-│┃│» YYYY-MM-DD HH:MM Created             │ At      YYYY-MM-DD HH:MM                          │││
-│┃│                                       │ Field   General                                      │┘│
-│┃│                                       │ Action  Created                                      │ │
-│┗│                                       │                                                      │ │
-│┌│                                       │ No field values recorded.                            │ │
-│││                                       │                                                      │ │
-│└│                                       │                                                      │ │
+│┃│» YYYY-MM-DD HH:MM Created               │ At      YYYY-MM-DD HH:MM                        │││
+│┃│                                         │ Field   General                                    │┘│
+│┃│                                         │ Action  Created                                    │ │
+│┗│                                         │                                                    │ │
+│┌│                                         │ No field values recorded.                          │ │
+│││                                         │                                                    │ │
+│└│                                         │                                                    │ │
 │ │                     ┌ Help — Card History ────────────────────────────┐                      │ │
 │ │                     │                      Keys                       │                      │ │
 │ │                     │  ↑ / ↓ / j / k  select entry                    │                      │ │
@@ -21,14 +21,14 @@ expression: "stamp.replace_all(&text, \"YYYY-MM-DD HH:MM\")"
 │ │                     │    x / d / del  delete entry (asks to confirm)  │                      │ │
 │ │                     │    esc / q / h  close                           │                      │ │
 │ │                     └ Esc:close ─────────────────────────────── vTEST ┘                      │ │
-│ │                                       │                                                      │ │
-│ │                                       │                                                      │ │
-│ │                                       │                                                      │ │
-│ │                                       │                                                      │ │
-│ │                                       │                                                      │ │
-│ │                                       │                                                      │ │
-│ │                                       │                                                      │ │
-│ │                                       │                                                      │ │
+│ │                                         │                                                    │ │
+│ │                                         │                                                    │ │
+│ │                                         │                                                    │ │
+│ │                                         │                                                    │ │
+│ │                                         │                                                    │ │
+│ │                                         │                                                    │ │
+│ │                                         │                                                    │ │
+│ │                                         │                                                    │ │
 │ └──────────────────────────────────────────────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
  HELP                                                                                        ~/.tct

@@ -68,6 +68,59 @@ fn snapshot_card_history_dialog() {
     });
 }
 
+/// (column, row, width, height) of the history popup, found by its title.
+fn history_popup_rect(text: &str) -> (usize, usize, usize, usize) {
+    let lines: Vec<&str> = text.lines().collect();
+    let row = lines.iter().position(|l| l.contains("History —")).unwrap();
+    let chars: Vec<char> = lines[row].chars().collect();
+    let col = chars.iter().position(|&c| c == '┌').unwrap();
+    let width = chars[col..].iter().position(|&c| c == '┐').unwrap() + 1;
+    let bottom = lines[row..]
+        .iter()
+        .position(|l| l.chars().nth(col) == Some('└'))
+        .unwrap();
+    (col, row, width, bottom + 1)
+}
+
+fn history_app() -> App {
+    let id = seed_demo_board();
+    let mut app = App::new(Some(id)).unwrap();
+    set_long_history(&mut app);
+    press(&mut app, KeyCode::Char('h'));
+    assert_eq!(app.mode, AppMode::Dialog);
+    app
+}
+
+/// The popup grows with the terminal: 12 columns left and right, 4 rows
+/// below 40 rows high and 8 above, at most 200 columns wide.
+#[test]
+fn card_history_popup_scales_with_terminal() {
+    with_temp_dir(|| {
+        let app = history_app();
+        // (terminal w, h) -> (x, y, w, h)
+        for ((tw, th), want) in [
+            ((100, 30), (2, 2, 96, 26)),
+            ((140, 40), (12, 2, 116, 36)),
+            ((140, 41), (12, 4, 116, 33)),
+            ((200, 60), (12, 4, 176, 52)),
+            ((260, 60), (30, 4, 200, 52)),
+        ] {
+            let got = history_popup_rect(&render_to_string_sized(&app, tw, th));
+            assert_eq!(got, want, "terminal {tw}x{th}");
+        }
+    });
+}
+
+#[test]
+fn snapshot_card_history_dialog_wide() {
+    with_temp_dir(|| {
+        let app = history_app();
+        let stamp = regex::Regex::new(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?").unwrap();
+        let text = render_to_string_sized(&app, 160, 50);
+        insta::assert_snapshot!(stamp.replace_all(&text, "YYYY-MM-DD HH:MM"));
+    });
+}
+
 #[test]
 fn snapshot_card_history_dialog_collapsed_diff() {
     use crate::model::card::HistoryField;
