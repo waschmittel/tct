@@ -426,18 +426,31 @@ impl BoardEditor {
                 pending.push(PendingWrite::Board);
             }
             Command::RenameLabel { label_id, name } => {
-                let label = self
+                // Renaming onto another label's name merges: the renamed label
+                // is removed and its cards carry the existing one instead.
+                let target = self
                     .board
                     .meta
                     .labels
-                    .iter_mut()
-                    .find(|l| l.id == label_id)
-                    .ok_or_else(|| BoardEditorError::NotFound {
-                        kind: "label",
-                        id: label_id.to_string(),
-                    })?;
-                label.name = name;
-                pending.push(PendingWrite::Board);
+                    .iter()
+                    .find(|l| l.id != label_id && l.name == name)
+                    .map(|l| l.id.clone());
+                if let Some(target) = target {
+                    self.merge_label(&label_id, &target, &mut pending)?;
+                } else {
+                    let label = self
+                        .board
+                        .meta
+                        .labels
+                        .iter_mut()
+                        .find(|l| l.id == label_id)
+                        .ok_or_else(|| BoardEditorError::NotFound {
+                            kind: "label",
+                            id: label_id.to_string(),
+                        })?;
+                    label.name = name;
+                    pending.push(PendingWrite::Board);
+                }
             }
             Command::SetLabelColor { label_id, color } => {
                 let label = self

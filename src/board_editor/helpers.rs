@@ -1,6 +1,6 @@
 use super::*;
-use crate::model::card::Card;
-use crate::model::id::{CardId, ListId};
+use crate::model::card::{Card, HistoryField};
+use crate::model::id::{CardId, LabelId, ListId};
 use crate::storage::{board_store, card_store};
 
 impl BoardEditor {
@@ -61,6 +61,53 @@ impl BoardEditor {
                 kind: "card",
                 id: card_id.to_string(),
             })
+    }
+
+    /// Merges label `from` into `into`: every card carrying `from` gets `into`
+    /// instead (once), then `from` is removed from the board.
+    pub(super) fn merge_label(
+        &mut self,
+        from: &LabelId,
+        into: &LabelId,
+        pending: &mut Vec<PendingWrite>,
+    ) -> Result<(), BoardEditorError> {
+        let labels = &mut self.board.meta.labels;
+        let pos = labels.iter().position(|l| l.id == *from).ok_or_else(|| {
+            BoardEditorError::NotFound {
+                kind: "label",
+                id: from.to_string(),
+            }
+        })?;
+        let from_name = labels.remove(pos).name;
+        let labels = &self.board.meta.labels;
+        let into_name = labels
+            .iter()
+            .find(|l| l.id == *into)
+            .map_or_else(String::new, |l| l.name.clone());
+        for card in self.board.cards.values_mut() {
+            let Some(pos) = card.label_ids.iter().position(|id| id == from) else {
+                continue;
+            };
+            let old = card.label_names_text(labels);
+            if card.label_ids.contains(into) {
+                card.label_ids.remove(pos);
+            } else {
+                card.label_ids[pos] = into.clone();
+            }
+            let new = card.label_names_text(labels);
+            card.log_change(
+                HistoryField::Labels,
+                format!("Merged label '{from_name}' into '{into_name}'"),
+                Some(old),
+                Some(new),
+            );
+            pending.push(PendingWrite::Card(Box::new(card.clone())));
+        }
+        if self.board.label_filter.as_ref() == Some(from) {
+            self.board.label_filter = Some(into.clone());
+        }
+        pending.push(PendingWrite::Board);
+        Ok(())
     }
 
     /// Clears the label filter when its label no longer exists — deleted

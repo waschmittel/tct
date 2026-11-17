@@ -13,6 +13,7 @@ use super::line_input::{LineInput, LineKey};
 use super::{InsertHandler, InsertOutcome, InsertSideEffect, InsertSurface};
 use crate::app::LoadedBoard;
 use crate::command::Command;
+use crate::dialog::confirm_merge_label::ConfirmMergeLabel;
 use crate::dialog::label_manager::LabelManager;
 use crate::model::id::{CardId, LabelId, ListId};
 
@@ -498,13 +499,27 @@ impl EditLabelName {
     }
 }
 impl InsertHandler for EditLabelName {
-    fn handle_key(&mut self, key: KeyEvent, _b: Option<&LoadedBoard>) -> InsertOutcome {
+    fn handle_key(&mut self, key: KeyEvent, b: Option<&LoadedBoard>) -> InsertOutcome {
         match self.input.handle_key(key) {
             LineKey::Confirm => {
                 let text = self.input.trimmed();
                 if text.is_empty() {
                     return InsertOutcome::OpenDialog(Box::new(LabelManager {
                         selected_idx: self.label_idx,
+                        from_picker: self.from_picker,
+                    }));
+                }
+                // Another label already has this name: renaming merges, so ask first.
+                if b.is_some_and(|b| {
+                    b.meta
+                        .labels
+                        .iter()
+                        .any(|l| l.id != self.label_id && l.name == text)
+                }) {
+                    return InsertOutcome::OpenDialog(Box::new(ConfirmMergeLabel {
+                        label_id: self.label_id.clone(),
+                        label_idx: self.label_idx,
+                        name: text,
                         from_picker: self.from_picker,
                     }));
                 }

@@ -311,6 +311,10 @@ Labels are **board-level**: defined once per board, then assigned to cards, so r
 
 `l` opens the label picker (board view or card detail): `↑`/`↓` to select, `space` or `enter` to toggle, `esc` to close.
 
+### Renaming and merging labels
+
+In the label manager, rename a label with its rename key. Renaming it to the exact name of another label **merges** the two after a `y`/`n` confirmation: the renamed label disappears and every card that carried it gets the other one (once, if it already had both).
+
 ### Label colors
 
 New labels get a pastel color whose hue is maximally distant from all existing label hues:

@@ -172,6 +172,96 @@ fn snapshot_label_manager() {
     });
 }
 
+/// Renaming a label to another label's name asks first, then merges through
+/// the real input path: the manager reopens without the renamed label and
+/// the card that carried both shows the survivor once.
+#[test]
+fn snapshot_label_rename_merges() {
+    with_temp_dir(|| {
+        let id = seed_board_with_multiple_labels();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('L'));
+        for _ in 0..3 {
+            press(&mut app, KeyCode::Down); // bug, feature, docs, urgent
+        }
+        press(&mut app, KeyCode::Char('e'));
+        for _ in 0.."urgent".len() {
+            press(&mut app, KeyCode::Backspace);
+        }
+        for c in "bug".chars() {
+            press(&mut app, KeyCode::Char(c));
+        }
+        press(&mut app, KeyCode::Enter);
+        // Nothing merged yet: the confirmation is up.
+        assert_eq!(app.board().unwrap().meta.labels.len(), 4);
+        let confirm = render_to_string(&app);
+        assert!(confirm.contains("Merge 'urgent' into 'bug'?"));
+        insta::assert_snapshot!("label_rename_merges_confirm", confirm);
+        press(&mut app, KeyCode::Char('y'));
+        assert_eq!(app.mode, AppMode::Dialog);
+        assert_eq!(label_names(&app), ["bug", "feature", "docs"]);
+        let manager = render_to_string(&app);
+        assert!(!manager.contains("urgent"));
+        insta::assert_snapshot!("label_rename_merges_manager", manager);
+        press(&mut app, KeyCode::Esc);
+        assert_eq!(app.mode, AppMode::Normal);
+        let board = render_to_string(&app);
+        assert!(!board.contains("urgent"));
+        insta::assert_snapshot!("label_rename_merges_board", board);
+    });
+}
+
+/// Declining the merge leaves both labels and their cards untouched.
+#[test]
+fn label_rename_merge_can_be_cancelled() {
+    with_temp_dir(|| {
+        let id = seed_board_with_multiple_labels();
+        for decline in [KeyCode::Char('n'), KeyCode::Esc] {
+            let mut app = App::new(Some(id.clone())).unwrap();
+            press(&mut app, KeyCode::Char('L'));
+            for _ in 0..3 {
+                press(&mut app, KeyCode::Down);
+            }
+            press(&mut app, KeyCode::Char('e'));
+            for _ in 0.."urgent".len() {
+                press(&mut app, KeyCode::Backspace);
+            }
+            for c in "bug".chars() {
+                press(&mut app, KeyCode::Char(c));
+            }
+            press(&mut app, KeyCode::Enter);
+            press(&mut app, decline);
+            assert_eq!(app.mode, AppMode::Dialog);
+            assert_eq!(label_names(&app), ["bug", "feature", "docs", "urgent"]);
+            assert!(render_to_string(&app).contains("urgent"));
+        }
+    });
+}
+
+fn label_names(app: &App) -> Vec<String> {
+    app.board()
+        .unwrap()
+        .meta
+        .labels
+        .iter()
+        .map(|l| l.name.clone())
+        .collect()
+}
+
+/// A name that is not taken stays a plain rename (no merge).
+#[test]
+fn label_rename_to_new_name_keeps_labels() {
+    with_temp_dir(|| {
+        let id = seed_board_with_multiple_labels();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Char('L'));
+        press(&mut app, KeyCode::Char('e'));
+        press(&mut app, KeyCode::Char('x'));
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(label_names(&app), ["bugx", "feature", "docs", "urgent"]);
+    });
+}
+
 #[test]
 fn snapshot_board_configuration_dialog() {
     with_temp_dir(|| {

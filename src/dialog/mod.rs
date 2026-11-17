@@ -28,6 +28,7 @@ pub mod confirm_cancel_edit;
 pub mod confirm_clear_due_date;
 pub mod confirm_delete_board;
 pub mod confirm_delete_label;
+pub mod confirm_merge_label;
 pub mod confirm_restore_board;
 pub mod confirm_restore_card;
 pub mod confirm_restore_list;

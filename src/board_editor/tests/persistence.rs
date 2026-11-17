@@ -301,6 +301,47 @@ fn label_meta_commands_persist_across_reload() {
 }
 
 #[test]
+fn renaming_a_label_to_an_existing_name_merges_them() {
+    with_temp_dir(|| {
+        let (mut ed, _, ids) = editor_with_cards(&["both", "only-b", "only-a"]);
+        for (n, c) in [("a", LabelColor::Red), ("b", LabelColor::Green)] {
+            ed.apply(Command::DefineLabel {
+                name: n.into(),
+                color: c,
+            })
+            .unwrap();
+        }
+        let a = ed.board().meta.labels[0].id.clone();
+        let b = ed.board().meta.labels[1].id.clone();
+        let toggle = |ed: &mut BoardEditor, i: usize, l: &_| {
+            ed.apply(Command::ToggleLabel {
+                card_id: ids[i].clone(),
+                label_id: Clone::clone(l),
+            })
+            .unwrap()
+        };
+        toggle(&mut ed, 0, &a);
+        toggle(&mut ed, 0, &b);
+        toggle(&mut ed, 1, &b);
+        toggle(&mut ed, 2, &a);
+        ed.apply(Command::RenameLabel {
+            label_id: b.clone(),
+            name: "a".into(),
+        })
+        .unwrap();
+        ed.reload().unwrap();
+        let labels = &ed.board().meta.labels;
+        assert_eq!(labels.len(), 1);
+        assert_eq!(labels[0].id, a);
+        for id in &ids {
+            assert_eq!(ed.board().cards[id].label_ids, vec![a.clone()]);
+        }
+        let last = ed.board().cards[&ids[1]].history.last().unwrap();
+        assert_eq!(last.action, "Merged label 'b' into 'a'");
+    });
+}
+
+#[test]
 fn list_commands_persist_across_reload() {
     with_temp_dir(|| {
         let (mut ed, lid, _) = editor_with_cards(&["task"]);
