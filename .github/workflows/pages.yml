@@ -30,6 +30,8 @@ jobs:
           cache-dependency-path: site/guide/package-lock.json
       - run: npm ci
         working-directory: site/guide
+      - name: Check layout invariants
+        run: node --test site/layout.test.mjs
       # Diagrams: mermaid-rs-renderer (pure Rust, no browser), prebuilt release binary.
       - name: Install mmdr
         run: |

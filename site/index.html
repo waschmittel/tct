@@ -57,9 +57,9 @@
   </div>
 </div></header>
 
-<main class="wrap">
+<main>
 
-<section id="install" style="--h:190">
+<section id="install" style="--h:190"><div class="wrap">
   <div class="head"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M4 19h16"/></svg></span><div><p class="eyebrow">Install</p><h2>Up and running in a minute.</h2></div></div>
   <div class="tabs">
     <div role="tablist" aria-label="Installation method">
@@ -88,9 +88,9 @@ cargo install --path .</pre></div>
 <span class="c"># optional: boards local to a project</span>
 <span class="p">$</span> tct init</pre></div>
   </div>
-</section>
+</div></section>
 
-<section id="features" style="--h:265">
+<section id="features" style="--h:265"><div class="wrap">
   <div class="head"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span><div><p class="eyebrow">Why tct</p><h2>Small, sharp feature set.</h2></div></div>
   <div class="group" style="--h:215">
     <h3 class="gh">Organize</h3>
@@ -129,9 +129,9 @@ cargo install --path .</pre></div>
       <div class="card" style="--h:320"><h3><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1"/><path d="M9 13.5v1.5M15 13.5v1.5"/></svg></span>Scripts &amp; AI agents</h3><p>A complete CLI and a user guide embedded in the binary: <code>tct --help user-guide</code>.</p></div>
     </div>
   </div>
-</section>
+</div></section>
 
-<section id="agents" style="--h:320">
+<section id="agents" style="--h:320"><div class="wrap">
   <div class="head"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16v4M17 18h4"/></svg></span><div><p class="eyebrow">Also for agents</p><h2>Works for AI agents, too.</h2></div></div>
   <p class="lead">Because boards are plain files and everything is scriptable, an AI agent can share a board with you: you use the TUI, the agent uses the CLI, and tct reloads from disk when files change so its changes show up on your screen. Nothing to host, nothing to configure.</p>
   <div class="split">
@@ -154,9 +154,9 @@ items as you go, run <span class="s">`tct commit`</span> when you finish.</pre><
       <p class="lead note">More in the <a href="guide/#humans-and-ai-agents">user guide</a>.</p>
     </div>
   </div>
-</section>
+</div></section>
 
-<section id="pdf" style="--h:0">
+<section id="pdf" style="--h:0"><div class="wrap">
   <div class="head"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg></span><div><p class="eyebrow">PDF export</p><h2>From card to paper.</h2></div></div>
   <p class="lead">Press <kbd>p</kbd> for a black-and-gray PDF/A made for monochrome printers, or <kbd>P</kbd> for color. Fonts are embedded, so it looks the same everywhere. Headings, lists, tables, code, footnotes and alerts are laid out with sensible page breaks. The language is detected from the card.</p>
   <div class="compare" id="compare">
@@ -171,15 +171,15 @@ items as you go, run <span class="s">`tct commit`</span> when you finish.</pre><
     </div>
   </div>
   <p class="lead note">More samples: <a href="export/color/15-alerts.pdf">alerts</a> · <a href="export/16-footnotes.pdf">footnotes</a> · <a href="export/14-matrix.pdf">matrix tables</a> · <a href="export/00-showcase.pdf">kitchen-sink showcase</a></p>
-</section>
+</div></section>
 
-<section id="faq" style="--h:235">
+<section id="faq" style="--h:235"><div class="wrap">
   <div class="head"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4z"/></svg></span><div><p class="eyebrow">FAQ</p><h2>Good to know.</h2></div></div>
   <details><summary>Do I need git?</summary><p>No. Git is optional and strictly opt-in; tct never commits in the background. Any file sync works.</p></details>
   <details><summary>Does tct talk to the network?</summary><p>No. There is no server, telemetry or account. The optional browser version is something you host yourself.</p></details>
   <details><summary>What if two people edit the same card?</summary><p>Writes are atomic and each card is its own file, so unrelated edits never clash. Concurrent edits to the <em>same</em> card are resolved by your sync tool as for any file.</p></details>
   <details><summary>Can I add or edit the files by hand?</summary><p>Yes, they are plain JSON. But tct keeps list membership, order and history consistent for you, and an invalid file makes loading fail. The command line is the better tool for changes from scripts.</p></details>
-</section>
+</div></section>
 
 </main>
 

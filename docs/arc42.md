@@ -647,6 +647,7 @@ The numbered, dated decision records live in [`docs/adr/`](adr/). Summary:
 | [0020](adr/0020-module-layout.md) | Directory modules for large files; tests beside, not inside a big file |
 | [0022](adr/0022-pdf-dashes.md) | PDF-only typographic dashes: `--`, `---` and a spaced hyphen |
 | [0023](adr/0023-testing-caveats.md) | Unit tests never touch a real data dir (`with_temp_dir`, enforced by a `cfg(test)` guard) and other testing caveats |
+| [0024](adr/0024-website-no-horizontal-scroll.md) | Website invariant: never allow horizontal page scroll at any viewport width (down to 320px) |
 
 Foundational decisions not captured as ADRs:
 
