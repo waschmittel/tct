@@ -1,0 +1,37 @@
+{
+  "list_id": "a589c4f4",
+  "position": 4.0,
+  "title": "Update the release template with emojis etc.",
+  "description": "Like this:\n\n### ⭐️ Features\n\n- ...\n\n### 📈 Improvements\n\n- ...\n \n### 🐞 Bugfixes\n\n- ...\n\n### ⚙️ Internals\n\n- ...",
+  "description_cursor": [
+    16,
+    5
+  ],
+  "label_ids": [],
+  "due_date": null,
+  "checklist": [],
+  "archived": false,
+  "created_at": "2026-11-20T16:29:22.286800Z",
+  "updated_at": "2026-11-20T16:30:54.083702Z",
+  "history": [
+    {
+      "at": "2026-11-20T16:29:22.286867Z",
+      "action": "Created",
+      "field": "general"
+    },
+    {
+      "at": "2026-11-20T16:30:21.393008Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "",
+      "new": "Like this:\n\n### ⭐️ Features\n\n- There is now a **Notes View** in addition to the classic board view. The view can be switched at any time. The notes view allows for much more space for the details and is more suitable for note-taking than task planning.\n- The details editor now has a context menu reachable with right-click or `accel`+`K` [^1], also enabling discoverable keyboard chords for editing.\n- The details editor can now include images from the attachments. Images can also be added via copy & paste. They are also placed correctly in the PDF.\n- Labels can now be merged.\n- Lists can now be collapsed in board view to save space.\n- Quick-create a card with due date and label by just entering \"do something #some-label due:2032-02-02\"\n- Descriptions can now contain (transposable) matrices in addition to classic tables.\n\n### 📈 Improvements\n\n- Windows geometry is now restored when re-opening.\n- Links in the details are now properly editable.\n- When moving between boards, the currently active card for each board is remembered.\n- Moving and selecting cards now wraps around at the top/bottom of a list.\n\n... and **lots of other small improvements** to the details editor and for the UI overall.\n\n### 🐞 Bugfixes\n\n- Table column alignment is now applied to all selected cells.\n\n### ⚙️ Internals\n\n- Writing a card with its attachments is now safer and kind-of-atomic.\n- The description schema is now validated in the backend.\n- Dependency updates.\n"
+    },
+    {
+      "at": "2026-11-20T16:30:54.083702Z",
+      "action": "Edited description",
+      "field": "description",
+      "old": "Like this:\n\n### ⭐️ Features\n\n- There is now a **Notes View** in addition to the classic board view. The view can be switched at any time. The notes view allows for much more space for the details and is more suitable for note-taking than task planning.\n- The details editor now has a context menu reachable with right-click or `accel`+`K` [^1], also enabling discoverable keyboard chords for editing.\n- The details editor can now include images from the attachments. Images can also be added via copy & paste. They are also placed correctly in the PDF.\n- Labels can now be merged.\n- Lists can now be collapsed in board view to save space.\n- Quick-create a card with due date and label by just entering \"do something #some-label due:2032-02-02\"\n- Descriptions can now contain (transposable) matrices in addition to classic tables.\n\n### 📈 Improvements\n\n- Windows geometry is now restored when re-opening.\n- Links in the details are now properly editable.\n- When moving between boards, the currently active card for each board is remembered.\n- Moving and selecting cards now wraps around at the top/bottom of a list.\n\n... and **lots of other small improvements** to the details editor and for the UI overall.\n\n### 🐞 Bugfixes\n\n- Table column alignment is now applied to all selected cells.\n\n### ⚙️ Internals\n\n- Writing a card with its attachments is now safer and kind-of-atomic.\n- The description schema is now validated in the backend.\n- Dependency updates.\n",
+      "new": "Like this:\n\n### ⭐️ Features\n\n- ...\n\n### 📈 Improvements\n\n- ...\n \n### 🐞 Bugfixes\n\n- ...\n\n### ⚙️ Internals\n\n- ..."
+    }
+  ]
+}
