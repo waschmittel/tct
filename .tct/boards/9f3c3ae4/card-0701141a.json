@@ -1,7 +1,7 @@
 {
   "list_id": "a589c4f4",
   "position": 5.0,
-  "title": "add search and replace",
+  "title": "add search and search and replace",
   "description": "",
   "label_ids": [
     "df88cb04"
@@ -10,7 +10,7 @@
   "checklist": [],
   "archived": false,
   "created_at": "2026-11-21T11:41:29.801489Z",
-  "updated_at": "2026-11-21T11:42:08.748980Z",
+  "updated_at": "2026-11-21T15:10:07.832984Z",
   "history": [
     {
       "at": "2026-11-21T11:41:29.801510Z",
@@ -37,6 +37,13 @@
       "field": "labels",
       "old": "",
       "new": "idea"
+    },
+    {
+      "at": "2026-11-21T15:10:07.832984Z",
+      "action": "Edited title",
+      "field": "title",
+      "old": "add search and replace",
+      "new": "add search and search and replace"
     }
   ]
 }
