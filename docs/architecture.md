@@ -90,10 +90,11 @@ src/
     emphasis.rs        # Bold/italic toggling by XOR on the `*` run around the text (ADR-0012)
     markdown_editor/   # Description editor (over TextAreaInput): copy/cut/paste, selection (ADR-0011)
       mod.rs           # Handler + key dispatch
+      find.rs          # In-editor Find and Find & Replace bar, Tab-focusable chips, undo-grouped replace (ADR-0025)
       lists.rs         # Autocontinue, nest/unnest, renumber
       footnotes.rs     # Footnote insert/jump/renumber (ADR-0017)
       normalize.rs     # Normalization (every save, paste-mode exit)
-      tests/           # basics, enter, numbered, nesting, renumber, quotes, session, footnotes
+      tests/           # basics, enter, find, numbered, nesting, renumber, quotes, session, footnotes
     date_picker.rs   # Due-date picker
     line_input.rs    # Shared single-line buffer/cursor base
     text_area_input.rs # Shared multi-line buffer base

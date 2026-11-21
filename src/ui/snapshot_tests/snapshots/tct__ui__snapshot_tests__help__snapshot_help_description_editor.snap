@@ -4,31 +4,31 @@ expression: render_to_string(&app)
 ---
  Demo (2 lists)
 ┌ To Do (2) ─────────────────────────────────────┐┌ Done (1) ──────────────────────────────────────┐
-│┏━━━┌ Help — Description Editor ─────────────────────────────────────────────────────────────┐───┐│
-│┃Fix│                    Edit                                       Tables                   │   ││
-│┃[bu│             ctrl+s  save                      tab / shift+tab  next/previous cell      │───┘│
-│┃[1/│             ctrl+q  save and close                      enter  row below / leave       │    │
-│┗━━━│                esc  cancel                           alt+←↑↓→  swap column / row       │    │
-│┌───│    ctrl+z / ctrl+y  undo / redo               alt+shift+→ / ↓  add column / row        │    │
-││Red│             ctrl+c  copy selection            alt+shift+← / ↑  delete column / row     │    │
-│└───│             ctrl+x  cut selection                       alt+a  cycle alignment         │    │
-│    │             ctrl+v  paste                              ctrl+t  insert table            │    │
-│    │         shift+←↑↓→  select text                 ctrl+t, r / c  add row / column        │    │
-│    │                                                 ctrl+t, R / C  add before              │    │
-│    │                   Format                        ctrl+t, x / X  delete row / column     │    │
-│    │             ctrl+b  toggle bold (**text**)          ctrl+t, T  delete table            │    │
-│    │             ctrl+e  toggle italic (*text*)       ctrl+t, ←↑↓→  swap row / column       │    │
-│    │             ctrl+k  inline code (`text`)            ctrl+t, a  cycle alignment         │    │
-│    │             ctrl+l  insert list item (- )           ctrl+t, t  transpose matrix        │    │
-│    │             ctrl+n  footnote / jump back                                               │    │
-│    │  ctrl+n (selected)  name it after the text              Alerts (in a quote)            │    │
-│    │             ctrl+p  toggle paste mode           ctrl+g, n t i  note / tip / important  │    │
-│    │                                                   ctrl+g, c w  caution / warning       │    │
-│    │                    Lists                            ctrl+g, x  plain quote again       │    │
-│    │              enter  auto-continue list                                                 │    │
-│    │                tab  nest line(s)                                                       │    │
-│    │          shift+tab  un-nest line(s)                                                    │    │
-│    └ Esc:close ────────────────────────────────────────────────────────────────────── vTEST ┘    │
-│                                                ││                                                │
+│┏━┌ Help — Description Editor ─────────────────────────────────────────────────────────────────┐─┐│
+│┃F│                      Edit                                         Tables                   │ ││
+│┃[│    ctrl+s / ctrl+q  save / save and close         tab / shift+tab  next/previous cell      │─┘│
+│┃[│                esc  cancel                                  enter  row below / leave       │  │
+│┗━│    ctrl+z / ctrl+y  undo / redo                          alt+←↑↓→  swap column / row       │  │
+│┌─│     ctrl+c / x / v  copy / cut / paste            alt+shift+→ / ↓  add column / row        │  │
+││R│         shift+←↑↓→  select text                   alt+shift+← / ↑  delete column / row     │  │
+│└─│                                                             alt+a  cycle alignment         │  │
+│  │                     Format                                 ctrl+t  insert table            │  │
+│  │             ctrl+b  toggle bold (**text**)          ctrl+t, r / c  add row / column        │  │
+│  │             ctrl+e  toggle italic (*text*)          ctrl+t, R / C  add before              │  │
+│  │             ctrl+k  inline code (`text`)            ctrl+t, x / X  delete row / column     │  │
+│  │             ctrl+l  insert list item (- )               ctrl+t, T  delete table            │  │
+│  │             ctrl+n  footnote / jump back             ctrl+t, ←↑↓→  swap row / column       │  │
+│  │  ctrl+n (selected)  name it after the text              ctrl+t, a  cycle alignment         │  │
+│  │             ctrl+p  toggle paste mode                   ctrl+t, t  transpose matrix        │  │
+│  │                                                                                            │  │
+│  │                 Find & Replace                                     Lists                   │  │
+│  │    ctrl+f / ctrl+r  find / find & replace                   enter  auto-continue list      │  │
+│  │      f3 / shift+f3  next / previous match         tab / shift+tab  nest / un-nest line(s)  │  │
+│  │     ↓ / ↑ (in bar)  next / previous match                                                  │  │
+│  │    tab / shift+tab  cycle fields & chips                    Alerts (in a quote)            │  │
+│  │      enter / space  next / replace / toggle         ctrl+g, n t i  note / tip / important  │  │
+│  │      alt+c / x / a  case / regex / replace all        ctrl+g, c w  caution / warning       │  │
+│  │                                                         ctrl+g, x  plain quote again       │  │
+│  └ Esc:close ────────────────────────────────────────────────────────────────────────── vTEST ┘  │
 └────────────────────────────────────────────────┘└────────────────────────────────────────────────┘
  HELP                                                                                        ~/.tct

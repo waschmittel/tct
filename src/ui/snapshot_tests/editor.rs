@@ -84,6 +84,79 @@ fn snapshot_description_editor_paste_mode() {
     });
 }
 
+#[test]
+fn snapshot_description_editor_find() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        {
+            let board = app.board_mut().unwrap();
+            let card_id = board.current_card_id().cloned().unwrap();
+            let card = board.cards.get_mut(&card_id).unwrap();
+            card.description =
+                "Token expires too early.\n\n- check token refresh\n- add test".into();
+        }
+        press(&mut app, KeyCode::Enter);
+        press(&mut app, KeyCode::Char('e'));
+        crate::input::handle_input(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+        )
+        .unwrap();
+        for c in "token".chars() {
+            press(&mut app, KeyCode::Char(c));
+        }
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_description_editor_find_and_replace() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        {
+            let board = app.board_mut().unwrap();
+            let card_id = board.current_card_id().cloned().unwrap();
+            let card = board.cards.get_mut(&card_id).unwrap();
+            card.description =
+                "Token expires too early.\n\n- check token refresh\n- add test".into();
+        }
+        press(&mut app, KeyCode::Enter);
+        press(&mut app, KeyCode::Char('e'));
+        crate::input::handle_input(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+        )
+        .unwrap();
+        for c in "token".chars() {
+            press(&mut app, KeyCode::Char(c));
+        }
+        press(&mut app, KeyCode::Tab);
+        for c in "session".chars() {
+            press(&mut app, KeyCode::Char(c));
+        }
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
+#[test]
+fn snapshot_description_editor_find_invalid_regex() {
+    with_temp_dir(|| {
+        let id = seed_demo_board();
+        let mut app = App::new(Some(id)).unwrap();
+        press(&mut app, KeyCode::Enter);
+        press(&mut app, KeyCode::Char('e'));
+        crate::input::handle_input(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+        )
+        .unwrap();
+        press(&mut app, KeyCode::Char('('));
+        insta::assert_snapshot!(render_to_string(&app));
+    });
+}
+
 /// Widget-level golden for the date-picker popup (layout broke twice:
 /// oversized popup, off-center calendar). Rendered with a fixed date so
 /// the text is deterministic — the today-highlight is style-only and

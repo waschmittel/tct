@@ -210,7 +210,7 @@ graph TB
         subgraph "insert/ (ADR-0003)"
             INS_MOD["mod.rs<br>InsertHandler trait + InsertOutcome"]
             INS_LINE["line_editor.rs<br>single-line inputs"]
-            INS_MD["markdown_editor/<br>desc editor: copy/cut/paste / nest / help (ADR-0011)"]
+            INS_MD["markdown_editor/<br>desc editor: copy/cut/paste / find & replace / nest / help (ADR-0011, ADR-0025)"]
             INS_DATE["date_picker.rs<br>due-date picker"]
         end
 
@@ -648,6 +648,7 @@ The numbered, dated decision records live in [`docs/adr/`](adr/). Summary:
 | [0022](adr/0022-pdf-dashes.md) | PDF-only typographic dashes: `--`, `---` and a spaced hyphen |
 | [0023](adr/0023-testing-caveats.md) | Unit tests never touch a real data dir (`with_temp_dir`, enforced by a `cfg(test)` guard) and other testing caveats |
 | [0024](adr/0024-website-no-horizontal-scroll.md) | Website invariant: never allow horizontal page scroll at any viewport width (down to 320px) |
+| [0025](adr/0025-editor-find-and-replace.md) | In-editor Find and Find & Replace: docked bar, regex default, Tab-focusable chips, zero vendor patch |
 
 Foundational decisions not captured as ADRs:
 

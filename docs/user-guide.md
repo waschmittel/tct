@@ -255,6 +255,9 @@ In the PDF, `...` becomes `…` and straight quotes become typographic ones (`�
 | ctrl+c | Copy selected text |
 | ctrl+x | Cut selected text |
 | ctrl+v | Paste from clipboard |
+| ctrl+f | Find in description (regex by default) |
+| ctrl+r | Find & replace in description |
+| f3 / shift+f3 | Next / previous match |
 | ctrl+n | Footnote: insert reference and jump to its definition (in a definition: jump back) |
 | ctrl+p | Paste mode on/off: plain text only (no list continuation, renumbering, table reflow); normalized when you leave it |
 | shift+←↑↓→ | Select text |
@@ -271,6 +274,21 @@ In the PDF, `...` becomes `…` and straight quotes become typographic ones (`�
 Saving (`ctrl+s` / `ctrl+q`) normalizes the text (tables, list indents, numbering; not fenced code) and writes only if something changed, which keeps history and sync free of noise. The cursor position is stored in the card and restored on the next edit.
 
 On macOS, **Cmd** can substitute for `ctrl` in terminals that support it (kitty, Alacritty, WezTerm).
+
+#### Find & Replace
+
+`ctrl+f` opens a docked Find bar at the bottom of the editor (`ctrl+r` opens Find & Replace; pressing `ctrl+r` from Find expands it). If text on one line is selected when you open it, the query is pre-filled from that selection.
+
+Search is **regular-expression and case-insensitive by default**, highlighting all matches live as you type and jumping to the first match at or after the cursor. `enter`, `↓` or `f3` jumps to the next match; `↑`, `shift+f3` or `shift+enter` jumps to the previous one (wrapping around).
+
+`tab` / `shift+tab` cycles focus across the input fields and the action/option chips on the right:
+
+- **`[Replace]`** (or `enter` in the Replace field): replaces the current match and advances to the next one (one undo step).
+- **`[All]`** (or `alt+a` / `ctrl+g`): replaces every match in the description in one undo step (reformatting tables and renumbering lists unless paste mode is on). In regex mode, `$1` / `${name}` capture groups expand in the replacement.
+- **`[Aa]`** (or `alt+c` / `f4`): toggles case-sensitive matching.
+- **`[.*]`** (or `alt+x` / `f5`): toggles between regular expressions and literal text.
+
+When a chip is focused, `enter` or `space` activates or toggles it. `esc` closes the bar, clears highlights, and leaves the cursor on the current match; `f3` / `shift+f3` continue to repeat the last search with the same options.
 
 #### Tables
 

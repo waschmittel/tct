@@ -413,4 +413,96 @@ mod tests {
             assert_eq!(after.history.len(), before.history.len());
         });
     }
+
+    fn render_frame(app: &App) {
+        let backend = ratatui::backend::TestBackend::new(100, 30);
+        let mut terminal = ratatui::Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| crate::ui::render(f, app))
+            .expect("render succeeds");
+    }
+
+    #[test]
+    fn e2e_find_replace_chips_help_and_persistence() {
+        with_temp_dir(|| {
+            let mut meta = board_store::create_board("Test".into()).unwrap();
+            let list = crate::test_support::add_list(&mut meta, "To Do");
+            let mut card = Card::new("Card".into());
+            card.description = "Token one\ntoken two\nTOKEN three".into();
+            crate::test_support::put_cards(&meta.id, &list, std::slice::from_mut(&mut card));
+
+            let mut app = App::new(Some(meta.id.clone())).unwrap();
+            // Board view -> Card detail -> Description editor
+            press(&mut app, KeyCode::Enter);
+            assert_eq!(app.mode, AppMode::CardDetail);
+            press(&mut app, KeyCode::Char('e'));
+            assert_eq!(app.mode, AppMode::Insert);
+
+            // Open Find (Ctrl+F), type regex query, render frame
+            ctrl(&mut app, 'f');
+            for c in "t.ken".chars() {
+                press(&mut app, KeyCode::Char(c));
+            }
+            render_frame(&app);
+
+            // Open Help over the live Find bar (F1) and close it (Esc) — bar stays open
+            press(&mut app, KeyCode::F(1));
+            assert_eq!(app.mode, AppMode::Help);
+            render_frame(&app);
+            press(&mut app, KeyCode::Esc);
+            assert_eq!(app.mode, AppMode::Insert);
+
+            // Expand into Find & Replace (Ctrl+R) — focus lands on Replace because query is non-empty
+            ctrl(&mut app, 'r');
+            for c in "session".chars() {
+                press(&mut app, KeyCode::Char(c));
+            }
+            render_frame(&app);
+
+            // Tab to [Replace] (1st Tab), then [All] (2nd Tab), activate with Enter
+            press(&mut app, KeyCode::Tab);
+            press(&mut app, KeyCode::Tab);
+            render_frame(&app);
+            press(&mut app, KeyCode::Enter);
+            assert_eq!(
+                app.status_message.as_ref().map(|(s, _)| s.as_str()),
+                Some("Replaced 3 occurrences")
+            );
+
+            // Esc closes Find bar (does NOT open discard dialog even though buffer is modified)
+            press(&mut app, KeyCode::Esc);
+            assert_eq!(app.mode, AppMode::Insert);
+            assert!(app.dialog.is_none());
+
+            // Save & close (Ctrl+Q), then reload from disk and verify persistence
+            ctrl(&mut app, 'q');
+            assert_eq!(app.mode, AppMode::CardDetail);
+            assert!(app.insert.is_none());
+
+            let reloaded = App::new(Some(meta.id)).unwrap();
+            let saved = reloaded.board().unwrap().current_card().unwrap();
+            assert_eq!(saved.description, "session one\nsession two\nsession three");
+        });
+    }
+
+    #[test]
+    fn e2e_find_paste_and_second_esc_opens_discard_dialog() {
+        with_temp_dir(|| {
+            let mut app = app_editing_description();
+            // Open Find and paste into it via handle_paste
+            ctrl(&mut app, 'f');
+            crate::input::handle_paste(&mut app, "x\n".into()).unwrap();
+            render_frame(&app);
+
+            // First Esc closes Find bar only
+            press(&mut app, KeyCode::Esc);
+            assert_eq!(app.mode, AppMode::Insert);
+            assert!(app.dialog.is_none());
+
+            // Second Esc opens ConfirmCancelEdit dialog
+            press(&mut app, KeyCode::Esc);
+            assert_eq!(app.mode, AppMode::Dialog);
+            assert!(app.dialog.is_some());
+        });
+    }
 }

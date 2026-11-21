@@ -29,6 +29,7 @@ impl TextAreaInput {
         textarea.set_wrap_continuation_indent(Some(crate::ui::markdown::detect_list_indent));
         textarea.set_cursor_line_style(Style::default());
         textarea.set_style(Style::default().fg(Color::White));
+        textarea.set_search_style(Style::default().bg(Color::Blue).fg(Color::White));
         Self {
             textarea,
             original: initial.to_string(),

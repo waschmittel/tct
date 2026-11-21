@@ -229,13 +229,10 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                     (
                         "Edit",
                         vec![
-                            ("ctrl+s", "save"),
-                            ("ctrl+q", "save and close"),
+                            ("ctrl+s / ctrl+q", "save / save and close"),
                             ("esc", "cancel"),
                             ("ctrl+z / ctrl+y", "undo / redo"),
-                            ("ctrl+c", "copy selection"),
-                            ("ctrl+x", "cut selection"),
-                            ("ctrl+v", "paste"),
+                            ("ctrl+c / x / v", "copy / cut / paste"),
                             ("shift+←↑↓→", "select text"),
                         ],
                     ),
@@ -252,11 +249,14 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                         ],
                     ),
                     (
-                        "Lists",
+                        "Find & Replace",
                         vec![
-                            ("enter", "auto-continue list"),
-                            ("tab", "nest line(s)"),
-                            ("shift+tab", "un-nest line(s)"),
+                            ("ctrl+f / ctrl+r", "find / find & replace"),
+                            ("f3 / shift+f3", "next / previous match"),
+                            ("↓ / ↑ (in bar)", "next / previous match"),
+                            ("tab / shift+tab", "cycle fields & chips"),
+                            ("enter / space", "next / replace / toggle"),
+                            ("alt+c / x / a", "case / regex / replace all"),
                         ],
                     ),
                 ],
@@ -278,6 +278,13 @@ fn render_help(frame: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                             ("ctrl+t, ←↑↓→", "swap row / column"),
                             ("ctrl+t, a", "cycle alignment"),
                             ("ctrl+t, t", "transpose matrix"),
+                        ],
+                    ),
+                    (
+                        "Lists",
+                        vec![
+                            ("enter", "auto-continue list"),
+                            ("tab / shift+tab", "nest / un-nest line(s)"),
                         ],
                     ),
                     (

@@ -3,6 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 mod basics;
 mod enter;
+mod find;
 mod footnotes;
 mod nesting;
 mod numbered;

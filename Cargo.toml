@@ -16,7 +16,7 @@ anyhow = "1.0"
 dirs = "7.0"
 thiserror = "2.0.21"
 # Vendored fork (hanging indent on soft wrap) — see vendor/README.md
-tui-textarea-2 = { path = "vendor/tui-textarea-2" }
+tui-textarea-2 = { path = "vendor/tui-textarea-2", features = ["search"] }
 regex = "1"
 arboard = "3.7"
 unicode-width = "0.2"

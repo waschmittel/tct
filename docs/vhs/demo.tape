@@ -300,6 +300,19 @@ Sleep 800ms
 Ctrl+P
 Sleep 1s
 
+# Find & Replace (Ctrl+R): regex by default, Tab cycles fields & chips
+Ctrl+R
+Sleep 600ms
+Type "plain line"
+Sleep 800ms
+Tab
+Type "plain text line"
+Sleep 800ms
+Enter
+Sleep 1s
+Escape
+Sleep 600ms
+
 # Save without closing (Ctrl+S), then save and close (Ctrl+Q)
 Ctrl+S
 Sleep 1.2s

@@ -8,7 +8,7 @@ use tui_textarea::CursorMove;
 
 use super::alert_edit;
 use super::emphasis;
-use super::line_input::has_ctrl_or_cmd;
+use super::line_input::{LineKey, has_ctrl_or_cmd};
 use super::table_edit::{self, grouped};
 use super::text_area_input::TextAreaInput;
 use super::{InsertHandler, InsertOutcome, InsertSurface};
@@ -17,10 +17,13 @@ use crate::command::Command;
 use crate::dialog::confirm_cancel_edit::ConfirmCancelEdit;
 use crate::footnote;
 use crate::model::id::CardId;
+pub use find::{FindFocus, FindState};
+use find::{FindHistory, repeat_search, selected_single_line};
 use footnotes::*;
 pub(crate) use lists::*;
 pub(crate) use normalize::*;
 
+pub mod find;
 mod footnotes;
 mod lists;
 mod normalize;
@@ -39,6 +42,10 @@ pub struct MarkdownEditor {
     /// Paste mode: keys and pastes insert plain text (no list continuation,
     /// renumbering or table reflow) until the text is normalized on leaving.
     paste_mode: bool,
+    /// Active Find / Find & Replace bar state, if open.
+    find: Option<FindState>,
+    /// Last search query/replacement/options for `F3` and reopening `Ctrl+F`.
+    find_history: FindHistory,
 }
 
 impl MarkdownEditor {
@@ -52,7 +59,13 @@ impl MarkdownEditor {
             table_chord: false,
             alert_chord: false,
             paste_mode: false,
+            find: None,
+            find_history: FindHistory::default(),
         }
+    }
+
+    pub fn find_state(&self) -> Option<&FindState> {
+        self.find.as_ref()
     }
 
     /// Put the cursor at `(row, col)` (clamped if the text got shorter).
@@ -96,7 +109,11 @@ impl InsertHandler for MarkdownEditor {
     }
 
     fn handle_paste(&mut self, text: &str) -> InsertOutcome {
-        self.paste_text(text);
+        if self.find.is_some() {
+            self.paste_into_find(text);
+        } else {
+            self.paste_text(text);
+        }
         InsertOutcome::Stay
     }
 
@@ -193,7 +210,334 @@ impl MarkdownEditor {
         InsertOutcome::StayWithStatus(refused)
     }
 
+    fn save(&mut self) -> InsertOutcome {
+        if !self.normalize_for_save() {
+            // Nothing but maybe the cursor moved: not worth a save.
+            return InsertOutcome::Stay;
+        }
+        let body = self.input.current_text();
+        self.input.original = body.clone();
+        InsertOutcome::Save(Command::EditCardDescription {
+            card_id: self.card_id.clone(),
+            body,
+            cursor: Some(self.input.textarea.cursor()),
+        })
+    }
+
+    fn save_and_close(&mut self) -> InsertOutcome {
+        if !self.normalize_for_save() {
+            return InsertOutcome::Cancel;
+        }
+        let body = self.input.current_text();
+        InsertOutcome::Confirm(Command::EditCardDescription {
+            card_id: self.card_id.clone(),
+            body,
+            cursor: Some(self.input.textarea.cursor()),
+        })
+    }
+
+    fn open_find(&mut self, replace_mode: bool) {
+        if let Some(f) = self.find.as_mut() {
+            if replace_mode {
+                f.replace_mode = true;
+                f.focus = if f.query.buffer.is_empty() {
+                    FindFocus::Query
+                } else {
+                    FindFocus::Replace
+                };
+            } else {
+                f.focus = FindFocus::Query;
+            }
+            return;
+        }
+
+        let sel = selected_single_line(&self.input.textarea);
+        let anchor = if sel.is_some() {
+            self.input
+                .textarea
+                .selection_range()
+                .map(|(start, _)| start)
+                .unwrap_or_else(|| self.input.textarea.cursor())
+        } else {
+            self.input.textarea.cursor()
+        };
+        let (initial_query, focus_replace) = match sel {
+            Some(text) => {
+                let q = if self.find_history.use_regex {
+                    regex::escape(&text)
+                } else {
+                    text
+                };
+                (q, replace_mode)
+            }
+            None => (self.find_history.query.clone(), false),
+        };
+        let mut state = FindState::open(
+            &initial_query,
+            &self.find_history.replace,
+            replace_mode,
+            focus_replace,
+            self.find_history.case_sensitive,
+            self.find_history.use_regex,
+            anchor,
+        );
+        state.refresh(&mut self.input.textarea);
+        self.find_history.query = state.query.buffer.clone();
+        self.find = Some(state);
+    }
+
+    fn close_find(&mut self) {
+        if let Some(f) = self.find.take() {
+            self.find_history.query = f.query.buffer;
+            self.find_history.replace = f.replace.buffer;
+            self.find_history.case_sensitive = f.case_sensitive;
+            self.find_history.use_regex = f.use_regex;
+            let _ = self.input.textarea.set_search_pattern("");
+        }
+    }
+
+    fn sync_find_history(&mut self) {
+        if let Some(f) = self.find.as_ref() {
+            self.find_history.query = f.query.buffer.clone();
+            self.find_history.replace = f.replace.buffer.clone();
+            self.find_history.case_sensitive = f.case_sensitive;
+            self.find_history.use_regex = f.use_regex;
+        }
+    }
+
+    fn paste_into_find(&mut self, text: &str) {
+        let single_line = text.replace("\r\n", " ").replace(['\r', '\n'], " ");
+        if single_line.is_empty() {
+            return;
+        }
+        let Some(f) = self.find.as_mut() else {
+            return;
+        };
+        match f.focus {
+            FindFocus::Query => {
+                f.query.buffer.insert_str(f.query.cursor, &single_line);
+                f.query.cursor += single_line.len();
+                f.refresh(&mut self.input.textarea);
+                self.sync_find_history();
+            }
+            FindFocus::Replace => {
+                f.replace.buffer.insert_str(f.replace.cursor, &single_line);
+                f.replace.cursor += single_line.len();
+                self.sync_find_history();
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_find_key(&mut self, key: KeyEvent) -> InsertOutcome {
+        match (key.code, key.modifiers) {
+            (KeyCode::Esc, _) => {
+                self.close_find();
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::F(1), _) => return InsertOutcome::Help,
+            (KeyCode::Char('h' | '?' | '/'), m) if has_ctrl_or_cmd(m) => {
+                return InsertOutcome::Help;
+            }
+            (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
+                self.close_find();
+                return self.save();
+            }
+            (KeyCode::Char('q'), m) if has_ctrl_or_cmd(m) => {
+                self.close_find();
+                return self.save_and_close();
+            }
+            (KeyCode::Char('f'), m) if has_ctrl_or_cmd(m) => {
+                self.open_find(false);
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Char('r'), m) if has_ctrl_or_cmd(m) => {
+                self.open_find(true);
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Char('z'), m) if has_ctrl_or_cmd(m) && m.contains(KeyModifiers::SHIFT) => {
+                self.input.textarea.redo();
+                if let Some(f) = self.find.as_mut() {
+                    f.refresh(&mut self.input.textarea);
+                }
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Char('z'), m) if has_ctrl_or_cmd(m) => {
+                self.input.textarea.undo();
+                if let Some(f) = self.find.as_mut() {
+                    f.refresh(&mut self.input.textarea);
+                }
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Char('y'), m) if has_ctrl_or_cmd(m) => {
+                self.input.textarea.redo();
+                if let Some(f) = self.find.as_mut() {
+                    f.refresh(&mut self.input.textarea);
+                }
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Tab, m) if !m.contains(KeyModifiers::SHIFT) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.focus_next();
+                }
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::BackTab, _) | (KeyCode::Tab, _) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.focus_prev();
+                }
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::F(3), m) if m.contains(KeyModifiers::SHIFT) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.prev_match(&mut self.input.textarea);
+                }
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::F(3), _) | (KeyCode::Down, _) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.next_match(&mut self.input.textarea);
+                }
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Up, _) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.prev_match(&mut self.input.textarea);
+                }
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Enter, m) if m.contains(KeyModifiers::SHIFT) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.prev_match(&mut self.input.textarea);
+                }
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Char('c' | 'C'), m) if m.contains(KeyModifiers::ALT) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.case_sensitive = !f.case_sensitive;
+                    f.refresh(&mut self.input.textarea);
+                }
+                self.sync_find_history();
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::F(4), _) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.case_sensitive = !f.case_sensitive;
+                    f.refresh(&mut self.input.textarea);
+                }
+                self.sync_find_history();
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Char('x' | 'X'), m) if m.contains(KeyModifiers::ALT) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.use_regex = !f.use_regex;
+                    f.refresh(&mut self.input.textarea);
+                }
+                self.sync_find_history();
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::F(5), _) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.use_regex = !f.use_regex;
+                    f.refresh(&mut self.input.textarea);
+                }
+                self.sync_find_history();
+                return InsertOutcome::Stay;
+            }
+            (KeyCode::Char('a' | 'A'), m) if m.contains(KeyModifiers::ALT) => {
+                return self.run_replace_all();
+            }
+            (KeyCode::Char('g'), m) if has_ctrl_or_cmd(m) => {
+                return self.run_replace_all();
+            }
+            _ => {}
+        }
+
+        let focus = self.find.as_ref().map(|f| f.focus);
+        match focus {
+            Some(FindFocus::Query) => match self.find.as_mut().unwrap().query.handle_key(key) {
+                LineKey::Edited => {
+                    if let Some(f) = self.find.as_mut() {
+                        f.refresh(&mut self.input.textarea);
+                    }
+                    self.sync_find_history();
+                }
+                LineKey::Confirm => {
+                    if let Some(f) = self.find.as_mut() {
+                        f.next_match(&mut self.input.textarea);
+                    }
+                }
+                LineKey::Cancel => self.close_find(),
+                LineKey::Ignored => {}
+            },
+            Some(FindFocus::Replace) => match self.find.as_mut().unwrap().replace.handle_key(key) {
+                LineKey::Edited => self.sync_find_history(),
+                LineKey::Confirm => {
+                    let paste_mode = self.paste_mode;
+                    if let Some(f) = self.find.as_mut() {
+                        f.replace_current(&mut self.input.textarea, paste_mode);
+                    }
+                }
+                LineKey::Cancel => self.close_find(),
+                LineKey::Ignored => {}
+            },
+            Some(FindFocus::ReplaceOne)
+                if matches!(key.code, KeyCode::Enter | KeyCode::Char(' ')) =>
+            {
+                let paste_mode = self.paste_mode;
+                if let Some(f) = self.find.as_mut() {
+                    f.replace_current(&mut self.input.textarea, paste_mode);
+                }
+            }
+            Some(FindFocus::ReplaceAll)
+                if matches!(key.code, KeyCode::Enter | KeyCode::Char(' ')) =>
+            {
+                return self.run_replace_all();
+            }
+            Some(FindFocus::CaseSensitive)
+                if matches!(key.code, KeyCode::Enter | KeyCode::Char(' ')) =>
+            {
+                if let Some(f) = self.find.as_mut() {
+                    f.case_sensitive = !f.case_sensitive;
+                    f.refresh(&mut self.input.textarea);
+                }
+                self.sync_find_history();
+            }
+            Some(FindFocus::Regex) if matches!(key.code, KeyCode::Enter | KeyCode::Char(' ')) => {
+                if let Some(f) = self.find.as_mut() {
+                    f.use_regex = !f.use_regex;
+                    f.refresh(&mut self.input.textarea);
+                }
+                self.sync_find_history();
+            }
+            _ => {}
+        }
+        InsertOutcome::Stay
+    }
+
+    fn run_replace_all(&mut self) -> InsertOutcome {
+        let paste_mode = self.paste_mode;
+        let Some(f) = self.find.as_mut() else {
+            return InsertOutcome::Stay;
+        };
+        if !f.replace_mode {
+            return InsertOutcome::Stay;
+        }
+        let n = f.replace_all(&mut self.input.textarea, paste_mode);
+        let msg = if n == 0 {
+            "No matches to replace".into()
+        } else if n == 1 {
+            "Replaced 1 occurrence".into()
+        } else {
+            format!("Replaced {n} occurrences")
+        };
+        InsertOutcome::StayWithStatus(Some(msg))
+    }
+
     fn dispatch_key(&mut self, key: KeyEvent) -> InsertOutcome {
+        if self.find.is_some() {
+            return self.handle_find_key(key);
+        }
         if std::mem::take(&mut self.table_chord) {
             return self.table_chord_key(key);
         }
@@ -213,6 +557,23 @@ impl MarkdownEditor {
             return InsertOutcome::StayWithStatus(refused);
         }
         match (key.code, key.modifiers) {
+            (KeyCode::Char('f'), m) if has_ctrl_or_cmd(m) => {
+                self.open_find(false);
+                InsertOutcome::Stay
+            }
+            (KeyCode::Char('r'), m) if has_ctrl_or_cmd(m) => {
+                self.open_find(true);
+                InsertOutcome::Stay
+            }
+            (KeyCode::F(3), m) => {
+                let forward = !m.contains(KeyModifiers::SHIFT);
+                if !repeat_search(&mut self.input.textarea, &self.find_history, forward)
+                    && !self.find_history.query.is_empty()
+                {
+                    return InsertOutcome::StayWithStatus(Some("No matches".into()));
+                }
+                InsertOutcome::Stay
+            }
             (KeyCode::Char('p'), m) if has_ctrl_or_cmd(m) => {
                 if self.paste_mode {
                     self.leave_paste_mode();
@@ -222,30 +583,8 @@ impl MarkdownEditor {
                     InsertOutcome::StayWithStatus(Some("Paste mode on".into()))
                 }
             }
-            (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => {
-                if !self.normalize_for_save() {
-                    // Nothing but maybe the cursor moved: not worth a save.
-                    return InsertOutcome::Stay;
-                }
-                let body = self.input.current_text();
-                self.input.original = body.clone();
-                InsertOutcome::Save(Command::EditCardDescription {
-                    card_id: self.card_id.clone(),
-                    body,
-                    cursor: Some(self.input.textarea.cursor()),
-                })
-            }
-            (KeyCode::Char('q'), m) if has_ctrl_or_cmd(m) => {
-                if !self.normalize_for_save() {
-                    return InsertOutcome::Cancel;
-                }
-                let body = self.input.current_text();
-                InsertOutcome::Confirm(Command::EditCardDescription {
-                    card_id: self.card_id.clone(),
-                    body,
-                    cursor: Some(self.input.textarea.cursor()),
-                })
-            }
+            (KeyCode::Char('s'), m) if has_ctrl_or_cmd(m) => self.save(),
+            (KeyCode::Char('q'), m) if has_ctrl_or_cmd(m) => self.save_and_close(),
             (KeyCode::Esc, _) => {
                 if self.input.is_modified() {
                     InsertOutcome::OpenDialogOverInsert(Box::new(ConfirmCancelEdit))

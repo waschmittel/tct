@@ -125,7 +125,8 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
             frame,
             popup,
             inner,
-            &handler.input.textarea,
+            handler,
+            matches!(app.mode, AppMode::Insert),
             accent,
             app.caps.scrollbar_thumb(),
         );
@@ -512,31 +513,252 @@ fn render_description_editor(
     frame: &mut Frame,
     popup: Rect,
     inner: Rect,
-    textarea: &tui_textarea::TextArea<'static>,
+    handler: &crate::insert::markdown_editor::MarkdownEditor,
+    show_find_cursor: bool,
     accent: Color,
     thumb_symbol: &str,
 ) {
+    let textarea = &handler.input.textarea;
+    let find = handler.find_state();
+    let bar_h: u16 = match find {
+        Some(f) => {
+            let needed = if f.replace_mode { 3 } else { 2 };
+            if inner.height >= needed + 2 {
+                needed
+            } else {
+                0
+            }
+        }
+        None => 0,
+    };
+    let editor_h = inner.height.saturating_sub(bar_h);
+
     // Match the rendered description view's wrap width (inner width minus
     // padding). The text sits one space off the left border. The textarea
     // keeps its last column free for the caret, so it gets one extra to
     // wrap where the view does.
     let width = inner.width.saturating_sub(PAD * 2) + 1;
-    let editor_area = Rect::new(inner.x + LEFT_PAD, inner.y, width, inner.height);
+    let editor_area = Rect::new(inner.x + LEFT_PAD, inner.y, width, editor_h);
     frame.render_widget(textarea, editor_area);
 
     // Scrollbar tracks the cursor's data line — the textarea keeps the
     // cursor in view, so this follows the viewport closely enough.
     // Thumb is drawn over the right border between the corners.
     let total = textarea.lines().len();
-    if total > inner.height as usize {
+    if total > editor_h as usize {
         let (cursor_row, _) = textarea.cursor();
-        render_scrollbar(
-            frame,
-            popup.inner(ratatui::layout::Margin::new(0, 1)),
-            total,
-            cursor_row,
+        let track = Rect::new(popup.x, popup.y + 1, popup.width, editor_h);
+        render_scrollbar(frame, track, total, cursor_row, accent, thumb_symbol);
+    }
+
+    if let Some(find) = find
+        && bar_h > 0
+    {
+        let bar_area = Rect::new(inner.x, inner.y + editor_h, inner.width, bar_h);
+        render_find_bar(frame, bar_area, find, show_find_cursor, accent);
+    }
+}
+
+fn chip_style(focused: bool, active: bool, accent: Color, inactive: Color) -> Style {
+    if focused {
+        Style::default()
+            .fg(Color::Black)
+            .bg(accent)
+            .add_modifier(Modifier::BOLD)
+    } else if active {
+        Style::default().fg(accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(inactive)
+    }
+}
+
+fn render_find_bar(
+    frame: &mut Frame,
+    area: Rect,
+    find: &crate::insert::markdown_editor::FindState,
+    show_cursor: bool,
+    accent: Color,
+) {
+    use crate::insert::markdown_editor::FindFocus;
+
+    // Top separator row
+    let sep = Line::from(Span::styled(
+        "─".repeat(area.width as usize),
+        Style::default().fg(Color::DarkGray),
+    ));
+    frame.render_widget(
+        Paragraph::new(sep),
+        Rect::new(area.x, area.y, area.width, 1),
+    );
+
+    let left = area.x + LEFT_PAD;
+    let row_w = area.width.saturating_sub(LEFT_PAD * 2);
+    if row_w < 10 {
+        return;
+    }
+
+    // --- Find row ---
+    let find_y = area.y + 1;
+    let find_label = if find.replace_mode {
+        "Find:    "
+    } else {
+        "Find: "
+    };
+    let label_style = if find.focus == FindFocus::Query {
+        Style::default().fg(accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let mut right_spans: Vec<Span<'static>> = Vec::new();
+    let mut right_w: u16 = 0;
+    if let Some(status) = find.status_label() {
+        let status_style = if find.regex_error || find.matches.is_empty() {
+            Style::default().fg(Color::Red)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        right_w += status.chars().count() as u16 + 2;
+        right_spans.push(Span::styled(status, status_style));
+        right_spans.push(Span::raw("  "));
+    }
+    right_spans.push(Span::styled(
+        "[Aa]",
+        chip_style(
+            find.focus == FindFocus::CaseSensitive,
+            find.case_sensitive,
             accent,
-            thumb_symbol,
+            Color::DarkGray,
+        ),
+    ));
+    right_spans.push(Span::raw(" "));
+    right_spans.push(Span::styled(
+        "[.*]",
+        chip_style(
+            find.focus == FindFocus::Regex,
+            find.use_regex,
+            accent,
+            Color::DarkGray,
+        ),
+    ));
+    right_w += 9; // "[Aa] [.*]"
+
+    render_bar_input_row(
+        frame,
+        Rect::new(left, find_y, row_w, 1),
+        find_label,
+        label_style,
+        &find.query.buffer,
+        find.query.cursor,
+        show_cursor && find.focus == FindFocus::Query,
+        right_spans,
+        right_w,
+    );
+
+    // --- Replace row ---
+    if find.replace_mode && area.height >= 3 {
+        let rep_y = area.y + 2;
+        let rep_label = "Replace: ";
+        let rep_label_style = if find.focus == FindFocus::Replace {
+            Style::default().fg(accent).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        let rep_right = vec![
+            Span::styled(
+                "[Replace]",
+                chip_style(
+                    find.focus == FindFocus::ReplaceOne,
+                    false,
+                    accent,
+                    Color::Gray,
+                ),
+            ),
+            Span::raw(" "),
+            Span::styled(
+                "[All]",
+                chip_style(
+                    find.focus == FindFocus::ReplaceAll,
+                    false,
+                    accent,
+                    Color::Gray,
+                ),
+            ),
+        ];
+        let rep_right_w = 15; // "[Replace] [All]"
+
+        render_bar_input_row(
+            frame,
+            Rect::new(left, rep_y, row_w, 1),
+            rep_label,
+            rep_label_style,
+            &find.replace.buffer,
+            find.replace.cursor,
+            show_cursor && find.focus == FindFocus::Replace,
+            rep_right,
+            rep_right_w,
+        );
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_bar_input_row(
+    frame: &mut Frame,
+    area: Rect,
+    label: &str,
+    label_style: Style,
+    buffer: &str,
+    cursor: usize,
+    place_cursor: bool,
+    right_spans: Vec<Span<'static>>,
+    right_w: u16,
+) {
+    let label_w = label.chars().count() as u16;
+    let show_right = area.width > label_w + right_w + 2;
+    let input_w = if show_right {
+        area.width.saturating_sub(label_w + right_w + 1)
+    } else {
+        area.width.saturating_sub(label_w)
+    };
+
+    // Label
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(label.to_string(), label_style))),
+        Rect::new(area.x, area.y, label_w.min(area.width), 1),
+    );
+
+    // Horizontally-scrolled input text
+    if input_w > 0 {
+        let visible_w = input_w as usize;
+        let cursor_char_idx = buffer[..cursor].chars().count();
+        let scroll = if cursor_char_idx >= visible_w {
+            cursor_char_idx - visible_w + 1
+        } else {
+            0
+        };
+        let visible: String = buffer.chars().skip(scroll).take(visible_w).collect();
+        let input_x = area.x + label_w;
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                visible,
+                Style::default().fg(Color::White),
+            ))),
+            Rect::new(input_x, area.y, input_w, 1),
+        );
+        if place_cursor {
+            let cx = input_x + (cursor_char_idx - scroll) as u16;
+            if cx < input_x + input_w {
+                frame.set_cursor_position((cx, area.y));
+            }
+        }
+    }
+
+    // Right-aligned status + chips
+    if show_right {
+        let rx = area.x + area.width.saturating_sub(right_w);
+        frame.render_widget(
+            Paragraph::new(Line::from(right_spans)),
+            Rect::new(rx, area.y, right_w, 1),
         );
     }
 }
