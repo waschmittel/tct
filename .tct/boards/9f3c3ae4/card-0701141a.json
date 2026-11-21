@@ -8,9 +8,9 @@
   ],
   "due_date": null,
   "checklist": [],
-  "archived": false,
+  "archived": true,
   "created_at": "2026-11-21T11:41:29.801489Z",
-  "updated_at": "2026-11-21T15:10:07.832984Z",
+  "updated_at": "2026-11-21T21:51:13.725270Z",
   "history": [
     {
       "at": "2026-11-21T11:41:29.801510Z",
@@ -44,6 +44,11 @@
       "field": "title",
       "old": "add search and replace",
       "new": "add search and search and replace"
+    },
+    {
+      "at": "2026-11-21T21:51:13.725270Z",
+      "action": "Archived",
+      "field": "general"
     }
   ]
 }
