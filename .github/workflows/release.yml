@@ -146,6 +146,22 @@ jobs:
         with:
           files: artifacts/**/*
           generate_release_notes: true
+          body: |
+            ### ⭐️ Features
+
+            - ...
+
+            ### 📈 Improvements
+
+            - ...
+
+            ### 🐞 Bugfixes
+
+            - ...
+
+            ### ⚙️ Internals
+
+            - ...
 
   homebrew:
     name: Update Homebrew tap

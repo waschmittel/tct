@@ -12,9 +12,9 @@
   ],
   "due_date": null,
   "checklist": [],
-  "archived": false,
+  "archived": true,
   "created_at": "2026-11-20T16:29:22.286800Z",
-  "updated_at": "2026-11-21T11:41:59.860652Z",
+  "updated_at": "2026-11-21T20:44:41.144804Z",
   "history": [
     {
       "at": "2026-11-20T16:29:22.286867Z",
@@ -41,6 +41,11 @@
       "field": "labels",
       "old": "",
       "new": "chore"
+    },
+    {
+      "at": "2026-11-21T20:44:41.144804Z",
+      "action": "Archived",
+      "field": "general"
     }
   ]
 }
