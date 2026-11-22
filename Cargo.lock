@@ -2123,6 +2123,7 @@ dependencies = [
  "insta",
  "krilla",
  "kurbo",
+ "libc",
  "notify",
  "notify-debouncer-mini",
  "ratatui",

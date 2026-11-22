@@ -21,7 +21,7 @@ const README: &str = include_str!("../../assets/data-dir-README.md");
 pub fn open_data_dir() -> Result<()> {
     let dir = paths::base_dir();
     if dir.is_dir() {
-        fs::create_dir_all(paths::boards_dir())?;
+        super::create_private_dir_all(&paths::boards_dir())?;
         super::version::ensure_compatible()
     } else if paths::is_home_fallback() {
         create_data_dir(&dir)
@@ -55,7 +55,7 @@ pub fn init_data_dir() -> Result<bool> {
 /// stamp, and the README. An existing README is never replaced, not even a
 /// symlink, which `symlink_metadata` reports instead of following.
 fn create_data_dir(dir: &std::path::Path) -> Result<()> {
-    fs::create_dir_all(paths::boards_dir())?;
+    super::create_private_dir_all(&paths::boards_dir())?;
     super::version::ensure_compatible()?;
     let readme = dir.join("README.md");
     if fs::symlink_metadata(&readme).is_err() {
@@ -160,7 +160,7 @@ pub fn save_board(meta: &BoardMeta) -> Result<()> {
         "board id must be stamped before saving"
     );
     let dir = paths::board_dir(&meta.id);
-    fs::create_dir_all(&dir)?;
+    super::create_private_dir_all(&dir)?;
     let json = serde_json::to_string_pretty(meta)?;
     atomic_write(&paths::board_meta_path(&meta.id), json.as_bytes())?;
     Ok(())

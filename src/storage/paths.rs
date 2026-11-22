@@ -11,7 +11,8 @@ use crate::model::id::{BoardId, CardId};
 /// The data directory: `TCT_DATA_DIR`, else the nearest `.tct` walking up from
 /// the cwd, else `~/.tct`.
 ///
-/// The discovered `.tct` must be a real directory. `TCT_DATA_DIR` and `~/.tct`
+/// The discovered `.tct` must be a real directory owned by the current user
+/// (and not world-writable). `TCT_DATA_DIR` and `~/.tct`
 /// are the user's own say-so about where their data lives and may well be
 /// symlinks into cloud storage, but a discovered `.tct` is repository content —
 /// a checked-out `.tct -> /etc` would otherwise silently make `/etc` the data
@@ -88,11 +89,29 @@ fn resolve_unchecked() -> (PathBuf, bool) {
     (home, true)
 }
 
-/// A directory and not a symlink to one — `symlink_metadata` does not follow.
+/// A directory that is not a symlink (`symlink_metadata` does not follow) and,
+/// on Unix, belongs to the current user and is not world-writable. Discovery
+/// walks up through shared directories like `/tmp`, where another user could
+/// have planted a `.tct` to be adopted.
 fn is_real_dir(path: &std::path::Path) -> bool {
-    std::fs::symlink_metadata(path)
-        .map(|m| m.is_dir())
-        .unwrap_or(false)
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.is_dir() && trusted_owner(&m))
+}
+
+#[cfg(unix)]
+fn trusted_owner(meta: &std::fs::Metadata) -> bool {
+    // SAFETY: `geteuid` has no preconditions and cannot fail.
+    owned_privately(meta, unsafe { libc::geteuid() })
+}
+
+#[cfg(not(unix))]
+fn trusted_owner(_: &std::fs::Metadata) -> bool {
+    true
+}
+
+#[cfg(unix)]
+fn owned_privately(meta: &std::fs::Metadata, euid: u32) -> bool {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    meta.uid() == euid && meta.permissions().mode() & 0o002 == 0
 }
 
 /// Home-shortened display form of [`base_dir`], e.g. `~/.tct`.
@@ -255,6 +274,26 @@ mod tests {
             !adopted.starts_with(&repo_path),
             "adopted the repo's symlinked .tct: {adopted:?}"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn discovery_only_trusts_own_non_world_writable_dirs() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let meta = |mode| {
+            let dir = tmp.path().join(format!("d{mode:o}"));
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(mode)).unwrap();
+            std::fs::symlink_metadata(dir).unwrap()
+        };
+        let me = unsafe { libc::geteuid() };
+        assert!(owned_privately(&meta(0o700), me));
+        assert!(owned_privately(&meta(0o775), me));
+        assert!(!owned_privately(&meta(0o777), me), "world-writable");
+        assert!(!owned_privately(&meta(0o700), me + 1), "someone else's");
+        assert!(is_real_dir(&tmp.path().join("d700")));
+        assert!(!is_real_dir(&tmp.path().join("d777")));
     }
 
     /// The empty id is the one `ShortId` admits that is not a path component:

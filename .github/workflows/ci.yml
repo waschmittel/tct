@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Advisories appear without commits: re-audit weekly.
+    - cron: '17 4 * * 1'
 
 permissions:
   contents: read
@@ -22,3 +25,16 @@ jobs:
       # No --all: that would also format the vendored fork (vendor/).
       - name: cargo fmt --check
         run: cargo fmt --check
+
+  # Known-vulnerable dependencies (RustSec advisory database).
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

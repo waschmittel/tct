@@ -147,7 +147,7 @@ graph TD
 | **Modal input architecture** | Mirrors Vim-style UX; each mode has isolated input handler, prevents accidental actions |
 | **Immediate-mode rendering** | Full re-render each frame via ratatui; simple, no widget state management |
 | **File-per-entity storage** | Each card/list/board is a separate JSON file; enables concurrent access and granular diffs |
-| **Atomic writes** | Write to `.tmp` then rename; prevents corruption on crash |
+| **Atomic writes** | Write to a random exclusive temp file (0600), sync, rename; prevents corruption on crash and symlink redirection (ADR-0026) |
 | **Single-threaded event loop** | Crossterm polling with 250ms tick; simple, sufficient for TUI perf |
 | **Dual interface (TUI + CLI)** | Same storage layer serves both; CLI enables automation |
 | **Type-driven modes** | `AppMode` enum drives dispatch; `Dialog` / `InsertHandler` traits make each dialog/insert target a self-contained struct (ADR-0003) |
@@ -513,8 +513,8 @@ flowchart TD
 All file mutations go through `storage::atomic_write()`:
 
 ```
-1. Write content to <path>.tmp
-2. Rename <path>.tmp → <path>    (atomic on POSIX)
+1. Create a random exclusive temp file next to <path> (O_EXCL, 0600) and write + sync it
+2. Rename it → <path>    (atomic on POSIX)
 ```
 
 This ensures no partial writes are visible even on crash.
@@ -733,7 +733,7 @@ mindmap
 | **Dialog** | Trait; one struct per dialog kind owns its render + input + state (ADR-0003). |
 | **Board Editor** | Aggregate root for the open board; only write path to disk (ADR-0001). |
 | **Command** | Enum covering every domain mutation; applied via `BoardEditor::apply` (ADR-0002). |
-| **Atomic write** | Write to `.tmp` then rename; ensures no partial file content. |
+| **Atomic write** | Write to a random exclusive temp file, then rename; ensures no partial file content and no symlink redirection. |
 | **Accent color** | Per-board `LabelColor` used for all UI highlights instead of hardcoded Cyan. |
 | **Pastel generation** | HSL-based algorithm that picks maximally distant hue from existing colors. |
 | **Periodic reload** | `on_tick()` reloads the board on watcher events (poll every 15s as fallback) for external-change detection. |

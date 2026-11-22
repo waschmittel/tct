@@ -26,6 +26,10 @@ docker run -d \
   ghcr.io/waschmittel/tct:latest
 ```
 
+The image runs as an unprivileged user (uid 10001), so the mounted directory must be writable by it — or run as the directory's owner with `--user "$(id -u):$(id -g)"` (add `--read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges` to harden further). Pin a release tag instead of `latest` for deliberate upgrades.
+
+The terminal WebSocket verifies the browser's `Origin` against the `Host` header (`ttyd --check-origin`), so other websites cannot drive a session on `localhost`. A reverse proxy must pass the original `Host` through; if yours rewrites it, set `-e TCT_CHECK_ORIGIN=0` and enforce the origin there instead.
+
 ### Standalone with Opt-In Basic Auth
 
 Set `TCT_BASIC_AUTH_USER` and `TCT_BASIC_AUTH_PASSWORD` to enable HTTP Basic Auth directly inside the container without needing a second container:
@@ -39,6 +43,8 @@ docker run -d \
   -e TCT_BASIC_AUTH_PASSWORD=change-me-strong-password \
   ghcr.io/waschmittel/tct:latest
 ```
+
+Basic Auth sends the password with every request in clear text: only use it behind TLS (reverse proxy) or on a private network. The password is visible in `docker inspect` and the process list of the host — prefer `--env-file` or Docker secrets.
 
 ---
 
@@ -61,6 +67,8 @@ Edit `.env` and configure:
   openssl rand -base64 32 | tr -- '+/' '-_'
   ```
 - `OAUTH2_PROXY_GITHUB_USERS`: Restrict login to your username (or configure `OAUTH2_PROXY_EMAIL_DOMAINS` / OIDC claims).
+- `OAUTH2_PROXY_EMAIL_DOMAINS`: Required, no default. `*` admits every account of the provider unless the user list or an OIDC issuer narrows it.
+- `TCT_UID` / `TCT_GID`: The owner of `TCT_HOST_DATA_DIR` (`id -u` / `id -g`); the container runs unprivileged.
 
 ### 2. Start the Stack
 
