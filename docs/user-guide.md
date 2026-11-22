@@ -656,7 +656,7 @@ This means:
 - tct exits with an error if the current directory no longer exists (except `tct init` with `TCT_DATA_DIR` set)
 - **`tct init --git enable|disable`** — also decides on [git integration](#git-integration) and says what it chose: enabled when the new `.tct/` is inside a git repository that does not ignore it, disabled otherwise; the flag overrides, a re-init keeps an existing setting
 
-`TCT_DATA_DIR` is the *complete* path of the data directory — `.version` and `boards/` go directly into it, nothing is appended. It may be a symlink (your own choice; a *discovered* `.tct` must be a real directory).
+`TCT_DATA_DIR` is the *complete* path of the data directory — `.version` and `boards/` go directly into it, nothing is appended. It may be a symlink (your own choice; a *discovered* `.tct` must be a real directory, and one owned by another user is refused unless you name it in `TCT_DATA_DIR`).
 
 ### Environment variables
 

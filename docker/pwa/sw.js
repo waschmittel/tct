@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tct-pwa-v1';
+const CACHE_NAME = 'tct-pwa-v2';
 const STATIC_ASSETS = ['/manifest.webmanifest', '/tct-pwa.js', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -32,8 +32,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (STATIC_ASSETS.includes(url.pathname)) {
+    // Network first, cache only as the offline fallback: a cache-first script
+    // would never pick up fixes, since the cache name only changes with this file.
     event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
     );
   }
 });

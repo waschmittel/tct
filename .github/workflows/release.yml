@@ -102,7 +102,7 @@ jobs:
       # zig is the C cross-compiler (psm builds a little C); the PyPI wheel bundles it.
       - name: Install cargo-zigbuild
         if: contains(matrix.target, 'linux-musl')
-        run: pip3 install cargo-zigbuild
+        run: pip3 install cargo-zigbuild==0.24.1
 
       - name: Compute version
         id: ver
@@ -135,16 +135,31 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
 
+      # Signed build provenance (verify: gh attestation verify <file> --repo <owner>/<repo>)
+      # and a checksum list next to the binaries.
+      - name: Attest binaries
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: artifacts/*/tct-*
+
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum */tct-* | sed 's#  .*/#  #' > SHA256SUMS
+
       - name: Create release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          files: artifacts/**/*
+          files: |
+            artifacts/**/*
           generate_release_notes: true
           body: |
             ### ⭐️ Features
@@ -192,7 +207,12 @@ jobs:
           lin_arm_sha=$(sha256sum "$lin_arm" | cut -d' ' -f1)
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/$tag"
 
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/homebrew-tct.git" tap
+          # The token goes through GIT_ASKPASS, so it is never in a URL, argv or .git/config.
+          askpass="$(mktemp)"
+          printf '#!/bin/sh\necho "$TAP_TOKEN"\n' > "$askpass"
+          chmod 700 "$askpass"
+          export GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0
+          git clone "https://x-access-token@github.com/${GITHUB_REPOSITORY_OWNER}/homebrew-tct.git" tap
           cat > tap/Formula/tct.rb <<EOF
           class Tct < Formula
             desc "Terminal Card Tracker - a keyboard-driven TUI Trello clone"

@@ -4,7 +4,7 @@ pub mod paths;
 pub mod version;
 
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::Path;
 
 #[derive(Debug, thiserror::Error)]
@@ -37,6 +37,10 @@ pub enum StorageError {
         "tct data directory {path} does not exist\n  hint: run `tct init` to create it (or point TCT_DATA_DIR at an existing directory)."
     )]
     NotInitialized { path: String },
+    #[error(
+        "refusing the data directory {path}: it belongs to another user (uid {uid})\n  hint: if you trust it, set TCT_DATA_DIR={path}"
+    )]
+    ForeignOwner { path: String, uid: u32 },
     #[error("Board not found: {0}")]
     BoardNotFound(String),
     #[error("Card not found: {0}")]
@@ -97,11 +101,32 @@ pub(crate) fn skip_corrupt() -> bool {
         .unwrap_or(false)
 }
 
+/// Write `contents` to `path` via a fresh sibling temp file and a rename.
+///
+/// The temp file has a random name and is created exclusively (`O_EXCL`, which
+/// never follows a symlink) with mode 0600, so a symlink planted in a checked-out
+/// data dir at a predictable name cannot redirect the write. It is synced before
+/// the rename, so a crash leaves the old or the new file, never an empty one.
 fn atomic_write(path: &Path, contents: &[u8]) -> io::Result<()> {
-    let tmp = path.with_extension("tmp");
-    fs::write(&tmp, contents)?;
-    fs::rename(&tmp, path)?;
+    let dir = path
+        .parent()
+        .ok_or_else(|| io::Error::other("path has no parent directory"))?;
+    let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
+    tmp.write_all(contents)?;
+    tmp.as_file().sync_all()?;
+    tmp.persist(path).map_err(|e| e.error)?;
     Ok(())
+}
+
+/// `create_dir_all` whose new directories are private (0700 on Unix): cards
+/// can hold sensitive text, and the default 0755 would expose it on shared
+/// machines. Existing directories keep their mode.
+pub(crate) fn create_private_dir_all(path: &Path) -> io::Result<()> {
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder.create(path)
 }
 
 #[cfg(test)]
@@ -131,8 +156,41 @@ mod tests {
         let dir = tempdir().unwrap();
         let target = dir.path().join("file.json");
         atomic_write(&target, b"x").unwrap();
-        let tmp = target.with_extension("tmp");
-        assert!(!tmp.exists(), "tmp file should not remain after success");
+        let names: Vec<_> = fs::read_dir(dir.path()).unwrap().flatten().collect();
+        assert_eq!(names.len(), 1, "only the target should remain");
+    }
+
+    /// A repository can plant a symlink at the old predictable temp names
+    /// (`card-x.tmp`, `.version.tmp`); writing must never go through it.
+    #[cfg(unix)]
+    #[test]
+    fn atomic_write_ignores_symlinks_planted_at_predictable_names() {
+        let dir = tempdir().unwrap();
+        let victim = dir.path().join("victim.txt");
+        fs::write(&victim, "PRECIOUS").unwrap();
+        for (target, planted) in [("card-x.json", "card-x.tmp"), (".version", ".version.tmp")] {
+            std::os::unix::fs::symlink(&victim, dir.path().join(planted)).unwrap();
+            atomic_write(&dir.path().join(target), b"new").unwrap();
+        }
+        assert_eq!(fs::read_to_string(&victim).unwrap(), "PRECIOUS");
+        assert_eq!(
+            fs::read_to_string(dir.path().join(".version")).unwrap(),
+            "new"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn written_files_and_new_dirs_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempdir().unwrap();
+        let sub = dir.path().join("a/b");
+        create_private_dir_all(&sub).unwrap();
+        let mode = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&sub), 0o700);
+        let file = sub.join("f.json");
+        atomic_write(&file, b"x").unwrap();
+        assert_eq!(mode(&file), 0o600);
     }
 
     #[test]

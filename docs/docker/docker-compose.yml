@@ -1,11 +1,22 @@
 services:
   tct:
+    # Pin TCT_IMAGE_TAG to a release in .env so upgrades are deliberate.
     image: ghcr.io/waschmittel/tct:${TCT_IMAGE_TAG:-latest}
     # Uncomment to build locally instead of pulling the release image:
     # build:
     #   context: ../..
     #   dockerfile: docker/Dockerfile
     restart: unless-stopped
+    # The image runs unprivileged; the bind-mounted data dir must be writable
+    # by this uid:gid (e.g. TCT_UID=$(id -u) TCT_GID=$(id -g) in .env).
+    user: "${TCT_UID:-10001}:${TCT_GID:-10001}"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
       TCT_DATA_DIR: /data
       TERM: xterm-256color
@@ -19,8 +30,13 @@ services:
       - "7681"
 
   oauth2-proxy:
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.1
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048
     restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - tct
     ports:
@@ -30,7 +46,9 @@ services:
       OAUTH2_PROXY_UPSTREAMS: http://tct:7681
       OAUTH2_PROXY_PROXY_WEBSOCKETS: "true"
       OAUTH2_PROXY_PASS_HOST_HEADER: "true"
-      OAUTH2_PROXY_EMAIL_DOMAINS: ${OAUTH2_PROXY_EMAIL_DOMAINS:-*}
+      # No default: `*` admits every account of the provider unless the user
+      # list / OIDC issuer below narrows it, so choosing it must be explicit.
+      OAUTH2_PROXY_EMAIL_DOMAINS: ${OAUTH2_PROXY_EMAIL_DOMAINS:?Set OAUTH2_PROXY_EMAIL_DOMAINS in .env (see .env.example)}
       OAUTH2_PROXY_PROVIDER: ${OAUTH2_PROXY_PROVIDER:-github}
       OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_PROXY_CLIENT_ID:?Set OAUTH2_PROXY_CLIENT_ID in .env}
       OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_PROXY_CLIENT_SECRET:?Set OAUTH2_PROXY_CLIENT_SECRET in .env}

@@ -15,7 +15,9 @@ use crate::model::id::{BoardId, CardId};
 /// are the user's own say-so about where their data lives and may well be
 /// symlinks into cloud storage, but a discovered `.tct` is repository content —
 /// a checked-out `.tct -> /etc` would otherwise silently make `/etc` the data
-/// directory.
+/// directory. One owned by another user is still found, but refused by
+/// [`foreign_owner`] rather than skipped, so tct never silently falls back to
+/// a different data directory.
 pub fn base_dir() -> PathBuf {
     resolve().0
 }
@@ -25,6 +27,32 @@ pub fn base_dir() -> PathBuf {
 /// any other missing directory needs `tct init`.
 pub fn is_home_fallback() -> bool {
     resolve().1
+}
+
+/// The owner's uid when [`base_dir`] is a discovered `.tct` that belongs to
+/// another user (Unix). Discovery walks up through shared directories like
+/// `/tmp`, where another user could have planted a `.tct` to be adopted —
+/// `board_store::open_data_dir` refuses it, as git refuses a repository owned
+/// by someone else. `TCT_DATA_DIR` overrides: it is the user's explicit choice.
+pub fn foreign_owner() -> Option<u32> {
+    if std::env::var_os("TCT_DATA_DIR").is_some() {
+        return None;
+    }
+    let (dir, home) = resolve();
+    if home {
+        return None;
+    }
+    let meta = std::fs::symlink_metadata(dir).ok()?;
+    #[cfg(unix)]
+    return owner_other_than(&meta, rustix::process::geteuid().as_raw());
+    #[cfg(not(unix))]
+    return None;
+}
+
+#[cfg(unix)]
+fn owner_other_than(meta: &std::fs::Metadata, me: u32) -> Option<u32> {
+    use std::os::unix::fs::MetadataExt;
+    (meta.uid() != me).then_some(meta.uid())
 }
 
 /// The data directory and whether it is the `~/.tct` fallback.
@@ -88,11 +116,9 @@ fn resolve_unchecked() -> (PathBuf, bool) {
     (home, true)
 }
 
-/// A directory and not a symlink to one — `symlink_metadata` does not follow.
+/// A directory that is not a symlink (`symlink_metadata` does not follow).
 fn is_real_dir(path: &std::path::Path) -> bool {
-    std::fs::symlink_metadata(path)
-        .map(|m| m.is_dir())
-        .unwrap_or(false)
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.is_dir())
 }
 
 /// Home-shortened display form of [`base_dir`], e.g. `~/.tct`.
@@ -255,6 +281,46 @@ mod tests {
             !adopted.starts_with(&repo_path),
             "adopted the repo's symlinked .tct: {adopted:?}"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn owner_other_than_flags_only_someone_elses_dir() {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let tmp = tempfile::tempdir().unwrap();
+        // Mode does not matter, world-writable included (ADR-0026).
+        std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(0o777)).unwrap();
+        let meta = std::fs::symlink_metadata(tmp.path()).unwrap();
+        let me = rustix::process::geteuid().as_raw();
+        assert_eq!(meta.uid(), me);
+        assert_eq!(owner_other_than(&meta, me), None);
+        assert_eq!(owner_other_than(&meta, me + 1), Some(me));
+    }
+
+    /// Discovery adopts the nearest real `.tct` whoever owns it — the owner
+    /// check refuses it later instead of silently walking on to another one.
+    #[cfg(unix)]
+    #[test]
+    fn discovery_adopts_own_tct_and_does_not_flag_it() {
+        let repo = tempfile::tempdir().unwrap();
+        let repo_path = std::fs::canonicalize(repo.path()).unwrap();
+        std::fs::create_dir_all(repo_path.join(".tct")).unwrap();
+        std::fs::create_dir_all(repo_path.join("sub/dir")).unwrap();
+
+        let restore = std::env::current_dir().unwrap();
+        let data_dir = std::env::var("TCT_DATA_DIR").ok();
+        unsafe { std::env::remove_var("TCT_DATA_DIR") };
+        std::env::set_current_dir(repo_path.join("sub/dir")).unwrap();
+
+        let adopted = resolve_unchecked();
+        let foreign = foreign_owner();
+
+        std::env::set_current_dir(restore).unwrap();
+        if let Some(dir) = data_dir {
+            unsafe { std::env::set_var("TCT_DATA_DIR", dir) };
+        }
+        assert_eq!(adopted, (repo_path.join(".tct"), false));
+        assert_eq!(foreign, None);
     }
 
     /// The empty id is the one `ShortId` admits that is not a path component:

@@ -28,10 +28,15 @@ skrifa = "0.50"
 kurbo = { version = "0.13.1", default-features = false, features = ["std"] }
 notify = "8.2.2"
 notify-debouncer-mini = "0.7.0"
+# Symlink-safe temp files for atomic writes
+tempfile = "3.27.0"
+
+[target.'cfg(unix)'.dependencies]
+# Owner check on the discovered data dir
+rustix = { version = "1.1.6", features = ["process"] }
 
 [build-dependencies]
 chrono = "0.4"
 
 [dev-dependencies]
 insta = "1.49.0"
-tempfile = "3.27.0"

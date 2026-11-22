@@ -2127,6 +2127,7 @@ dependencies = [
  "notify-debouncer-mini",
  "ratatui",
  "regex",
+ "rustix",
  "serde",
  "serde_json",
  "skrifa 0.50.0",
