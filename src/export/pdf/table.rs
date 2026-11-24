@@ -179,18 +179,17 @@ impl<'f> Flow<'f> {
             self.table_row(row, false, &layout);
         }
         if !layout.open_ends() {
-            self.rule_across(self.y, left, total, layout.outer_rule());
+            self.rule_across(self.y, left, total, HEAVY_RULE);
         }
         self.y += 6.0;
     }
 
-    /// Rule above the header; a matrix leaves the empty corner cell open.
+    /// Rule above the header; a matrix has none.
     pub(super) fn top_rule(&mut self, t: &TableLayout, total: f32) {
         if t.open_ends() {
             return;
         }
-        let skip = if t.matrix { t.widths[0] } else { 0.0 };
-        self.rule_across(self.y, t.left + skip, total - skip, t.outer_rule());
+        self.rule_across(self.y, t.left, total, HEAVY_RULE);
     }
 
     /// Rule under the header: light, but heavy in a matrix where it separates

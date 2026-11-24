@@ -50,10 +50,11 @@ pub(super) fn border_style() -> Style {
 }
 
 /// One table row. In a matrix (empty top-left cell) the first column is bold
-/// like the header, and the header row has no border left of the open corner.
+/// like the header, and the outer borders are blank (spaces).
 pub(super) fn row_line(line: &str, header: bool, matrix: bool, accent: Color) -> Line<'static> {
     let mut spans = Vec::new();
     let mut pipes = 0; // unescaped pipes seen so far; the first cell sits after pipe 1
+    let total = unescaped_pipes(line);
     for span in highlight_line(line, accent) {
         let mut text = String::new();
         let mut escaped = false;
@@ -71,7 +72,7 @@ pub(super) fn row_line(line: &str, header: bool, matrix: bool, accent: Color) ->
                     spans.push(Span::styled(std::mem::take(&mut text), styled(pipes)));
                 }
                 pipes += 1;
-                if matrix && header && pipes == 1 {
+                if matrix && (pipes == 1 || pipes == total) {
                     spans.push(Span::raw(" "));
                 } else {
                     spans.push(Span::styled("│", border_style()));
@@ -88,21 +89,26 @@ pub(super) fn row_line(line: &str, header: bool, matrix: bool, accent: Color) ->
     Line::from(spans)
 }
 
-/// The rule under the header. In a matrix the header row has no left border,
-/// so the rule opens the frame and gets a corner (`┌`) instead of a `├`.
+fn unescaped_pipes(line: &str) -> usize {
+    let mut escaped = false;
+    let mut n = 0;
+    for c in line.chars() {
+        n += (c == '|' && !escaped) as usize;
+        escaped = c == '\\' && !escaped;
+    }
+    n
+}
+
+/// The rule under the header. A matrix has no outer borders, so its rule has
+/// no corners either.
 pub(super) fn rule_line(line: &str, matrix: bool) -> Line<'static> {
     let first = line.find('|');
     let last = line.rfind('|');
     let text: String = line
         .char_indices()
         .map(|(i, c)| match c {
-            '|' if Some(i) == first => {
-                if matrix {
-                    '┌'
-                } else {
-                    '├'
-                }
-            }
+            '|' if matrix && (Some(i) == first || Some(i) == last) => '─',
+            '|' if Some(i) == first => '├',
             '|' if Some(i) == last => '┤',
             '|' => '┼',
             ' ' if first.is_none_or(|f| i < f) => ' ',

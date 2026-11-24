@@ -44,20 +44,23 @@ fn footnotes_in_code_blocks_and_malformed_ones_stay_plain() {
 }
 
 #[test]
-fn matrix_corner_is_open_and_first_column_bold() {
+fn matrix_has_no_outer_borders_and_first_column_bold() {
     let r = render("|  | x |\n|---|---|\n| row | 1 |", Color::Cyan, 10);
     let rows: Vec<String> = r.lines().iter().map(text).collect();
     assert!(
-        rows[0].starts_with(' ') && !rows[0].starts_with('│'),
-        "no border left of the corner: {:?}",
-        rows[0]
+        rows.iter()
+            .all(|r| r.starts_with(' ') || r.starts_with('─')),
+        "no left border: {rows:?}"
     );
     assert!(
-        rows[1].starts_with('┌'),
-        "the open corner gets a corner glyph, not a tee: {:?}",
-        rows[1]
+        rows.iter().all(|r| r.ends_with(' ') || r.ends_with('─')),
+        "no right border: {rows:?}"
     );
-    assert!(rows[2].starts_with('│'));
+    assert!(
+        rows[1].starts_with('─') && rows[1].ends_with('─'),
+        "{rows:?}"
+    );
+    assert!(rows[2].contains('│'), "inner border stays: {rows:?}");
     let bold = |l: &Line, t: &str| {
         l.spans
             .iter()

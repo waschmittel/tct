@@ -131,14 +131,9 @@ struct TableLayout<'a> {
 }
 
 impl TableLayout<'_> {
-    /// Top and bottom rule: heavy, unless row separators make them one of many.
-    fn outer_rule(&self) -> f32 {
-        if self.row_lines { MIDRULE } else { HEAVY_RULE }
-    }
-
-    /// A matrix without row separators has no top and bottom border at all.
+    /// A matrix has no top and bottom border at all, only row separators.
     fn open_ends(&self) -> bool {
-        self.matrix && !self.row_lines
+        self.matrix
     }
 }
 

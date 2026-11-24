@@ -19,18 +19,6 @@ fn matrix_corner_has_no_rule_above_and_no_line_left() {
     let m = table_page(&matrix(3, 2));
     let hm = rules(&m, HEAVY_RULE);
     assert_eq!(hm.len(), 1, "just the header rule");
-    // With row separators the top rule starts right of the open corner.
-    let r = table_page(&matrix(3, 8));
-    let (thin, header) = (rules(&r, MIDRULE), rules(&r, HEAVY_RULE)[0]);
-    assert!(
-        thin[0].1 > header.1 + 10.0,
-        "top rule must start right of the corner"
-    );
-    assert_eq!(thin[0].2, header.2);
-    assert!(
-        thin.last().unwrap().1 <= header.1 + 0.1,
-        "the bottom rule stays whole"
-    );
     // Wide matrix: no outer vertical lines, left or right, on any row.
     let g = table_page(&matrix(5, 2));
     let thin = verticals(&g, MIDRULE);
@@ -76,18 +64,19 @@ fn matrix_column_lines_start_at_four_content_columns() {
 fn matrix_row_separators_start_above_eight_rows_regardless_of_columns() {
     let seps = |cols, body| rules(&table_page(&matrix(cols, body)), MIDRULE).len();
     assert_eq!(seps(3, 6), 0, "7 rows in all");
-    // 6 between the 7 body rows + the (now thin) top and bottom rules
-    assert_eq!(seps(3, 7), 8, "8 rows");
-    assert_eq!(seps(6, 7), 8, "column count is irrelevant");
+    // 6 between the 7 body rows; no top or bottom rule
+    assert_eq!(seps(3, 7), 6, "8 rows");
+    assert_eq!(seps(6, 7), 6, "column count is irrelevant");
     assert_eq!(seps(6, 3), 0, "few rows, many columns: no row separators");
 }
 
 #[test]
-fn matrix_outer_rules_are_as_thin_as_row_separators_when_there_are_any() {
+fn matrix_has_no_outer_rules_even_with_row_separators() {
     let many = table_page(&matrix(3, 7));
     let few = table_page(&matrix(3, 3));
-    // Heavy: only the header rule remains in the long one.
+    // Only the header rule is heavy; separators are thin, none at the ends.
     assert_eq!(rules(&many, HEAVY_RULE).len(), 1);
+    assert_eq!(rules(&many, MIDRULE).len(), 6);
     assert_eq!(
         rules(&few, HEAVY_RULE).len(),
         1,
