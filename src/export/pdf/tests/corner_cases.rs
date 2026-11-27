@@ -131,6 +131,14 @@ pub(super) fn corner_cases() -> Vec<(&'static str, BoardMeta, Card)> {
         ),
     ));
     cases.push((
+        "03k-emoji",
+        meta.clone(),
+        plain(
+            "Emoji 😀 ❤ ☀",
+            "These are the monochrome emoji that the fonts have, so every one of them is drawn as a glyph: 😀 😁 😂 😃 😄 😅 😆 😇 😉 😊 😍 😎 😐 😢 😭 😡 😱 🙃 ☺ ☹\n\nSymbols: ❤ ♥ ♠ ♣ ♦ ★ ☆ ✔ ✖ ☑ ☒ ✂ ✉ ✈ ✌ ✍ ✏ ☎ ☕ ☘ ⚓ ⚠ ⚡\n\nWeather: ☀ ☁ ☂ ☃ ❄\n\n# Headings 😀 ❤\n\n**Bold 😎 ★** and *italic 😊 ✔* and ***both 😍 ⚡***\n\n- list 😀\n  - nested ☕\n- [ ] todo ☐\n\n> quote 😢 ❤\n\n| mood | sign |\n|---|:-:|\n| 😀 | ✔ |\n| 😡 | ✖ |".into(),
+        ),
+    ));
+    cases.push((
         "04-unbreakable-words",
         meta.clone(),
         plain(

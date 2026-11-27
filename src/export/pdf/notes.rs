@@ -76,11 +76,11 @@ impl<'f> Flow<'f> {
                 extra += Self::note_head(first) + self.note_lines(n).len() as f32 * NOTE_LINE;
                 first = false;
             }
-            if self.reserved() + extra > NOTE_BUDGET {
+            if overflows(self.reserved() + extra, NOTE_BUDGET) {
                 return false;
             }
         }
-        self.y + height + self.reserved() + extra <= BOTTOM
+        !overflows(self.y + height + self.reserved() + extra, BOTTOM)
     }
 
     /// Show the notes of `nums` on this page, for a block of `height` at the

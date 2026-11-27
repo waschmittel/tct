@@ -59,7 +59,7 @@ impl<'f> Flow<'f> {
                 }
                 Atom::Word(word, style, w) => {
                     let gap: f32 = pending.iter().map(|(_, w)| w).sum();
-                    if x > 0.0 && x + gap + w > width {
+                    if x > 0.0 && overflows(x + gap + w, width) {
                         pending.clear();
                         lines.push(Vec::new());
                         x = 0.0;
@@ -67,14 +67,14 @@ impl<'f> Flow<'f> {
                     for (s, sw) in pending.drain(..) {
                         place(&mut lines, &mut x, " ", s, sw);
                     }
-                    if w <= width {
+                    if !overflows(w, width) {
                         place(&mut lines, &mut x, &word, style, w);
                         continue;
                     }
                     let face = self.fonts.face(style);
                     for c in word.chars() {
                         let cw = face.advance(c, eff(style, size));
-                        if x > 0.0 && x + cw > width {
+                        if x > 0.0 && overflows(x + cw, width) {
                             lines.push(Vec::new());
                             x = 0.0;
                         }

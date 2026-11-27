@@ -6,10 +6,12 @@ use crate::model::card::Card;
 
 pub(super) fn fit(face: &Face, text: &str, size: f32, max: f32) -> String {
     let mut text = face.clean(text);
-    if face.width(&text, size) <= max {
+    if !overflows(face.width(&text, size), max) {
         return text;
     }
-    while face.width(&text, size) + face.width("…", size) > max && text.pop().is_some() {}
+    while overflows(face.width(&text, size) + face.width("…", size), max) && text.pop().is_some()
+    {
+    }
     format!("{}…", text.trim_end())
 }
 

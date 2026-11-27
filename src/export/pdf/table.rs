@@ -27,7 +27,7 @@ impl<'f> Flow<'f> {
                 })
             })
             .collect();
-        if natural.iter().sum::<f32>() <= CONTENT_W {
+        if !overflows(natural.iter().sum(), CONTENT_W) {
             return (natural, true);
         }
         let longest_word = |s: &Self, runs: &[Run]| {

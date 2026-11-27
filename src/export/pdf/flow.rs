@@ -73,7 +73,7 @@ impl<'f> Flow<'f> {
         };
         build(&mut scratch);
         let height = scratch.y - MARGIN + scratch.reserved();
-        if scratch.pages.len() == 1 && height <= max {
+        if scratch.pages.len() == 1 && !overflows(height, max) {
             self.need(height);
         }
     }
@@ -86,7 +86,7 @@ impl<'f> Flow<'f> {
     }
 
     pub(super) fn need(&mut self, height: f32) {
-        if self.y + height > self.bottom() && self.y > MARGIN {
+        if overflows(self.y + height, self.bottom()) && self.y > MARGIN {
             self.new_page();
         }
     }

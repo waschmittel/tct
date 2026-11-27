@@ -269,7 +269,7 @@ impl<'f> Flow<'f> {
         for line in lines {
             let mut row = String::new();
             for c in mono.clean(line).chars() {
-                if mono.width(&row, size) + mono.advance(c, size) > room {
+                if overflows(mono.width(&row, size) + mono.advance(c, size), room) {
                     rows.push(std::mem::take(&mut row));
                 }
                 row.push(c);

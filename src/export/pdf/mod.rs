@@ -41,6 +41,18 @@ const FOOTER_BASELINE: f32 = PAGE_H - MARGIN + 12.0;
 const HEADER_BASELINE: f32 = MARGIN - 14.0;
 
 const KEEP_MAX: f32 = (BOTTOM - MARGIN) / 2.0;
+/// Tolerance (pt) for "does it fit?" comparisons, orders of magnitude below
+/// anything visible but above f32 error at page scale (~1e-4 at 800 pt).
+/// Widths are measured in one place and compared in another, and `(w + p) - p`
+/// is not always `w`: an exact fit would otherwise count as overflow and a
+/// word be broken per character. Compare lengths only through `overflows`.
+const EPS: f32 = 0.01;
+
+/// Does `used` exceed `room`, beyond rounding error?
+fn overflows(used: f32, room: f32) -> bool {
+    used > room + EPS
+}
+
 const BODY: f32 = 10.0;
 /// Footnote text size, gap between the longest marker and the text, gap above
 /// the footnote area, and the most a page's footnote area may take before the
